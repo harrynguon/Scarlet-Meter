@@ -36,13 +36,23 @@ Commit (message ends with the Co-Authored-By line the session's attribution asks
 - Write multi-line messages with `git commit -F -` and a quoted heredoc from Bash. Windows PowerShell 5.1 splits a native argument at embedded double quotes, so `-m` with a here-string that holds `"` commits nothing.
 - A PR that needs another open PR's code is stacked: `--base <that branch>`, so its diff shows only its own change. GitHub retargets it to `main` when the base branch is deleted after its merge; then merge `origin/main` into it, rerun the checks and let CI pass before merging.
 
-## 5. Audit
+## 5. Audit and review comments
 
-Docs-only changes (Markdown only) need none. Otherwise run the `scarlet-auditor` agent: standard by default, deep at high effort for window lifecycle or WebView2 hosting, threading, saved data, validation or security, capture or the engine's upstream mapping, or package versions. Fix its findings; fixes that apply its own suggestions need no second audit. Record the audit in the WORKLOG entry.
+Docs-only changes (Markdown only) need no audit. Otherwise run the `scarlet-auditor` agent: standard by default, deep at high effort for window lifecycle or WebView2 hosting, threading, saved data, validation or security, capture or the engine's upstream mapping, or package versions. Fix its findings; fixes that apply its own suggestions need no second audit. Record the audit in the WORKLOG entry.
+
+Every PR, docs-only ones included, also gets the Codex bot's review (chatgpt-codex-connector) when it is opened. Before merging:
+
+```bash
+gh api repos/harrynguon/ScarletMeter/issues/<n>/comments --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .body'   # summary: wait for "Completed"
+gh api repos/harrynguon/ScarletMeter/pulls/<n>/comments --jq '.[] | "\(.path):\(.line // .original_line) \(.body)"'                   # inline findings
+gh api repos/harrynguon/ScarletMeter/pulls/<n>/reviews --jq '.[] | "\(.user.login) \(.state) \(.body)"'
+```
+
+(Bash, as the session's shell runs it; Windows PowerShell 5.1 mangles the quotes in `--jq` filters.) Check each finding against the current head (a later commit may already fix it), fix the valid ones with a test where it can fail, answer the rest, and list every finding and its outcome in the WORKLOG entry. After pushing fixes, comment `@codex review` and check the new review the same way. A summary stuck at "Running" means no review happened: comment `@codex review` again rather than merging on silence.
 
 ## 6. Merge
 
-Only with the player's go-ahead and green CI on the head commit:
+Only with the player's go-ahead, green CI on the head commit, the audit's findings addressed and every Codex comment checked:
 
 ```powershell
 gh run list -R harrynguon/ScarletMeter --branch <branch> --limit 2

@@ -8,10 +8,13 @@ namespace ScarletMeter.App.Alerts;
 /// <param name="Alerts">Due notices, most urgent first (Soon before a start, Open while entry is possible).</param>
 /// <param name="Next">The next alerted event when "show the next event" is on and nothing is due, else null.</param>
 /// <param name="RefreshAt">When this view next changes, or null when no event is alerted at all.</param>
-public sealed record AlertView(IReadOnlyList<EventAlert> Alerts, EventOccurrence? Next, DateTimeOffset? RefreshAt, TimeSpan Lead)
+public sealed record AlertView(IReadOnlyList<EventAlert> Alerts, UpcomingEvent? Next, DateTimeOffset? RefreshAt, TimeSpan Lead)
 {
     public static AlertView None { get; } = new([], null, null, AlertPlanner.DefaultLeadTime);
 }
+
+/// <summary>An enabled event's next start, for the overlay's dim "next event" line.</summary>
+public readonly record struct UpcomingEvent(EventRule Rule, DateTimeOffset Start);
 
 /// <summary>
 /// Keeps the overlay's world-event notices current. The plan comes from ScarletMeter.WorldEvents and says
@@ -81,13 +84,16 @@ public sealed class AlertMonitor : IDisposable
         var lead = TimeSpan.FromMinutes(alerts.LeadMinutes);
         var plan = AlertPlanner.Plan(rules, enabled, now, offset, lead);
 
-        EventOccurrence? next = null;
+        // Each rule's next start is its occurrence's Next: the first start after now, also while the current
+        // occurrence is still running (Shugo after its entry closed, say), so such a rule is never skipped.
+        UpcomingEvent? next = null;
         if (alerts.ShowNextEvent && plan.Alerts.Count == 0)
         {
             next = EventSchedule.Timeline(rules.Where(r => enabled.Contains(r.Id)).ToList(), now, offset)
-                .Where(o => o.Phase == EventPhase.Upcoming)
-                .OrderBy(o => o.Start)
-                .Cast<EventOccurrence?>()
+                .Select(o => new UpcomingEvent(o.Rule, o.Next))
+                .OrderBy(e => e.Start)
+                .ThenBy(e => e.Rule.Id, StringComparer.Ordinal)
+                .Cast<UpcomingEvent?>()
                 .FirstOrDefault();
         }
         return new AlertView(plan.Alerts, next, plan.NextChange, lead);

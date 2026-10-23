@@ -2,6 +2,33 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Codex review comments on PRs #1 to #11
+
+**What:** Every comment the Codex bot (chatgpt-codex-connector) left on PRs #1 to #11, checked against `main` at b76c148, and the two that still held fixed. AGENTS.md now has a Security section (no API keys, tokens, passwords or other credentials anywhere in the repository; no paths that depend on the starting directory) and makes reading every PR review comment, Codex's included, part of review and merge; the scarlet-ship skill and the scarlet-auditor agent say how.
+
+**Why:** Harry asked for every Codex comment on the eleven PRs to be reviewed and fixed, for PR comments to be checked from now on, and for the security rules to be written down.
+
+**The findings** (Codex reviewed each PR at the commit it was opened with):
+
+- #4, P1, `Install-Meter.ps1`: a junction in the install path's ancestors could alias the data directory or the checkout. Already fixed in #4 (7903008, b5ea0b2): the nearest existing ancestor is resolved with `GetFinalPathNameByHandle` before the overlap checks, with Test-InstallMeter cases for junctions to the data directory and the checkout.
+- #4, P2, README: promised a release notice the UI did not show yet. Fixed by #10, which shows it.
+- #5, P2, `HistoryQuery`: a huge page number wrapped upstream's 32-bit offset. Already fixed in #5 (`MaxPage` 1,000,000, with tests).
+- #6, P2, `AlertMonitor`: the next-event line skipped a rule whose current occurrence was still running (Shugo for four minutes after its entry closed, Invasion for ten). **Fixed here:** it takes each rule's `Next`; `AlertView.Next` is now an `UpcomingEvent` (rule and start). Test `TheNextEventLineKeepsAnEventWhoseCurrentOccurrenceIsStillRunning`, Codex's 01:04 UTC case and an Invasion one, fails with the old filter.
+- #8, P2, `DamageChart`: buff-lane icons ignored "Skill icons". Already fixed in #8 (2cb7ba7), also found by the audit.
+- #8, P2, `PlayerDetailsPage`: a late saved-fight load could relabel the window. Already fixed in #8 (2cb7ba7).
+- #9, P2, scarlet-smoke skill: the `--demo` example did not run on the main of that moment. Resolved when #5 and #8 merged; the example runs now (used in this session's smoke runs).
+- #10, P1, Settings, About: the update commands were relative (`scripts\Update-Upstream.ps1`), so they only worked from the checkout. **Fixed here:** `& "<checkout>\scripts\Update-Upstream.ps1" -Tag <tag>` and `& "<checkout>\scripts\Install-Meter.ps1"`, as DEVELOPMENT.md writes them. New `RazorMarkupTests.ScriptCommandsShownToThePlayerAreRootedAtTheCheckout` fails with the old line put back.
+- #7 and #11: no findings (thumbs-up). #1, #2 and #3: Codex's review never finished (its summary still says "Running"), so those PRs have no Codex findings at all.
+
+**Checks (SDK 10.0.402):**
+
+- `scripts/Build.ps1`: 354/354; each of the two new tests failed with its bug put back, then passed.
+- Smoke run built briefly against the older pin (upstream checked out at v1.11.4.334 in the worktree, then restored to aa3ffc6), so the real release check found v1.11.5.341: the overlay line appeared, and Settings, About read `& "<checkout>\scripts\Update-Upstream.ps1" -Tag v1.11.5.341` and `& "<checkout>\scripts\Install-Meter.ps1"`; exit code 0.
+
+**Not checked:** the next-event line in the running app at the exact moment an entry closes (the computation is tested; the strip renders whatever `Next` holds).
+
+**Next:** PR, audit, Codex's review of the PR, CI and merge. Offer to ask Codex to review #1 to #3 again.
+
 ## 2026-10-24 — Agent tooling: auditor and skills
 
 **What:** `.claude/agents/scarlet-auditor.md`, an independent read-only pre-merge reviewer (standard or deep pass, verdict with evidence), and three skills in `.claude/skills/`: `scarlet-ship` (worktree, checks, docs, PR, audit, CI, squash merge pinned to the tested commit), `scarlet-smoke` (driving the real app's pages through WebView2 remote debugging with `Smoke-Meter.ps1`, including `--demo`, seeded settings, alerts and the release notice) and `scarlet-upstream-update` (moving the upstream pin to a release and what to check). AGENTS.md "Review and merge" now names the auditor and the skills.

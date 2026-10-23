@@ -2,7 +2,9 @@
 
 Read docs/README.md and docs/HANDOFF.md before changes. Update relevant docs and docs/WORKLOG.md for each meaningful change: reason, actual checks, unresolved issues and next action. Keep architecture and reproducible commands current. Do not infer acceptance from unchecked items.
 
-Never embed, print, log or commit secrets, authentication data, personal progress, packet captures or private combat logs. Use synthetic fixtures and validate untrusted data.
+## Security
+
+Security comes first in every change. Never store sensitive data in the repository, in code, configuration, fixtures, scripts, docs, commit messages or PR text: no API keys, tokens, passwords or other credentials, no authentication data, personal data or progress, packet captures or private combat logs. Never print or log them either. Use synthetic fixtures, validate untrusted data (network answers, `settings.json`, imported files) and preserve recovery protections (backups, keeping unreadable files aside, read-only for newer formats). Paths in the repository never depend on the starting directory (Paths, below).
 
 ## Paths
 
@@ -14,7 +16,7 @@ Never rely on a relative path or on the starting directory: anyone, on any machi
 
 ## Review and merge
 
-Changes reach `main` through a PR and a squash merge, after CI passes and with the player's go-ahead. Docs-only changes (Markdown only) need no review beyond CI. Otherwise run the `scarlet-auditor` agent (.claude/agents/scarlet-auditor.md): a standard pass by default, a deep pass at high effort for window lifecycle or WebView2 hosting, threading, saved data, validation or security, capture or the engine's upstream mapping, or package versions. Address its findings before merging; small fixes that apply its own suggestions need no second audit. Run checks appropriate to the change; a rendered window does not validate combat. The repeatable workflows are skills in .claude/skills: `scarlet-ship` (branch to merge), `scarlet-smoke` (driving the UI without the game) and `scarlet-upstream-update` (moving the upstream pin).
+Changes reach `main` through a PR and a squash merge, after CI passes and with the player's go-ahead. Docs-only changes (Markdown only) need no review beyond CI. Otherwise run the `scarlet-auditor` agent (.claude/agents/scarlet-auditor.md): a standard pass by default, a deep pass at high effort for window lifecycle or WebView2 hosting, threading, saved data, validation or security, capture or the engine's upstream mapping, or package versions. Address its findings before merging; small fixes that apply its own suggestions need no second audit. Every PR also gets the Codex bot's automatic review (chatgpt-codex-connector): before merging, wait until its summary comment says the review completed (or it reacts with a thumbs-up for no findings), read every inline comment and review on the PR (`gh api repos/harrynguon/ScarletMeter/pulls/<n>/comments`, `.../pulls/<n>/reviews`, `.../issues/<n>/comments`), fix each valid finding or answer why not, and record them in the WORKLOG entry. After pushing fixes, comment `@codex review` for a fresh review and check it the same way. Run checks appropriate to the change; a rendered window does not validate combat. The repeatable workflows are skills in .claude/skills: `scarlet-ship` (branch to merge), `scarlet-smoke` (driving the UI without the game) and `scarlet-upstream-update` (moving the upstream pin).
 
 ## Structure and comments
 
