@@ -150,6 +150,147 @@ Second-audit checks:
 
 **Next:** CI on the PR and Harry's go-ahead; the UI pages on top of these contracts (treat a missing `Details` entry and `IsComplete` false); the icon-serving decision for skill icons (HANDOFF.md); the new in-game acceptance items.
 
+## 2026-10-24 — Upstream release check and installer
+
+**What:**
+
+- Build stamp: `src/ScarletMeter.App/Updates/BuildStamp.targets`, imported by the app's project only, stamps `AssemblyMetadata("ScarletUpstreamRelease")` (the submodule's exact tag, else its short commit, else `unknown`) and `AssemblyMetadata("ScarletCommit")`. `BuildInfo` reads them.
+- `UpstreamReleaseChecker` (`ScarletMeter.App.Updates`): one anonymous GET to GitHub's latest-release API for upstream. It validates the answer, compares versions numerically, caches the result, requests at most once per six hours and never throws. `AddUpstreamReleaseChecker` registers it; it is deliberately not registered in `App.xaml.cs`, because the UI rewrite in progress wires it into the overlay and settings.
+- `scripts/Install-Meter.ps1`: Release build with tests, self-contained single-file publish into `<install>.staging`, layout check, then a reversible folder swap that keeps `<install>.previous`. `-Shortcut` adds a Start menu shortcut.
+- CI fetches the pinned upstream release tag, which its shallow submodule lacks, and fails if the pin is not a release. It now runs `Install-Meter.ps1 -SkipTests` under pwsh in place of the bare publish and layout steps.
+- Tests, 24 to 108 (84 new cases): `BuildInfoTests`, `UpstreamReleaseCheckerTests`. The test project gains Microsoft.Extensions.TimeProvider.Testing 10.10.0.
+- Docs: ARCHITECTURE "Updates", DEVELOPMENT "Install and update" and CI, README, SECURITY "Network", HANDOFF.
+
+**Why:** Harry asked for an automatic updater, if possible and reasonable, for a meter only he uses. A RATmeter-style self-updater (download a release, replace the exe) does not fit: Scarlet has no published binaries, and swapping one in would skip the build and its checks. What matters is knowing when upstream releases, since game-patch parser fixes arrive that way, plus one command to rebuild and reinstall.
+
+**Checks (SDK 10.0.402, `SCARLET_DOTNET` and `DOTNET_ROOT` set, Windows PowerShell 5.1):**
+
+- `scripts/Build.ps1` Debug and Release: 0 warnings, 0 errors, 108/108 passed.
+- Mutations, each caught by the new tests, then reverted:
+  - no cache: 4 failures;
+  - `$` instead of `\z` in the tag pattern: 2;
+  - no page-path check: 1;
+  - text instead of numeric comparison: 3;
+  - no timeout: 2 timeout tests failed by their wait limit;
+  - no read cap: 1.
+- Stamp:
+  - Generated assembly info carried `v1.11.4.334` and `9495922`, and both values are in the bundled exe.
+  - A temporary local commit, undone afterwards, was restamped by an incremental build, and the reset stamped the old value back.
+  - With the pinned tag deleted from this worktree's submodule clone, the stamp fell back to `57974f8`. The tag was then re-created at the same commit.
+  - With git removed from PATH: `unknown` for both, build exit 0.
+- CI checkout simulated in the scratch directory (the same fetch, then `git submodule update --init --force --depth=1`):
+  - The submodule held only `v1.11.5.341`, the tag at upstream master's tip. `describe --exact-match` failed, so CI would have stamped the commit.
+  - The CI step's script, run locally, fetched `v1.11.4.334` at depth 1; after that `describe` matched and the env file held the tag.
+- One manual live check, outside the tests, through `AddUpstreamReleaseChecker` and the production handler: `NewerAvailable`, v1.11.5.341, published 2026-10-23T17:19:58Z, page on upstream's repository. The second call was served from the cache.
+- `Install-Meter.ps1` against a temporary install directory in the scratch directory, never the default location:
+  - Fresh install with `-Shortcut` and tests: layout passed, the shortcut pointed at the installed exe.
+  - The installed exe started with `--no-capture --data-dir <temp>` and showed its window.
+  - While it ran, the script refused before building. It then closed with exit 0.
+  - A second install moved the first to `.previous`.
+  - With a file held open in the install, the rename failed and was undone: install and `.previous` unchanged, the new build left in staging, no `.retired`.
+  - A rerun replaced `.previous` and cleared staging.
+  - With a wrapper failing only `dotnet publish`, staging was removed and the install left untouched.
+  - Refusals before any build: relative path, drive root, the data directory, a folder inside it, its parent, a folder in the checkout, a foreign folder, a file, a foreign `.previous`. The foreign files were kept.
+  - `%LocalAppData%\ScarletMeter` and `%LocalAppData%\Programs\ScarletMeter` do not exist afterwards.
+  - Cleanup: the shortcut, the temporary install and the scratch projects were removed.
+
+**Not checked:**
+
+- pwsh: it is not installed here. CI runs `Install-Meter.ps1` and the tag step under pwsh.
+- CI itself: pending the PR.
+- An elevated meter: refused by design as "location unreadable", but not run.
+- The UI wiring: notice, settings switch and registration are left to the UI rewrite.
+- The default install location: never installed there.
+
+**Audit (deep pass, PR 4): request changes.** Merged origin/main first (#2 overlay and settings, #3 world events), keeping both sides in README, ARCHITECTURE, WORKLOG and the app project. CI keeps its steps plus the tag step, and the layout check still runs on the published output inside `Install-Meter.ps1`. Then:
+
+- Major: `Install-Meter.ps1` accepted any folder holding a `ScarletMeter.exe`. The auditor's Downloads-like folder (a dummy exe, `important.txt` and a junction) was renamed to `.previous` by one install and deleted by the next. Fixed:
+  - A checked publish now gets an install marker, `.scarlet-install` with fixed text, which stays in the install.
+  - The install, `.previous` and `.retired` are renamed or deleted only when they carry that marker or are empty. Staging is accepted with the staging marker or the install marker.
+  - Any folder that is or holds a link or junction is refused; the tree is walked without following links.
+  - New `-CheckOnly` runs every check and stops before building.
+  - New `scripts/Test-InstallMeter.ps1` runs the refusals against throwaway folders, and CI runs it. It checks the auditor's folder stays byte for byte as it was.
+  - The "a mistyped path cannot move other files" claims are corrected.
+- The overlap guards compared strings. Now:
+  - Only local drive paths are accepted (no UNC, admin shares, `\\?\` or `\\.\`), and no names Windows would change (trailing dot or space) or cannot create.
+  - The parent of the install, the data directory and the checkout are compared by their final paths from `GetFinalPathNameByHandle`, which resolves links, junctions, 8.3 names and substituted drives. A path resolving to a network share is refused.
+  - The process check resolves the running exe's folder the same way.
+- Rollback: each undo rename has its own try/catch; failures are collected, and the error reports every folder's state. A leftover `.retired` is deleted only while an install exists, otherwise refused up front, since it may be the only copy.
+- Checker: Network and Timeout results stand for `RetryInterval` (10 minutes); answered failures (rate limit, 404, invalid) stay six hours. Disposing mid-check, or calling after disposal, gives `Unknown(Cancelled)` with no warning.
+- Nits:
+  - Tests for an answer of exactly 1 MiB (read) and 1 MiB + 1 (rejected), with and without a length.
+  - A gzip answer inflated by the production handler, plus a gzip answer over the cap once inflated, both through a one-shot server on 127.0.0.1.
+  - Dispose mid-check.
+  - CI retries the tag fetch like `ls-remote` and no longer sleeps after the last attempt.
+  - `Get-GitLine` requires the `.git` entry, as BuildStamp.targets does.
+
+Checks after the fixes (SDK 10.0.402, Windows PowerShell 5.1):
+
+- `scripts/Build.ps1` Debug and Release: Scarlet's projects had 0 warnings (the six are upstream's), and 252/252 tests passed.
+- `Test-InstallMeter.ps1`: every case passed. The short-name case was skipped because this volume has no 8.3 names. No temp folder was left.
+- Five installer mutations, each failing the named cases:
+  - any folder counted as owned;
+  - no final-path resolution;
+  - no link walk;
+  - UNC allowed (the admin share was still refused, by the final-path layer);
+  - no `.retired` guard.
+- Five checker mutations, each caught:
+  - `>=` in the read cap;
+  - `>=` in the length cap;
+  - no retry window;
+  - the retry for every failure;
+  - dispose reported as Unexpected.
+  - (A first form of the dispose mutation, `when (false)`, did not compile under warnings-as-errors and was replaced.)
+- Install-Meter end to end, in a uniquely named scratch folder:
+  - Two installs left the install and `.previous`, both marked, with no staging or `.retired` left.
+  - With a file held open, the swap rolled back and the error listed the folders: install and `.previous` intact, the checked build left in staging (marked).
+  - The running installed meter was refused under `-CheckOnly`; it then closed with exit 0.
+  - A rerun recovered.
+  - The folder was removed afterwards. `%LocalAppData%\ScarletMeter` and `%LocalAppData%\Programs\ScarletMeter` do not exist.
+
+Not checked:
+
+- A failing undo (no way to inject one).
+- pwsh locally; CI runs both scripts under pwsh.
+
+A local dry-run of CI's tag step made this worktree's own submodule clone shallow; `git fetch --unshallow --tags` restored it (334 commits, 38 tags, still v1.11.4.334), and the CI comment now warns about it.
+**Second merge of main (45ecab3, #6 event notices):** conflicts in README, HANDOFF and WORKLOG were resolved keeping both sides. Main's `App.xaml.cs` registers `TimeProvider.System` itself; `AddUpstreamReleaseChecker` only try-adds it, so the two agree. Checks: `Build.ps1` Debug and Release 268/268, `Test-InstallMeter.ps1` passed, and one `-SkipTests` install of the merged tree into a scratch folder passed the layout check (now including `alerts.css`) and carried the marker; the folder was removed.
+
+**Second audit (deep pass, head fb24e0a): approve with nits.** Merged origin/main first (40206be, #7: upstream v1.11.5.341, aa3ffc6). HANDOFF and WORKLOG were resolved by keeping both sides. `git add -A` had restaged the old submodule commit over the merge, so main's gitlink was put back with `update-index` before committing. HANDOFF's pin mentions now say v1.11.5.341; ARCHITECTURE and SECURITY already did. Fixes:
+
+- Deletes could strip the marker. `[IO.Directory]::Delete(x, true)` goes in directory order, where `.scarlet-install` sorts first, so a delete stopped by an open file left an unmarked folder the next install refused as foreign. A new `Remove-OwnedFolder` deletes every entry but the markers, then the markers, then the folder. It is used for the leftover `.retired` before the swap (whose failure now reports the folder state and swaps nothing), for `.retired` after the swap, and for stale and failed staging.
+- The folder rules moved to the dot-sourced library `scripts/InstallFolders.ps1`: markers, final paths, ownership and link checks, the delete, the swap. That lets `Test-InstallMeter.ps1` run the delete and swap paths on fake installs without building. New cases:
+  - a `.retired` with a file held open in a subfolder: the swap is blocked with nothing moved, the marker survives, `-CheckOnly` still accepts the folder, and once the file is released a rerun completes the swap;
+  - a failed rename is undone;
+  - a foreign `.staging`, and an install with a foreign `.retired`: both refused, all foreign folders byte for byte unchanged.
+- The loopback gzip tests used the production `SocketsHttpHandler`, which honours `HTTP_PROXY` and the system proxy. They now use its settings with `UseProxy = false`, set in the tests, so the public API is unchanged. ARCHITECTURE's "nothing leaves the machine" now holds.
+- An existing install folder that is not a link is resolved through `GetFinalPathNameByHandle` too, not only its parent, so an 8.3 name for it matches the running-meter check and gives the siblings real names. Docs say so.
+- The ownership checks and the `.retired` guard run again just before the swap, like the running-meter check.
+- DEVELOPMENT notes that the trailing dot or space check is defence in depth behind `GetFullPath`, and that subst'd drives are resolved but untested.
+
+Checks:
+
+- `Build.ps1` Debug and Release, with upstream at v1.11.5.341: Scarlet's projects had 0 warnings, and 269/269 tests passed.
+- `Test-InstallMeter.ps1` under Windows PowerShell 5.1: all 36 cases passed (the short-name case is skipped on this volume), no temp leftovers.
+- Library mutations, each caught:
+  - a plain recursive delete: the marker was lost and the next install refused the folder;
+  - no staging ownership check;
+  - no `.retired` ownership check;
+  - no undo.
+- With `HTTP_PROXY` and `HTTPS_PROXY` at `http://127.0.0.1:9`, the checker tests passed 71/71. With the proxy line removed they failed 2 (both loopback tests).
+- Two `-SkipTests` installs of the merged tree into a uniquely named scratch folder passed the layout check and left the install and `.previous`, both marked. The folder was removed afterwards.
+
+Not checked:
+
+- A subst'd drive.
+- pwsh locally; CI runs both scripts under it.
+- The checks repeated just before the swap run after the build, so no test reaches them; code reading only.
+- The install folder's own 8.3 resolution: under Windows PowerShell 5.1, .NET Framework's `GetFullPath` already expands short names, so removing it fails nothing there; only pwsh needs it, and no case covers it.
+
+**Third audit (deep pass on the refactor, head b5ea0b2): approve with nits.** The merge 2c3e237 brought exactly main's change and kept the submodule at aa3ffc6; the library preserves every refusal and its order, `-CheckOnly` still touches nothing, dot-sourcing uses `$PSScriptRoot`, and `Remove-OwnedFolder` deletes links inside an owned folder without following them (probed with junctions). Applied: the undo case now fails, rather than printing "ok" and crashing, when a rename is not undone (`Test-Unchanged` treats a missing folder as changed); the two untested paths above are listed.
+
+**Next:** CI on the PR, Harry's go-ahead and a squash merge. The overlay notice and settings switch for the checker follow in their own PR (#10).
+
 ## 2026-10-24 — Upstream v1.11.5.341
 
 **What:** `upstream/` moves from release v1.11.4.334 (57974f8) to release v1.11.5.341 (aa3ffc6), published 2026-10-23, with `scripts/Update-Upstream.ps1`. Upstream's changes that reach Scarlet:
