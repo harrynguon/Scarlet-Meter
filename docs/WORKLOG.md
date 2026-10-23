@@ -40,12 +40,12 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 - The fork's A2Tools reproduction table (TIMER-COMPARISON.md: Asia, UTC+9, nine cases) passes against the Global preset.
 - The eight-day `NextChange` walk passes for both presets, with lead times of 1, 5 and 60 minutes.
 - Planning with no alert allocated 0 bytes over 100 calls (`GC.GetAllocatedBytesForCurrentThread`).
+- CI on 20029bc (PR 3): push run 40000400784 and pull_request run 40000450148 passed.
 
 **Not checked:**
 
 - The game: the times are not verified against Global Asia / Nezekan (HANDOFF.md, "Next: world-event times in game").
 - The overlay, which is not built here.
-- CI on this branch (pending the PR).
 - Instants within a week of `DateTimeOffset`'s limits, which throw.
 - Regions with daylight saving: the offset is fixed, as in the fork.
 
