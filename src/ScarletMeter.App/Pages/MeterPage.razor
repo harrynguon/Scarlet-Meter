@@ -1,37 +1,62 @@
-<div class="meter">
-    <header class="meter-header">
-        <div class="target">
+<div class="overlay" data-window="overlay" style="@PanelStyle">
+    <header class="ov-header" @onmousedown="OnHeaderMouseDown">
+        <div class="ov-title">
             @if (snapshot.Target is { } target)
             {
-                <div class="target-line">
-                    <span class="target-name">@target.Name</span>
-                    <span class="target-hp">@Compact.Number(target.HpCurrent) / @Compact.Number(target.HpTotal)</span>
-                </div>
-                <div class="hp-bar"><div class="hp-fill" style="width:@Compact.Percent(target.HpPercent)"></div></div>
+                <span class="target-name" title="@target.Name">@target.Name</span>
+                <span class="target-hp">@Compact.Number(target.HpCurrent) / @Compact.Number(target.HpTotal)</span>
             }
             else
             {
                 <span class="target-name muted">@StatusText</span>
             }
         </div>
-        <div class="totals">
-            <span title="Combat duration">@Compact.Duration(snapshot.Duration)</span>
-            <span title="Party DPS" class="accent">@Compact.Number(snapshot.PartyDps)/s</span>
-            <span title="Ping" class="ping">@(ping is null ? "-- ms" : $"{ping} ms")</span>
-            <button type="button" class="btn" title="Drop the current fight" @onclick="Reset">Reset</button>
+        <div class="ov-actions" @onmousedown:stopPropagation="true">
+            <button type="button" class="icon-btn" title="Drop the current fight" @onclick="Reset">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8a4.5 4.5 0 1 0 1.3-3.2" /><path d="M3.2 2.6v2.6h2.6" /></svg>
+            </button>
+            <button type="button" class="icon-btn" title="Settings" @onclick="Windows.OpenSettings">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.2" /><path d="M8 1.8v1.6M8 12.6v1.6M14.2 8h-1.6M3.4 8H1.8M12.4 3.6l-1.1 1.1M4.7 11.3l-1.1 1.1M12.4 12.4l-1.1-1.1M4.7 4.7 3.6 3.6" /></svg>
+            </button>
+            <button type="button" class="icon-btn" title="Minimize (the shortcut restores it)" @onclick="Windows.MinimizeOverlay">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5h9" /></svg>
+            </button>
+            <button type="button" class="icon-btn close" title="Close Scarlet Meter" @onclick="Windows.CloseMeter">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" /></svg>
+            </button>
         </div>
     </header>
+
+    <div class="hp-bar @(snapshot.Target is null ? "idle" : "")">
+        <div class="hp-fill" style="width:@Compact.Percent(snapshot.Target?.HpPercent ?? 0)"></div>
+    </div>
+
+    <div class="ov-totals">
+        <span title="Combat duration">@Compact.Duration(snapshot.Duration)</span>
+        <span title="Party DPS" class="accent">@Compact.Number(snapshot.PartyDps)/s</span>
+        <span class="ping @PingLevel.Of(ping)" title="Ping">
+            <i></i><i></i><i></i>
+            @(ping is null ? "-- ms" : $"{ping} ms")
+        </span>
+    </div>
 
     <ul class="rows">
         @foreach (var player in Visible)
         {
-            <li class="row @(player.IsUser ? "me" : "")">
-                <div class="fill" style="width:@Compact.Percent(player.DamageShare)"></div>
-                <span class="name">@player.Name <small class="cls">@player.ClassName</small></span>
+            <li class="row @(player.IsUser ? "me" : "")" @key="player.Id">
+                <div class="fill @FillClass(player)" style="width:@Compact.Percent(BarPercent(player))"></div>
+                @if (WebAssetHosts.ClassIconUrl(player.ClassId) is { } icon)
+                {
+                    <span class="class-icon" style="background-image:url('@icon')" title="@player.ClassName"></span>
+                }
+                <span class="name" title="@DisplayName(player)">@DisplayName(player)</span>
+                @if (appearance.ShowDeaths && player.Deaths > 0)
+                {
+                    <span class="deaths" title="Deaths">&#x1F480; @player.Deaths</span>
+                }
                 <span class="num">@Compact.Number(player.TotalDamage)</span>
                 <span class="num dps">@Compact.Number(player.Dps)/s</span>
                 <span class="num pct">@Compact.Percent(player.DamageShare)</span>
-                <span class="num crit" title="Critical rate">@Compact.Percent(player.CriticalRate) crit</span>
             </li>
         }
     </ul>

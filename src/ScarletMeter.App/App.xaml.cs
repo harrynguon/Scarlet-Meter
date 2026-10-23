@@ -3,8 +3,11 @@ using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ScarletMeter.App.Settings;
+using ScarletMeter.App.Windows;
 using ScarletMeter.Engine;
 using Serilog;
+using Serilog.Events;
 
 namespace ScarletMeter.App;
 
@@ -71,20 +74,27 @@ public partial class App : Application
         });
         builder.Services.AddSerilog(configuration => configuration
             .MinimumLevel.Information()
+            // EF Core logs every SQL command at Information, which buries the capture lines.
+            .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
             .WriteTo.File(
                 Path.Combine(options.DataDirectory, "logs", "scarlet-.log"),
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 14));
         builder.Services.AddScarletEngine(options);
+        builder.Services.AddSingleton(services => new SettingsStore(options.DataDirectory, services.GetRequiredService<ILogger<SettingsStore>>()));
+        builder.Services.AddSingleton<SettingsService>();
+        builder.Services.AddSingleton<MeterWindows>();
+        builder.Services.AddSingleton<IMeterWindows>(services => services.GetRequiredService<MeterWindows>());
         builder.Services.AddWpfBlazorWebView();
 
         host = builder.Build();
         host.Start();
+        // Settings load before the engine resolves, so upstream sees the saved fight rules from the first hit.
+        host.Services.GetRequiredService<SettingsService>();
         engine = host.Services.GetRequiredService<ICombatEngine>();
         engine.Start();
 
-        MainWindow = new MainWindow(host.Services);
-        MainWindow.Show();
+        MainWindow = host.Services.GetRequiredService<MeterWindows>().ShowOverlay();
     }
 
     protected override void OnExit(ExitEventArgs e)

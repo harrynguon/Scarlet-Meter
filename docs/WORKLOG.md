@@ -67,6 +67,104 @@ Re-run after the fixes:
 - `scripts/Build.ps1 -Configuration Release`: 0 warnings, 0 errors, 114 passed. The build was incremental, so upstream was not recompiled and its 6 known warnings did not reappear.
 
 **Next:** CI on the audit fixes, the player's go-ahead and a squash merge. The overlay change then wires `AlertPlanner` into the app and updates AGENTS.md, where the app references the engine only (HANDOFF.md, "Next: world-event notices"). Then settings persistence for the enabled ids, lead time, offset and overrides, and in-game verification.
+## 2026-10-24 — Overlay, settings and hotkey
+
+**What:** The first of the feature PRs Harry asked for (details, history, settings, fight options, an updater and world event alerts).
+
+- **Window layer:** a shared `ScarletWindow` replaces the XAML `MainWindow`.
+- **Overlay:** chromeless and transparent. It is dragged by its header (posted `WM_NCLBUTTONDOWN`), resized from its edges (`WindowChrome`), and has reset, settings, minimize and close buttons and a ping indicator.
+- **Tool windows:** dark-framed and owned by the overlay; the settings window is the first.
+- **Hotkey:** global, `Ctrl+Shift+D` by default as in RATmeter; it minimizes or restores the meter.
+- **Window positions** are remembered.
+- **`settings.json`:**
+  - validation in `SettingsNormalizer`
+  - atomic save with a `.bak` of the previous save
+  - an unreadable file is kept aside, never deleted
+  - a file from a newer build is never overwritten
+  - live application, with fight options mirrored into `EngineSettings`
+- **Appearance:**
+  - background opacity (background only, so text stays solid)
+  - background picture (imported into the data directory, served through a WebView2 virtual host)
+  - RATmeter's class gradients and class icons (copied from upstream's UI at build time, never edited)
+  - relative bars, deaths, RATmeter-compatible name masking, row size
+- **Security:** a Content-Security-Policy on the page; the EF Core SQL log lowered to Warning.
+- **`scripts/Smoke-Meter.ps1`:** drives the built meter's pages through WebView2 remote debugging, for UI checks without the game.
+- **Docs:** ARCHITECTURE "Windows", "Settings", "Image hosts".
+
+**Why:** Harry asked for RATmeter's settings screen, fight switches and window handling in Scarlet, with heavy inspiration from RATmeter. An Explore survey of upstream's UI supplied its exact behaviour: gradients, masking, hotkey default and toggle semantics, ping bands. Two deliberate differences from RATmeter:
+
+- Opacity fades only the background. RATmeter fades the whole content.
+- The background picture is actually displayed. RATmeter's setting is stored but never rendered.
+
+The overlay is the base the alerts and other windows build on.
+
+**Checks (SDK 10.0.402):**
+
+- `scripts/Build.ps1`, Debug and Release: 0 warnings in Scarlet's projects (6 in upstream's, as before), 61 tests passed (37 new settings and formatting tests).
+- Smoke runs through `Smoke-Meter.ps1` on the Debug build:
+  - The overlay rendered "Capture is off"; clicking ⚙ opened the settings window with its four tabs.
+  - A real mouse drag on the header moved the overlay by exactly (120, 60) and (−150, 40).
+  - Clicking the Class colours row and moving the opacity slider to 40%:
+    - the overlay's `--panel-alpha` became 0.4 live
+    - `settings.json` held `classColors: false` and `backgroundOpacity: 0.4` within a second
+  - A second run on the same data directory restored the overlay at the saved position and size (1370, 606, 400×260) and opacity 0.4.
+  - Real `Ctrl+Shift+D` key presses minimized and then restored the overlay (UI Automation window state).
+  - Closing through the page's ✕ with the settings window open:
+    - exit code 0
+    - no warning or error in the log
+    - the UI-thread WebView2 disposal fallback logged
+  - A screen capture at 50% opacity showed the desktop through the panel (not committed).
+- Release self-contained single-file publish:
+  - `Test-PublishLayout.ps1` passed; class icons are now checked.
+  - In the published exe, `https://assets.scarlet.example/classes/11.png` and a background picture placed in `<data dir>\backgrounds` loaded (40 px wide).
+  - `--panel-image` pointed at the data host.
+  - An image from `https://example.com` was blocked by the policy.
+
+**Not checked:**
+
+- The file picker dialog itself (`BackgroundImages.Import` is unit-tested; the dialog was not driven).
+- The game: the overlay over a borderless game window, the hotkey while the game has focus, and DPI scaling or multiple monitors.
+- Rows with real players (the demo mode comes with the engine PR).
+
+**Audit (deep pass, PR 2, head 3acbde5):** request changes, with two major defects reproduced in the built meter. Both are fixed:
+
+- **Recording a shortcut did not unregister the current one.** `SuspendHotkey` reset its "registered" marker to the same empty string it then wanted, so nothing changed; pressing Ctrl+Shift+D while recording minimized the meter.
+  - Fix: the decisions moved into `HotkeyBinding` (a null marker forces the first registration), with `HotkeyBindingTests` on a fake target. Recording also ends after 15 seconds as a backstop for a lost blur.
+- **Closing the overlay while the picture dialog was open killed the process** (0xE0434352, `ObjectDisposedException` inside the dispatcher's handler). This is the crash the deferred close exists to prevent.
+  - Fix: while the picker is open every meter window is disabled (`EnableWindow`) and refuses to close (`ScarletWindow.CloseBlocked`), and the hotkey and minimize do nothing. The settings page ignores a picker result after it has been disposed.
+
+The minor findings and nits, all applied:
+
+- **Settings store:** a damaged file or backup that cannot be renamed aside, or a backup that cannot be opened, now switches saving off. Without that, two saves destroyed the damaged file. A missing file with a usable backup restores it. Unreadable files keep unique names.
+- **Picture names:** the stored-name regex uses `\z`, so a trailing newline is rejected.
+- **CSP:** tightened to `script-src 'self'`, `object-src 'none'`, `base-uri 'self'`, without `data:`.
+- **Boundary docs:** ARCHITECTURE "Upstream boundary" names the class-icon copy as the one build-time contact with upstream's UI files; the "What breaks" table has a row for it.
+- **Closing guard:** `MeterWindows` refuses to open windows once the overlay is closing.
+- **Placement:** tool windows use the overlay's monitor's work area.
+- **Comments:** fixed for hidden names and for tool-window placement.
+- **Hotkeys:** shortcuts Windows or most programs use (Alt+F4, Ctrl+C and similar) are refused.
+- **Settings page:**
+  - save errors re-render it at once (`SaveStatusChanged`)
+  - the retention field shows the clamped value
+  - in read-only mode the picture is neither imported nor deleted
+- **Smoke script:** picks a free DevTools port and drives only pages on BlazorWebView's origin, `https://0.0.0.1/`. The earlier fixed port could drive another running meter.
+- **Masking test:** checks upstream's exact masked value ("Ab**3**").
+
+**Checks after the fixes:**
+
+- `Build.ps1`, Debug and Release: 68/68 tests (7 new).
+- The auditor's hotkey reproduction (`keybd_event` while the field records): the overlay stays Normal.
+- A full real-mouse and real-key flow:
+  - opened settings, the Overlay tab and the shortcut field with real clicks
+  - pressing the current Ctrl+Shift+D was recorded, and the overlay stayed Normal
+  - recording Ctrl+Alt+K saved it
+  - Ctrl+Alt+K then minimized and restored the overlay
+  - the old Ctrl+Shift+D did nothing
+- The auditor's dialog reproduction: with the picture dialog open, clicking ✕ did not close the meter (it was still running after 3 s). After the dialog was cancelled, ✕ closed it with exit code 0 and only the usual WebView2 disposal lines in the log.
+- Under the tightened CSP, a class icon loaded from the assets host and an image from another host was blocked.
+- No `%TEMP%\scarlet-*` leftovers.
+
+**Next:** CI on the fixes and a squash merge, then the engine, events and update-check PRs, then the details, history, alerts and update-notice UI on top of this.
 
 ## 2026-10-23 — Review fixes
 

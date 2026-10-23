@@ -4,7 +4,7 @@ Repository: https://github.com/harrynguon/ScarletMeter (private, default branch 
 
 ## State
 
-The scaffold described in ARCHITECTURE.md exists: `upstream/` submodule at release v1.11.4.334, the engine over upstream's pipeline, a WPF window with a Blazor WebView meter page, boundary, mapping and close-ordering tests, build, upstream-update and publish-layout scripts, CI. CI has run: the bootstrap commit passed (run 39920164346), and the review fixes of 2026-10-23 (WORKLOG.md) go through a PR. Checks that have actually run are listed in WORKLOG.md; nothing has been tried in the game.
+What ARCHITECTURE.md describes exists: `upstream/` submodule at release v1.11.4.334, the engine over upstream's pipeline, a chromeless translucent overlay with a settings window (appearance, fight options, hotkey, remembered positions, all saved in `settings.json`), boundary, mapping, settings and close-ordering tests, build, upstream-update, publish-layout and UI smoke scripts, CI. Player details, history, world event alerts and the upstream release check are being added in separate PRs (WORKLOG.md). Checks that have actually run are listed in WORKLOG.md; nothing has been tried in the game.
 
 The world-events module (`src/ScarletMeter.WorldEvents`, ARCHITECTURE.md "World events") holds the world event schedules and the alert planner for the overlay's notices, ported from the fork's World Companion. It is not wired into the app yet, and its times are not verified in the game.
 
@@ -18,6 +18,10 @@ Record the tested commit, observation date and Windows configuration. Pending:
 - [ ] Without Npcap (or with it uninstalled), a normal launch shows the "Install Npcap" dialog and exits.
 - [ ] Close the window during a fight: no crash, a completed boss fight appears in `combat-history.db`.
 - [ ] CPU and memory are comparable to RATmeter on the same fight.
+- [ ] The overlay shows over the game (borderless or windowed mode), stays on top, drags by its header and resizes from its edges; the background opacity and a background picture look right over the game.
+- [ ] `Ctrl+Shift+D` (or the chosen shortcut) minimizes and restores the meter while the game has focus, and does not trigger a game action.
+- [ ] Class colours, relative bars, deaths, hidden names and row size behave as in RATmeter.
+- [ ] Settings and window positions survive a restart; fight options (boss-only, combined summons, one-minute dummy) change new hits.
 
 ## Next: world-event notices
 
@@ -27,7 +31,7 @@ The overlay that shows the notices is a separate change. Wiring notes for it:
 - A timer set for `NextChange` does not notice the PC resuming from sleep or its clock being changed. Cap the wait (for example at one minute) and re-plan on resume and on a system time change, so a missed change is corrected within the cap.
 - The app will then reference this module as well as the engine: update AGENTS.md ("Upstream boundary", which says the app references the engine only) and ARCHITECTURE.md in that change. The boundary tests forbid upstream references, not Scarlet modules, so they keep passing.
 - Persisting the enabled ids, the lead time, the server offset and any rule overrides is the app's: validate with `ScheduleValidation` and merge with `EventCatalog.TryApplyOverrides` on load, and preserve a player's saved rules when the presets change.
-- Bound the settings file's size before deserialising it: validation bounds its own work (at most 18 entries examined, 50 errors returned), but not the cost of parsing a huge file. The `overlay-settings` branch's `SettingsStore` already refuses a `settings.json` over 1 MB (`MaxFileBytes`) before reading it.
+- Bound the settings file's size before deserialising it: validation bounds its own work (at most 18 entries examined, 50 errors returned), but not the cost of parsing a huge file. `SettingsStore` already refuses a `settings.json` over 1 MB (`MaxFileBytes`) before reading it.
 
 ## Next: world-event times in game
 
@@ -44,10 +48,7 @@ Once a time is verified, correct the Global preset and its regression tests (`Ev
 
 ## After acceptance
 
-- Settings persistence for `EngineSettings` and window bounds (Scarlet's own format, under the data directory).
 - Per-player details (skills, buffs, graph): upstream's `CombatSessionManager` already computes them; extend `ICombatEngine` with Scarlet records, never upstream types.
 - Port the fork's native window lifecycle check (AionDpsMeter.LifecycleCheck). The close-ordering unit tests are ported; the native check would also cover the real WebView2 close, the profile location under the data directory and a launch of the published executable, none of which CI exercises.
-- Quieten the log: EF Core writes every SQL command at Information (schema creation, the startup cleanup), which buries "[CAPTURE]" lines. A Serilog override to Warning for `Microsoft.EntityFrameworkCore` in `App.xaml.cs` would do.
 - Decide whether to host the fork's full World Companion page (AionDpsMeter.Companion, a Razor class library with no upstream references) in this window. Its schedule engine is already ported as `ScarletMeter.WorldEvents`.
-- Chromeless, translucent overlay window; the current window keeps the standard title bar.
-- Offer the fork the UI-thread WebView2 disposal fallback from `MainWindow.ReleaseBlazorContentAsync` (its companion logs show the same off-thread failure) and offer upstream the quirks noted in WORKLOG.md (processor registration, failed start, unlocked `IPacketService.Reset`, adapter open failures swallowed, the history cleanup that outlives disposal).
+- Offer the fork the UI-thread WebView2 disposal fallback from `ScarletWindow.ReleaseBlazorContentAsync` (its companion logs show the same off-thread failure) and offer upstream the quirks noted in WORKLOG.md (processor registration, failed start, unlocked `IPacketService.Reset`, adapter open failures swallowed, the history cleanup that outlives disposal).

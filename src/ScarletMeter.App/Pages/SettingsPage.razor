@@ -1,0 +1,115 @@
+<div class="tool settings" data-window="settings">
+    <nav class="tabs" role="tablist">
+        @foreach (var tab in Tabs)
+        {
+            <button type="button" role="tab" class="tab @(tab == current ? "active" : "")" @onclick="() => current = tab">@tab</button>
+        }
+    </nav>
+
+    @if (Settings.LoadResult.Notice is { } notice)
+    {
+        <div class="notice">@notice</div>
+    }
+    @if (Settings.SaveError is { } saveError)
+    {
+        <div class="notice error">@saveError</div>
+    }
+
+    <div class="tab-body">
+        @switch (current)
+        {
+            case "Appearance":
+                <section>
+                    <h2>Overlay</h2>
+                    <RangeSetting Label="Background opacity" Description="Text and bars stay solid."
+                                  Value="@S.Appearance.BackgroundOpacity" Min="@AppearanceSettings.MinOpacity" Max="@AppearanceSettings.MaxOpacity" Step="0.05"
+                                  Format="@(v => $"{v * 100:0}%")"
+                                  ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { BackgroundOpacity = v } }))" />
+                    <div class="setting picture">
+                        <span class="text">
+                            <span class="label">Background picture</span>
+                            <span class="desc">Shown behind the meter at the opacity above. PNG, JPG, GIF, WebP or BMP up to 8 MB.</span>
+                        </span>
+                        <div class="picture-row">
+                            @if (WebAssetHosts.BackgroundUrl(S.Appearance.BackgroundImage) is { } url)
+                            {
+                                <span class="thumb" style="background-image:url('@url')"></span>
+                            }
+                            <button type="button" class="btn" @onclick="ChoosePicture">Choose...</button>
+                            <button type="button" class="btn" @onclick="RemovePicture" disabled="@(S.Appearance.BackgroundImage is null)">Remove</button>
+                        </div>
+                        @if (pictureError is not null)
+                        {
+                            <span class="error">@pictureError</span>
+                        }
+                    </div>
+                    <RangeSetting Label="Row size" Value="@S.Appearance.RowScale" Min="@AppearanceSettings.MinRowScale" Max="@AppearanceSettings.MaxRowScale" Step="0.05"
+                                  Format="@(v => $"{v:0.00}x")"
+                                  ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { RowScale = v } }))" />
+                </section>
+                <section>
+                    <h2>Player list</h2>
+                    <ToggleSetting Label="Class colours" Description="Colour each bar by the player's class."
+                                   Value="@S.Appearance.ClassColors" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { ClassColors = v } }))" />
+                    <ToggleSetting Label="Relative bars" Description="Bars measure against the top player instead of each player's share."
+                                   Value="@S.Appearance.RelativeBars" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { RelativeBars = v } }))" />
+                    <ToggleSetting Label="Show deaths" Value="@S.Appearance.ShowDeaths"
+                                   ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { ShowDeaths = v } }))" />
+                    <ToggleSetting Label="Hide player names" Description="Masks every name, yours included, for screenshots and streams."
+                                   Value="@S.Appearance.HideNicknames" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { HideNicknames = v } }))" />
+                </section>
+                break;
+
+            case "Tracking":
+                <section>
+                    <h2>Fights</h2>
+                    <ToggleSetting Label="Boss encounters only" Description="Ignore hits on mobs that are not bosses. Applies to new hits."
+                                   Value="@S.Fight.BossOnlyCapture" ValueChanged="@(v => Change(s => s with { Fight = s.Fight with { BossOnlyCapture = v } }))" />
+                    <ToggleSetting Label="Combine summon damage" Description="Fold a summon's damage into its owner's skill breakdown."
+                                   Value="@S.Fight.GroupSummonDamage" ValueChanged="@(v => Change(s => s with { Fight = s.Fight with { GroupSummonDamage = v } }))" />
+                    <ToggleSetting Label="Cap dummy parses at one minute" Description="Stop counting hits on a training dummy a minute after the first hit."
+                                   Value="@S.Fight.OneMinuteDummyMode" ValueChanged="@(v => Change(s => s with { Fight = s.Fight with { OneMinuteDummyMode = v } }))" />
+                </section>
+                <section>
+                    <h2>History</h2>
+                    <label class="setting number">
+                        <span class="text">
+                            <span class="label">Keep boss fights for</span>
+                            <span class="desc">Older fights are removed when the meter starts.</span>
+                        </span>
+                        <span class="number-field">
+                            <input type="number" @key="retentionKey" min="@FightSettings.MinRetentionDays" max="@FightSettings.MaxRetentionDays"
+                                   value="@S.Fight.HistoryRetentionDays" @onchange="OnRetentionChanged" /> days
+                        </span>
+                    </label>
+                </section>
+                break;
+
+            case "Overlay":
+                <section>
+                    <h2>Shortcut</h2>
+                    <HotkeyBox Label="Show or hide the meter" Description="Works while the game has focus. Needs Ctrl, Alt, Shift or Win unless it is a function key."
+                               Value="@S.Overlay.ToggleHotkey" ValueChanged="@(v => Change(s => s with { Overlay = s.Overlay with { ToggleHotkey = v } }))" />
+                </section>
+                <section>
+                    <h2>Window</h2>
+                    <p class="hint">Drag the meter by its header and resize it from any edge. Positions and sizes are remembered.</p>
+                </section>
+                break;
+
+            case "About":
+                <section>
+                    <h2>Scarlet Meter @Version</h2>
+                    <p class="hint">Capture and decoding come from RATmeter (Kuroukihime/AIon2-Dps-Meter, GPLv3).</p>
+                    <div class="setting">
+                        <span class="text">
+                            <span class="label">Data folder</span>
+                            <span class="desc mono">@DataDirectory</span>
+                        </span>
+                        <button type="button" class="btn" @onclick="Windows.OpenDataFolder">Open</button>
+                    </div>
+                </section>
+                break;
+        }
+    </div>
+</div>

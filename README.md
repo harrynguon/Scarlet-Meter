@@ -2,7 +2,7 @@
 
 A network-based DPS meter for AION 2 Global with its own UI, built on the packet capture and decoding of [RATmeter](https://github.com/Kuroukihime/AIon2-Dps-Meter) (Kuroukihime/AIon2-Dps-Meter), which is included unmodified as the `upstream/` git submodule and pinned to a release tag.
 
-Status: scaffold. Capture, decoding, fight tracking and history come from upstream through `ScarletMeter.Engine`; the window shows the active target, party DPS, ping and per-player damage. See [docs/HANDOFF.md](docs/HANDOFF.md) for what has been checked and what is next.
+Status: in development, not yet tried in the game. Capture, decoding, fight tracking and history come from upstream through `ScarletMeter.Engine`. The overlay is a chromeless, translucent, always-on-top window showing the active target, party DPS, ping and per-player damage, with a settings window for background opacity and picture, class colours, relative bars, deaths, hidden names, row size, fight options (boss-only, combined summons, one-minute dummy, history retention) and a show/hide shortcut (`Ctrl+Shift+D` by default). Window positions are remembered. See [docs/HANDOFF.md](docs/HANDOFF.md) for what has been checked and what is next.
 
 ## Layout
 
@@ -10,10 +10,10 @@ Status: scaffold. Capture, decoding, fight tracking and history come from upstre
 | --- | --- |
 | `upstream/` | RATmeter at a release tag (submodule). Never edited here. |
 | `src/ScarletMeter.Engine` | The only project that references upstream. Wraps its pipeline behind Scarlet's own contracts (`ICombatEngine`, `CombatSnapshot`). |
-| `src/ScarletMeter.App` | WPF window hosting a Blazor WebView; references the engine only. |
+| `src/ScarletMeter.App` | WPF windows hosting Blazor WebViews (overlay, settings) and the settings store; references the engine only. |
 | `src/ScarletMeter.WorldEvents` | World event schedules (Global preset) and the alert planner for overlay notices; pure .NET, no dependencies, not wired into the app yet. Times are not verified in the game. |
-| `tests/ScarletMeter.Tests` | Boundary guards, engine mapping tests and world-event schedule tests (no Npcap needed). |
-| `scripts/` | `Build.ps1` (restore, build, test), `Update-Upstream.ps1 -Tag vX.Y.Z.N` and `Test-PublishLayout.ps1`. Each derives its paths from its own location. |
+| `tests/ScarletMeter.Tests` | Boundary guards, engine mapping, settings, close-ordering and world-event schedule tests (no Npcap needed). |
+| `scripts/` | `Build.ps1` (restore, build, test), `Update-Upstream.ps1 -Tag vX.Y.Z.N`, `Test-PublishLayout.ps1` and `Smoke-Meter.ps1` (drives the UI for checks). Each derives its paths from its own location. |
 | `docs/` | Maintainer documentation. Start with [docs/README.md](docs/README.md). |
 
 ## Build and run
