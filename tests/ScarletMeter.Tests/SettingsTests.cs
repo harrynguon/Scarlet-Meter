@@ -78,6 +78,40 @@ public sealed class SettingsTests : IDisposable
     }
 
     [Fact]
+    public void AFileFromBeforeAlertsLoadsTheirDefaultsWithoutRepair()
+    {
+        File.WriteAllText(Path.Combine(directory.FullPath, "settings.json"),
+            """{ "version": 1, "fight": { "bossOnlyCapture": true }, "appearance": {}, "overlay": { "toggleHotkey": "F9" }, "windows": {} }""");
+        var result = NewStore().Load();
+        Assert.Equal(SettingsLoadStatus.Loaded, result.Status);
+        Assert.Null(result.Notice);
+        Assert.Equal(new AlertSettings(), result.Settings.Alerts);
+        Assert.False(result.Settings.Alerts.RestoreMinimizedMeter); // an upgrade never starts restoring a hidden meter
+        Assert.True(result.Settings.Fight.BossOnlyCapture);
+    }
+
+    [Fact]
+    public void AFileSavedWithAByteOrderMarkLoads()
+    {
+        var json = """{ "version": 1, "alerts": { "leadMinutes": 20 } }""";
+        File.WriteAllText(Path.Combine(directory.FullPath, "settings.json"), json, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        var result = NewStore().Load();
+        Assert.Equal(SettingsLoadStatus.Loaded, result.Status);
+        Assert.Equal(20, result.Settings.Alerts.LeadMinutes);
+    }
+
+    [Fact]
+    public void ANullAlertEventListTakesTheDefaults()
+    {
+        File.WriteAllText(Path.Combine(directory.FullPath, "settings.json"),
+            """{ "version": 1, "alerts": { "events": null, "leadMinutes": 10 } }""");
+        var result = NewStore().Load();
+        Assert.Equal(SettingsLoadStatus.Loaded, result.Status);
+        Assert.Equal(AlertSettings.DefaultEvents, result.Settings.Alerts.Events);
+        Assert.Equal(10, result.Settings.Alerts.LeadMinutes);
+    }
+
+    [Fact]
     public void HotkeysAreStoredInCanonicalForm()
     {
         var settings = SettingsNormalizer.Normalize(new MeterSettings { Overlay = new OverlaySettings { ToggleHotkey = " shift + ctrl + d " } }).Settings;
@@ -90,7 +124,7 @@ public sealed class SettingsTests : IDisposable
         // Adding a property to MeterSettings must extend its Equals; this count is the reminder.
         var properties = typeof(MeterSettings).GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.Name != "EqualityContract").Select(p => p.Name).Order().ToList();
-        Assert.Equal(new[] { "Appearance", "Fight", "Overlay", "Version", "Windows" }, properties);
+        Assert.Equal(new[] { "Alerts", "Appearance", "Fight", "Overlay", "Version", "Windows" }, properties);
 
         var baseline = SettingsNormalizer.Normalize(null).Settings with
         {
@@ -102,6 +136,19 @@ public sealed class SettingsTests : IDisposable
         Assert.NotEqual(baseline, baseline with { Fight = baseline.Fight with { BossOnlyCapture = true } });
         Assert.NotEqual(baseline, baseline with { Appearance = baseline.Appearance with { RowScale = 1.2 } });
         Assert.NotEqual(baseline, baseline with { Overlay = baseline.Overlay with { ToggleHotkey = "F10" } });
+        // Every AlertSettings member, since it has a hand-written Equals too.
+        var alertProperties = typeof(AlertSettings).GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.Name != "EqualityContract").Select(p => p.Name).Order().ToList();
+        Assert.Equal(new[] { "Enabled", "Events", "LeadMinutes", "RestoreMinimizedMeter", "ServerOffsetHours", "ShowNextEvent" }, alertProperties);
+        var alerts = baseline.Alerts;
+        Assert.Equal(alerts, alerts with { Events = alerts.Events.ToList() });
+        Assert.NotEqual(alerts, alerts with { Enabled = !alerts.Enabled });
+        Assert.NotEqual(alerts, alerts with { Events = alerts.Events.Skip(1).ToList() });
+        Assert.NotEqual(alerts, alerts with { LeadMinutes = 7 });
+        Assert.NotEqual(alerts, alerts with { RestoreMinimizedMeter = !alerts.RestoreMinimizedMeter });
+        Assert.NotEqual(alerts, alerts with { ServerOffsetHours = 8 });
+        Assert.NotEqual(alerts, alerts with { ShowNextEvent = !alerts.ShowNextEvent });
+        Assert.NotEqual(baseline, baseline with { Alerts = alerts with { LeadMinutes = 7 } });
         Assert.NotEqual(baseline, baseline with { Windows = new Dictionary<string, WindowPlacement> { [WindowKeys.Overlay] = new(1, 3, 300, 200) } });
     }
 

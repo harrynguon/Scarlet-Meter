@@ -2,7 +2,7 @@
 
 A network-based DPS meter for AION 2 Global with its own UI, built on the packet capture and decoding of [RATmeter](https://github.com/Kuroukihime/AIon2-Dps-Meter) (Kuroukihime/AIon2-Dps-Meter), which is included unmodified as the `upstream/` git submodule and pinned to a release tag.
 
-Status: in development, not yet tried in the game. Capture, decoding, fight tracking and history come from upstream through `ScarletMeter.Engine`. The overlay is a chromeless, translucent, always-on-top window showing the active target, party DPS, ping and per-player damage, with a settings window for background opacity and picture, class colours, relative bars, deaths, hidden names, row size, fight options (boss-only, combined summons, one-minute dummy, history retention) and a show/hide shortcut (`Ctrl+Shift+D` by default). Window positions are remembered. See [docs/HANDOFF.md](docs/HANDOFF.md) for what has been checked and what is next.
+Status: in development, not yet tried in the game. Capture, decoding, fight tracking and history come from upstream through `ScarletMeter.Engine`. The overlay is a chromeless, translucent, always-on-top window showing the active target, party DPS, ping and per-player damage, with a settings window for background opacity and picture, class colours, relative bars, deaths, hidden names, row size, fight options (boss-only, combined summons, one-minute dummy, history retention) and a show/hide shortcut (`Ctrl+Shift+D` by default). Window positions are remembered. A slim strip at the bottom of the overlay announces world events (Spacetime Rift, Shugo Festival, Dimensional Invasion, bosses and more) five minutes ahead and while their entry is open; times follow the World Companion's Global preset and are not yet verified in the game. See [docs/HANDOFF.md](docs/HANDOFF.md) for what has been checked and what is next.
 
 ## Layout
 
@@ -10,8 +10,8 @@ Status: in development, not yet tried in the game. Capture, decoding, fight trac
 | --- | --- |
 | `upstream/` | RATmeter at a release tag (submodule). Never edited here. |
 | `src/ScarletMeter.Engine` | The only project that references upstream. Wraps its pipeline behind Scarlet's own contracts (`ICombatEngine`, `CombatSnapshot`). |
-| `src/ScarletMeter.App` | WPF windows hosting Blazor WebViews (overlay, settings) and the settings store; references the engine only. |
-| `src/ScarletMeter.WorldEvents` | World event schedules (Global preset) and the alert planner for overlay notices; pure .NET, no dependencies, not wired into the app yet. Times are not verified in the game. |
+| `src/ScarletMeter.App` | WPF windows hosting Blazor WebViews (overlay, settings) and the settings store; references the engine and the world-events module, never upstream. |
+| `src/ScarletMeter.WorldEvents` | World event schedules (Global preset) and the alert planner for overlay notices; pure .NET, no dependencies; drives the overlay's notices. Times are not verified in the game. |
 | `tests/ScarletMeter.Tests` | Boundary guards, engine mapping, settings, close-ordering and world-event schedule tests (no Npcap needed). |
 | `scripts/` | `Build.ps1` (restore, build, test), `Update-Upstream.ps1 -Tag vX.Y.Z.N`, `Test-PublishLayout.ps1` and `Smoke-Meter.ps1` (drives the UI for checks). Each derives its paths from its own location. |
 | `docs/` | Maintainer documentation. Start with [docs/README.md](docs/README.md). |

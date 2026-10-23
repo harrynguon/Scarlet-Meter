@@ -1,3 +1,5 @@
+using ScarletMeter.WorldEvents;
+
 namespace ScarletMeter.App.Settings;
 
 /// <summary>
@@ -56,9 +58,28 @@ public static class SettingsNormalizer
             Fight = fight with { HistoryRetentionDays = retention },
             Appearance = appearance with { BackgroundOpacity = opacity, RowScale = scale, BackgroundImage = image },
             Overlay = overlay with { ToggleHotkey = hotkey },
+            Alerts = NormalizeAlerts(input.Alerts, repairs),
             Windows = windows,
         };
         return (settings, repairs);
+    }
+
+    // Lead time and offset are clamped (the offset to whole minutes, as the schedule module requires); event
+    // ids are kept only if the catalog knows them, once each, in catalog order.
+    private static AlertSettings NormalizeAlerts(AlertSettings? input, List<string> repairs)
+    {
+        var alerts = input ?? new AlertSettings();
+        var lead = Math.Clamp(alerts.LeadMinutes, AlertSettings.MinLeadMinutes, AlertSettings.MaxLeadMinutes);
+        if (lead != alerts.LeadMinutes) repairs.Add($"Alert lead time set to {lead} minutes.");
+        var offset = ClampFinite(alerts.ServerOffsetHours, AlertSettings.MinServerOffsetHours, AlertSettings.MaxServerOffsetHours, 9, "Server UTC offset", repairs);
+        offset = Math.Round(offset * 60) / 60;
+
+        var saved = alerts.Events ?? AlertSettings.DefaultEvents;
+        var events = EventCatalog.Ids.Where(id => saved.Contains(id, StringComparer.Ordinal)).ToList();
+        if (saved.Any(id => id is null || !EventCatalog.Ids.Contains(id, StringComparer.Ordinal)))
+            repairs.Add("Unknown world events were removed from the alert list.");
+
+        return alerts with { LeadMinutes = lead, ServerOffsetHours = offset, Events = events };
     }
 
     private static double ClampFinite(double value, double min, double max, double fallback, string name, List<string> repairs)
