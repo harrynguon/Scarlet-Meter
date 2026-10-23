@@ -2,6 +2,40 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Update notice in the overlay
+
+**What:** The upstream release check reaches the player (ARCHITECTURE.md "Updates", "Notice").
+
+- `UpdateNotice` asks `UpstreamReleaseChecker` 30 s after start-up and whenever its cached answer expires.
+- A newer release shows one quiet line above the alert strip ("RATmeter v… is out", "Release notes", a cross that hides it until the next release).
+- Settings, About: a switch (on by default), the release the build is on, the last result, and the update commands when a release is out.
+- `UpdateSettings` (`settings.json` `updates`): the switch and the dismissed release, validated as a release tag.
+- `MeterWindows.OpenReleasePage` opens only an https page under upstream's releases on github.com.
+
+**Why:** Harry asked for an automatic updater "if it's even possible, and reasonable"; the meter is for his own use and has no published binaries, so the reasonable form is a notice plus a one-command reinstall (PR #4). This is the notice.
+
+**Checks (SDK 10.0.402, on the update-check branch at fb24e0a):**
+
+- `scripts/Build.ps1`: 284/284, 16 of them new (`UpdateNoticeTests`), and `SettingsTests.EqualityCoversEveryProperty` extended for the new section.
+- Smoke run (`Smoke-Meter.ps1`, `--no-capture`, throwaway data directory). This branch was still pinned to v1.11.4.334, so the real check, one GET to api.github.com, found v1.11.5.341:
+  - no line at start; about 30 s later "RATmeter v1.11.5.341 is out | Release notes", its tooltip naming v1.11.4.334;
+  - Settings, About read "v1.11.5.341 is out (published 24 Oct); this build is on v1.11.4.334 (checked 06:24)" and gave `scripts\Update-Upstream.ps1 -Tag v1.11.5.341`, then `scripts\Install-Meter.ps1`;
+  - the cross removed the line and saved `"dismissedRelease": "v1.11.5.341"`; the checker logged its result once; exit code 0.
+
+**Not checked:** "Release notes" opening the browser (not clicked in the smoke run, so no browser was launched); the line over the game.
+
+**Compatibility:** no version bump, as the `updates` section is additive. A file without it, or with `"updates": null`, loads with checking on. An older build ignores the section and drops it on its next save, so a player who turned checking off finds it on again after going back and forth; a settings file reset to defaults does the same. SECURITY.md says so.
+
+**Audit (pr-auditor, deep pass on 3243ad0): approve with nits**, applied after merging main (#4, e30cbc1):
+
+- Minor: a timer callback already queued when the switch went off or the meter closed could still call the checker. `CheckAsync` now returns before asking when the switch is off or the notice is disposed.
+- Minor: tests missed the privacy paths (the auditor's mutations survived). New: a check in flight when the switch goes off books no other, one in flight when the meter closes sees its token cancelled and books no other, other settings changes neither ask nor redraw, dismissing asks nothing, switching off redraws.
+- Minor (docs): the opt-out can revert (above, and SECURITY.md).
+- Nits: the release-page check's comment and ARCHITECTURE say what it does (Uri resolves dot segments; the `..` test only catches what Uri leaves); a fragment or any `@` is now refused too, with test rows; a refused address is no longer logged; only a change to the `updates` section re-renders or re-checks.
+
+Checks after the fixes: `scripts/Build.ps1` 291/291 on the merged tree (upstream v1.11.5.341).
+
+**Next:** CI and merge.
 ## 2026-10-24 — Player details and history windows
 
 **What:** The UI for the engine's details and history (ARCHITECTURE "Player details and history windows").

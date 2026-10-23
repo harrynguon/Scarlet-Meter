@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ScarletMeter.App.Alerts;
 using ScarletMeter.App.Settings;
+using ScarletMeter.App.Updates;
 using ScarletMeter.App.Windows;
 using ScarletMeter.Engine;
 using Serilog;
@@ -89,6 +90,8 @@ public partial class App : Application
         builder.Services.AddSingleton<DetailsSelection>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<AlertMonitor>();
+        builder.Services.AddUpstreamReleaseChecker();
+        builder.Services.AddSingleton<UpdateNotice>();
         builder.Services.AddWpfBlazorWebView();
 
         host = builder.Build();
@@ -101,6 +104,7 @@ public partial class App : Application
         var windows = host.Services.GetRequiredService<MeterWindows>();
         MainWindow = windows.ShowOverlay();
         windows.FollowAlerts(host.Services.GetRequiredService<AlertMonitor>());
+        host.Services.GetRequiredService<UpdateNotice>().Start();
     }
 
     protected override void OnExit(ExitEventArgs e)

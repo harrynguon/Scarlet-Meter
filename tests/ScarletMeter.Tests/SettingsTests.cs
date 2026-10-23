@@ -124,7 +124,7 @@ public sealed class SettingsTests : IDisposable
         // Adding a property to MeterSettings must extend its Equals; this count is the reminder.
         var properties = typeof(MeterSettings).GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.Name != "EqualityContract").Select(p => p.Name).Order().ToList();
-        Assert.Equal(new[] { "Alerts", "Appearance", "Fight", "Overlay", "Version", "Windows" }, properties);
+        Assert.Equal(new[] { "Alerts", "Appearance", "Fight", "Overlay", "Updates", "Version", "Windows" }, properties);
 
         var baseline = SettingsNormalizer.Normalize(null).Settings with
         {
@@ -149,6 +149,8 @@ public sealed class SettingsTests : IDisposable
         Assert.NotEqual(alerts, alerts with { ServerOffsetHours = 8 });
         Assert.NotEqual(alerts, alerts with { ShowNextEvent = !alerts.ShowNextEvent });
         Assert.NotEqual(baseline, baseline with { Alerts = alerts with { LeadMinutes = 7 } });
+        Assert.NotEqual(baseline, baseline with { Updates = baseline.Updates with { CheckUpstreamReleases = false } });
+        Assert.NotEqual(baseline, baseline with { Updates = baseline.Updates with { DismissedRelease = "v1.11.6.350" } });
         Assert.NotEqual(baseline, baseline with { Windows = new Dictionary<string, WindowPlacement> { [WindowKeys.Overlay] = new(1, 3, 300, 200) } });
     }
 

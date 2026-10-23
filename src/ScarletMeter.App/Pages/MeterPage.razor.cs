@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using ScarletMeter.App.Alerts;
 using ScarletMeter.App.Formatting;
 using ScarletMeter.App.Settings;
+using ScarletMeter.App.Updates;
 using ScarletMeter.App.Windows;
 using ScarletMeter.Engine;
 
@@ -47,6 +48,10 @@ public partial class MeterPage : IAsyncDisposable
     [Inject]
     private TimeProvider Clock { get; set; } = default!;
 
+    // The "newer RATmeter release" line above the alert strip.
+    [Inject]
+    private UpdateNotice Updates { get; set; } = default!;
+
     // Upstream's rule: hide players the game has not named unless they already matter. Highest damage first.
     private IEnumerable<PlayerRow> Visible => snapshot.Players
         .Where(p => p.IsIdentified || p.DamageShare > 1)
@@ -76,10 +81,13 @@ public partial class MeterPage : IAsyncDisposable
         Settings.Changed += OnSettingsChanged;
         Engine.PingUpdated += OnPingUpdated;
         Alerts.Changed += OnAlertsChanged;
+        Updates.Changed += OnUpdateNoticeChanged;
         refreshLoop = RefreshLoopAsync();
     }
 
     private void OnAlertsChanged(object? sender, EventArgs e) => _ = RenderAsync();
+
+    private void OnUpdateNoticeChanged(object? sender, EventArgs e) => _ = RenderAsync();
 
     private string DisplayName(PlayerRow player) => appearance.HideNicknames ? NicknameMask.Mask(player.Name) : player.Name;
 
@@ -172,6 +180,7 @@ public partial class MeterPage : IAsyncDisposable
         Settings.Changed -= OnSettingsChanged;
         Engine.PingUpdated -= OnPingUpdated;
         Alerts.Changed -= OnAlertsChanged;
+        Updates.Changed -= OnUpdateNoticeChanged;
         await stopping.CancelAsync();
         if (refreshLoop is not null) await refreshLoop;
         stopping.Dispose();
