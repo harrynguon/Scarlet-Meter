@@ -85,6 +85,7 @@ public partial class App : Application
         builder.Services.AddSingleton<SettingsService>();
         builder.Services.AddSingleton<MeterWindows>();
         builder.Services.AddSingleton<IMeterWindows>(services => services.GetRequiredService<MeterWindows>());
+        builder.Services.AddSingleton<DetailsSelection>();
         builder.Services.AddWpfBlazorWebView();
 
         host = builder.Build();

@@ -1,0 +1,95 @@
+<div class="tool details" data-window="details">
+    @if (details is null)
+    {
+        <div class="empty-state">@EmptyText</div>
+    }
+    else
+    {
+        var player = details.Player;
+        <header class="details-header">
+            <div class="who">
+                @if (WebAssetHosts.ClassIconUrl(player.ClassId) is { } classIcon)
+                {
+                    <span class="class-icon big" style="background-image:url('@classIcon')"></span>
+                }
+                <div class="who-text">
+                    <div class="who-name">
+                        @Name(player)
+                        @if (player.IsUser) { <span class="badge you">You</span> }
+                        <span class="badge @(source?.IsLive == true ? "live" : "saved")">@SourceLabel</span>
+                        @if (stale) { <span class="badge stale" title="The player is no longer in the active fight; showing the last data.">Not in the current fight</span> }
+                    </div>
+                    <div class="who-sub">
+                        @player.ClassName
+                        @if (!string.IsNullOrEmpty(player.ServerName)) { <text> · @player.ServerName</text> }
+                        @if (player.CombatPower > 0) { <text> · CP @DetailFormat.Full(player.CombatPower)</text> }
+                        @if (player.Deaths > 0) { <text> · &#x1F480; @player.Deaths</text> }
+                    </div>
+                </div>
+            </div>
+            <div class="stats">
+                <div class="stat"><span>Damage</span><b>@DetailFormat.Full(player.TotalDamage)</b></div>
+                <div class="stat"><span>DPS</span><b class="accent">@Compact.Number(player.Dps)</b></div>
+                <div class="stat"><span>Share</span><b>@Compact.Percent(player.DamageShare)</b></div>
+                <div class="stat"><span>Time</span><b>@Compact.Duration(details.Duration)</b></div>
+                <div class="stat"><span>Hits</span><b>@DetailFormat.Full(details.Rates.Hits)</b></div>
+                <div class="stat"><span>Crit</span><b>@DetailFormat.Rate(details.Rates.Critical)</b></div>
+                <div class="stat"><span>Back</span><b>@DetailFormat.Rate(details.Rates.BackAttack)</b></div>
+                <div class="stat"><span>Front</span><b>@DetailFormat.Rate(details.Rates.FrontAttack)</b></div>
+                <div class="stat"><span>Perfect</span><b>@DetailFormat.Rate(details.Rates.Perfect)</b></div>
+                <div class="stat"><span>x2</span><b>@DetailFormat.Rate(details.Rates.DoubleDamage)</b></div>
+                <div class="stat"><span>Parry</span><b>@DetailFormat.Rate(details.Rates.Parry)</b></div>
+            </div>
+        </header>
+
+        <nav class="tabs" role="tablist">
+            @foreach (var tab in Tabs)
+            {
+                <button type="button" role="tab" class="tab @(tab == current ? "active" : "")" @onclick="() => current = tab">
+                    @tab
+                    @if (tab == "Buffs" && details.Buffs.Count > 0) { <span class="count">@details.Buffs.Count</span> }
+                    @if (tab == "Log") { <span class="count">@details.CombatLog.Count</span> }
+                </button>
+            }
+        </nav>
+
+        <div class="tab-body @(current == "Log" ? "log-body" : "")">
+            @switch (current)
+            {
+                case "Skills":
+                    <SkillTable Skills="details.Skills" IconsEnabled="icons" />
+                    break;
+                case "Buffs":
+                    @if (details.Buffs.Count == 0)
+                    {
+                        <div class="empty-state small">No buffs recorded.</div>
+                    }
+                    else
+                    {
+                        <table class="grid-table buffs">
+                            <thead><tr><th></th><th class="left">Buff</th><th>Applied</th><th>Uptime</th><th class="bar-col">Share of fight</th></tr></thead>
+                            <tbody>
+                                @foreach (var buff in details.Buffs)
+                                {
+                                    <tr title="@buff.Description">
+                                        <td class="icon-cell">@if (SkillIcons.Url(buff.Icon, icons) is { } url) { <img src="@url" alt="" /> }</td>
+                                        <td class="left">@buff.Name</td>
+                                        <td>x@buff.Applications</td>
+                                        <td>@Compact.Duration(buff.Uptime)</td>
+                                        <td class="bar-col"><span class="cell-bar" style="width:@Compact.Percent(buff.UptimePercent)"></span><span class="cell-bar-text">@Compact.Percent(buff.UptimePercent)</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    break;
+                case "Graph":
+                    <DamageChart Data="chart" />
+                    break;
+                case "Log":
+                    <CombatLogView Entries="details.CombatLog" IconsEnabled="icons" NewestFirst="true" />
+                    break;
+            }
+        </div>
+    }
+</div>

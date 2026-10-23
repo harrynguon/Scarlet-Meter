@@ -15,6 +15,15 @@ public interface IMeterWindows
     /// <summary>Opens the settings window, or brings it forward.</summary>
     void OpenSettings();
 
+    /// <summary>Opens the history window, or brings it forward.</summary>
+    void OpenHistory();
+
+    /// <summary>Shows a player in the details window: from the live fight, or from a saved fight when <paramref name="fightId"/> is given.</summary>
+    void OpenPlayerDetails(long playerId, Guid? fightId = null);
+
+    /// <summary>Puts text on the clipboard.</summary>
+    void CopyText(string text);
+
     /// <summary>Starts dragging the overlay; call from a left-button press on its header.</summary>
     void BeginOverlayDrag();
 
@@ -51,6 +60,8 @@ public sealed class MeterWindows : IMeterWindows
 {
     /// <summary>The tool windows this build has.</summary>
     public static readonly ToolWindowSpec Settings = new(WindowKeys.Settings, typeof(SettingsPage), "Scarlet Meter · Settings", 540, 660, 420, 360);
+    public static readonly ToolWindowSpec History = new(WindowKeys.History, typeof(FightHistoryPage), "Scarlet Meter · History", 860, 620, 560, 360);
+    public static readonly ToolWindowSpec PlayerDetails = new(WindowKeys.PlayerDetails, typeof(PlayerDetailsPage), "Scarlet Meter · Player details", 980, 600, 620, 360);
 
     private readonly IServiceProvider services;
     private readonly SettingsService settings;
@@ -104,6 +115,27 @@ public sealed class MeterWindows : IMeterWindows
     }
 
     public void OpenSettings() => Open(Settings);
+
+    public void OpenHistory() => Open(History);
+
+    public void OpenPlayerDetails(long playerId, Guid? fightId = null)
+    {
+        services.GetRequiredService<DetailsSelection>().Select(new DetailsSource(playerId, fightId));
+        Open(PlayerDetails);
+    }
+
+    public void CopyText(string text)
+    {
+        try
+        {
+            Clipboard.SetText(text);
+        }
+        catch (System.Runtime.InteropServices.ExternalException ex)
+        {
+            // Another program holds the clipboard open.
+            logger.LogWarning(ex, "Copying to the clipboard failed.");
+        }
+    }
 
     /// <summary>
     /// Opens a tool window of the given kind, or restores and activates the open one. Does nothing once the

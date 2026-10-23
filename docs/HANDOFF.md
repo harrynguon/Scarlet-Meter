@@ -4,7 +4,7 @@ Repository: https://github.com/harrynguon/ScarletMeter (private, default branch 
 
 ## State
 
-What ARCHITECTURE.md describes exists: `upstream/` submodule at release v1.11.4.334, the engine over upstream's pipeline, a chromeless translucent overlay with a settings window (appearance, fight options, hotkey, remembered positions, all saved in `settings.json`), boundary, mapping, settings and close-ordering tests, build, upstream-update, publish-layout and UI smoke scripts, CI. Player details, history, world event alerts and the upstream release check are being added in separate PRs (WORKLOG.md). Checks that have actually run are listed in WORKLOG.md; nothing has been tried in the game.
+What ARCHITECTURE.md describes exists: `upstream/` submodule at release v1.11.4.334, the engine over upstream's pipeline, a chromeless translucent overlay with a settings window (appearance, fight options, hotkey, remembered positions, all saved in `settings.json`), a player details window (skills, buffs, damage graph, combat log; live or from a saved fight) and a history window of saved boss fights, a `--demo` mode with synthetic fights, boundary, mapping, settings and close-ordering tests, build, upstream-update, publish-layout and UI smoke scripts, CI. World event alerts and the upstream release check are being added in separate PRs (WORKLOG.md). Checks that have actually run are listed in WORKLOG.md; nothing has been tried in the game.
 
 The world-events module (`src/ScarletMeter.WorldEvents`, ARCHITECTURE.md "World events") holds the world event schedules and the alert planner for the overlay's notices, ported from the fork's World Companion. It is not wired into the app yet, and its times are not verified in the game.
 

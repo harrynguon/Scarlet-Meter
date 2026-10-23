@@ -2,6 +2,59 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Player details and history windows
+
+**What:** The UI for the engine's details and history (ARCHITECTURE "Player details and history windows").
+
+- **Details window:** clicking a player in the overlay opens it (one window, re-targeted by `DetailsSelection`).
+  - The header shows RATmeter's stats.
+  - Skills tab: RATmeter's columns, with expandable summon groups.
+  - Buffs tab: uptime.
+  - Graph tab: an SVG chart of cumulative DPS and per-second damage, with buff lanes.
+  - Log tab: filters by skill and flags, virtualized.
+- **History window:** the new header button opens it.
+  - Boss-name and date filters, 50 fights per page.
+  - A saved fight's party, with RATmeter's Copy DPS line.
+  - Players open in the details window from the saved data.
+- **Icons and settings:**
+  - Class icons by id.
+  - Skill and buff icons only from NC's CDN path, behind a new "Skill icons" setting (on by default).
+  - `views.css` (also checked by `Test-PublishLayout.ps1`).
+
+**Why:** Harry asked for RATmeter's per-player details (skill breakdown, buffs, damage graph, combat log) and a history browser for past boss fights, with heavy inspiration from RATmeter. The Explore survey of upstream's UI gave the columns, filters, Copy DPS format and chart series.
+
+**Checks (SDK 10.0.402, on main plus the engine branch):**
+
+- `scripts/Build.ps1`: 203/203 tests, 11 of them new (`DetailFormatTests`):
+  - lanes merge, clip and sort;
+  - chart points;
+  - Copy DPS for the top ten through the masking delegate;
+  - skill-icon URL validation, including lookalike hosts, dot segments and plain HTTP;
+  - icons switch off;
+  - hit tags.
+- Smoke runs through `Smoke-Meter.ps1 --demo` on the Debug build:
+  - **Overlay:** four demo rows with class gradients and icons, and the boss "Aultross" with its HP.
+  - **Opening details:** clicking the top row opened details for "Demo Ranger" (Live).
+  - **Skills tab:** four rows, for example "Rapid Fire 6 hits, 50% crit, avg 440.1K, max 990,664, 2.64M 50.5%". Skill icons loaded from the CDN for two of the four skills.
+  - **Buffs tab:** three rows.
+  - **Graph:** the cumulative-DPS path and three buff lanes.
+  - **Log:** the skill filter, the flag chips, "13 of 13 hits, newest first", and summon hits labelled with the pet.
+  - **History, during the first fight:** the list loaded.
+  - **History, after the fight completed (73 s):**
+    - a search listed "Aultross · 01:13 · 148.15M · 2.00M/s · 4" as completed
+    - opening it showed the party
+    - Copy DPS put "Demo Gladiator : 619.7K DPS (45.51M dmg), Demo Ranger : …" on the clipboard
+    - clicking a player opened details with the saved-fight badge ("Aultross · Sat 24 Oct 05:40") and five skills
+  - Only `demo-history.db` was written; no warning in the log; exit code 0. Screenshots are not committed.
+
+**Not checked:**
+
+- Real players and real skill icons in the game.
+- A saved fight with tens of thousands of hits (the log is virtualized and the fight loads off the UI thread, but load time is unmeasured).
+- Hover tooltips on the chart.
+
+**Next:** rebase onto main once the engine PR (#5) merges, then PR, audit, CI and merge.
+
 ## 2026-10-24 — Engine: player details, history, demo mode
 
 **What:** The engine side of the per-player details and history browser, plus a demo mode for UI work. The pages are being built separately; the app gains only the `--demo` switch and its one-line mapping in `App.xaml.cs`.

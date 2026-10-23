@@ -82,6 +82,9 @@ public sealed record AppearanceSettings
 
     /// <summary>Size of the meter's rows and text (0.75 to 1.5).</summary>
     public double RowScale { get; init; } = 1.0;
+
+    /// <summary>Show skill and buff icons, which load from NC's game-data CDN as in RATmeter.</summary>
+    public bool SkillIcons { get; init; } = true;
 }
 
 /// <summary>Overlay behaviour.</summary>

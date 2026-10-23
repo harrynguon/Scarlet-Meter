@@ -1,0 +1,92 @@
+<div class="tool history" data-window="history">
+    @if (fight is null)
+    {
+        <div class="history-filters">
+            <input type="search" placeholder="Boss name" maxlength="@HistoryQuery.MaxNameLength" value="@nameFilter"
+                   @onchange="e => nameFilter = e.Value?.ToString() ?? string.Empty" @onkeydown="OnFilterKey" />
+            <label>From <input type="date" value="@DateText(fromFilter)" @onchange="e => fromFilter = ParseDate(e.Value)" /></label>
+            <label>To <input type="date" value="@DateText(toFilter)" @onchange="e => toFilter = ParseDate(e.Value)" /></label>
+            <button type="button" class="btn primary" @onclick="() => SearchAsync(1)">Search</button>
+            <button type="button" class="btn" @onclick="ResetFiltersAsync">Reset</button>
+        </div>
+        @if (error is not null)
+        {
+            <div class="notice error">@error</div>
+        }
+        <div class="tab-body">
+            @if (results is null)
+            {
+                <div class="empty-state small">Loading...</div>
+            }
+            else if (results.Entries.Count == 0)
+            {
+                <div class="empty-state">No boss fights saved@(Filtered ? " that match" : " yet"). Completed boss fights appear here.</div>
+            }
+            else
+            {
+                <table class="grid-table fights">
+                    <thead><tr><th></th><th class="left">Boss</th><th class="left">When</th><th>Time</th><th>Damage</th><th>Party DPS</th><th>Players</th></tr></thead>
+                    <tbody>
+                        @foreach (var entry in results.Entries)
+                        {
+                            <tr class="clickable" @onclick="() => OpenFightAsync(entry.FightId)">
+                                <td><span class="state-dot @(entry.Completed ? "" : "active")" title="@(entry.Completed ? "Completed" : "In progress")"></span></td>
+                                <td class="left">@entry.TargetName</td>
+                                <td class="left muted">@DetailFormat.When(entry.Start)</td>
+                                <td>@Compact.Duration(entry.Duration)</td>
+                                <td>@Compact.Number(entry.TotalDamage)</td>
+                                <td class="accent">@Compact.Number(entry.PartyDps)/s</td>
+                                <td>@entry.PlayerCount</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+        @if (results is { TotalCount: > 0 })
+        {
+            <footer class="pager">
+                <span class="muted">@results.TotalCount fights · showing @((results.Page - 1) * results.PageSize + 1)–@Math.Min(results.TotalCount, results.Page * results.PageSize)</span>
+                <button type="button" class="btn" disabled="@(results.Page <= 1)" @onclick="() => SearchAsync(results.Page - 1)">Previous</button>
+                <span>Page @results.Page of @PageCount</span>
+                <button type="button" class="btn" disabled="@(results.Page >= PageCount)" @onclick="() => SearchAsync(results.Page + 1)">Next</button>
+            </footer>
+        }
+    }
+    else
+    {
+        var entry = fight.Entry;
+        <header class="fight-header">
+            <button type="button" class="btn" @onclick="CloseFight">&#x2190; All fights</button>
+            <div class="fight-title">
+                <div class="who-name">
+                    @entry.TargetName
+                    <span class="badge @(entry.Completed ? "saved" : "live")">@(entry.Completed ? "Completed" : "In progress")</span>
+                </div>
+                <div class="who-sub">@DetailFormat.When(entry.Start) · @Compact.Duration(entry.Duration) · @Compact.Number(entry.TotalDamage) damage · @Compact.Number(entry.PartyDps)/s party DPS</div>
+            </div>
+            <button type="button" class="btn" title="Copy the top ten players' DPS, as RATmeter does" @onclick="CopyDpsLine">@(copied ? "Copied" : "Copy DPS")</button>
+        </header>
+        <div class="tab-body">
+            <table class="grid-table party">
+                <thead><tr><th></th><th class="left">Player</th><th>Damage</th><th>DPS</th><th>Crit</th><th class="bar-col">Share</th></tr></thead>
+                <tbody>
+                    @foreach (var player in VisiblePlayers)
+                    {
+                        <tr class="clickable @(player.IsUser ? "me" : "")" @onclick="() => Windows.OpenPlayerDetails(player.Id, entry.FightId)" title="Open this player's breakdown">
+                            <td class="icon-cell">@if (WebAssetHosts.ClassIconUrl(player.ClassId) is { } icon) { <span class="class-icon" style="background-image:url('@icon')"></span> }</td>
+                            <td class="left">
+                                @Name(player)
+                                <small class="muted"> @player.ClassName@(player.CombatPower > 0 ? $" · CP {DetailFormat.Full(player.CombatPower)}" : "")@(player.Deaths > 0 ? $" · \U0001F480 {player.Deaths}" : "")</small>
+                            </td>
+                            <td>@DetailFormat.Full(player.TotalDamage)</td>
+                            <td class="accent">@Compact.Number(player.Dps)/s</td>
+                            <td>@DetailFormat.Rate(player.CriticalRate)</td>
+                            <td class="bar-col"><span class="cell-bar" style="width:@Compact.Percent(player.DamageShare)"></span><span class="cell-bar-text">@Compact.Percent(player.DamageShare)</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
