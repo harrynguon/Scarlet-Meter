@@ -14,7 +14,7 @@ Never rely on a relative path or on the starting directory: anyone, on any machi
 
 ## Review and merge
 
-Changes reach `main` through a PR and a squash merge, after CI passes and with the player's go-ahead. Docs-only changes (Markdown only) need no review beyond CI. Run checks appropriate to the change; a rendered window does not validate combat.
+Changes reach `main` through a PR and a squash merge, after CI passes and with the player's go-ahead. Docs-only changes (Markdown only) need no review beyond CI. Otherwise run the `scarlet-auditor` agent (.claude/agents/scarlet-auditor.md): a standard pass by default, a deep pass at high effort for window lifecycle or WebView2 hosting, threading, saved data, validation or security, capture or the engine's upstream mapping, or package versions. Address its findings before merging; small fixes that apply its own suggestions need no second audit. Run checks appropriate to the change; a rendered window does not validate combat. The repeatable workflows are skills in .claude/skills: `scarlet-ship` (branch to merge), `scarlet-smoke` (driving the UI without the game) and `scarlet-upstream-update` (moving the upstream pin).
 
 ## Structure and comments
 
