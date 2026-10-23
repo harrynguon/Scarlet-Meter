@@ -8,6 +8,13 @@ public enum CaptureMode
 
     /// <summary>No capture at all: for UI work, tests and machines without Npcap.</summary>
     None,
+
+    /// <summary>
+    /// No capture; a synthetic party fights synthetic boss fights through upstream's fight tracking, so the UI
+    /// can be developed and tested without the game or Npcap. Its history goes to its own database
+    /// (<see cref="EngineOptions.HistoryDatabasePath"/>), never mixed with real fights.
+    /// </summary>
+    Demo,
 }
 
 /// <summary>
@@ -41,8 +48,12 @@ public sealed class EngineOptions
             : throw new ArgumentException("DataDirectory must be an absolute path.", nameof(value));
     }
 
-    /// <summary>SQLite file in which upstream's history store keeps completed boss fights.</summary>
-    public string HistoryDatabasePath => Path.Combine(DataDirectory, "combat-history.db");
+    /// <summary>
+    /// SQLite file in which upstream's history store keeps completed boss fights: combat-history.db, or
+    /// demo-history.db in <see cref="CaptureMode.Demo"/> so synthetic fights never land in the player's history.
+    /// </summary>
+    public string HistoryDatabasePath =>
+        Path.Combine(DataDirectory, Capture == CaptureMode.Demo ? "demo-history.db" : "combat-history.db");
 
     public CaptureMode Capture { get; set; } = CaptureMode.Live;
 }

@@ -65,7 +65,7 @@ public partial class App : Application
     // Builds the host, starts capture and shows the window. Throws on any failure; OnStartup reports it.
     private void StartMeter(LaunchOptions launch, string[] args)
     {
-        var options = new EngineOptions { Capture = launch.NoCapture ? CaptureMode.None : CaptureMode.Live };
+        var options = new EngineOptions { Capture = launch.Demo ? CaptureMode.Demo : launch.NoCapture ? CaptureMode.None : CaptureMode.Live };
         if (launch.DataDirectory is not null) options.DataDirectory = launch.DataDirectory;
         Directory.CreateDirectory(options.DataDirectory);
 
@@ -87,6 +87,7 @@ public partial class App : Application
         builder.Services.AddSingleton<SettingsService>();
         builder.Services.AddSingleton<MeterWindows>();
         builder.Services.AddSingleton<IMeterWindows>(services => services.GetRequiredService<MeterWindows>());
+        builder.Services.AddSingleton<DetailsSelection>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<AlertMonitor>();
         builder.Services.AddUpstreamReleaseChecker();

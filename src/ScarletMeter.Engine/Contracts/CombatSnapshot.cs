@@ -18,8 +18,11 @@ public sealed record TargetInfo(int Id, string Name, long HpCurrent, long HpTota
 }
 
 /// <summary>
-/// One player's totals against the active target. Players the game has not named yet carry a placeholder
-/// name and <see cref="IsIdentified"/> false; <see cref="DamageShare"/> is their share of all damage in percent.
+/// One player's totals against a target. Players the game has not named yet carry a placeholder name and
+/// <see cref="IsIdentified"/> false; <see cref="DamageShare"/> is their share of all damage in percent;
+/// <see cref="Dps"/> and <see cref="CriticalRate"/> are upstream's, over the player's own first to last hit
+/// and direct hits. There is no class icon: upstream's is a path into its own WPF project, which Scarlet does not
+/// ship, so the app shows its own image for <see cref="ClassId"/>.
 /// </summary>
 public sealed record PlayerRow(
     long Id,
@@ -36,5 +39,8 @@ public sealed record PlayerRow(
     double CriticalRate,
     int Deaths);
 
-/// <summary>Capture status. <paramref name="AdapterName"/> is set once the game's connection has been locked.</summary>
+/// <summary>
+/// Capture status. <paramref name="AdapterName"/> is set once the game's connection has been locked; in
+/// <see cref="CaptureMode.Demo"/> it reads "Demo" while the synthetic feed runs.
+/// </summary>
 public sealed record CaptureState(bool IsCapturing, string? AdapterName);

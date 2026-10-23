@@ -36,6 +36,224 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 Checks after the fixes: `scripts/Build.ps1` 291/291 on the merged tree (upstream v1.11.5.341).
 
 **Next:** CI and merge.
+## 2026-10-24 — Player details and history windows
+
+**What:** The UI for the engine's details and history (ARCHITECTURE "Player details and history windows").
+
+- **Details window:** clicking a player in the overlay opens it (one window, re-targeted by `DetailsSelection`).
+  - The header shows RATmeter's stats.
+  - Skills tab: RATmeter's columns, with expandable summon groups.
+  - Buffs tab: uptime.
+  - Graph tab: an SVG chart of cumulative DPS and per-second damage, with buff lanes.
+  - Log tab: filters by skill and flags, virtualized.
+- **History window:** the new header button opens it.
+  - Boss-name and date filters, 50 fights per page.
+  - A saved fight's party, with RATmeter's Copy DPS line.
+  - Players open in the details window from the saved data.
+- **Icons and settings:**
+  - Class icons by id.
+  - Skill and buff icons only from NC's CDN path, behind a new "Skill icons" setting (on by default).
+  - `views.css` (also checked by `Test-PublishLayout.ps1`).
+- **The engine's final contract:** a saved fight the engine cannot read says so (in history and in details), a player missing from a saved fight's details reads "missing from the saved fight, or could not be read", and an incomplete history page (`IsComplete` false) shows a notice that some fights are left out.
+
+**Why:** Harry asked for RATmeter's per-player details (skill breakdown, buffs, damage graph, combat log) and a history browser for past boss fights, with heavy inspiration from RATmeter. The Explore survey of upstream's UI gave the columns, filters, Copy DPS format and chart series.
+
+**Checks (SDK 10.0.402).** Final, on main 40206be (world-event notices, upstream v1.11.5.341) merged with the engine's final head a7777cb:
+
+- `scripts/Build.ps1` Debug and Release: 235/235, 12 of them new for this PR (`DetailFormatTests`, `RazorMarkupTests`).
+- `Smoke-Meter.ps1 --demo` (Debug), with alerts seeded for Shugo and the rift at a 60-minute lead: four demo rows and "Aultross"; the strip read "Spacetime Rift · in 44:10" and "Shugo Festival · in 44:10" (both at 07:00 local); details with Skills (five rows), Buffs, Graph (both series and buff lanes) and Log ("12 of 12 hits, newest first"); history listed the fight and opened its party of four. No warnings in the log; exit code 0.
+- **Found in that smoke:** the Buffs tab showed the literal text "x@buff.Applications", and the chart's lane tooltips "x@lane.Count": Razor reads a letter followed by `@` as an e-mail address and does not evaluate it. Fixed with `x@(...)`; the new `RazorMarkupTests` scans every `.razor` file for the pattern (it failed with the bug put back, and passes). The first smoke runs below counted buff rows without reading them, which is how it got through.
+
+Earlier, on main plus the engine branch before its review fixes:
+
+- `scripts/Build.ps1`: 203/203 tests, 11 of them new (`DetailFormatTests`):
+  - lanes merge, clip and sort;
+  - chart points;
+  - Copy DPS for the top ten through the masking delegate;
+  - skill-icon URL validation, including lookalike hosts, dot segments and plain HTTP;
+  - icons switch off;
+  - hit tags.
+- Smoke runs through `Smoke-Meter.ps1 --demo` on the Debug build:
+  - **Overlay:** four demo rows with class gradients and icons, and the boss "Aultross" with its HP.
+  - **Opening details:** clicking the top row opened details for "Demo Ranger" (Live).
+  - **Skills tab:** four rows, for example "Rapid Fire 6 hits, 50% crit, avg 440.1K, max 990,664, 2.64M 50.5%". Skill icons loaded from the CDN for two of the four skills.
+  - **Buffs tab:** three rows.
+  - **Graph:** the cumulative-DPS path and three buff lanes.
+  - **Log:** the skill filter, the flag chips, "13 of 13 hits, newest first", and summon hits labelled with the pet.
+  - **History, during the first fight:** the list loaded.
+  - **History, after the fight completed (73 s):**
+    - a search listed "Aultross · 01:13 · 148.15M · 2.00M/s · 4" as completed
+    - opening it showed the party
+    - Copy DPS put "Demo Gladiator : 619.7K DPS (45.51M dmg), Demo Ranger : …" on the clipboard
+    - clicking a player opened details with the saved-fight badge ("Aultross · Sat 24 Oct 05:40") and five skills
+  - Only `demo-history.db` was written; no warning in the log; exit code 0. Screenshots are not committed.
+
+**Not checked:**
+
+- Real players and real skill icons in the game.
+- A saved fight with tens of thousands of hits (the log is virtualized and the fight loads off the UI thread, but load time is unmeasured).
+- Hover tooltips on the chart.
+
+**Audit (pr-auditor, deep pass on 7d4a41a): request changes**, now addressed:
+
+- Major: the "Skill icons" setting did not stop the graph's buff-lane icons (`DamageChart` called `SkillIcons.Url` with its default `enabled = true`), so turning it off still sent requests to NC's CDN. `DamageChart` now takes `IconsEnabled` from the page, and `SkillIcons.Url` has no default.
+- Minor: "Show deaths" was ignored in the details header and the saved fight's party; both follow it now.
+- Minor: a slower saved-fight load for an earlier click could label the details window with the wrong fight; the load goes into a local and applies only if the selection is still current.
+- Minor: the history window applied results in arrival order; a request counter keeps only the latest search and fight load, going back to the list drops a fight still loading, and closing the window cancels.
+- Minor: Log filters and expanded summon groups carried over to another player; the tab body is keyed by the selection, so they reset.
+- Nits: a page past the end (retention shrank the history) is replaced by the last page; the chart's empty text no longer says "yet" for saved fights. Left as is: the live details loop keeps polling while the window is minimized (500 ms, acceptable for now); `NewestFirst` relies on the engine's order.
+
+Checks after the fixes: `scripts/Build.ps1` 235/235. `Smoke-Meter.ps1 --demo` with `showDeaths` off: the Graph showed two lane icons, and after switching "Skill icons" off in Settings it showed none and the page had no image at all; a Log filter ("Combustion", 3 of 16 hits) reset to all skills (19 of 19) when the details window was re-targeted to another player from the overlay; exit code 0. Deaths were not exercised (the demo party did not die), so hiding them is checked by reading the code only.
+
+**Next:** CI; merge after the engine PR (#5), then CI on the merged result.
+
+## 2026-10-24 — Engine: player details, history, demo mode
+
+**What:** The engine side of the per-player details and history browser, plus a demo mode for UI work. The pages are being built separately; the app gains only the `--demo` switch and its one-line mapping in `App.xaml.cs`.
+
+- `ICombatEngine.GetPlayerDetails(playerId)` returns a `PlayerDetails` (player row, fight duration, hit rates, skills by damage with summon groups, buffs by uptime, damage graph with buff lanes, the newest 1,000 hits), composed from `CombatSessionManager`'s per-player getters. A read that straddles a change of fight is taken again, and after three such reads gives up with null (see the audit below).
+- `GetHistory(HistoryQuery)` maps `GetHistoryPage`. `HistoryQuery.Validate` enforces page 1 to 1,000,000, page size 1 to 200, a trimmed name of at most 100 characters and `From` ≤ `To`, and makes times local. `GetHistoryFight(id)` returns every player's row and details, built by the same `UpstreamMapping` code as the live view. Saved fights are read from the history store directly, outside the session lock. Damaged saved data is cleaned or left out, never thrown (see the audit below).
+- Upstream's store cannot delete a single fight, so there is no `DeleteHistoryFight`.
+- Every skill and buff icon is upstream's string, unchanged; ARCHITECTURE.md ("Icons") says what they look like. Class icons are not exposed (see the audit below).
+- `CaptureMode.Demo` and `--demo`, which excludes `--no-capture`. `DemoCaptureDevice` stands in for upstream's capture device and runs `DemoCombatFeed` on its own thread. Four "Demo …" players of different classes (the Gladiator is the user) and an Elementalist's fire spirit fight Aultross, Fediv Wraith and Transcendent Bakarma in turn. Their skill, buff, class and mob codes are real upstream game data. The feed calls only upstream's public API, as its processors do. Each fight ends in a kill, then `CompleteAndPersistActiveSessions` and a flush, and so becomes one history entry; the next starts 10 s later. Demo history goes to `demo-history.db`.
+- Tests: 24 to 58 in the first commit. New: `PlayerDetailsTests`, `HistoryTests`, `HistoryQueryTests`, `DemoModeTests` and a shared `SyntheticCombat` helper; `EngineOptionsTests` and `LaunchOptionsTests` were extended. With main merged in the suite counted 192; the audit fixes add 14 (206), with a shared `CapturingLoggerProvider`.
+- Docs: ARCHITECTURE (data flow, contract, player details, history, icons, demo mode, storage, tests, update table), DEVELOPMENT and README (`--demo`), HANDOFF (state, two acceptance items, icon decision).
+
+**Why:** Harry asked for per-player details and a history browser. Upstream already computes both, so the engine maps them into Scarlet records and keeps upstream types out of the app. Demo mode lets the UI be built and tested without the game or Npcap. It drives upstream's own fight tracking rather than fake records, so the UI sees what capture would produce.
+
+Design decisions:
+
+- Upstream never ends a fight on a kill, only on a 45-second idle timeout, a respawn or `CompleteAndPersistActiveSessions`. The demo uses the last: it is the public call that persists, and the one the engine's shutdown already uses.
+- Demo history has its own database so synthetic fights never enter the player's history.
+- Saved fights bypass `GetHistorySession`, which deserialises every hit under the session lock. That would stall the capture thread while someone browses history mid-fight.
+- Buffs are ordered by uptime; upstream orders them by application count.
+- The combat log's `Second` counts from the fight's start. The graph keeps upstream's origin, the player's first hit. Both are documented on the records.
+- `CombatLogEntry` gains `SkillId`, which the spec did not have, so the log can be filtered by skill: names repeat across skills.
+
+**Checks (SDK 10.0.402, `SCARLET_DOTNET` and `DOTNET_ROOT` set):**
+
+- `scripts/Build.ps1` (Debug) and `scripts/Build.ps1 -Configuration Release`: restore with audit as errors, build with 0 errors and no diagnostics from Scarlet's projects (upstream's own 6 warnings unchanged), 58/58 tests passed in each configuration.
+- The Release test executable, three more full runs: 58/58 each.
+- `%TEMP%` held 20 `scarlet-tests-*` directories before and after every run: the auditor's leftovers of 2026-10-23, still there. These runs added none.
+- Six mutations to the new code; each failed at least one test:
+  - buffs ordered by applications;
+  - the log cap removed;
+  - back and front rates swapped;
+  - unspecified database times left unmarked;
+  - summon children shown without a group (caught only after a single-skill summon case was added);
+  - the demo's `CompleteAndPersistActiveSessions` removed (all three seeds).
+- Demo fight length: 60 simulated fights (seed 7) lasted 69.0 to 84.3 s with HP for 70 to 82 s of expected damage. The earlier 65 to 82 s window gave a 63 s fight in the first smoke run, so it was narrowed.
+- First smoke run: the Debug `ScarletMeter.exe --demo --data-dir <scratch>`, closed after 100 s with `CloseMainWindow`.
+  - Fight 1 against Aultross (135,477,000 HP) ended after 63 s and was saved with exactly that damage.
+  - Fight 2 (Fediv Wraith) started 10 s later.
+  - Exit code 0. Disposal saved the interrupted fight 2.
+  - The data directory held `demo-history.db`, `logs` and `webview2`, and no `combat-history.db`.
+  - The log showed the known WebView2 off-thread disposal fallback.
+- Second smoke run, on the final fight-length window and otherwise the same:
+  - Fight 1 against Aultross (147,442,000 HP) ended after 73 s and was saved.
+  - Fight 2 started 10 s later.
+  - Exit code 0. The interrupted fight was saved.
+  - The data directory held only `demo-history.db`, `logs` and `webview2`.
+- The smoke runs' data directories and a throwaway game-data probe lived in a session scratch folder, outside the repository, and were deleted afterwards.
+
+**Not checked:**
+
+- The window was not looked at. `MeterPage` shows only the snapshot, and the new pages do not exist yet.
+- Live capture and the game. Demo mode does not exercise upstream's packet decoders.
+- Whether real summons, buff descriptions and icons arrive as the demo models them. The demo follows upstream's processors as read in v1.11.4.334 (HANDOFF.md, acceptance).
+- `GetHistory` under concurrent capture load (the database query under the session lock).
+
+**CI:** PR 5 at 9cf4835 passed: push run 40002328567 in 2m22s and pull_request run 40002336279 in 2m16s, including the published-layout check.
+
+**Upstream quirks, new candidates to offer upstream:**
+
+- `GetHistoryPage` and `GetHistorySession` query, decompress and deserialise SQLite under the session lock that every hit takes.
+- No fight ends on a boss kill, so a fight reaches history only 45 s after its last hit, and only once another target is hit (or the meter closes).
+- `BuffStatisticsCalculator` orders buffs by application count.
+- The buff decoder always leaves `Description` empty.
+- `GetHistoryPage` computes its skip as `(PageNumber - 1) * PageSize` in an int, so a huge page wraps round to the first.
+
+**Audit (deep pass, PR 5, head 903a523): request changes.** The branch was first brought up to date with main: the overlay and settings PR (#2) and the world-events PR (#3) were merged in as df7af76, with the docs conflicts resolved and 192/192 tests. The findings, and what changed:
+
+- **Major: saved rows were not sanitised.** The auditor inserted synthetic rows and broke both history calls:
+  - a hit `{}` (no time) made `GraphDataCalculator` throw `OverflowException` in `GetHistoryFight`;
+  - two hits 50 days apart made a 4,233,661-point, 474 MB graph;
+  - a saved uptime of 1e300 seconds made `TimeSpan` overflow;
+  - text in `SessionEnd` made `GetHistory` throw, so the whole list was unusable.
+
+  Changes:
+  - `SavedFightSanitizer` cleans every saved snapshot before it is mapped. It checks the start and end are usable (set, in order, at most 12 h apart; otherwise rows only, no details). It drops null entries, hits with no skill or negative damage, hits more than a minute outside the fight, and buff events over an hour or outside the window. It re-sorts hits newest first.
+  - Buff uptime is clamped to the fight; a non-finite figure counts as 0.
+  - The fight total saturates instead of overflowing.
+  - A player whose details still fail is left out of `Details`, logged.
+  - `GetHistoryFight` logs and returns null for an unreadable row.
+  - When upstream's list query fails, `GetHistory` reads the list again with `SavedHistoryReader`: every list column as text, damaged rows skipped and counted. The page comes back with the new `HistoryPage.IsComplete` false and without the running fight.
+  - A probe showed upstream's query fails only on the pages that hold the damaged row, while counting it on the others. So the engine keeps reading that way until a read finds no damaged row, and every page agrees. If even that read fails, the page is empty and incomplete.
+- **Huge pages (3).** `Page` is capped at `HistoryQuery.MaxPage` (1,000,000), so upstream's int skip cannot wrap round to the first page.
+- **Retry overstated (4).** A read that still straddles a change of fight after three attempts now returns null instead of mixed parts. The docs (ICombatEngine, ARCHITECTURE) now say the check is by identity, so a switch away and back between the two checks goes unnoticed. An internal `BetweenDetailsReads` seam lets two tests force a straddle once (the second read wins) and every time (null).
+- **Clock jumps (5).** One step an hour late took 10.4 s: 3,601 pings and 42 fights, longer than the 10 s stop timeout.
+  - When the earliest event is more than `MaxClockJump` (5 s) behind or ahead of the step's time, `DemoCombatFeed` moves the whole schedule so the earliest falls due now. A jump back no longer freezes the demo either.
+  - `Step` takes the stop token and checks it between events.
+- **Class icons (6).** `PlayerRow.ClassIcon` is removed, with its test and docs. It exposed a path into upstream's WPF project, which Scarlet does not ship; the app shows its own copies by `ClassId`.
+- **Nits:**
+  - (7) The docs now say that after the feed gives up (ten failures in a row), `Start` does nothing until `Stop`.
+  - (8) Comments now cite `DemoModeTests.RosterResolvesInUpstreamsGameDataWithSyntheticNames`, not a nonexistent `DemoRosterTests`.
+  - (9) A new test pins the store-first lookup: a saved fight loads while a held save keeps upstream's session lock taken, which a read through the session manager waits for. The docs now call it a performance choice.
+
+Audit checks (SDK 10.0.402):
+
+- New tests in `HistoryTests` damage rows through upstream's own `CombatHistoryDbContext` (JSON fields, `SessionStart` and `SessionEnd`, text in a date column, a dropped table). `PlayerDetailsTests`, `HistoryQueryTests` and `DemoModeTests` gained tests for the straddle, page bound, clock jump and stop request. 206 tests pass in Debug on df7af76 plus these changes.
+- Twelve mutations to the fixes, each failing at least one test (a mutant that only failed to compile was reworded until it built):
+  - sanitizer: hit filter off; buff-event filter off; window check off;
+  - mapping: uptime clamp off;
+  - history: the list fallback off; damaged mode off; the fight read throwing; the session manager asked first;
+  - details: mixed parts returned on the last attempt;
+  - demo: realignment off; the stop request ignored;
+  - query: the page bound off.
+- `scripts/Build.ps1` Debug and `-Configuration Release` on 0662631: 206/206 each, no diagnostics from Scarlet's projects.
+- main at 45ecab3 (the world-event notices PR #6) was then merged in, with README and WORKLOG conflicts kept from both sides. On the merged result, `scripts/Build.ps1` Debug and `-Configuration Release` passed 222/222 each, with no diagnostics from Scarlet's projects.
+- `%TEMP%` held the same 20 old `scarlet-tests-*` directories before and after every run.
+
+**Second audit (deep pass, PR 5, head a7777cb): approve with nits.** What changed:
+
+- **Damaged mode could outlast the damage (minor).** The row-by-row reader was stricter than upstream's own reads: text in a number column reads as 0 upstream, a numeric date as a Julian date, and any `State` number is accepted. Damaged mode also ended only when a read skipped nothing. The auditor's probe:
+  - damage row 902 (`SessionEnd` set to 'not a date') and row 903 (`PlayerCount` set to 'x');
+  - repair 902;
+  - upstream's `GetSessionList` now read all three rows, yet `GetHistory` stayed incomplete with a total of 2 until restart.
+
+  Changes:
+  - `SavedHistoryReader` now reads each row with the same SQLite provider calls EF Core makes for upstream's store, so it skips exactly what upstream cannot read, and reads the rest the same way.
+  - While damaged, each `GetHistory` first asks upstream's store to read every row (`GetSessionList`, outside the session lock). Once that succeeds, damaged mode ends and the same call already goes through upstream's query.
+  - The probe is now the test `DamagedModeEndsWhenUpstreamCanReadEveryRowAgain`. It also checks that the rows both reads can read come out identical.
+  - ARCHITECTURE and the reader's comment name the two remaining differences: dates compared and ordered as read rather than as stored text, which only rows upstream never writes can show.
+- **Name filter (nit).** The reader now matches upstream's SQL: the stored name lowered ASCII-only by SQLite, the search lowered in the current culture, compared ordinally. `AnUnreadableRowLeavesTheRestOfTheHistoryReadable` saves a Fediv Wraith fight among the Aultross ones and filters on both names.
+- **Untested window guards (nit).** `AFightSavedWithAnUnusableStartOrEndShowsItsPlayersOnly` adds:
+  - a reversed start and end;
+  - an hour-long fight near `DateTime.MinValue`, which only the margin rejects;
+  - the same near `MaxValue`.
+
+  The per-player catch is now commented as defence in depth that no test drives.
+- **Log wording (nit).** The message for a failing upstream list query no longer assumes a damaged row. It says the history is read row by row until upstream can read it again.
+
+Second-audit checks:
+
+- 223 tests pass in Debug on a7777cb plus these changes.
+- Six mutations, each failing a test:
+  - the old exit rule (no upstream probe);
+  - a strict number read;
+  - the name filter off (reworded once to compile);
+  - the reversed check off;
+  - the MinValue margin off;
+  - the MaxValue margin off.
+- main at 40206be was then merged in: the upstream move to v1.11.5.341, PR #7. Only WORKLOG conflicted, and both sides were kept. `git submodule update` put `upstream/` at aa3ffc6. On the merged result, `scripts/Build.ps1` Debug and `-Configuration Release` passed 224/224 each, with no diagnostics from Scarlet's projects. The demo roster still resolves in the new release's game data.
+- `--demo` smoke through `scripts/Smoke-Meter.ps1` with a throwaway data directory (deleted afterwards):
+  - The overlay showed Aultross with its HP falling, and the four "Demo …" rows, "Demo Gladiator" as the user. Ping read 43 ms. A screenshot was taken and not committed.
+  - Fight 1 ended after 77 s and was saved with exactly its 155,291,000 HP as damage.
+  - Fediv Wraith came up 10 s later.
+  - Closing through the window gave exit code 0 and saved the interrupted fight. The data directory held `demo-history.db` and no `combat-history.db`. The log had no warnings or errors.
+- `%TEMP%` again held only the 20 old `scarlet-tests-*` directories.
+
+**Next:** CI on the PR and Harry's go-ahead; the UI pages on top of these contracts (treat a missing `Details` entry and `IsComplete` false); the icon-serving decision for skill icons (HANDOFF.md); the new in-game acceptance items.
 
 ## 2026-10-24 — Upstream release check and installer
 

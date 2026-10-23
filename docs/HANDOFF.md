@@ -4,9 +4,11 @@ Repository: https://github.com/harrynguon/ScarletMeter (private, default branch 
 
 ## State
 
-What ARCHITECTURE.md describes exists: `upstream/` submodule at release v1.11.5.341, the engine over upstream's pipeline, a chromeless translucent overlay with a settings window (appearance, fight options, hotkey, remembered positions, all saved in `settings.json`), boundary, mapping, settings and close-ordering tests, build, upstream-update, publish-layout and UI smoke scripts, CI. Player details and history are being added in separate PRs (WORKLOG.md). Checks that have actually run are listed in WORKLOG.md; nothing has been tried in the game.
+What ARCHITECTURE.md describes exists: `upstream/` submodule at release v1.11.5.341, the engine over upstream's pipeline, a chromeless translucent overlay with a settings window (appearance, fight options, hotkey, remembered positions, all saved in `settings.json`), a player details window (skills, buffs, damage graph, combat log; live or from a saved fight) and a history window of saved boss fights, a `--demo` mode with synthetic fights, world-event notices at the bottom of the overlay, boundary, mapping, settings and close-ordering tests, build, upstream-update, publish-layout and UI smoke scripts, CI. The upstream release check and installer are in (see Updates below); a quiet line in the overlay says when RATmeter has a newer release (WORKLOG.md). Checks that have actually run are listed in WORKLOG.md; nothing has been tried in the game.
 
 World-event notices are in the overlay: `src/ScarletMeter.WorldEvents` (ARCHITECTURE.md "World events") holds the schedules and the alert planner, ported from the fork's World Companion, and the overlay shows them ("Overlay notices"), five minutes ahead by default, with an Alerts tab in settings. The times are not verified in the game.
+
+The engine also offers per-player details (`GetPlayerDetails`), boss-fight history (`GetHistory`, `GetHistoryFight`) and a demo mode (`--demo`: synthetic fights through upstream's fight tracking, for UI work without the game); see WORKLOG.md, 2026-10-24. The details and history windows show them.
 
 Updates (2026-10-24, ARCHITECTURE.md "Updates"): builds stamp the pinned upstream release; `UpstreamReleaseChecker` tells whether upstream has a newer one, and a quiet line in the overlay and Settings, About say so (`UpdateNotice`); `scripts/Install-Meter.ps1` builds and installs for the current user. Upstream published v1.11.5.341 on 2026-10-23 (a live run of the checker reported it); the pin moved to it on 2026-10-24 (WORKLOG.md).
 
@@ -27,6 +29,8 @@ Record the tested commit, observation date and Windows configuration. Pending:
 - [ ] Without Npcap (or with it uninstalled), a normal launch shows the "Install Npcap" dialog and exits.
 - [ ] Close the window during a fight: no crash, a completed boss fight appears in `combat-history.db`.
 - [ ] CPU and memory are comparable to RATmeter on the same fight.
+- [ ] Player details for a real fight match RATmeter's details window on the same fight: skill names, icons and rates, buffs and uptime, the graph, and an Elementalist's or other summon's damage grouped under its owner skill.
+- [ ] A boss fight appears in history after upstream's 45-second idle timeout (or on close) and reopens with the details the live view showed; browsing history during a fight does not drop hits.
 - [ ] The overlay shows over the game (borderless or windowed mode), stays on top, drags by its header and resizes from its edges; the background opacity and a background picture look right over the game.
 - [ ] `Ctrl+Shift+D` (or the chosen shortcut) minimizes and restores the meter while the game has focus, and does not trigger a game action.
 - [ ] Class colours, relative bars, deaths, hidden names and row size behave as in RATmeter.
@@ -56,7 +60,7 @@ Once a time is verified, correct the Global preset and its regression tests (`Ev
 
 ## After acceptance
 
-- Per-player details (skills, buffs, graph): upstream's `CombatSessionManager` already computes them; extend `ICombatEngine` with Scarlet records, never upstream types.
+- Icons: skill and buff icons are URLs on NC's CDN (ARCHITECTURE.md, "Icons"); class icons are served from the copies beside the executable. Decide whether the app caches skill icons under the data directory; until then they load from the CDN as in RATmeter.
 - Port the fork's native window lifecycle check (AionDpsMeter.LifecycleCheck). The close-ordering unit tests are ported; the native check would also cover the real WebView2 close, the profile location under the data directory and a launch of the published executable, none of which CI exercises.
 - Decide whether to host the fork's full World Companion page (AionDpsMeter.Companion, a Razor class library with no upstream references) in this window. Its schedule engine is already ported as `ScarletMeter.WorldEvents`.
-- Offer the fork the UI-thread WebView2 disposal fallback from `ScarletWindow.ReleaseBlazorContentAsync` (its companion logs show the same off-thread failure) and offer upstream the quirks noted in WORKLOG.md (processor registration, failed start, unlocked `IPacketService.Reset`, adapter open failures swallowed, the history cleanup that outlives disposal).
+- Offer the fork the UI-thread WebView2 disposal fallback from `ScarletWindow.ReleaseBlazorContentAsync` (its companion logs show the same off-thread failure) and offer upstream the quirks noted in WORKLOG.md (processor registration, failed start, unlocked `IPacketService.Reset`, adapter open failures swallowed, the history cleanup that outlives disposal, history reads under the session lock).

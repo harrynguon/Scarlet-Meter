@@ -2,15 +2,15 @@
 
 A network-based DPS meter for AION 2 Global with its own UI, built on the packet capture and decoding of [RATmeter](https://github.com/Kuroukihime/AIon2-Dps-Meter) (Kuroukihime/AIon2-Dps-Meter), which is included unmodified as the `upstream/` git submodule and pinned to a release tag.
 
-Status: in development, not yet tried in the game. Capture, decoding, fight tracking and history come from upstream through `ScarletMeter.Engine`. The overlay is a chromeless, translucent, always-on-top window showing the active target, party DPS, ping and per-player damage, with a settings window for background opacity and picture, class colours, relative bars, deaths, hidden names, row size, fight options (boss-only, combined summons, one-minute dummy, history retention) and a show/hide shortcut (`Ctrl+Shift+D` by default). Window positions are remembered. A slim strip at the bottom of the overlay announces world events (Spacetime Rift, Shugo Festival, Dimensional Invasion, bosses and more) five minutes ahead and while their entry is open; times follow the World Companion's Global preset and are not yet verified in the game. A quiet line says when RATmeter publishes a release newer than the one the meter is built on, and `scripts/Install-Meter.ps1` rebuilds and reinstalls it. See [docs/HANDOFF.md](docs/HANDOFF.md) for what has been checked and what is next.
+Status: in development, not yet tried in the game. Capture, decoding, fight tracking and history come from upstream through `ScarletMeter.Engine`. The overlay is a chromeless, translucent, always-on-top window showing the active target, party DPS, ping and per-player damage, with a settings window for background opacity and picture, class colours, relative bars, deaths, hidden names, row size, fight options (boss-only, combined summons, one-minute dummy, history retention) and a show/hide shortcut (`Ctrl+Shift+D` by default). Window positions are remembered. Clicking a player opens their details (skills, buffs, damage graph, combat log), and a history window browses saved boss fights; `--demo` runs synthetic fights for trying the UI without the game. A slim strip at the bottom of the overlay announces world events (Spacetime Rift, Shugo Festival, Dimensional Invasion, bosses and more) five minutes ahead and while their entry is open; times follow the World Companion's Global preset and are not yet verified in the game. A quiet line says when RATmeter publishes a release newer than the one the meter is built on, and `scripts/Install-Meter.ps1` rebuilds and reinstalls it. See [docs/HANDOFF.md](docs/HANDOFF.md) for what has been checked and what is next.
 
 ## Layout
 
 | Path | Purpose |
 | --- | --- |
 | `upstream/` | RATmeter at a release tag (submodule). Never edited here. |
-| `src/ScarletMeter.Engine` | The only project that references upstream. Wraps its pipeline behind Scarlet's own contracts (`ICombatEngine`, `CombatSnapshot`). |
-| `src/ScarletMeter.App` | WPF windows hosting Blazor WebViews (overlay, settings), the settings store and the upstream release check (`Updates/`); references the engine and the world-events module, never upstream. |
+| `src/ScarletMeter.Engine` | The only project that references upstream. Wraps its pipeline behind Scarlet's own contracts (`ICombatEngine`, `CombatSnapshot`, `PlayerDetails`, the history records). |
+| `src/ScarletMeter.App` | WPF windows hosting Blazor WebViews (overlay, settings, player details, history), the settings store and the upstream release check (`Updates/`); references the engine and the world-events module, never upstream. |
 | `src/ScarletMeter.WorldEvents` | World event schedules (Global preset) and the alert planner for overlay notices; pure .NET, no dependencies; drives the overlay's notices. Times are not verified in the game. |
 | `tests/ScarletMeter.Tests` | Boundary guards, engine mapping, settings, close-ordering, world-event schedule, build-stamp and release-check tests (no Npcap needed). |
 | `scripts/` | `Build.ps1` (restore, build, test), `Install-Meter.ps1` (build and install for the current user) with its folder rules `InstallFolders.ps1` and `Test-InstallMeter.ps1` (its refusal, delete and swap checks), `Update-Upstream.ps1 -Tag vX.Y.Z.N`, `Test-PublishLayout.ps1` and `Smoke-Meter.ps1` (drives the UI for checks). Each derives its paths from its own location. |
@@ -27,7 +27,7 @@ git clone --recurse-submodules https://github.com/harrynguon/ScarletMeter.git "<
 & "<checkout>\scripts\Build.ps1"
 ```
 
-Run `src\ScarletMeter.App` from your IDE, or publish it as described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). `--no-capture` opens the window without Npcap; `--data-dir <absolute path>` moves everything the meter writes (history database, logs, WebView2 profile) away from `%LocalAppData%\ScarletMeter`.
+Run `src\ScarletMeter.App` from your IDE, or publish it as described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). `--no-capture` opens the window without Npcap; `--demo` opens it without Npcap on a synthetic party's boss fights (kept in their own history database), for UI work; `--data-dir <absolute path>` moves everything the meter writes (history database, logs, WebView2 profile) away from `%LocalAppData%\ScarletMeter`.
 
 ## Updating upstream
 
