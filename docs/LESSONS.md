@@ -5,9 +5,9 @@ Mistakes found in this repository's work, why they got through, and what now cat
 ## In the product
 
 **Settings backup overwritten when the main file was missing** (Codex on #2, fixed 2026-10-24).
-- What: with `settings.json` missing and `settings.json.bak` damaged, from a newer build or locked, saving stayed on, and the second save's `File.Replace` replaced the only recoverable settings.
+- What: with `settings.json` missing and `settings.json.bak` damaged, from a newer build or locked, saving stayed on, and the second save's `File.Replace` replaced the only recoverable settings. Now a damaged backup is kept aside, a newer one is used read-only, and a locked or unmovable one switches saving off.
 - Why: the keep-aside and read-only protections were written for a damaged main file only; the missing-file branch was not walked through the same cases.
-- Guard: `SettingsTests.WithoutTheMainFile...` (three tests, shown to fail with the old branch). When adding a protection, list every branch that can reach the same write.
+- Guard: four `SettingsTests.WithoutTheMainFile...` tests (damaged, newer, locked and unmovable backups), shown to fail with the old branch. When adding a protection, list every branch that can reach the same write.
 
 **Saved window position restored off every monitor** (Codex on #2, fixed 2026-10-24).
 - What: placement was checked against the virtual screen's bounding box, which includes the empty corners of an L-shaped or offset layout.

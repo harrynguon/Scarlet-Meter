@@ -239,25 +239,40 @@ public sealed class SettingsTests : IDisposable
         Assert.Equal(good, NewStore().Load().Settings); // the backup survived; the damaged file was kept aside
     }
 
-    // Codex review on PR #2: with settings.json missing, an unusable backup must survive the next saves.
-    [Theory]
-    [InlineData("{ damaged")]
-    [InlineData("""{ "version": 99, "appearance": { "rowScale": 1.25 } }""")]
-    public void WithoutTheMainFileAnUnusableBackupIsKeptAsideBeforeAnySave(string backup)
+    // Codex review on PR #2: with settings.json missing, a backup that cannot be used must survive the next saves.
+    [Fact]
+    public void WithoutTheMainFileADamagedBackupIsKeptAsideBeforeAnySave()
     {
         var store = NewStore();
-        File.WriteAllText(store.BackupPath, backup);
+        File.WriteAllText(store.BackupPath, "{ damaged");
 
         var result = store.Load();
         Assert.Equal(SettingsLoadStatus.ResetToDefaults, result.Status);
         Assert.True(result.CanSave);
         Assert.False(File.Exists(store.BackupPath));
         var kept = Assert.Single(Directory.GetFiles(directory.FullPath, "settings.bak.unreadable-*.json"));
-        Assert.Equal(backup, File.ReadAllText(kept));
+        Assert.Equal("{ damaged", File.ReadAllText(kept));
 
         store.Save(new MeterSettings());
         store.Save(new MeterSettings { Appearance = new AppearanceSettings { RowScale = 1.2 } });
-        Assert.Equal(backup, File.ReadAllText(kept)); // two saves later, the old backup is intact
+        Assert.Equal("{ damaged", File.ReadAllText(kept)); // two saves later, the old backup is intact
+    }
+
+    // As a newer main file is: used, never overwritten.
+    [Fact]
+    public void WithoutTheMainFileABackupFromANewerBuildIsUsedButNeverOverwritten()
+    {
+        var store = NewStore();
+        const string newer = """{ "version": 99, "appearance": { "rowScale": 1.25 } }""";
+        File.WriteAllText(store.BackupPath, newer);
+
+        var result = store.Load();
+        Assert.Equal(SettingsLoadStatus.ReadOnly, result.Status);
+        Assert.False(result.CanSave);
+        Assert.Equal(1.25, result.Settings.Appearance.RowScale);
+        Assert.Contains("newer version", result.Notice);
+        Assert.Equal(newer, File.ReadAllText(store.BackupPath));
+        Assert.False(File.Exists(store.FilePath));
     }
 
     [Fact]
@@ -270,6 +285,7 @@ public sealed class SettingsTests : IDisposable
             var result = store.Load();
             Assert.Equal(SettingsLoadStatus.ReadOnly, result.Status);
             Assert.False(result.CanSave);
+            Assert.Contains("could not be opened", result.Notice); // this branch, not the keep-aside one
         }
         Assert.Equal("""{ "version": 1 }""", File.ReadAllText(store.BackupPath));
     }
@@ -284,6 +300,7 @@ public sealed class SettingsTests : IDisposable
             var result = store.Load();
             Assert.Equal(SettingsLoadStatus.ReadOnly, result.Status);
             Assert.False(result.CanSave);
+            Assert.Contains("could not be read or set aside", result.Notice);
         }
         Assert.Equal("{ damaged", File.ReadAllText(store.BackupPath));
     }

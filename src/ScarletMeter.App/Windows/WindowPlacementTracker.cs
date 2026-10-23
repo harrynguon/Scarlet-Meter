@@ -12,7 +12,6 @@ namespace ScarletMeter.App.Windows;
 /// </summary>
 internal sealed class WindowPlacementTracker
 {
-
     private readonly Window window;
     private readonly string key;
     private readonly SettingsService settings;

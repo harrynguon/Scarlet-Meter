@@ -33,7 +33,9 @@ public sealed class ScreenPlacementTests
         Assert.False(ScreenPlacement.IsVisible(new Rect(1880, 560, 80, 80), LShaped));
     }
 
+    // A smoke test of the Win32 calls only: it proves they run without throwing here. It cannot fail on an empty
+    // list, because Monitors() falls back to the virtual screen when none can be listed.
     [Fact]
-    public void TheMonitorsOfThisMachineAreListed() =>
-        Assert.NotEmpty(ScreenPlacement.Monitors()); // falls back to the virtual screen when none can be listed
+    public void ListingTheMonitorsDoesNotThrow() =>
+        Assert.NotEmpty(ScreenPlacement.Monitors());
 }
