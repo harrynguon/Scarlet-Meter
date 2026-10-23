@@ -1,21 +1,24 @@
 namespace ScarletMeter.Engine;
 
 /// <summary>
-/// Everything the app needs from combat: capture control, a snapshot of the current fight and ping
-/// updates. The only implementation wraps upstream RATmeter's pipeline (Upstream/UpstreamCombatEngine).
-/// Callers never see an upstream type, so an upstream change is contained in the engine.
+/// Everything the app needs from combat: capture control, a snapshot of the current fight, per-player
+/// details, boss-fight history and ping updates. The only implementation wraps upstream RATmeter's pipeline
+/// (Upstream/UpstreamCombatEngine). Callers never see an upstream type, so an upstream change is contained in
+/// the engine. Every method may be called from any thread.
 /// </summary>
 public interface ICombatEngine : IDisposable
 {
     /// <summary>
     /// Discovers network adapters and starts listening for the game's traffic. An adapter that is found but
     /// fails to open is only logged by upstream, so Start can return with nothing listening;
-    /// <see cref="CaptureState.AdapterName"/> then stays null.
+    /// <see cref="CaptureState.AdapterName"/> then stays null. In <see cref="CaptureMode.Demo"/> it starts the
+    /// synthetic feed instead; in <see cref="CaptureMode.None"/> it does nothing.
     /// </summary>
-    /// <exception cref="CaptureStartException">Npcap could not be loaded, or no eligible adapter was found.</exception>
+    /// <exception cref="CaptureStartException">Npcap could not be loaded, or no eligible adapter was found; in demo
+    /// mode, the demo's skills, classes or bosses are no longer in upstream's game data.</exception>
     void Start();
 
-    /// <summary>Stops capture. The current fight's numbers stay readable.</summary>
+    /// <summary>Stops capture, or the demo feed (its thread has ended when this returns). The current fight's numbers stay readable.</summary>
     void Stop();
 
     /// <summary>
@@ -30,6 +33,31 @@ public interface ICombatEngine : IDisposable
     /// <summary>An immutable view of the active fight, cheap enough to poll several times a second.</summary>
     CombatSnapshot GetSnapshot();
 
-    /// <summary>Latest ping in milliseconds. Raised on a capture thread, never on the UI thread.</summary>
+    /// <summary>
+    /// One player's breakdown of the active fight, or null when the player has dealt no damage in it (or no
+    /// fight is active). Like <see cref="GetSnapshot"/> it is a composition of consecutive reads, each under
+    /// upstream's session lock: a hit landing between them can show in one part (say the skills) and not yet
+    /// in another (the log). Reads that straddle a change of fight are retried, so all parts describe the same
+    /// fight. Its cost grows with the fight's hits; polling it a few times a second for one player is fine.
+    /// </summary>
+    PlayerDetails? GetPlayerDetails(long playerId);
+
+    /// <summary>
+    /// A page of boss-fight history: the running boss fight first, then the saved ones, newest first. Upstream
+    /// runs the database query under its session lock, which holds up hit processing for that time, so read it
+    /// on demand rather than on a timer.
+    /// </summary>
+    /// <exception cref="ArgumentException">The query is invalid (see <see cref="HistoryQuery.Validate"/>).</exception>
+    HistoryPage GetHistory(HistoryQuery query);
+
+    /// <summary>
+    /// A whole fight from history, saved or still running, or null when the id is unknown. A fight that has
+    /// just ended can be missing for a moment: upstream saves it in the background. Saved fights are read
+    /// without upstream's session lock, so loading a large fight never holds up live capture; it still takes a
+    /// while (the store decompresses and deserialises every hit), so call it off the UI thread.
+    /// </summary>
+    HistoryFight? GetHistoryFight(Guid fightId);
+
+    /// <summary>Latest ping in milliseconds. Raised on a capture (or demo feed) thread, never on the UI thread.</summary>
     event EventHandler<int>? PingUpdated;
 }

@@ -2,6 +2,72 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Engine: player details, history, demo mode
+
+**What:** The engine side of the per-player details and history browser, plus a demo mode for UI work. The pages are being built separately; the app gains only the `--demo` switch and its one-line mapping in `App.xaml.cs`.
+
+- `ICombatEngine.GetPlayerDetails(playerId)` returns a `PlayerDetails` (player row, fight duration, hit rates, skills by damage with summon groups, buffs by uptime, damage graph with buff lanes, the newest 1,000 hits), composed from `CombatSessionManager`'s per-player getters. A read that straddles a change of fight is retried up to three times, so the parts never mix two fights.
+- `GetHistory(HistoryQuery)` maps `GetHistoryPage`. `HistoryQuery.Validate` enforces page ≥ 1, page size 1 to 200, a trimmed name of at most 100 characters and `From` ≤ `To`, and makes times local. `GetHistoryFight(id)` returns every player's row and details, built by the same `UpstreamMapping` code as the live view. Saved fights are read from the history store directly, outside the session lock.
+- Upstream's store cannot delete a single fight, so there is no `DeleteHistoryFight`.
+- `PlayerRow` gains an optional `ClassIcon`. Every icon is upstream's string, unchanged; ARCHITECTURE.md ("Icons") says what they look like.
+- `CaptureMode.Demo` and `--demo`, which excludes `--no-capture`. `DemoCaptureDevice` stands in for upstream's capture device and runs `DemoCombatFeed` on its own thread. Four "Demo …" players of different classes (the Gladiator is the user) and an Elementalist's fire spirit fight Aultross, Fediv Wraith and Transcendent Bakarma in turn. Their skill, buff, class and mob codes are real upstream game data. The feed calls only upstream's public API, as its processors do. Each fight ends in a kill, then `CompleteAndPersistActiveSessions` and a flush, and so becomes one history entry; the next starts 10 s later. Demo history goes to `demo-history.db`.
+- Tests: 24 to 58. New: `PlayerDetailsTests`, `HistoryTests`, `HistoryQueryTests`, `DemoModeTests` and a shared `SyntheticCombat` helper; `EngineOptionsTests` and `LaunchOptionsTests` were extended.
+- Docs: ARCHITECTURE (data flow, contract, player details, history, icons, demo mode, storage, tests, update table), DEVELOPMENT and README (`--demo`), HANDOFF (state, two acceptance items, icon decision).
+
+**Why:** Harry asked for per-player details and a history browser. Upstream already computes both, so the engine maps them into Scarlet records and keeps upstream types out of the app. Demo mode lets the UI be built and tested without the game or Npcap. It drives upstream's own fight tracking rather than fake records, so the UI sees what capture would produce.
+
+Design decisions:
+
+- Upstream never ends a fight on a kill, only on a 45-second idle timeout, a respawn or `CompleteAndPersistActiveSessions`. The demo uses the last: it is the public call that persists, and the one the engine's shutdown already uses.
+- Demo history has its own database so synthetic fights never enter the player's history.
+- Saved fights bypass `GetHistorySession`, which deserialises every hit under the session lock. That would stall the capture thread while someone browses history mid-fight.
+- Buffs are ordered by uptime; upstream orders them by application count.
+- The combat log's `Second` counts from the fight's start. The graph keeps upstream's origin, the player's first hit. Both are documented on the records.
+- `CombatLogEntry` gains `SkillId`, which the spec did not have, so the log can be filtered by skill: names repeat across skills.
+
+**Checks (SDK 10.0.402, `SCARLET_DOTNET` and `DOTNET_ROOT` set):**
+
+- `scripts/Build.ps1` (Debug) and `scripts/Build.ps1 -Configuration Release`: restore with audit as errors, build with 0 errors and no diagnostics from Scarlet's projects (upstream's own 6 warnings unchanged), 58/58 tests passed in each configuration.
+- The Release test executable, three more full runs: 58/58 each.
+- `%TEMP%` held 20 `scarlet-tests-*` directories before and after every run: the auditor's leftovers of 2026-10-23, still there. These runs added none.
+- Six mutations to the new code; each failed at least one test:
+  - buffs ordered by applications;
+  - the log cap removed;
+  - back and front rates swapped;
+  - unspecified database times left unmarked;
+  - summon children shown without a group (caught only after a single-skill summon case was added);
+  - the demo's `CompleteAndPersistActiveSessions` removed (all three seeds).
+- Demo fight length: 60 simulated fights (seed 7) lasted 69.0 to 84.3 s with HP for 70 to 82 s of expected damage. The earlier 65 to 82 s window gave a 63 s fight in the first smoke run, so it was narrowed.
+- First smoke run: the Debug `ScarletMeter.exe --demo --data-dir <scratch>`, closed after 100 s with `CloseMainWindow`.
+  - Fight 1 against Aultross (135,477,000 HP) ended after 63 s and was saved with exactly that damage.
+  - Fight 2 (Fediv Wraith) started 10 s later.
+  - Exit code 0. Disposal saved the interrupted fight 2.
+  - The data directory held `demo-history.db`, `logs` and `webview2`, and no `combat-history.db`.
+  - The log showed the known WebView2 off-thread disposal fallback.
+- Second smoke run, on the final fight-length window and otherwise the same:
+  - Fight 1 against Aultross (147,442,000 HP) ended after 73 s and was saved.
+  - Fight 2 started 10 s later.
+  - Exit code 0. The interrupted fight was saved.
+  - The data directory held only `demo-history.db`, `logs` and `webview2`.
+- The smoke runs' data directories and a throwaway game-data probe lived in a session scratch folder, outside the repository, and were deleted afterwards.
+
+**Not checked:**
+
+- The window was not looked at. `MeterPage` shows only the snapshot, and the new pages do not exist yet.
+- Live capture and the game. Demo mode does not exercise upstream's packet decoders.
+- Whether real summons, buff descriptions and icons arrive as the demo models them. The demo follows upstream's processors as read in v1.11.4.334 (HANDOFF.md, acceptance).
+- `GetHistory` under concurrent capture load (the database query under the session lock).
+- CI on this branch (pending the PR).
+
+**Upstream quirks, new candidates to offer upstream:**
+
+- `GetHistoryPage` and `GetHistorySession` query, decompress and deserialise SQLite under the session lock that every hit takes.
+- No fight ends on a boss kill, so a fight reaches history only 45 s after its last hit, and only once another target is hit (or the meter closes).
+- `BuffStatisticsCalculator` orders buffs by application count.
+- The buff decoder always leaves `Description` empty.
+
+**Next:** CI on the PR and Harry's go-ahead; the UI pages on top of these contracts; the icon-serving decision (HANDOFF.md); the new in-game acceptance items.
+
 ## 2026-10-23 — Review fixes
 
 **What:** Applied the bootstrap review: 15 findings, 8 confirmed by independent verifiers and 7 more judged real when verification was cut short by a usage limit.

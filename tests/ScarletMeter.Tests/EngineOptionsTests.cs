@@ -17,6 +17,18 @@ public sealed class EngineOptionsTests
     }
 
     [Fact]
+    public void DemoHistoryNeverSharesTheRealDatabase()
+    {
+        // Synthetic fights must not land in the player's history, even with the same data directory.
+        var live = new EngineOptions { Capture = CaptureMode.Live };
+        var none = new EngineOptions { Capture = CaptureMode.None };
+        var demo = new EngineOptions { Capture = CaptureMode.Demo };
+        Assert.Equal(live.HistoryDatabasePath, none.HistoryDatabasePath);
+        Assert.Equal(Path.Combine(demo.DataDirectory, "demo-history.db"), demo.HistoryDatabasePath);
+        Assert.NotEqual(live.HistoryDatabasePath, demo.HistoryDatabasePath);
+    }
+
+    [Fact]
     public void RelativeDataDirectoryIsRejected()
     {
         var options = new EngineOptions();

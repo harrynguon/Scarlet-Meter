@@ -2,14 +2,14 @@
 
 A network-based DPS meter for AION 2 Global with its own UI, built on the packet capture and decoding of [RATmeter](https://github.com/Kuroukihime/AIon2-Dps-Meter) (Kuroukihime/AIon2-Dps-Meter), which is included unmodified as the `upstream/` git submodule and pinned to a release tag.
 
-Status: scaffold. Capture, decoding, fight tracking and history come from upstream through `ScarletMeter.Engine`; the window shows the active target, party DPS, ping and per-player damage. See [docs/HANDOFF.md](docs/HANDOFF.md) for what has been checked and what is next.
+Status: scaffold. Capture, decoding, fight tracking and history come from upstream through `ScarletMeter.Engine`, which also offers per-player details (skills, buffs, damage graph, combat log), boss-fight history and a demo mode; the window shows the active target, party DPS, ping and per-player damage. See [docs/HANDOFF.md](docs/HANDOFF.md) for what has been checked and what is next.
 
 ## Layout
 
 | Path | Purpose |
 | --- | --- |
 | `upstream/` | RATmeter at a release tag (submodule). Never edited here. |
-| `src/ScarletMeter.Engine` | The only project that references upstream. Wraps its pipeline behind Scarlet's own contracts (`ICombatEngine`, `CombatSnapshot`). |
+| `src/ScarletMeter.Engine` | The only project that references upstream. Wraps its pipeline behind Scarlet's own contracts (`ICombatEngine`, `CombatSnapshot`, `PlayerDetails`, the history records). |
 | `src/ScarletMeter.App` | WPF window hosting a Blazor WebView; references the engine only. |
 | `tests/ScarletMeter.Tests` | Boundary guards and engine mapping tests (no Npcap needed). |
 | `scripts/` | `Build.ps1` (restore, build, test), `Update-Upstream.ps1 -Tag vX.Y.Z.N` and `Test-PublishLayout.ps1`. Each derives its paths from its own location. |
@@ -26,7 +26,7 @@ git clone --recurse-submodules https://github.com/harrynguon/ScarletMeter.git "<
 & "<checkout>\scripts\Build.ps1"
 ```
 
-Run `src\ScarletMeter.App` from your IDE, or publish it as described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). `--no-capture` opens the window without Npcap; `--data-dir <absolute path>` moves everything the meter writes (history database, logs, WebView2 profile) away from `%LocalAppData%\ScarletMeter`.
+Run `src\ScarletMeter.App` from your IDE, or publish it as described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). `--no-capture` opens the window without Npcap; `--demo` opens it without Npcap on a synthetic party's boss fights (kept in their own history database), for UI work; `--data-dir <absolute path>` moves everything the meter writes (history database, logs, WebView2 profile) away from `%LocalAppData%\ScarletMeter`.
 
 ## Updating upstream
 

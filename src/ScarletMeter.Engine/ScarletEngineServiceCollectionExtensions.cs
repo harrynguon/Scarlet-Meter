@@ -8,6 +8,7 @@ using AionDpsMeter.Services.Services.Settings;
 using AionDpsMeter.Services.Services.Timed;
 using Microsoft.Extensions.DependencyInjection;
 using ScarletMeter.Engine.Upstream;
+using ScarletMeter.Engine.Upstream.Demo;
 
 namespace ScarletMeter.Engine;
 
@@ -34,11 +35,20 @@ public static class ScarletEngineServiceCollectionExtensions
         services.AddCombatHistoryPersistence(options.HistoryDatabasePath);
 
         // Upstream capture and TCP reassembly. No FilePacketWriter is registered, so payloads are never logged.
+        // Demo mode swaps the adapter for the synthetic feed, which upstream's pipeline starts and stops alike.
         services.AddSingleton<TcpStreamBuffer>();
-        if (options.Capture == CaptureMode.Live)
-            services.AddSingleton<IPacketCaptureDevice, CaptureDevice>();
-        else
-            services.AddSingleton<IPacketCaptureDevice, NoCaptureDevice>();
+        switch (options.Capture)
+        {
+            case CaptureMode.Live:
+                services.AddSingleton<IPacketCaptureDevice, CaptureDevice>();
+                break;
+            case CaptureMode.Demo:
+                services.AddSingleton<IPacketCaptureDevice, DemoCaptureDevice>();
+                break;
+            default:
+                services.AddSingleton<IPacketCaptureDevice, NoCaptureDevice>();
+                break;
+        }
 
         // Upstream game state, the timed trackers its session manager requires, decoding and the pipeline.
         services.AddSingleton<EntityTracker>();
