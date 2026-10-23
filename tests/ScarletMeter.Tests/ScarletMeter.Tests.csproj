@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Guards the upstream boundary and the engine's mapping over upstream. Runs without Npcap. -->
+  <!-- Guards the upstream boundary and the engine's mapping over upstream, and tests the world-events module and
+       its independence. Runs without Npcap. -->
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -21,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/ScarletMeter.Engine/ScarletMeter.Engine.csproj" />
     <ProjectReference Include="../../src/ScarletMeter.App/ScarletMeter.App.csproj" />
+    <ProjectReference Include="../../src/ScarletMeter.WorldEvents/ScarletMeter.WorldEvents.csproj" />
   </ItemGroup>
 
 </Project>

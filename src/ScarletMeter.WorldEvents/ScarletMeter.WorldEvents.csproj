@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- World event schedules: the built-in rules (Global preset and legacy defaults), their validation, the
+       occurrence calculation and the overlay's alert planner. Pure .NET: it references no project in this
+       repository, no upstream assembly and no package, so it can move to another meter unchanged.
+       WorldEventsBoundaryTests guards that; see docs/ARCHITECTURE.md ("World events"). -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>ScarletMeter.WorldEvents</RootNamespace>
+  </PropertyGroup>
+
+</Project>

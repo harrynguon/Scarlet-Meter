@@ -11,7 +11,8 @@ Status: in development, not yet tried in the game. Capture, decoding, fight trac
 | `upstream/` | RATmeter at a release tag (submodule). Never edited here. |
 | `src/ScarletMeter.Engine` | The only project that references upstream. Wraps its pipeline behind Scarlet's own contracts (`ICombatEngine`, `CombatSnapshot`). |
 | `src/ScarletMeter.App` | WPF windows hosting Blazor WebViews (overlay, settings) and the settings store; references the engine only. |
-| `tests/ScarletMeter.Tests` | Boundary guards, engine mapping, settings and close-ordering tests (no Npcap needed). |
+| `src/ScarletMeter.WorldEvents` | World event schedules (Global preset) and the alert planner for overlay notices; pure .NET, no dependencies, not wired into the app yet. Times are not verified in the game. |
+| `tests/ScarletMeter.Tests` | Boundary guards, engine mapping, settings, close-ordering and world-event schedule tests (no Npcap needed). |
 | `scripts/` | `Build.ps1` (restore, build, test), `Update-Upstream.ps1 -Tag vX.Y.Z.N`, `Test-PublishLayout.ps1` and `Smoke-Meter.ps1` (drives the UI for checks). Each derives its paths from its own location. |
 | `docs/` | Maintainer documentation. Start with [docs/README.md](docs/README.md). |
 

@@ -53,8 +53,9 @@ public sealed class UpstreamBoundaryTests
         Assert.Contains(UpstreamTypesShownBy(typeof(NoCaptureDevice)), leak => leak.Contains("IPacketCaptureDevice", StringComparison.Ordinal));
     }
 
-    // Direct dependencies of each Scarlet project library in this test run's dependency graph.
-    private static Dictionary<string, List<string>> ScarletProjectDependencies()
+    // Direct dependencies of each Scarlet project library in this test run's dependency graph. WorldEventsBoundaryTests
+    // reads the same graph.
+    internal static Dictionary<string, List<string>> ScarletProjectDependencies()
     {
         using var deps = JsonDocument.Parse(File.ReadAllText(
             Path.Combine(AppContext.BaseDirectory, "ScarletMeter.Tests.deps.json")));

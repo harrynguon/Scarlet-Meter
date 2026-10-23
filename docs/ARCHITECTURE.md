@@ -24,6 +24,7 @@ network adapters --SharpPcap/Npcap--> upstream CaptureDevice (finds the game's p
 | `src/ScarletMeter.App/DeferredWindowClose.cs` | The close ordering that keeps Blazor from crashing the process. |
 | `src/ScarletMeter.App/Settings/` | `MeterSettings` (the model), `SettingsNormalizer` (validation), `SettingsStore` (durable file), `SettingsService` (live settings), `HotkeyGesture`, `BackgroundImages`. |
 | `src/ScarletMeter.App/Pages/`, `Components/`, `wwwroot/` | The UI: `MeterPage` (overlay), `SettingsPage`, shared setting controls, one stylesheet. |
+| `src/ScarletMeter.WorldEvents` | World event schedules and the overlay's alert planner (see World events). Not wired into the app yet. |
 
 ## Upstream boundary
 
@@ -118,6 +119,68 @@ Everything the meter writes lives under `EngineOptions.DataDirectory`:
 
 Nothing is written next to the executable or in the working directory. Upstream's `appsettings.user.json` is not used.
 
+## World events
+
+`src/ScarletMeter.WorldEvents` holds the schedule behind the overlay's world-event notices: the built-in rules, their validation, the occurrence calculation and the alert planner. It is ported from the World Companion of the harrynguon/AIon2-Dps-Meter fork (`AionDpsMeter.Companion/wwwroot/schedule.mjs`, `presets.mjs` and `state.mjs`, JavaScript, at 4feb72b), together with its tests; the alert planner is new. No UI and no app wiring yet.
+
+The module is pure .NET and independent: it references no project in this repository, no upstream assembly, no UI framework and no package (`WorldEventsBoundaryTests`), so it can move to another meter unchanged. Storage, the settings format and every other host policy belong to the host. Nothing in it reads the system clock or the PC's time zone: the current instant and the server offset are parameters, instants are compared in UTC and every instant it returns is UTC (offset zero).
+
+| Type | Purpose |
+| --- | --- |
+| `EventRule` | Immutable rule: `Id`, `Name`, `Location`, `Kind` (`EventKind`: Boss, Rift, Event, Reset), `Basis` (`ScheduleBasis`: Utc, Server), `Days` (null = every day; 0 = Sunday to 6 = Saturday), `Hours`, `Minute`, `DurationMinutes`, `EntryMinutes?`, `ActiveMinutes?`. `Hours` and `Days` are copied, de-duplicated and sorted on construction (and by `with`) and compare by value. Ranges are not enforced on construction, so a host can build rules from untrusted settings and validate them. |
+| `EventIds`, `EventCatalog` | The nine ids (`kaira`, `nahma`, `executors`, `rift`, `siege`, `invasion`, `shugo`, `daily`, `weekly`, the fork's strings) in display order; the presets `Legacy` and `Global`, with `Default` = `Global`; `DefaultServerOffset` (UTC+9); `TryApplyOverrides`. |
+| `ScheduleValidation` | `ValidateRules` and `ValidateServerOffset` return `ScheduleError(RuleId, Message)` lists, empty when valid. |
+| `EventSchedule` | `Occurrence(rule, now, serverOffset)` returns an `EventOccurrence`; `Timeline(rules, now, serverOffset)` returns them all, ordered. |
+| `AlertPlanner` | `Plan(rules, enabledIds, now, serverOffset[, leadTime])` returns an `AlertPlan`: the `EventAlert`s to show and when they next change. |
+
+### Occurrences
+
+- An occurrence starts on each listed weekday at each listed hour and `Minute`, read in the rule's clock: UTC, or UTC plus the server offset. The offset is fixed, so a region with daylight saving needs it changed by hand, as in the fork. A start at exactly `now` has begun; a window or entry window that ends at exactly `now` has closed.
+- The window runs from the start for `ActiveMinutes ?? DurationMinutes`. A duration of 0 is never active: resets, and the boss and siege windows of the Global preset, whose end times are unknown. The entry window is `EntryMinutes`, or a rift's `DurationMinutes` (the portal).
+- `EventOccurrence`: `Phase` (`Upcoming`, `PortalOpen` for a rift's entry window, `EntryOpen`, `ActiveEntryClosed`, `ScheduledActive` for a window without an entry window), `IsActive`, `IsEntryOpen`, `Start` (the running occurrence while active, otherwise the next one), `Next` (the first start after `now`), `End`, `EntryEnd`, `TargetEnd` (the entry close while entry is open, the end while otherwise active, else the next start), `Remaining` (to `TargetEnd`, always positive) and `Progress` (0 to 100: elapsed share of the countdown while active, share of the final hour while upcoming).
+- `Timeline` orders active occurrences first, then by `Remaining`, then by id, and keeps simultaneous events. The id tiebreak is ordinal; the fork's `timeline()` uses `localeCompare`, which gives the same order for the catalog's lowercase ASCII ids.
+- `Occurrence`, `Timeline` and `Plan` throw `ArgumentException` for a rule that fails the value checks below and `ArgumentOutOfRangeException` for an invalid server offset: validated input is their precondition. They also throw `ArgumentOutOfRangeException` when an instant to return lies outside `DateTimeOffset`'s range: the next start for a `now` within a week of `DateTimeOffset.MaxValue`, or the start of a window still running within a day of `DateTimeOffset.MinValue` (both presets work at `MinValue` itself). No real clock gets there.
+
+Deliberate differences from the fork: `End` and `EntryEnd` belong to the occurrence at `Start`, so they lie ahead for an upcoming event (the fork's `end` belonged to the most recent start, in the past for an upcoming event; its UI never read it). Minutes are whole numbers and the server offset is a whole number of minutes (the fork accepted any finite number; whole minutes keep the offset usable as a `DateTimeOffset` offset). Validation returns every problem rather than throwing at the first.
+
+### Validation and saved rules
+
+`ValidateRules` makes the checks of the fork's `validateEvents` and `validateState`: each of the nine ids exactly once (missing, duplicate and unknown entries are reported), a defined clock, hours 0–23 (at least one), days 0–6 (at least one) or null, minute 0–59, duration 0–1440, entry window 0 to the duration, activity from the duration to 1440, and an activity length for the rift. Kinds come from the catalog, never from the input. Unsorted or repeated hours and days are not errors, since rules normalise them. `ValidateServerOffset` accepts −12:00 to +14:00 in whole minutes, so +5:30 and +5:45 pass. Each error names the catalog id it concerns, or null for list-level problems and unknown ids; input text is never copied into an error. The work and the result are bounded for hostile input: a list of more than `MaximumEntries` (twice the catalog, 18) gets the single error "too many entries", and at most `MaximumReportedErrors` (50) errors are returned, the last saying that more exist. The size of the file the rules come from is the host's to bound before it deserialises.
+
+`TryApplyOverrides(saved, out rules, out errors)` is the fork's `validateState` merge: when the saved rules pass, it returns them in catalog order with the catalog's id, name, location and kind, taking only the clock, days, hours, minute, duration and entry window from the saved rule, plus the activity length for the rift (a saved activity length on any other entry is dropped). On failure the host decides: reject the file (the fork runs on defaults and blocks writes until the player recovers) or repair the named entries, for example from `EventCatalog.Default`. File versioning stays with the host's settings format.
+
+### Alert planner
+
+`AlertPlanner.Plan` gives each enabled rule at most one alert:
+
+- **Open** while its portal or entry window is open, from the start (inclusive) to the close (exclusive). `Deadline` is the close. Resets never get it.
+- Otherwise **Soon** while its next start is at most the lead time away, from exactly start minus lead time (inclusive) to the start (exclusive). `Deadline` is the start.
+- Nothing else: an event that is active without an open entry window (a legacy boss or siege window, or a Shugo or Invasion window after entry has closed) gets no alert, though its next start still gets Soon. While Open shows, it hides a Soon for the same rule.
+
+Each `EventAlert` carries the rule, `Kind`, the occurrence's `Start`, the `Deadline` and `Remaining` (to the deadline). Alerts are ordered Open first, then by earliest deadline, then by id. The lead time defaults to five minutes (`DefaultLeadTime`) and must be 1–60 minutes, otherwise `ArgumentOutOfRangeException`. Rules whose ids are not in `enabledIds` are skipped without being checked.
+
+`AlertPlan.NextChange` is the first instant after `now` at which the alerts differ: one appears, disappears or moves to another occurrence. Before it only the countdowns move, so the overlay can show the alerts, count down to each deadline itself and call `Plan` again at `NextChange` rather than every second. Per rule it is the close or the next start, whichever is first, while Open shows; otherwise the next start minus the lead time while that is ahead, else the next start. It is null when no rule is enabled. A test walks eight days minute by minute for both presets and checks that the plan is constant up to `NextChange` and different at it. Planning allocates nothing when there is no alert, and one or two small arrays otherwise.
+
+### Global preset
+
+Scarlet's default, as the fork's: its legacy defaults with the times and window lengths of taengu/A2Tools-Plugins' event-timers data (fork docs/TIMER-COMPARISON.md; provenance in SECURITY.md).
+
+| Entry | Clock | Days | Starts | Window |
+| --- | --- | --- | --- | --- |
+| Watcher Kaira | server | every day | 01:00, then every 3 hours | unknown (duration 0) |
+| Guardian Lord Nahma | server | Sun, Fri | 21:00 | unknown |
+| Executors Tamasa & Argo | server | Mon, Thu, Sat | 21:30 | unknown |
+| Spacetime Rift | server | every day | 02:00, then every 3 hours | 10-minute portal, no longer activity |
+| Artifact Siege | server | Mon, Thu, Sat | 21:00 | unknown |
+| Dimensional Invasion | server | every day | every hour at :30 | 3-minute entry, 13 minutes in all |
+| Shugo Festival | server | every day | every hour at :00 | 3-minute entry, 7 minutes in all |
+| Daily reset | UTC | every day | 07:00 | instant |
+| Weekly reset | UTC | Wed | 07:00 | instant |
+
+`EventCatalog.Legacy` keeps the fork's original defaults for comparison: Kaira on the UTC clock with a 30-minute window, estimated 45/30/45-minute Nahma, Executors and siege windows, rifts at 00:00 UTC every three hours with a 10-minute portal and 60 minutes of activity, 15-minute Shugo and Invasion windows without an entry window, and resets at 09:00 server.
+
+**Accuracy: not verified against Global Asia / Nezekan.** UTC+9 is an assumption. The fork's evidence (its HANDOFF.md) is consistent with the preset but proves no exact transition: a daily-completion countdown consistent with 16:00 server (07:00 UTC), the player's report of the weekly reset at Wednesday 18:00 Melbourne during AEDT (07:00 UTC), and two rift reports, rounded to the minute, at about 08:00 and 11:01 server. Entry closures (Shugo and Invasion after 3 minutes, the rift portal after 10), boss and siege times, and resets outside Australian daylight saving are unobserved. A scheduled window is not a live report: a boss may already be dead. The A2Tools reproduction cases of the fork's TIMER-COMPARISON.md are tests here; passing them shows agreement with A2Tools' arithmetic, not with the game. In-game verification is listed in HANDOFF.md.
+
 ## Tests
 
 - `UpstreamBoundaryTests`: the app references no upstream assembly; no Scarlet project but the engine declares an upstream project reference (and the check confirms it sees the engine's); the engine's public surface (public and protected members) exposes no upstream type, with a self-check that the surface scan sees an upstream interface.
@@ -127,6 +190,7 @@ Nothing is written next to the executable or in the working directory. Upstream'
 - `FormattingTests`: RATmeter-compatible name masking, ping bands, and that pages only get image URLs on the two local hosts.
 - `EngineOptionsTests`, `LaunchOptionsTests`: absolute-path rules at the engine and command-line boundaries.
 - `SqliteRuntimeTests`: the native SQLite that actually loads carries the CVE-2025-6965 fix (the upstream overlay works).
+- `tests/ScarletMeter.Tests/WorldEvents/`: the world-events module. `EventScheduleTests` ports the fork's recurrence cases (UTC invariance across offsets, Friday-to-Sunday rollover, exact rift phase boundaries, year and week rollover, fractional offsets, simultaneous events, the Global preset's entry boundaries) and its A2Tools reproduction table, and adds weekdays at the −12 and +14 limits, an instant's offset not mattering, progress, argument checks and the `DateTimeOffset` range limits. `ScheduleValidationTests` ports the validation and `validateState` cases (each bad value against its entry, the rift's activity, missing, duplicate and unknown entries, offsets, merging keeps every editable value and takes metadata from the catalog) and checks that hostile input gets a bounded answer. `EventCatalogTests` pins both presets value for value and the rules' immutability and value equality. `AlertPlannerTests` covers the planner's boundaries (exactly at the lead time, at the start, at the entry close), resets, windows without entry, disabled rules, lead-time and offset checks, ordering, an eight-day walk proving `NextChange` exact, and no allocation without alerts. `WorldEventsBoundaryTests`: the module references only the .NET base library (no `ScarletMeter.*`, `AionDpsMeter.*`, UI or package assembly) and declares no dependency in the build graph.
 
 `TestEngineHost` gives each engine test its own graph and data directory. Upstream's `CombatHistoryStore` starts an expired-session cleanup (DELETE, VACUUM, ANALYZE) fire-and-forget in its constructor; it outlives the provider and re-creates the database if the directory is deleted under it. The host waits for the store's "startup cleanup" log entry before deleting (only when the database exists, since the store creates it before starting the cleanup), and `TestDataDirectory` fails the test if the directory still cannot be deleted after five seconds, so leaked handles surface.
 

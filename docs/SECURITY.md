@@ -20,6 +20,15 @@ Upstream: https://github.com/Kuroukihime/AIon2-Dps-Meter at the release tag reco
 
 `src/ScarletMeter.App/DeferredWindowClose.cs` and `tests/ScarletMeter.Tests/DeferredWindowCloseTests.cs` are ported from the harrynguon/AIon2-Dps-Meter fork (GPLv3), where they are fork-owned files.
 
+World events (`src/ScarletMeter.WorldEvents`, `tests/ScarletMeter.Tests/WorldEvents/`):
+
+- The schedule engine (rules, validation, override merging, recurrence) and its test cases are ported from the harrynguon/AIon2-Dps-Meter fork's World Companion (GPLv3; `AionDpsMeter.Companion/wwwroot/schedule.mjs`, `presets.mjs` and `state.mjs`, `tests/companion.test.mjs` and `tests/companion-state.test.mjs`, at 4feb72baf86c8f5e4eaf8e03684401f1249de910), where they were written for the fork. The alert planner is new here.
+- The Global preset's times and window lengths follow taengu/A2Tools-Plugins event-timers data at b11f345c93494a2b6a77142002dc26a656b610d2 (https://github.com/taengu/A2Tools-Plugins), as the fork's docs/TIMER-COMPARISON.md records: schedule parameters only, no code. That repository's licence terms have not been reviewed.
+- The legacy defaults are adapted from Byanski/aion2timeroverlay at 2a5727ecdf5487e9becb6b3a756819f9d14ff564 (https://github.com/Byanski/aion2timeroverlay), whose package.json declares MIT; the snapshot contains no standalone MIT text. The fork's SECURITY.md ("Provenance") has the full record, including the cube coordinates and maps the fork once bundled from there, none of which are here.
+- The schedules are **not verified against Global Asia / Nezekan** (ARCHITECTURE.md, "World events"). They are scheduled times, not live reports from the game.
+
+Confirm the schedule data's redistribution terms before any public binary release.
+
 ## Game terms
 
 The fork's assessment at https://github.com/harrynguon/AIon2-Dps-Meter/blob/master/docs/SECURITY.md ("Game terms") applies unchanged: NC's EULA forbids reverse engineering and access outside its published interfaces, and the AION 2 Global Operation Policy sanctions creating or distributing unauthorised programs with an integrated account ban. A passive meter arguably neither circumvents protection nor interferes with operations, but building and running it is the player's risk. Re-read both documents before any public release or any new packet decoding. This repository is private; keeping it private does not change the risk of running the meter.
