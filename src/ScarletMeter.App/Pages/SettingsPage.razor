@@ -168,9 +168,10 @@
                     @if (Updates.Result is UpstreamReleaseCheckResult.NewerAvailable update)
                     {
                         <p class="hint">
-                            To update, in your Scarlet Meter checkout run <span class="mono">scripts\Update-Upstream.ps1 -Tag @update.Tag</span>,
-                            then <span class="mono">scripts\Install-Meter.ps1</span>, and start the meter again.
+                            To update, run these in PowerShell, with the full path of your Scarlet Meter checkout for &lt;checkout&gt;,
+                            then start the meter again:
                         </p>
+                        <p class="hint mono">&amp; "&lt;checkout&gt;\scripts\Update-Upstream.ps1" -Tag @update.Tag<br />&amp; "&lt;checkout&gt;\scripts\Install-Meter.ps1"</p>
                     }
                 </section>
                 break;

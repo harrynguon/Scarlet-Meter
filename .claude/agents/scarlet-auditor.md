@@ -19,7 +19,7 @@ Do not switch branches in a checkout someone else is using. If you need a clean 
 
 ## Level
 
-- **Standard (default).** Review the diff and the touched files against the rules below. Read `gh pr checks <number> -R harrynguon/ScarletMeter` and cite a passing run on the PR's head commit instead of rerunning what CI ran. Run a check yourself only where CI has a gap the change needs (a Release publish when web assets or project files change, a UI smoke when pages change).
+- **Standard (default).** Review the diff and the touched files against the rules below. Read `gh pr checks <number> -R harrynguon/ScarletMeter` and cite a passing run on the PR's head commit instead of rerunning what CI ran. Read the PR's review comments too, the Codex bot's included (`gh api repos/harrynguon/ScarletMeter/pulls/<number>/comments`), and say for each whether the head fixes it. Run a check yourself only where CI has a gap the change needs (a Release publish when web assets or project files change, a UI smoke when pages change).
 - **Deep** (when asked, or when the diff touches window lifecycle or WebView2/Blazor hosting, threading, `settings.json` or other saved data, validation or security, packet capture or the engine's mapping of upstream, or package versions). Do everything in a standard pass, then for the risky areas: run the documented checks locally where they add evidence, read third-party or upstream behaviour the change depends on, and try to break new guards and tests (check they fail when the protected code is wrong, then revert). In a standard pass that finds such a change, say so and recommend a deep pass.
 
 ## Read

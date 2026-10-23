@@ -75,6 +75,23 @@ public sealed class AlertTests : IDisposable
     }
 
     [Fact]
+    public void TheNextEventLineKeepsAnEventWhoseCurrentOccurrenceIsStillRunning()
+    {
+        // 01:04 UTC: Shugo's entry closed at 01:03 but the festival runs until 01:07, so no notice is due and
+        // the line must already name the 02:00 start (Codex review on PR #6).
+        var shugo = AlertMonitor.Compute(Only(EventIds.Shugo) with { ShowNextEvent = true }, new DateTimeOffset(2026, 10, 24, 1, 4, 0, TimeSpan.Zero));
+        Assert.Empty(shugo.Alerts);
+        var next = Assert.NotNull(shugo.Next);
+        Assert.Equal(EventIds.Shugo, next.Rule.Id);
+        Assert.Equal(new DateTimeOffset(2026, 10, 24, 2, 0, 0, TimeSpan.Zero), next.Start);
+
+        // 01:40 UTC: Invasion's entry closed at 01:33 and it runs until 01:43; next start 02:30.
+        var invasion = AlertMonitor.Compute(Only(EventIds.Invasion) with { ShowNextEvent = true }, new DateTimeOffset(2026, 10, 24, 1, 40, 0, TimeSpan.Zero));
+        Assert.Empty(invasion.Alerts);
+        Assert.Equal(new DateTimeOffset(2026, 10, 24, 2, 30, 0, TimeSpan.Zero), Assert.NotNull(invasion.Next).Start);
+    }
+
+    [Fact]
     public void TheServerOffsetMovesServerTimedEvents()
     {
         // At UTC+8 the rift's server 02:00 start is 18:00 UTC the day before.
