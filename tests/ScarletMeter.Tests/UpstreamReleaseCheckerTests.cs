@@ -323,11 +323,11 @@ public sealed class UpstreamReleaseCheckerTests
     [Fact]
     public async Task ACompressedAnswerIsDecompressedByTheProductionHandler()
     {
-        // Through the real SocketsHttpHandler, against a one-shot HTTP server on the loopback address: the
+        // Through the production handler (proxy off), against a one-shot HTTP server on the loopback address: the
         // handler asks for compression and inflates the gzip body before the checker reads it.
         await using var server = await LoopbackServer.StartAsync(Gzip(Encoding.UTF8.GetBytes(Release("v1.11.5.341"))));
         using var checker = new UpstreamReleaseChecker(
-            new RedirectToLoopback(server.Address) { InnerHandler = UpstreamReleaseChecker.CreateDefaultHandler() },
+            new RedirectToLoopback(server.Address) { InnerHandler = ProductionHandlerWithoutProxy() },
             new BuildInfo(Pinned, "9495922"), time, logger);
 
         Assert.IsType<NewerAvailable>(await checker.CheckAsync(Token).WaitAsync(Wait, Token));
@@ -340,7 +340,7 @@ public sealed class UpstreamReleaseCheckerTests
         // About 1 KiB on the wire, over 1 MiB once inflated: rejected, not buffered.
         await using var server = await LoopbackServer.StartAsync(Gzip(Encoding.UTF8.GetBytes(ReleaseOfSize(UpstreamReleaseChecker.MaxResponseBytes + 1))));
         using var checker = new UpstreamReleaseChecker(
-            new RedirectToLoopback(server.Address) { InnerHandler = UpstreamReleaseChecker.CreateDefaultHandler() },
+            new RedirectToLoopback(server.Address) { InnerHandler = ProductionHandlerWithoutProxy() },
             new BuildInfo(Pinned, "9495922"), time, logger);
 
         AssertFailure(UpstreamReleaseCheckFailure.InvalidResponse, await checker.CheckAsync(Token).WaitAsync(Wait, Token));
@@ -547,6 +547,15 @@ public sealed class UpstreamReleaseCheckerTests
         return compressed.ToArray();
     }
 
+    // The production handler with its settings (no redirects, no cookies, decompression) but no proxy: the system
+    // proxy or HTTP_PROXY would otherwise carry the loopback request off the machine, or fail it.
+    private static SocketsHttpHandler ProductionHandlerWithoutProxy()
+    {
+        var handler = Assert.IsType<SocketsHttpHandler>(UpstreamReleaseChecker.CreateDefaultHandler());
+        handler.UseProxy = false;
+        return handler;
+    }
+
     /// <summary>Sends the checker's request to a loopback server instead of api.github.com, keeping its path.</summary>
     private sealed class RedirectToLoopback(Uri server) : DelegatingHandler
     {
@@ -559,7 +568,7 @@ public sealed class UpstreamReleaseCheckerTests
 
     /// <summary>
     /// A one-shot HTTP/1.1 server on 127.0.0.1 that answers one request with a gzip-encoded 200 and reports the
-    /// request's Accept-Encoding. Loopback only: nothing leaves the machine.
+    /// request's Accept-Encoding. Loopback only, and reached without a proxy: nothing leaves the machine.
     /// </summary>
     private sealed class LoopbackServer : IAsyncDisposable
     {

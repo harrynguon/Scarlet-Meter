@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Checks Install-Meter.ps1's refusals and acceptances without building or installing anything.
+Checks Install-Meter.ps1's refusals and acceptances, and its delete and swap paths, without building anything.
 
 .DESCRIPTION
 Builds a set of folders in a new, uniquely named folder under the user's temp directory: someone's folder that
@@ -9,9 +9,13 @@ install, wrong markers, a .retired folder without an install, junctions to the c
 directory's parent. It then runs Install-Meter.ps1 -CheckOnly against each, and against paths in forms that
 used to slip past the overlap checks (\\?\, \\.\, admin shares, UNC, short names, forward slashes, trailing
 dots). Every refusal must name its reason, every acceptance must pass, and the foreign folder must be exactly
-as it was. -CheckOnly never builds or changes a folder, so a broken check cannot move anything. The temp
-folder is removed at the end, links first, so no link target is touched. Targets Windows PowerShell 5.1 and
-pwsh; CI runs it.
+as it was. -CheckOnly never builds or changes a folder, so a broken check cannot move anything.
+
+The delete and swap paths are tested directly through scripts\InstallFolders.ps1 on fake install folders: a
+.retired holding a file held open in a subfolder must keep its marker and block the swap with nothing moved, be
+accepted by the next install's checks, and go once the file is released; a failed rename must be undone. The temp
+folder is removed at the end, links first, so no link target is touched. Targets Windows PowerShell 5.1 and pwsh;
+CI runs it.
 
 .EXAMPLE
 & "<checkout>\scripts\Test-InstallMeter.ps1"
@@ -21,10 +25,11 @@ param()
 
 $ErrorActionPreference = 'Stop'
 $installer = Join-Path $PSScriptRoot 'Install-Meter.ps1'
+. (Join-Path $PSScriptRoot 'InstallFolders.ps1')
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $localAppData = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
 $work = Join-Path ([IO.Path]::GetTempPath()) ('scarlet-install-test-' + [guid]::NewGuid().ToString('N'))
-$markerText = 'Scarlet Meter install, made by scripts\Install-Meter.ps1. The next install replaces this folder; keep nothing else in it.'
+$markerText = $InstallMarkerText
 $failures = New-Object 'System.Collections.Generic.List[string]'
 $links = New-Object 'System.Collections.Generic.List[string]'
 
@@ -73,6 +78,11 @@ function Test-Accepted([string]$Name, [string]$Path) {
     }
 }
 
+# Records a failure unless $Path's tree still matches $Before (a Get-TreeSnapshot taken earlier).
+function Test-Unchanged([string]$Name, [string]$Path, [string]$Before) {
+    if ((Get-TreeSnapshot $Path) -ne $Before) { $failures.Add("$Name`: $Path changed") ; Write-Host "FAIL $Name (changed)" }
+}
+
 # Every file and link under $Path, relative, with file contents: compared before and after the checks.
 function Get-TreeSnapshot([string]$Path) {
     $pending = New-Object 'System.Collections.Generic.Stack[string]'
@@ -97,7 +107,14 @@ try {
     New-TestJunction (Join-Path $downloads 'linked') $target | Out-Null
     $foreignBefore = (Get-TreeSnapshot $downloads) + "`n" + (Get-TreeSnapshot $target)
 
-    New-TestFolder (Join-Path $work 'Meter2.previous') @{ 'ScarletMeter.exe' = 'not a meter'; 'important.txt' = 'keep me' } | Out-Null
+    # Someone's folders at the other names an install renames or deletes: .previous, .staging and .retired.
+    $foreign = @{ 'ScarletMeter.exe' = 'not a meter'; 'important.txt' = 'keep me' }
+    $foreignPrevious = New-TestFolder (Join-Path $work 'Meter2.previous') $foreign
+    $foreignStaging = New-TestFolder (Join-Path $work 'Stage.staging') $foreign
+    New-TestFolder (Join-Path $work 'Ret') @{ 'ScarletMeter.exe' = 'x'; '.scarlet-install' = $markerText } | Out-Null
+    $foreignRetired = New-TestFolder (Join-Path $work 'Ret.retired') $foreign
+    $foreignSnapshots = @{}
+    foreach ($folder in $foreignPrevious, $foreignStaging, $foreignRetired) { $foreignSnapshots[$folder] = Get-TreeSnapshot $folder }
     $linkedInstall = New-TestFolder (Join-Path $work 'Linked') @{ 'ScarletMeter.exe' = 'x'; '.scarlet-install' = $markerText }
     New-TestJunction (Join-Path $linkedInstall 'linked') $target | Out-Null
     New-TestJunction (Join-Path $work 'JunctionInstall') $target | Out-Null
@@ -151,6 +168,9 @@ try {
     # Folders the installer did not make.
     Test-Refused 'a folder holding a ScarletMeter.exe that is not an install' $downloads @('not made by Install-Meter')
     Test-Refused 'such a folder as .previous' (Join-Path $work 'Meter2') @('not made by Install-Meter')
+    Test-Refused 'such a folder as .staging' (Join-Path $work 'Stage') @('not made by Install-Meter')
+    Test-Refused 'an install with such a folder as .retired' (Join-Path $work 'Ret') @('not made by Install-Meter')
+    foreach ($folder in $foreignSnapshots.Keys) { Test-Unchanged 'a refused foreign folder' $folder $foreignSnapshots[$folder] }
     Test-Refused 'an install holding a junction' $linkedInstall @('link or junction')
     Test-Refused 'an install that is a junction' (Join-Path $work 'JunctionInstall') @('link or junction')
     Test-Refused 'a marker with other text' (Join-Path $work 'Fake') @('not made by Install-Meter')
@@ -162,6 +182,78 @@ try {
     Test-Accepted 'an empty folder' (Join-Path $work 'Empty')
     Test-Accepted 'a marked install with a marked .previous' (Join-Path $work 'Marked')
     Test-Accepted 'a checked build left in staging' (Join-Path $work 'Left')
+
+    # Deleting a leftover .retired stopped by a file held open in a subfolder: the marker must survive (it is
+    # deleted last), the swap must not start, the next install's checks must still accept the folder, and once
+    # the file is released the swap must complete.
+    $locked = New-InstallFolders (Join-Path $work 'Locked')
+    New-TestFolder $locked.Install @{ 'ScarletMeter.exe' = 'x'; 'version.txt' = 'install'; $InstallMarker = $markerText } | Out-Null
+    New-TestFolder $locked.Previous @{ 'ScarletMeter.exe' = 'x'; 'version.txt' = 'previous'; $InstallMarker = $markerText } | Out-Null
+    New-TestFolder $locked.Retired @{ 'ScarletMeter.exe' = 'x'; 'version.txt' = 'retired'; $InstallMarker = $markerText } | Out-Null
+    New-TestFolder (Join-Path $locked.Retired 'sub') @{ 'held.txt' = 'held open' } | Out-Null
+    New-TestFolder $locked.Staging @{ 'ScarletMeter.exe' = 'x'; 'version.txt' = 'new'; $InstallMarker = $markerText } | Out-Null
+    $lockedBefore = @{}
+    foreach ($folder in $locked.Install, $locked.Previous, $locked.Staging) { $lockedBefore[$folder] = Get-TreeSnapshot $folder }
+    $held = [IO.File]::Open((Join-Path $locked.Retired 'sub\held.txt'), 'Open', 'Read', 'None')
+    try {
+        try {
+            Invoke-FolderSwap $locked
+            $failures.Add('a .retired held open: the swap went ahead')
+            Write-Host 'FAIL a .retired held open (swapped)'
+        }
+        catch {
+            if ($_.Exception.Message.Contains('Could not remove the leftover')) { Write-Host 'ok   a .retired held open blocks the swap' }
+            else { $failures.Add("a .retired held open: $($_.Exception.Message)"); Write-Host "FAIL a .retired held open ($($_.Exception.Message))" }
+        }
+        if (Test-Marker $locked.Retired $InstallMarker $InstallMarkerText) { Write-Host 'ok   a .retired held open keeps its marker' }
+        else { $failures.Add('a .retired held open lost its marker'); Write-Host 'FAIL a .retired held open lost its marker' }
+        foreach ($folder in $lockedBefore.Keys) { Test-Unchanged 'a .retired held open' $folder $lockedBefore[$folder] }
+        Test-Accepted 'the next install accepts a half-deleted .retired' $locked.Install
+    }
+    finally {
+        $held.Dispose()
+    }
+    try {
+        Invoke-FolderSwap $locked
+        $installed = [IO.File]::ReadAllText((Join-Path $locked.Install 'version.txt'))
+        $kept = [IO.File]::ReadAllText((Join-Path $locked.Previous 'version.txt'))
+        if ($installed -eq 'new' -and $kept -eq 'install' -and -not (Test-Path -LiteralPath $locked.Retired) -and -not (Test-Path -LiteralPath $locked.Staging)) {
+            Write-Host 'ok   the rerun recovers once the file is released'
+        }
+        else {
+            $failures.Add("the rerun left install=$installed previous=$kept; $(Get-FolderState $locked)")
+            Write-Host 'FAIL the rerun recovers once the file is released'
+        }
+    }
+    catch {
+        $failures.Add("the rerun failed: $($_.Exception.Message)")
+        Write-Host "FAIL the rerun recovers once the file is released ($($_.Exception.Message))"
+    }
+
+    # A rename that fails during the swap (a file held open in the install) is undone: every folder as it was.
+    $undo = New-InstallFolders (Join-Path $work 'Undo')
+    New-TestFolder $undo.Install @{ 'ScarletMeter.exe' = 'x'; 'held.txt' = 'held open'; $InstallMarker = $markerText } | Out-Null
+    New-TestFolder $undo.Previous @{ 'ScarletMeter.exe' = 'x'; 'version.txt' = 'previous'; $InstallMarker = $markerText } | Out-Null
+    New-TestFolder $undo.Staging @{ 'ScarletMeter.exe' = 'x'; 'version.txt' = 'new'; $InstallMarker = $markerText } | Out-Null
+    $undoBefore = @{}
+    foreach ($folder in $undo.Install, $undo.Previous, $undo.Staging) { $undoBefore[$folder] = Get-TreeSnapshot $folder }
+    $held = [IO.File]::Open((Join-Path $undo.Install 'held.txt'), 'Open', 'Read', 'None')
+    try {
+        try {
+            Invoke-FolderSwap $undo
+            $failures.Add('a failed rename: the swap reported success')
+            Write-Host 'FAIL a failed rename is undone (no error)'
+        }
+        catch {
+            if ($_.Exception.Message.Contains('left as it was')) { Write-Host 'ok   a failed rename is undone' }
+            else { $failures.Add("a failed rename: $($_.Exception.Message)"); Write-Host "FAIL a failed rename is undone ($($_.Exception.Message))" }
+        }
+    }
+    finally {
+        $held.Dispose()
+    }
+    foreach ($folder in $undoBefore.Keys) { Test-Unchanged 'a failed rename' $folder $undoBefore[$folder] }
+    if (Test-Path -LiteralPath $undo.Retired) { $failures.Add('a failed rename left .retired behind'); Write-Host 'FAIL a failed rename left .retired behind' }
 
     $foreignAfter = (Get-TreeSnapshot $downloads) + "`n" + (Get-TreeSnapshot $target)
     if ($foreignAfter -ne $foreignBefore) { $failures.Add('the foreign folder or its link target changed') }
