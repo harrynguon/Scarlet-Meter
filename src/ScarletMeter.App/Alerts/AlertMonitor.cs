@@ -50,7 +50,10 @@ public sealed class AlertMonitor : IDisposable
         get { lock (gate) return view; }
     }
 
-    /// <summary>Raised after <see cref="Current"/> changes, on a thread-pool thread or the settings caller's.</summary>
+    /// <summary>
+    /// Raised after each refresh (a settings change, a planned change, or the once-a-minute wake-up), whether or
+    /// not <see cref="Current"/> differs, on a thread-pool thread or the settings caller's.
+    /// </summary>
     public event EventHandler? Changed;
 
     /// <summary>Raised once per event occurrence, when its Soon notice first appears.</summary>

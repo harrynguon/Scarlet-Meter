@@ -5,12 +5,13 @@
     start with a bar that fills over the lead time; "Open" counts down to the end of the entry or portal
     window. At most two notices show; the rest are summarised. Countdowns use the time the parent passes in,
     so they tick with the overlay's own refresh. Screen readers hear only the hidden summary, which changes
-    when a notice appears or changes kind, not every second.
+    when a notice appears or changes kind, not every second. It is always rendered (empty when nothing is
+    due), because a live region inserted already filled is often not announced.
 *@
+<span class="sr-only" role="status">@Announcement</span>
 @if (View.Alerts.Count > 0)
 {
     <div class="alerts" aria-label="World event alerts">
-        <span class="sr-only" role="status">@Announcement</span>
         @foreach (var alert in View.Alerts.Take(MaxShown))
         {
             var remaining = alert.Deadline - Now;

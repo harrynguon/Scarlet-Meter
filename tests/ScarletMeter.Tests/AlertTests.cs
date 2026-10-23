@@ -149,6 +149,12 @@ public sealed class AlertTests : IDisposable
 
         var auckland = TimeZoneInfo.CreateCustomTimeZone("UTC+13", TimeSpan.FromHours(13), "UTC+13", "UTC+13");
         Assert.Equal("next 15:00", EventText.Status(EventSchedule.Occurrence(rules[EventIds.Rift], midnight, offset), midnight, auckland));
+
+        // Fri 23:30 UTC is Sat 12:30 at UTC+13 and the 02:00 UTC rift is Sat 15:00 there: the same local day,
+        // though not the same UTC day, so no weekday.
+        var lateFriday = new DateTimeOffset(2026, 10, 23, 23, 30, 0, TimeSpan.Zero);
+        Assert.Equal("next 15:00", EventText.Status(EventSchedule.Occurrence(rules[EventIds.Rift], lateFriday, offset), lateFriday, auckland));
+        Assert.Equal("next Sat 02:00", Status(EventIds.Rift, lateFriday));
     }
 
     [Fact]

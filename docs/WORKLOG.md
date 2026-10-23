@@ -52,6 +52,8 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 - Tests for the gaps the auditor's mutation runs left (listed under Checks). Nits: the `RefreshAt` doc, the live region on the per-second countdown, the raw offset double in the field, and `alerts.css` in `Test-PublishLayout.ps1`.
 - Downgrade: no version bump, as the section is additive. An older build ignores `alerts` and drops it on its next save.
 
+A second pass over the fixes (66dc773, including the byte-order-mark change, which the first pass had not suggested) approved with nits, now applied: the hidden status region is always rendered, so the first notice is announced; a settings-list case where the local and UTC dates differ; the `Changed` doc says it fires on every refresh.
+
 **Next:** CI and merge; then the details and history UI on the engine PR.
 
 ## 2026-10-24 — World event schedules
