@@ -59,6 +59,17 @@ internal sealed class UpstreamSettingsBridge : IAppSettingsService
     public double StatCalcPartySmiteBuff { get; set; }
     public double StatCalcBossSmiteResist { get; set; }
 
+    // Upstream v1.11.5.341's "My Style" colours for the player's own name and bar, used only by its UI;
+    // upstream's defaults, kept in memory.
+    public string CurrentPlayerNameStyleMode { get; set; } = "default";
+    public string CurrentPlayerNameColor { get; set; } = "#F2F1F5";
+    public string CurrentPlayerNameGradientColor1 { get; set; } = "#C084FC";
+    public string CurrentPlayerNameGradientColor2 { get; set; } = "#60A5FA";
+    public string CurrentPlayerBarStyleMode { get; set; } = "default";
+    public string CurrentPlayerBarColor { get; set; } = "#9C27B0";
+    public string CurrentPlayerBarGradientColor1 { get; set; } = "#7C3AED";
+    public string CurrentPlayerBarGradientColor2 { get; set; } = "#EC4899";
+
     // Overlays stay disabled, so upstream's timed trackers track nothing.
     public OverlaySettings BufOverlaySettings { get => buffOverlay; set => buffOverlay = value ?? new(); }
     public OverlaySettings SkillCdOverlaySettings { get => skillCdOverlay; set => skillCdOverlay = value ?? new(); }
