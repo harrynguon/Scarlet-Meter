@@ -1,0 +1,41 @@
+@using System.Globalization
+@* A labelled slider for the settings page. Values cross the page boundary culture-invariantly. *@
+<label class="setting range">
+    <span class="text">
+        <span class="label">@Label</span>
+        @if (Description is not null)
+        {
+            <span class="desc">@Description</span>
+        }
+    </span>
+    <span class="value">@Format(Value)</span>
+    <input type="range"
+           min="@Min.ToString(CultureInfo.InvariantCulture)"
+           max="@Max.ToString(CultureInfo.InvariantCulture)"
+           step="@Step.ToString(CultureInfo.InvariantCulture)"
+           value="@Value.ToString(CultureInfo.InvariantCulture)"
+           @oninput="OnInput" />
+</label>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+
+    [Parameter] public string? Description { get; set; }
+
+    [Parameter] public double Value { get; set; }
+
+    [Parameter] public double Min { get; set; }
+
+    [Parameter] public double Max { get; set; } = 1;
+
+    [Parameter] public double Step { get; set; } = 0.01;
+
+    [Parameter] public Func<double, string> Format { get; set; } = v => v.ToString("0.##", CultureInfo.InvariantCulture);
+
+    [Parameter] public EventCallback<double> ValueChanged { get; set; }
+
+    private Task OnInput(ChangeEventArgs e) =>
+        double.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+            ? ValueChanged.InvokeAsync(Math.Clamp(value, Min, Max))
+            : Task.CompletedTask;
+}

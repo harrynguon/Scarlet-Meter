@@ -1,0 +1,24 @@
+@* A labelled on/off switch for the settings page. *@
+<label class="setting toggle">
+    <span class="text">
+        <span class="label">@Label</span>
+        @if (Description is not null)
+        {
+            <span class="desc">@Description</span>
+        }
+    </span>
+    <input type="checkbox" checked="@Value" @onchange="OnChange" />
+    <span class="switch" aria-hidden="true"></span>
+</label>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+
+    [Parameter] public string? Description { get; set; }
+
+    [Parameter] public bool Value { get; set; }
+
+    [Parameter] public EventCallback<bool> ValueChanged { get; set; }
+
+    private Task OnChange(ChangeEventArgs e) => ValueChanged.InvokeAsync(e.Value is true);
+}

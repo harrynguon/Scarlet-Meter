@@ -25,6 +25,18 @@
     <ProjectReference Include="../ScarletMeter.Engine/ScarletMeter.Engine.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Class icons from upstream's UI project (read from the submodule, never edited), copied beside the
+         executable and served to the pages through the assets.scarlet.example virtual host
+         (Windows/WebAssetHosts.cs). A wildcard, so a renamed folder upstream drops icons, not the build;
+         scripts/Test-PublishLayout.ps1 checks they were published. -->
+    <None Include="$(ScarletUpstreamRoot)AionDpsMeter.UI/wwwroot/images/classes/*.png"
+          Link="assets/classes/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
   <!-- Stamps the pinned upstream release and Scarlet's commit into this assembly (read by Updates/BuildInfo.cs). -->
   <Import Project="$(MSBuildThisFileDirectory)Updates\BuildStamp.targets" />
 

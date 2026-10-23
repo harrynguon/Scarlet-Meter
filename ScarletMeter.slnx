@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/ScarletMeter.Engine/ScarletMeter.Engine.csproj" />
     <Project Path="src/ScarletMeter.App/ScarletMeter.App.csproj" />
+    <Project Path="src/ScarletMeter.WorldEvents/ScarletMeter.WorldEvents.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ScarletMeter.Tests/ScarletMeter.Tests.csproj" />
