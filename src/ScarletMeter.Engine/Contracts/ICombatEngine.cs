@@ -7,14 +7,21 @@ namespace ScarletMeter.Engine;
 /// </summary>
 public interface ICombatEngine : IDisposable
 {
-    /// <summary>Discovers network adapters and starts listening for the game's traffic.</summary>
-    /// <exception cref="CaptureStartException">Npcap is missing or no adapter could be opened.</exception>
+    /// <summary>
+    /// Discovers network adapters and starts listening for the game's traffic. An adapter that is found but
+    /// fails to open is only logged by upstream, so Start can return with nothing listening;
+    /// <see cref="CaptureState.AdapterName"/> then stays null.
+    /// </summary>
+    /// <exception cref="CaptureStartException">Npcap could not be loaded, or no eligible adapter was found.</exception>
     void Start();
 
     /// <summary>Stops capture. The current fight's numbers stay readable.</summary>
     void Stop();
 
-    /// <summary>Drops the current fight (targets, summons and the buffered stream). Known players are kept.</summary>
+    /// <summary>
+    /// Drops the current fight: every target's session, the active target and buffered buffs. Known players,
+    /// summon ownership and the captured stream are kept, so the next hit starts a fresh fight.
+    /// </summary>
     void Reset();
 
     /// <summary>Whether capture runs and, once the game's connection is found, which adapter carries it.</summary>

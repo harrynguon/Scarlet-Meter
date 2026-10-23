@@ -49,9 +49,18 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         {
             pipeline.Start();
         }
+        catch (InvalidOperationException ex)
+        {
+            // Upstream's CaptureDevice.StartCapture: Npcap listed the adapters, but every one is of a kind
+            // upstream skips (Hyper-V, VMware, VirtualBox, TAP, WAN Miniport).
+            throw new CaptureStartException(
+                "Packet capture could not start: no eligible network adapter was found (virtual, TAP and WAN " +
+                "Miniport adapters are skipped). The log in the data directory has the details.", ex);
+        }
         catch (Exception ex)
         {
-            // SharpPcap fails when wpcap.dll (Npcap) is absent; upstream throws when no adapter is eligible.
+            // SharpPcap fails (DllNotFoundException, often inside a TypeInitializationException) when wpcap.dll,
+            // Npcap's WinPcap-compatible library, is absent.
             throw new CaptureStartException(
                 "Packet capture could not start. Install Npcap (https://npcap.com) with \"Install Npcap in " +
                 "WinPcap API-compatible Mode\" ticked, then start the meter again.", ex);
@@ -60,11 +69,11 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
 
     public void Stop() => pipeline.Stop();
 
-    public void Reset()
-    {
-        pipeline.Reset(); // summons and the TCP reassembly buffer
-        sessions.Reset(); // every target's fight
-    }
+    // Fight state only, under the session manager's lock. Upstream's IPacketService.Reset would also clear the
+    // summon-to-owner map (a pet already out would show as an unidentified player) and the TCP reassembly
+    // buffer (frames are dropped until the stream re-synchronises), both without a lock while the capture
+    // thread writes them. Upstream's own UI never calls it.
+    public void Reset() => sessions.Reset();
 
     public CombatSnapshot GetSnapshot()
     {

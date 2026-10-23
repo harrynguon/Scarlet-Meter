@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using ScarletMeter.Engine;
 
 namespace ScarletMeter.App.Pages;
 
 /// <summary>
 /// Live meter view. Polls the engine ten times a second on a background loop and renders the active fight;
-/// ping arrives by event from a capture thread. Everything stops in <see cref="DisposeAsync"/>, which the
-/// window's deferred close awaits before the WebView goes away.
+/// ping arrives by event from a capture thread. A failed refresh is logged and retried on the next tick, so
+/// the meter never freezes silently. Everything stops in <see cref="DisposeAsync"/>, which the window's
+/// deferred close awaits before the WebView goes away.
 /// </summary>
 public partial class MeterPage : IAsyncDisposable
 {
@@ -16,9 +18,13 @@ public partial class MeterPage : IAsyncDisposable
     private CombatSnapshot snapshot = CombatSnapshot.Empty;
     private int? ping;
     private Task? refreshLoop;
+    private bool refreshFailing;
 
     [Inject]
     private ICombatEngine Engine { get; set; } = default!;
+
+    [Inject]
+    private ILogger<MeterPage> Logger { get; set; } = default!;
 
     // Upstream's rule: hide players the game has not named unless they already matter.
     private IEnumerable<PlayerRow> Visible => snapshot.Players.Where(p => p.IsIdentified || p.DamageShare > 1);
@@ -43,8 +49,22 @@ public partial class MeterPage : IAsyncDisposable
         {
             while (await timer.WaitForNextTickAsync(stopping.Token))
             {
-                snapshot = Engine.GetSnapshot();
-                await RenderAsync();
+                try
+                {
+                    snapshot = Engine.GetSnapshot();
+                    await RenderAsync();
+                    if (refreshFailing) Logger.LogInformation("Refreshing the meter works again.");
+                    refreshFailing = false;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // Upstream's EntityTracker dictionaries are read here while the capture thread writes them,
+                    // as in upstream's own UI, so a read can fail now and then. Keep the last snapshot and log
+                    // the first failure of a run only, so a persistent fault cannot flood the log.
+                    if (!refreshFailing)
+                        Logger.LogWarning(ex, "Refreshing the meter failed; retrying on every tick.");
+                    refreshFailing = true;
+                }
             }
         }
         catch (OperationCanceledException)
