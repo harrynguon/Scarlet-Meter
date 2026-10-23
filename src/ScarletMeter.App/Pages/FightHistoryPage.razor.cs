@@ -92,7 +92,8 @@ public partial class FightHistoryPage : IDisposable
         try
         {
             fight = await Task.Run(() => Engine.GetHistoryFight(fightId));
-            if (fight is null) error = "That fight is no longer in the history.";
+            // Null: removed by retention, or a saved row the engine could not read (it logs which).
+            if (fight is null) error = "That fight is no longer in the history, or could not be read. The log has the details.";
         }
         catch (Exception ex)
         {

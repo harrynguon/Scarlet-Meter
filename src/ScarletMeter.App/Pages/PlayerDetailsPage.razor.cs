@@ -39,7 +39,8 @@ public partial class PlayerDetailsPage : IAsyncDisposable
 
     private string EmptyText => loadFailed ? "This fight could not be loaded. The log has the details."
         : source is null ? "Click a player in the meter or in a saved fight."
-        : source.IsLive ? "Waiting for this player's hits..." : "This player has no data in the saved fight.";
+        : source.IsLive ? "Waiting for this player's hits..."
+        : "This player's details are missing from the saved fight, or could not be read.";
 
     private string SourceLabel => source?.IsLive != false
         ? "Live"
@@ -93,7 +94,7 @@ public partial class PlayerDetailsPage : IAsyncDisposable
                 if (fight?.Entry.FightId != subject.FightId)
                     fight = await Task.Run(() => Engine.GetHistoryFight(subject.FightId!.Value), stopping.Token);
                 if (subject != source) return;
-                loadFailed = false;
+                loadFailed = fight is null; // the engine logs and returns null for a saved fight it cannot read
                 stale = false;
                 loaded = fight?.Details.GetValueOrDefault(subject.PlayerId);
                 if (loaded is not null) SetDetails(loaded);

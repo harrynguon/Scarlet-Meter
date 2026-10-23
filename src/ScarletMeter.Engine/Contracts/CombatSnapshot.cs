@@ -21,7 +21,8 @@ public sealed record TargetInfo(int Id, string Name, long HpCurrent, long HpTota
 /// One player's totals against a target. Players the game has not named yet carry a placeholder name and
 /// <see cref="IsIdentified"/> false; <see cref="DamageShare"/> is their share of all damage in percent;
 /// <see cref="Dps"/> and <see cref="CriticalRate"/> are upstream's, over the player's own first to last hit
-/// and direct hits. <see cref="ClassIcon"/> is upstream's class icon string, unchanged (docs/ARCHITECTURE.md, "Icons").
+/// and direct hits. There is no class icon: upstream's is a path into its own WPF project, which Scarlet does not
+/// ship, so the app shows its own image for <see cref="ClassId"/>.
 /// </summary>
 public sealed record PlayerRow(
     long Id,
@@ -36,8 +37,7 @@ public sealed record PlayerRow(
     double Dps,
     double DamageShare,
     double CriticalRate,
-    int Deaths,
-    string? ClassIcon = null);
+    int Deaths);
 
 /// <summary>
 /// Capture status. <paramref name="AdapterName"/> is set once the game's connection has been locked; in

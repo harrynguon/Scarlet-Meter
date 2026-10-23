@@ -8,12 +8,16 @@ public sealed class HistoryQueryTests
     [Theory]
     [InlineData(0, 50)]
     [InlineData(-1, 50)]
+    [InlineData(HistoryQuery.MaxPage + 1, 50)]
+    [InlineData(20_000_000, HistoryQuery.MaxPageSize)] // upstream's int skip would wrap round to page 1
+    [InlineData(int.MaxValue, 1)]
     [InlineData(1, 0)]
     [InlineData(1, HistoryQuery.MaxPageSize + 1)]
     public void RejectsPagesOutsideTheirRange(int page, int pageSize)
     {
         var error = Assert.Throws<ArgumentException>(() => new HistoryQuery(Page: page, PageSize: pageSize).Validate());
-        Assert.Contains(page < 1 ? "page must be 1 or more" : "page size must be 1 to 200", error.Message, StringComparison.Ordinal);
+        var pageWrong = page is < 1 or > HistoryQuery.MaxPage;
+        Assert.Contains(pageWrong ? "page must be 1 to 1,000,000" : "page size must be 1 to 200", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -22,6 +26,8 @@ public sealed class HistoryQueryTests
         var first = new HistoryQuery(Page: 1, PageSize: 1).Validate();
         Assert.Equal((1, 1), (first.Page, first.PageSize));
         Assert.Equal(HistoryQuery.MaxPageSize, new HistoryQuery(PageSize: HistoryQuery.MaxPageSize).Validate().PageSize);
+        Assert.Equal(HistoryQuery.MaxPage, new HistoryQuery(Page: HistoryQuery.MaxPage, PageSize: HistoryQuery.MaxPageSize).Validate().Page);
+        Assert.True((long)(HistoryQuery.MaxPage - 1) * HistoryQuery.MaxPageSize < int.MaxValue); // upstream's skip fits its int
         var instant = new DateTime(2026, 10, 23, 12, 0, 0, DateTimeKind.Local);
         Assert.Equal(instant, new HistoryQuery(From: instant, To: instant).Validate().To);
     }

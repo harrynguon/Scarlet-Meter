@@ -1,6 +1,7 @@
 using AionDpsMeter.Core.Models;
 using Microsoft.Extensions.DependencyInjection;
 using ScarletMeter.Engine;
+using ScarletMeter.Engine.Upstream;
 
 namespace ScarletMeter.Tests;
 
@@ -66,7 +67,6 @@ public sealed class PlayerDetailsTests : IDisposable
         Assert.Equal(10_000, details.Player.TotalDamage);
         Assert.Equal(80, details.Player.DamageShare, 6);        // of 12,500
         Assert.Equal(2_000, details.Player.Dps, 6);              // over Alpha's own 5 s
-        Assert.Equal("synthetic/class-11.png", details.Player.ClassIcon); // upstream's string, unchanged
         Assert.Equal(TimeSpan.FromSeconds(6), details.Duration); // the fight's, from Beta's opening hit
 
         var rates = details.Rates;
@@ -251,6 +251,56 @@ public sealed class PlayerDetailsTests : IDisposable
         combat.Engine.Reset();
         Assert.Null(combat.Engine.GetPlayerDetails(AlphaId));
     }
+
+    [Fact]
+    public void ADetailsReadStraddlingAChangeOfFightIsTakenAgain()
+    {
+        // Alpha fights mob A; during the first read the party switches to mob B (Alpha hits it later), so the
+        // first read's parts would mix A and B. The second read sees B throughout and is the one returned.
+        var alpha = combat.Player(AlphaId, "Alpha", SyntheticCombat.Class(11, "Gladiator"), isUser: true);
+        var a = combat.Target(900, mobCode: 0, hp: 10_000_000);
+        var b = combat.Target(901, mobCode: 0, hp: 10_000_000);
+        var skill = SyntheticCombat.Skill(1101, "Skill A");
+        combat.Hit(alpha, a, T0, 1_000, skill);
+        combat.Hit(alpha, a, T0.AddSeconds(2), 2_000, skill);
+        var reads = 0;
+        Engine.BetweenDetailsReads = () =>
+        {
+            if (++reads == 1) combat.Hit(alpha, b, T0.AddSeconds(3), 7_000, skill);
+        };
+
+        var details = Assert.IsType<PlayerDetails>(combat.Engine.GetPlayerDetails(AlphaId));
+        Assert.Equal(2, reads);
+        Assert.Equal(7_000, details.Player.TotalDamage);           // B's, not A's 3,000
+        Assert.Equal([7_000L], details.CombatLog.Select(hit => hit.Damage));
+        Assert.Equal(TimeSpan.Zero, details.Duration);             // B's one-hit fight
+    }
+
+    [Fact]
+    public void ADetailsReadThatKeepsStraddlingGivesUp()
+    {
+        // Every read sees the party switch target, so no read describes one fight: the result is null rather
+        // than a mix, and the caller's next poll reads afresh.
+        var alpha = combat.Player(AlphaId, "Alpha", SyntheticCombat.Class(11, "Gladiator"), isUser: true);
+        Mob[] mobs = [combat.Target(900, mobCode: 0, hp: 10_000_000), combat.Target(901, mobCode: 0, hp: 10_000_000)];
+        var skill = SyntheticCombat.Skill(1101, "Skill A");
+        combat.Hit(alpha, mobs[0], T0, 1_000, skill);
+        var reads = 0;
+        Engine.BetweenDetailsReads = () =>
+        {
+            reads++;
+            combat.Hit(alpha, mobs[reads % 2], T0.AddSeconds(reads), 1_000, skill);
+        };
+
+        Assert.Null(combat.Engine.GetPlayerDetails(AlphaId));
+        Assert.Equal(3, reads);
+
+        Engine.BetweenDetailsReads = null;
+        Assert.NotNull(combat.Engine.GetPlayerDetails(AlphaId)); // the next poll, with the fights settled
+    }
+
+    // The engine behind the interface, for its test seam.
+    private UpstreamCombatEngine Engine => (UpstreamCombatEngine)combat.Engine;
 
     public void Dispose() => host.Dispose();
 }

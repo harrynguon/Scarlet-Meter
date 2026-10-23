@@ -2,6 +2,7 @@ using AionDpsMeter.Services.Models;
 using AionDpsMeter.Services.PacketCapture;
 using AionDpsMeter.Services.Services.Session;
 using AionDpsMeter.Services.Services.Session.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace ScarletMeter.Engine.Upstream;
@@ -10,19 +11,22 @@ namespace ScarletMeter.Engine.Upstream;
 /// <see cref="ICombatEngine"/> over upstream RATmeter's pipeline. Upstream's IPacketService drives capture,
 /// TCP reassembly, frame decoding and the opcode processors that feed CombatSessionManager; snapshots, details
 /// and history are read back from that manager (and saved fights from its history store), then converted by
-/// <see cref="UpstreamMapping"/>. Only the Upstream folder touches upstream types, so an upstream API change is
-/// contained there.
+/// <see cref="UpstreamMapping"/>. Saved data is untrusted: it is cleaned by <see cref="SavedFightSanitizer"/>, and
+/// history reads fail soft (logged) rather than throw. Only the Upstream folder touches upstream types, so an
+/// upstream API change is contained there.
 /// </summary>
 internal sealed class UpstreamCombatEngine : ICombatEngine
 {
-    // A details read that straddles a change of fight is retried this many times in all, then returned as is.
+    // A details read that straddles a change of fight is taken again, this many times in all, then given up.
     private const int DetailsReadAttempts = 3;
 
     private readonly IPacketService pipeline;
     private readonly IPacketCaptureDevice capture;
     private readonly CombatSessionManager sessions;
     private readonly ICombatHistoryStore history;
+    private readonly SavedHistoryReader savedHistory;
     private readonly ILogger<UpstreamCombatEngine> logger;
+    private volatile bool savedHistoryDamaged; // set while the saved list holds a row upstream's query cannot read
     private bool disposed;
 
     public UpstreamCombatEngine(
@@ -30,14 +34,19 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         IPacketCaptureDevice capture,
         CombatSessionManager sessions,
         ICombatHistoryStore history,
+        IDbContextFactory<CombatHistoryDbContext> historyDatabase,
         ILogger<UpstreamCombatEngine> logger)
     {
         this.pipeline = pipeline;
         this.capture = capture;
         this.sessions = sessions;
         this.history = history;
+        savedHistory = new SavedHistoryReader(historyDatabase);
         this.logger = logger;
     }
+
+    /// <summary>Test seam: runs in every details read between its first and last check of the active fight. Null in production.</summary>
+    internal Action? BetweenDetailsReads { get; set; }
 
     public event EventHandler<int>? PingUpdated
     {
@@ -104,9 +113,11 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     public PlayerDetails? GetPlayerDetails(long playerId)
     {
         // Upstream computes every part on its own call, each under the session lock. If the active fight changed
-        // between the first read and the last (it ended, or the party switched targets), the parts would mix two
-        // fights, so the read is taken again. The session's start is set once, so reading it unlocked is safe.
-        for (var attempt = 1; ; attempt++)
+        // between the first check and the last (it ended, or the party switched targets), the parts could mix two
+        // fights, so the read is taken again, and given up (null) if it keeps straddling: the caller polls again.
+        // The check is by identity, so a switch away and back between the two checks goes unnoticed (documented on
+        // ICombatEngine). The session's start is set once, so reading it unlocked is safe.
+        for (var attempt = 1; attempt <= DetailsReadAttempts; attempt++)
         {
             var session = sessions.GetActiveTargetSession();
             if (session is null) return null;
@@ -117,36 +128,106 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
             var buffs = sessions.GetPlayerBuffStats(playerId);
             var graph = sessions.GetPlayerGraphData(playerId);
             var hits = sessions.GetPlayerCombatLog(playerId);
-            if (ReferenceEquals(sessions.GetActiveTargetSession(), session) || attempt == DetailsReadAttempts)
+            BetweenDetailsReads?.Invoke();
+            if (ReferenceEquals(sessions.GetActiveTargetSession(), session))
                 return UpstreamMapping.ToDetails(stats, duration, session.SessionStart, skills, buffs, graph, hits);
         }
+        return null;
     }
 
     public HistoryPage GetHistory(HistoryQuery query)
     {
         ArgumentNullException.ThrowIfNull(query);
         var valid = query.Validate();
-        // Upstream merges the running boss fights with the saved ones and pages across both, under its lock.
-        var page = sessions.GetHistoryPage(new HistorySessionQuery
+        if (savedHistoryDamaged) return ReadDamagedHistory(valid);
+        try
         {
-            BossNameContains = valid.TargetNameContains,
-            DateFrom = valid.From,
-            DateTo = valid.To,
-            PageNumber = valid.Page,
-            PageSize = valid.PageSize,
-        });
-        return new HistoryPage(
-            page.Items.Select(UpstreamMapping.ToHistoryEntry).ToList(), page.TotalCount, page.PageNumber, page.PageSize);
+            // Upstream merges the running boss fights with the saved ones and pages across both, under its lock.
+            var page = sessions.GetHistoryPage(new HistorySessionQuery
+            {
+                BossNameContains = valid.TargetNameContains,
+                DateFrom = valid.From,
+                DateTo = valid.To,
+                PageNumber = valid.Page,
+                PageSize = valid.PageSize,
+            });
+            return new HistoryPage(
+                page.Items.Select(UpstreamMapping.ToHistoryEntry).ToList(), page.TotalCount, page.PageNumber, page.PageSize);
+        }
+        catch (Exception ex)
+        {
+            // Upstream's store parses the rows of a page as it reads them, so a damaged row fails every page it
+            // falls on (and only those: other pages would still count it). From now on the list is read column by
+            // column, leaving damaged rows out, so every page agrees, until a read finds none to leave out.
+            logger.LogError(ex, "The fight history could not be read as saved; reading it without damaged entries from now on.");
+            savedHistoryDamaged = true;
+            return ReadDamagedHistory(valid);
+        }
     }
 
     public HistoryFight? GetHistoryFight(Guid fightId)
     {
-        // Saved fights are read from the store directly, not through CombatSessionManager.GetHistorySession, which
-        // holds the session lock while it decompresses and deserialises every hit of the fight: that would stall
-        // the capture thread for a large fight. A fight is saved only once it has left upstream's live sessions, so
-        // it is never in both; only a running fight is left for the session manager, which then snapshots it.
-        var snapshot = history.GetSession(fightId) ?? sessions.GetHistorySession(fightId);
-        return snapshot is null ? null : UpstreamMapping.ToHistoryFight(snapshot);
+        try
+        {
+            // Saved fights are read from the store directly, not through CombatSessionManager.GetHistorySession,
+            // which holds the session lock while it decompresses and deserialises every hit of the fight: a
+            // performance choice, so that loading a large fight cannot stall the capture thread. A fight is saved
+            // only once it has left upstream's live sessions, so only a running fight is left for the session
+            // manager, which then snapshots it.
+            var snapshot = history.GetSession(fightId) ?? sessions.GetHistorySession(fightId);
+            return snapshot is null ? null : MapFight(snapshot);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Fight {FightId} could not be read from the history.", fightId);
+            return null;
+        }
+    }
+
+    // Maps a saved or running fight once its damaged entries are dropped; what was left out is logged.
+    private HistoryFight MapFight(HistorySessionSnapshot snapshot)
+    {
+        if (!SavedFightSanitizer.HasUsableWindow(snapshot))
+        {
+            logger.LogWarning(
+                "Fight {FightId} was saved with an unusable start ({Start}) or end ({End}); only its players are shown.",
+                snapshot.SessionId, snapshot.SessionStart, snapshot.SessionEnd);
+            return UpstreamMapping.ToHistoryFight(snapshot, includeDetails: false);
+        }
+
+        var clean = SavedFightSanitizer.Clean(snapshot, out var removed);
+        if (removed > 0)
+            logger.LogWarning("Fight {FightId}: {Removed} damaged saved entries were left out.", snapshot.SessionId, removed);
+        return UpstreamMapping.ToHistoryFight(clean, includeDetails: true, (playerId, ex) =>
+            logger.LogWarning(ex, "Fight {FightId}: player {PlayerId}'s details could not be built and are left out.",
+                snapshot.SessionId, playerId));
+    }
+
+    // The saved fights that can still be read, marked incomplete (running fights are left out: only upstream's own
+    // query lists them); an empty page if even that fails. A read that leaves nothing out hands the list back to
+    // upstream's query for the next call.
+    private HistoryPage ReadDamagedHistory(HistoryQuery valid)
+    {
+        try
+        {
+            var (items, total, skipped) = savedHistory.ReadPage(valid);
+            if (skipped == 0)
+            {
+                savedHistoryDamaged = false;
+                logger.LogInformation("The fight history reads as saved again.");
+            }
+            else
+            {
+                logger.LogWarning("Saved fights left out of the history because they could not be read: {Skipped}.", skipped);
+            }
+            return new HistoryPage(
+                items.Select(UpstreamMapping.ToHistoryEntry).ToList(), total, valid.Page, valid.PageSize, IsComplete: false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "The fight history could not be read at all.");
+            return new HistoryPage([], 0, valid.Page, valid.PageSize, IsComplete: false);
+        }
     }
 
     public void Dispose()

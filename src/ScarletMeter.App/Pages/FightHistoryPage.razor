@@ -13,6 +13,10 @@
         {
             <div class="notice error">@error</div>
         }
+        else if (results is { IsComplete: false })
+        {
+            <div class="notice">Some saved fights could not be read and are left out, and a fight in progress is not listed. The log has the details.</div>
+        }
         <div class="tab-body">
             @if (results is null)
             {

@@ -35,7 +35,8 @@ internal sealed record DemoBuff(int Code, int CasterId, bool OnParty, double Per
 /// The demo's cast: four clearly synthetic players of different classes (the user among them), a summon, their
 /// buffs and the bosses they fight. Skill, class and mob codes are real entries of upstream's game data
 /// (skills.json, classes.json, mobs.json), so names and icons resolve as they would in a real fight;
-/// DemoRosterTests guards that against a game-data update. Entity ids are arbitrary but distinct.
+/// DemoModeTests.RosterResolvesInUpstreamsGameDataWithSyntheticNames guards that against a game-data update. Entity
+/// ids are arbitrary but distinct.
 /// </summary>
 internal static class DemoRoster
 {

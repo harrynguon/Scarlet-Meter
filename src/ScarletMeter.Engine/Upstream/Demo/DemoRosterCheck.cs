@@ -4,7 +4,8 @@ namespace ScarletMeter.Engine.Upstream.Demo;
 
 /// <summary>
 /// Checks <see cref="DemoRoster"/> against upstream's game data, so a game-data update that renames or drops an
-/// entry the demo relies on fails loudly (at demo start, and in DemoRosterTests) instead of showing unknown skills.
+/// entry the demo relies on fails loudly (at demo start, and in
+/// DemoModeTests.RosterResolvesInUpstreamsGameDataWithSyntheticNames) instead of showing unknown skills.
 /// </summary>
 internal static class DemoRosterCheck
 {

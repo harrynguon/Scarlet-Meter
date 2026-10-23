@@ -1,5 +1,10 @@
 using System.Text.Json;
 using AionDpsMeter.Core.Models;
+using AionDpsMeter.Services.Services.Session;
+using AionDpsMeter.Services.Services.Session.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using ScarletMeter.Engine;
 
 namespace ScarletMeter.Tests;
@@ -7,15 +12,19 @@ namespace ScarletMeter.Tests;
 /// <summary>
 /// Boss-fight history through the engine: synthetic fights are completed and saved through
 /// CompleteAndPersistActiveSessions (the path the demo and the engine's shutdown use), then listed, filtered,
-/// paged and reloaded from upstream's real SQLite store in the test's data directory.
+/// paged and reloaded from upstream's real SQLite store in the test's data directory. Damaged rows are made
+/// through upstream's own database context, as a damaged or edited file would hold them.
 /// </summary>
 public sealed class HistoryTests : IDisposable
 {
     private static readonly DateTime Day1 = new(2026, 10, 20, 20, 0, 0, DateTimeKind.Local);
+    private static readonly TimeSpan Patience = TimeSpan.FromSeconds(5);
     private const int AlphaId = 7;
     private const int BetaId = 8;
 
-    private readonly TestEngineHost host = new(CaptureMode.None);
+    private readonly CapturingLoggerProvider log = new();
+    private readonly TestEngineHost host;
+    private readonly GatedHistoryStore store;
     private readonly SyntheticCombat combat;
     private readonly Player alpha;
     private readonly Player beta;
@@ -24,6 +33,14 @@ public sealed class HistoryTests : IDisposable
 
     public HistoryTests()
     {
+        // Upstream's real store, behind a gate that can hold a save (which upstream makes under its session lock).
+        host = new TestEngineHost(CaptureMode.None, services =>
+        {
+            services.AddLogging(logging => logging.AddProvider(log));
+            services.AddSingleton<ICombatHistoryStore>(provider =>
+                new GatedHistoryStore(ActivatorUtilities.CreateInstance<CombatHistoryStore>(provider)));
+        });
+        store = (GatedHistoryStore)host.Services.GetRequiredService<ICombatHistoryStore>();
         combat = new SyntheticCombat(host);
         alpha = combat.Player(AlphaId, "Alpha", SyntheticCombat.Class(11, "Gladiator"), isUser: true);
         beta = combat.Player(BetaId, "Beta", SyntheticCombat.Class(16, "Elementalist"));
@@ -44,6 +61,7 @@ public sealed class HistoryTests : IDisposable
         };
 
         var page = Engine.GetHistory(new HistoryQuery());
+        Assert.True(page.IsComplete);
         Assert.Equal(3, page.TotalCount);
         Assert.Equal((1, 50), (page.Page, page.PageSize));
         Assert.Equal(["Aultross", "Fediv Wraith", "Aultross"], page.Entries.Select(e => e.TargetName)); // names from mobs.json
@@ -151,9 +169,156 @@ public sealed class HistoryTests : IDisposable
     [Fact]
     public void InvalidQueriesAreRejectedAtTheEngine()
     {
+        Save(901, SyntheticCombat.AultrossCode, Day1, 20);
+
         Assert.Throws<ArgumentException>(() => Engine.GetHistory(new HistoryQuery(Page: 0)));
         Assert.Throws<ArgumentException>(() => Engine.GetHistory(new HistoryQuery(PageSize: 500)));
         Assert.Throws<ArgumentNullException>(() => Engine.GetHistory(null!));
+        // Upstream would compute this page's skip in an int that wraps round, and return page 1.
+        Assert.Throws<ArgumentException>(() => Engine.GetHistory(new HistoryQuery(Page: 20_000_000, PageSize: 200)));
+        Assert.Empty(Engine.GetHistory(new HistoryQuery(Page: HistoryQuery.MaxPage, PageSize: HistoryQuery.MaxPageSize)).Entries);
+    }
+
+    [Fact]
+    public void HitsWithNoTimeOrFarFromTheFightAreLeftOut()
+    {
+        var fightId = SaveAndFind(901, Day1, 60);
+        // Alpha: a sound hit and an empty one (no time, no skill). Beta: a hit fifty days after the fight, which
+        // would stretch the one-point-per-second graph to millions of points, a sound hit and a null.
+        Damage(901, row => row.HitsByPlayerJson =
+            $$"""{"7":[{{HitJson(Day1.AddSeconds(10), 1_234)}},{}],"8":[{{HitJson(Day1.AddDays(50), 5)}},{{HitJson(Day1.AddSeconds(5), 4_321)}},null]}""");
+
+        var fight = Assert.IsType<HistoryFight>(Engine.GetHistoryFight(fightId));
+        Assert.Equal([1_234L], fight.Details[AlphaId].CombatLog.Select(hit => hit.Damage));
+        Assert.Equal([4_321L], fight.Details[BetaId].CombatLog.Select(hit => hit.Damage));
+        Assert.Equal(2, fight.Details[BetaId].Graph.Points.Count); // one hit: seconds 0 and 1, not fifty days of points
+        Assert.Contains(log.Warnings, w => w.Contains("3 damaged saved entries were left out", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ImpossibleBuffFiguresAreBoundedOrLeftOut()
+    {
+        var fightId = SaveAndFind(901, Day1, 60);
+        // An uptime of 1e300 seconds, a buff lasting 46 days (upstream's decoder rejects anything over an hour),
+        // one applied at the end of time, and one sound buff.
+        Damage(901, row =>
+        {
+            row.BuffStatsByPlayerJson = """{"7":[{"buffId":500,"buffName":"Might","applicationCount":1,"effectiveDurationSeconds":1e300},null]}""";
+            row.BuffEventsByPlayerJson =
+                $$"""{"7":[{"entityId":7,"buffId":500,"durationMs":4000000000,"appliedAt":"{{Day1:o}}"},""" +
+                """{"entityId":7,"buffId":600,"durationMs":1000,"appliedAt":"9999-12-31T23:59:59"},""" +
+                $$"""{"entityId":7,"buffId":700,"buffName":"Sound","durationMs":5000,"appliedAt":"{{Day1.AddSeconds(1):o}}"}]}""";
+        });
+
+        var details = Engine.GetHistoryFight(fightId)!.Details[AlphaId];
+        var might = Assert.Single(details.Buffs);
+        Assert.Equal(details.Duration, might.Uptime); // no longer than the fight
+        Assert.Equal(100, might.UptimePercent);
+        Assert.Equal([700], details.Graph.Buffs.Select(span => span.BuffId));
+    }
+
+    [Fact]
+    public void AFightSavedWithAnUnusableStartOrEndShowsItsPlayersOnly()
+    {
+        var unset = SaveAndFind(901, Day1, 20);
+        var tooLong = SaveAndFind(902, Day1.AddDays(1), 20);
+        Damage(901, row => row.SessionStart = DateTime.MinValue);
+        Damage(902, row => row.SessionEnd = row.SessionStart.AddDays(3)); // longer than any fight
+
+        foreach (var fightId in new[] { unset, tooLong })
+        {
+            var fight = Assert.IsType<HistoryFight>(Engine.GetHistoryFight(fightId));
+            Assert.Equal(["Alpha", "Beta"], fight.Players.Select(p => p.Name).Order(StringComparer.Ordinal));
+            Assert.Empty(fight.Details); // nothing in it can be timed
+        }
+        Assert.Equal(2, Engine.GetHistory(new HistoryQuery()).TotalCount); // both still listed
+        Assert.Equal(2, log.Warnings.Count(w => w.Contains("unusable start", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void AnUnreadableRowLeavesTheRestOfTheHistoryReadable()
+    {
+        var first = SaveAndFind(901, Day1, 60);
+        var broken = SaveAndFind(902, Day1.AddDays(1), 60);
+        SaveAndFind(903, Day1.AddDays(2), 60);
+        Assert.Equal(1, Sql("UPDATE CombatSessions SET SessionEnd = 'not a date' WHERE TargetId = 902"));
+        Assert.Throws<FormatException>(() => combat.History.GetSessionList()); // the premise: upstream's own read fails
+
+        // Upstream's query fails on that row; the engine reads the list again without it.
+        var page = Engine.GetHistory(new HistoryQuery());
+        Assert.False(page.IsComplete);
+        Assert.Equal(2, page.TotalCount);
+        Assert.Equal([Day1.AddDays(2), Day1], page.Entries.Select(e => e.Start));
+        Assert.All(page.Entries, entry => Assert.True(entry.Completed));
+        Assert.Contains(log.Errors, e => e.Contains("could not be read as saved", StringComparison.Ordinal));
+        Assert.Contains(log.Warnings, w => w.Contains("because they could not be read: 1", StringComparison.Ordinal));
+
+        // Every later page is read the same way, so pages agree: this one would not contain the damaged row,
+        // and upstream would have returned it whole yet counted the damaged row. Filters still apply.
+        var second = Engine.GetHistory(new HistoryQuery("aultross", PageSize: 1, Page: 2));
+        Assert.False(second.IsComplete);
+        Assert.Equal(2, second.TotalCount);
+        Assert.Equal([Day1], second.Entries.Select(e => e.Start));
+        Assert.Empty(Engine.GetHistory(new HistoryQuery(From: Day1.AddDays(1), To: Day1.AddDays(1).AddHours(1))).Entries);
+
+        Assert.Null(Engine.GetHistoryFight(broken)); // logged, not thrown
+        Assert.Contains(log.Errors, e => e.Contains($"Fight {broken} could not be read", StringComparison.Ordinal));
+        Assert.NotNull(Engine.GetHistoryFight(first));
+
+        // Once the row reads again, the next read finds nothing to leave out and hands back to upstream's query.
+        Assert.Equal(1, Sql("UPDATE CombatSessions SET SessionEnd = '2026-10-21 20:01:00.5' WHERE TargetId = 902"));
+        Assert.False(Engine.GetHistory(new HistoryQuery()).IsComplete);
+        var healed = Engine.GetHistory(new HistoryQuery());
+        Assert.True(healed.IsComplete);
+        Assert.Equal(3, healed.TotalCount);
+    }
+
+    [Fact]
+    public void AHistoryThatCannotBeReadAtAllIsEmptyAndIncomplete()
+    {
+        var fightId = SaveAndFind(901, Day1, 20);
+        Sql("DROP TABLE CombatSessions");
+
+        var page = Engine.GetHistory(new HistoryQuery());
+        Assert.False(page.IsComplete);
+        Assert.Empty(page.Entries);
+        Assert.Equal(0, page.TotalCount);
+        Assert.Null(Engine.GetHistoryFight(fightId));
+        Assert.Contains(log.Errors, e => e.Contains("could not be read at all", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ASavedFightLoadsWhileUpstreamHoldsItsSessionLock()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var saved = SaveAndFind(901, Day1, 20);
+        Fight(902, SyntheticCombat.FedivWraithCode, Day1.AddDays(1), 20);
+
+        // Completing the running fight saves it under upstream's session lock; the gate holds that save, and
+        // with it the lock, as a slow save would.
+        store.HoldSaves();
+        var completing = Task.Run(() => combat.CompleteAndSave(Day1.AddDays(1).AddSeconds(21)), token);
+        Task? throughSessions = null;
+        try
+        {
+            Assert.True(store.SaveEntered.Wait(Patience, token));
+
+            // The premise: a read through upstream's session manager waits for the lock.
+            throughSessions = Task.Run(() => combat.Sessions.GetHistorySession(saved), token);
+            var first = await Task.WhenAny(throughSessions, Task.Delay(TimeSpan.FromMilliseconds(300), token));
+            Assert.NotSame(throughSessions, first);
+
+            // The engine reads a saved fight from the store, so it does not wait.
+            var loaded = await Task.Run(() => Engine.GetHistoryFight(saved), token).WaitAsync(Patience, token);
+            Assert.Equal(saved, loaded?.Entry.FightId);
+        }
+        finally
+        {
+            // Both waiting tasks finish before the host, and its database, go away.
+            store.ReleaseSaves();
+            await completing.WaitAsync(Patience, token);
+            if (throughSessions is not null) await throughSessions.WaitAsync(Patience, token);
+        }
     }
 
     // One boss fight of the given length: Alpha and Beta hit every second (Alpha critically every third second),
@@ -184,9 +349,79 @@ public sealed class HistoryTests : IDisposable
         return total;
     }
 
+    // Saves an Aultross fight on the given entity and returns its id.
+    private Guid SaveAndFind(int entityId, DateTime start, int seconds)
+    {
+        Save(entityId, SyntheticCombat.AultrossCode, start, seconds);
+        using var db = Database();
+        return db.Sessions.Single(row => row.TargetId == entityId).SessionId;
+    }
+
+    // Changes a saved row through upstream's own context, as a damaged or edited database would hold it. JSON
+    // written here is left uncompressed, which upstream's store reads as is.
+    private void Damage(int entityId, Action<CombatSessionEntity> change)
+    {
+        using var db = Database();
+        change(db.Sessions.Single(row => row.TargetId == entityId));
+        db.SaveChanges();
+    }
+
+    // Runs SQL the entity cannot express, such as text in a date column; returns the rows it changed.
+    private int Sql(string sql)
+    {
+        using var db = Database();
+        return db.Database.ExecuteSqlRaw(sql);
+    }
+
+    private CombatHistoryDbContext Database() =>
+        host.Services.GetRequiredService<IDbContextFactory<CombatHistoryDbContext>>().CreateDbContext();
+
+    // A saved hit as upstream's JSON holds it, with the fields the details read.
+    private static string HitJson(DateTime at, long damage) =>
+        $$$"""{"dateTime":"{{{at:o}}}","damage":{{{damage}}},"skill":{"id":1101,"name":"Strike"}}""";
+
     private IEnumerable<DateTime> Starts(HistoryQuery query) => Engine.GetHistory(query).Entries.Select(e => e.Start);
 
     private static string Json(object? value) => JsonSerializer.Serialize(value);
 
     public void Dispose() => host.Dispose();
+
+    /// <summary>
+    /// Upstream's history store with a gate on Save, which upstream calls under its session lock when a fight
+    /// completes: holding the gate holds the lock. Everything else passes straight through.
+    /// </summary>
+    private sealed class GatedHistoryStore(ICombatHistoryStore inner) : ICombatHistoryStore
+    {
+        private readonly ManualResetEventSlim open = new(initialState: true);
+
+        public ManualResetEventSlim SaveEntered { get; } = new();
+
+        public void HoldSaves()
+        {
+            SaveEntered.Reset();
+            open.Reset();
+        }
+
+        public void ReleaseSaves() => open.Set();
+
+        public void Save(HistorySessionSnapshot snapshot)
+        {
+            SaveEntered.Set();
+            open.Wait(TimeSpan.FromSeconds(10), CancellationToken.None); // never hangs a test run for good
+            inner.Save(snapshot);
+        }
+
+        public void FlushPendingSaves() => inner.FlushPendingSaves();
+
+        public IReadOnlyList<HistorySessionListItem> GetSessionList() => inner.GetSessionList();
+
+        public int GetSessionCount(DateTime? dateFrom, DateTime? dateTo, string? bossNameContains, IReadOnlySet<Guid>? excludeSessionIds = null) =>
+            inner.GetSessionCount(dateFrom, dateTo, bossNameContains, excludeSessionIds);
+
+        public IReadOnlyList<HistorySessionListItem> GetSessionPage(DateTime? dateFrom, DateTime? dateTo, string? bossNameContains,
+            int skip, int take, IReadOnlySet<Guid>? excludeSessionIds = null) =>
+            inner.GetSessionPage(dateFrom, dateTo, bossNameContains, skip, take, excludeSessionIds);
+
+        public HistorySessionSnapshot? GetSession(Guid sessionId) => inner.GetSession(sessionId);
+    }
 }

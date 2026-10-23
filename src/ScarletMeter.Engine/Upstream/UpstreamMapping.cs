@@ -7,8 +7,9 @@ namespace ScarletMeter.Engine.Upstream;
 /// <summary>
 /// Pure conversions from upstream's models to Scarlet's records. Nothing here reads shared state: callers pass
 /// what they read under upstream's session lock (the live fight) or from a saved snapshot (history), so live
-/// and saved details are built by the same code. Saved fights are deserialised from the history database, so
-/// every list is read null-tolerantly: a damaged entry is skipped rather than failing the whole fight.
+/// and saved details are built by the same code. A saved snapshot is cleaned by <see cref="SavedFightSanitizer"/>
+/// first; the lists here are still read null-tolerantly, and figures that feed TimeSpan or sums are bounded, so
+/// no saved value can make a conversion throw.
 /// </summary>
 internal static class UpstreamMapping
 {
@@ -16,7 +17,7 @@ internal static class UpstreamMapping
     public static PlayerRow ToPlayerRow(PlayerStats s) => new(
         s.PlayerId, s.PlayerName ?? string.Empty, s.IsUser, s.IsIdentified, s.ClassId, s.ClassName ?? string.Empty,
         s.ServerName ?? string.Empty, s.CombatPower, s.TotalDamage, s.DamagePerSecond, s.DamagePercentage,
-        s.CriticalRate, s.PlayerDeaths, s.ClassIcon);
+        s.CriticalRate, s.PlayerDeaths);
 
     /// <summary>
     /// One player's details from the parts upstream computes. <paramref name="hitsNewestFirst"/> is the player's
@@ -68,12 +69,19 @@ internal static class UpstreamMapping
             s.DoubleDamageRate, s.ParryRate),
         s.IsSummonGroup ? ToSkillRows(s.SummonChildren) : []);
 
-    /// <summary>Buff rows by uptime, longest first; uptime percent is of <paramref name="fightDuration"/>.</summary>
+    /// <summary>
+    /// Buff rows by uptime, longest first; uptime percent is of <paramref name="fightDuration"/>. Upstream measures
+    /// uptime within the fight, so it is bounded by the fight's duration; a saved figure beyond that (or not a
+    /// finite number) is damaged and is clamped, which also keeps TimeSpan from overflowing.
+    /// </summary>
     public static IReadOnlyList<BuffRow> ToBuffRows(IEnumerable<BuffStats?>? buffs, TimeSpan fightDuration) =>
         (buffs ?? []).OfType<BuffStats>()
             .Select(b =>
             {
-                var uptime = TimeSpan.FromSeconds(Math.Max(0, b.EffectiveDurationSeconds));
+                var seconds = double.IsFinite(b.EffectiveDurationSeconds)
+                    ? Math.Clamp(b.EffectiveDurationSeconds, 0, Math.Max(0, fightDuration.TotalSeconds))
+                    : 0;
+                var uptime = TimeSpan.FromSeconds(seconds);
                 var percent = fightDuration > TimeSpan.Zero ? Math.Clamp(uptime / fightDuration * 100, 0, 100) : 0;
                 return new BuffRow(b.BuffId, b.BuffName ?? string.Empty, b.BuffIcon, b.Description ?? string.Empty,
                     b.ApplicationCount, uptime, percent);
@@ -116,13 +124,18 @@ internal static class UpstreamMapping
         item.PlayerCount, item.State == SessionState.Completed);
 
     /// <summary>
-    /// A saved or running fight with every player's details. The entry's totals and player count are computed
-    /// from the snapshot's players the way upstream computes them when it saves a fight.
+    /// A saved or running fight with its players' details. The entry's totals and player count are computed
+    /// from the snapshot's players the way upstream computes them when it saves a fight (the total saturating
+    /// rather than overflowing). Pass a snapshot cleaned by <see cref="SavedFightSanitizer"/>. With
+    /// <paramref name="includeDetails"/> false (a saved fight whose start or end is damaged, so nothing in it can
+    /// be timed) only the rows are returned. A player whose details still fail to build is reported through
+    /// <paramref name="playerFailed"/> and left out of the details, so one damaged player does not cost the fight.
     /// </summary>
-    public static HistoryFight ToHistoryFight(HistorySessionSnapshot snapshot)
+    public static HistoryFight ToHistoryFight(
+        HistorySessionSnapshot snapshot, bool includeDetails = true, Action<long, Exception>? playerFailed = null)
     {
         var players = (snapshot.PlayerStats ?? []).OfType<PlayerStats>().DistinctBy(p => p.PlayerId).ToList();
-        long totalDamage = players.Sum(p => p.TotalDamage);
+        long totalDamage = SaturatingSum(players.Select(p => p.TotalDamage));
         var duration = snapshot.Duration;
         var entry = new HistoryEntry(
             snapshot.SessionId, snapshot.TargetName ?? string.Empty, snapshot.TargetHpTotal,
@@ -131,17 +144,26 @@ internal static class UpstreamMapping
             snapshot.State == SessionState.Completed);
 
         var details = new Dictionary<long, PlayerDetails>(players.Count);
-        foreach (var player in players)
+        foreach (var player in includeDetails ? players : [])
         {
-            // Upstream keeps the raw hits newest first, matching the live combat log, which GraphDataCalculator expects.
-            var hits = (Lookup(snapshot.HitsByPlayer, player.PlayerId) ?? []).OfType<PlayerDamage>().ToList();
-            var buffEvents = (Lookup(snapshot.BuffEventsByPlayer, player.PlayerId) ?? []).OfType<BuffEvent>().ToList();
-            details[player.PlayerId] = ToDetails(
-                player, duration, snapshot.SessionStart,
-                Lookup(snapshot.SkillStatsByPlayer, player.PlayerId) ?? [],
-                Lookup(snapshot.BuffStatsByPlayer, player.PlayerId) ?? [],
-                GraphDataCalculator.Compute(hits, buffEvents),
-                hits);
+            try
+            {
+                // Hits newest first, matching the live combat log, as GraphDataCalculator expects.
+                var hits = (Lookup(snapshot.HitsByPlayer, player.PlayerId) ?? []).OfType<PlayerDamage>().ToList();
+                var buffEvents = (Lookup(snapshot.BuffEventsByPlayer, player.PlayerId) ?? []).OfType<BuffEvent>().ToList();
+                details[player.PlayerId] = ToDetails(
+                    player, duration, snapshot.SessionStart,
+                    Lookup(snapshot.SkillStatsByPlayer, player.PlayerId) ?? [],
+                    Lookup(snapshot.BuffStatsByPlayer, player.PlayerId) ?? [],
+                    GraphDataCalculator.Compute(hits, buffEvents),
+                    hits);
+            }
+            catch (Exception ex)
+            {
+                // Defence in depth behind the sanitizer: saved data is not trusted, and one player's damage must
+                // not cost the whole fight.
+                playerFailed?.Invoke(player.PlayerId, ex);
+            }
         }
 
         return new HistoryFight(entry, players.Select(ToPlayerRow).ToList(), details);
@@ -168,6 +190,19 @@ internal static class UpstreamMapping
 
     private static double PerSecond(long damage, TimeSpan duration) =>
         duration > TimeSpan.Zero ? damage / duration.TotalSeconds : 0;
+
+    // Enumerable.Sum is checked and would throw on saved totals that overflow together; this saturates instead.
+    private static long SaturatingSum(IEnumerable<long> values)
+    {
+        long total = 0;
+        foreach (var value in values)
+        {
+            if (value > 0 && total > long.MaxValue - value) total = long.MaxValue;
+            else if (value < 0 && total < long.MinValue - value) total = long.MinValue;
+            else total += value;
+        }
+        return total;
+    }
 
     private static T? Lookup<T>(IReadOnlyDictionary<long, T>? map, long playerId) where T : class =>
         map is not null && map.TryGetValue(playerId, out var value) ? value : null;
