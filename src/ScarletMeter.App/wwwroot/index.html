@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Scarlet Meter</title>
     <base href="/" />
+    <!-- Scripts only from the app; images only from the app, the two local virtual hosts and NC's game-data CDN
+         (skill icons). Inline styles are allowed because the pages set widths and colours in style attributes. -->
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://data.scarlet.example https://assets.scarlet.example https://assets.playnccdn.com; connect-src 'self'; object-src 'none'; base-uri 'self'" />
     <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
