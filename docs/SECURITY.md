@@ -2,19 +2,19 @@
 
 Never embed, print, log or commit credentials, tokens, game authentication data, personal progress, packet captures or private combat logs. Use synthetic fixtures. Treat anything read from the network or from files as untrusted; upstream validates packet fields before use, and the engine validates paths at its boundary.
 
-Filesystem operations use absolute paths derived from trusted roots (AGENTS.md, "Paths"). The meter writes only under its per-user data directory.
+Filesystem operations use absolute paths derived from trusted roots (AGENTS.md, "Paths"). The meter writes only under its data directory (per-user by default, or `--data-dir`): history database, logs and the WebView2 browser profile (ARCHITECTURE.md, "Storage").
 
 Raw packet logging, which upstream offers as a developer setting and which writes other players' data to disk, is not reachable here: the settings bridge reports it off and no packet writer is registered. The history database still stores other players' names and combat statistics for completed boss fights, as upstream does.
 
 ## Dependencies
 
-Restore runs with NuGet audit advisories as errors (`-warnaserror:NU1901..NU1904`). Upstream's `AionDpsMeter.Services` overrides the SQLite native bundle (SQLitePCLRaw.bundle_e_sqlite3 3.0.5) for CVE-2025-6965; that override is upstream's own at the pinned release. Audit results are time-dependent, not a security review.
+Restore runs with NuGet audit advisories as errors (`-warnaserror:NU1901..NU1904`). Upstream's `AionDpsMeter.Services` at the pinned release pulls the vulnerable native SQLite package (CVE-2025-6965, GHSA-2m69-gcr7-jv3q); Scarlet's root `Directory.Build.props` overlays it with SQLitePCLRaw.bundle_e_sqlite3 3.0.5, mirroring the override the harrynguon/AIon2-Dps-Meter fork carries in its copy of that project (ARCHITECTURE.md, "Upstream overlay"). Upstream itself does not carry it. Audit results are time-dependent, not a security review.
 
 ## Provenance
 
-Upstream: https://github.com/Kuroukihime/AIon2-Dps-Meter at the release tag recorded by the `upstream` submodule (v1.11.4.334, commit 57974f8, at this baseline), GPLv3. Scarlet Meter is GPLv3 as well, because the built program links upstream's code; private use carries no obligation, and any distribution must ship the source under the same licence.
+Upstream: https://github.com/Kuroukihime/AIon2-Dps-Meter at the release tag recorded by the `upstream` submodule (v1.11.4.334, commit 57974f8, at this baseline), GPLv3, "RATmeter, Copyright (c) 2026 Kuroukihime" (`upstream/LICENSE`). Scarlet Meter is GPLv3 as well, because the built program links upstream's code; private use carries no obligation, and any distribution must ship the source under the same licence. The root `LICENSE` carries Scarlet Meter's own notice and names upstream's.
 
-`src/ScarletMeter.App/DeferredWindowClose.cs` is ported from the harrynguon/AIon2-Dps-Meter fork (GPLv3), where it is a fork-owned file.
+`src/ScarletMeter.App/DeferredWindowClose.cs` and `tests/ScarletMeter.Tests/DeferredWindowCloseTests.cs` are ported from the harrynguon/AIon2-Dps-Meter fork (GPLv3), where they are fork-owned files.
 
 ## Game terms
 

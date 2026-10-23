@@ -7,7 +7,7 @@ Every path is derived from this script's own location, so the same command works
 Set SCARLET_DOTNET to a dotnet.exe when the .NET 10 SDK is not the one on PATH.
 
 .EXAMPLE
-.\scripts\Build.ps1 -Configuration Release
+& "<checkout>\scripts\Build.ps1" -Configuration Release
 #>
 [CmdletBinding()]
 param(

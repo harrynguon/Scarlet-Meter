@@ -675,5 +675,11 @@ Public License instead of this License.  But first, please read
 
 ---
 
-RATmeter
-Copyright (c) 2026 Kuroukihime
+Scarlet Meter
+Copyright (C) 2026 harrynguon
+
+Scarlet Meter is free software: you can redistribute it and/or modify it under the terms of the GNU
+General Public License, version 3, as published by the Free Software Foundation.
+
+It includes and links RATmeter (https://github.com/Kuroukihime/AIon2-Dps-Meter), Copyright (c) 2026
+Kuroukihime, in the upstream/ directory under the same licence; see upstream/LICENSE.

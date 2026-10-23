@@ -8,7 +8,7 @@ upstream's dev branch or an unreleased commit (AGENTS.md, "Upstream boundary"). 
 script's location, so it runs from any working directory.
 
 .EXAMPLE
-.\scripts\Update-Upstream.ps1 -Tag v1.11.4.334
+& "<checkout>\scripts\Update-Upstream.ps1" -Tag v1.11.4.334
 #>
 [CmdletBinding()]
 param(
@@ -26,13 +26,15 @@ if (-not (Test-Path -LiteralPath (Join-Path $upstream '.git'))) {
     throw "The upstream submodule is not initialised. Run: git -C `"$repoRoot`" submodule update --init"
 }
 
-& $git -C $upstream fetch --tags origin
+# --quiet: git reports success on stderr, which Windows PowerShell 5.1 turns into a terminating error under
+# Stop when stderr is redirected or the host has no console (ISE, VS Code). $LASTEXITCODE is the failure signal.
+& $git -C $upstream fetch --tags --quiet origin
 if ($LASTEXITCODE) { throw 'Fetching upstream tags failed.' }
 & $git -C $upstream rev-parse --verify --quiet "refs/tags/$Tag^{commit}" | Out-Null
 if ($LASTEXITCODE) { throw "No release tag $Tag on upstream. Only released tags may be used." }
 
 $before = (& $git -C $upstream rev-parse HEAD).Trim()
-& $git -C $upstream checkout --detach "refs/tags/$Tag"
+& $git -C $upstream checkout --quiet --detach "refs/tags/$Tag"
 if ($LASTEXITCODE) { throw 'Checking out the tag failed.' }
 $after = (& $git -C $upstream rev-parse HEAD).Trim()
 & $git -C $repoRoot add upstream

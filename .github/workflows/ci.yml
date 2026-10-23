@@ -25,7 +25,8 @@ jobs:
         shell: pwsh
         run: '& "${{ github.workspace }}/scripts/Build.ps1" -Configuration Release'
 
-      # Catches single-file publish regressions (native SQLite, WebView assets) before a release does.
+      # Proves the self-contained single-file publish completes (win-x64 restore, static web assets, bundling).
+      # The next step checks its layout; nothing here launches the meter.
       - name: Publish smoke (self-contained single-file win-x64)
         shell: pwsh
         run: >-
@@ -33,3 +34,7 @@ jobs:
           --configuration Release --runtime win-x64 --self-contained true
           -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
           --output "${{ github.workspace }}/publish"
+
+      - name: Verify published layout
+        shell: pwsh
+        run: '& "${{ github.workspace }}/scripts/Test-PublishLayout.ps1" -PublishDirectory "${{ github.workspace }}/publish"'

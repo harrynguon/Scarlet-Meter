@@ -12,24 +12,26 @@ Status: scaffold. Capture, decoding, fight tracking and history come from upstre
 | `src/ScarletMeter.Engine` | The only project that references upstream. Wraps its pipeline behind Scarlet's own contracts (`ICombatEngine`, `CombatSnapshot`). |
 | `src/ScarletMeter.App` | WPF window hosting a Blazor WebView; references the engine only. |
 | `tests/ScarletMeter.Tests` | Boundary guards and engine mapping tests (no Npcap needed). |
-| `scripts/` | `Build.ps1` (restore, build, test) and `Update-Upstream.ps1 -Tag vX.Y.Z.N`. |
+| `scripts/` | `Build.ps1` (restore, build, test), `Update-Upstream.ps1 -Tag vX.Y.Z.N` and `Test-PublishLayout.ps1`. Each derives its paths from its own location. |
 | `docs/` | Maintainer documentation. Start with [docs/README.md](docs/README.md). |
 
 ## Build and run
 
 Requires Windows, the .NET 10 SDK, the WebView2 runtime and, for live capture, [Npcap](https://npcap.com) installed in WinPcap API-compatible mode.
 
+`<checkout>` below is the absolute path of your clone.
+
 ```powershell
-git clone --recurse-submodules https://github.com/harrynguon/ScarletMeter.git
-.\ScarletMeter\scripts\Build.ps1
+git clone --recurse-submodules https://github.com/harrynguon/ScarletMeter.git "<checkout>"
+& "<checkout>\scripts\Build.ps1"
 ```
 
-Run `src\ScarletMeter.App` from your IDE, or publish it as described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). `--no-capture` opens the window without Npcap; `--data-dir <absolute path>` moves the history database and logs away from `%LocalAppData%\ScarletMeter`.
+Run `src\ScarletMeter.App` from your IDE, or publish it as described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). `--no-capture` opens the window without Npcap; `--data-dir <absolute path>` moves everything the meter writes (history database, logs, WebView2 profile) away from `%LocalAppData%\ScarletMeter`.
 
 ## Updating upstream
 
 ```powershell
-.\scripts\Update-Upstream.ps1 -Tag v1.11.4.334
+& "<checkout>\scripts\Update-Upstream.ps1" -Tag v1.11.4.334
 ```
 
 Releases only, never upstream's `dev` branch. The script moves the submodule, rebuilds and runs the tests; a compile error in `src/ScarletMeter.Engine/Upstream` is the signal that upstream changed an API the engine maps.
