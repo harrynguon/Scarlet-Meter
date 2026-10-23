@@ -153,12 +153,13 @@ public sealed class MeterWindows : IMeterWindows
     }
 
     /// <summary>
-    /// Brings a minimized meter back when a world-event notice appears (if the player wants that), without
-    /// activating it, so the game keeps keyboard focus. Owned tool windows reappear with the overlay.
+    /// Brings a minimized meter back once per event occurrence, when its Soon notice appears (if the player
+    /// wants that), without activating it, so the game keeps keyboard focus. Owned tool windows reappear with
+    /// the overlay.
     /// </summary>
     public void FollowAlerts(AlertMonitor alerts)
     {
-        alerts.AlertAppeared += (_, _) => Application.Current?.Dispatcher.InvokeAsync(() =>
+        alerts.EventApproaching += (_, _) => Application.Current?.Dispatcher.InvokeAsync(() =>
         {
             if (overlay is null || closing || modalOpen || overlay.WindowState != WindowState.Minimized) return;
             if (!settings.Current.Alerts.RestoreMinimizedMeter) return;

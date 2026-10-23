@@ -9,7 +9,8 @@ namespace ScarletMeter.Tests;
 /// <summary>
 /// The overlay's world-event notices over the Global preset at UTC+9 (server 10:00 is 01:00 UTC; Shugo is
 /// hourly on the hour with a three-minute entry, the rift every three hours from server 02:00 with a
-/// ten-minute portal), their settings, wording, and the monitor's "a notice appeared" signal.
+/// ten-minute portal), their settings, wording, and the monitor: its once-per-occurrence "event approaching"
+/// signal, its wake-ups and its recovery from failures.
 /// </summary>
 public sealed class AlertTests : IDisposable
 {
@@ -67,6 +68,10 @@ public sealed class AlertTests : IDisposable
         Assert.Equal(new DateTimeOffset(2026, 10, 24, 2, 0, 0, TimeSpan.Zero), next.Start); // server 11:00
 
         Assert.Null(AlertMonitor.Compute(riftOnly with { ShowNextEvent = false }, new DateTimeOffset(2026, 10, 24, 0, 0, 0, TimeSpan.Zero)).Next);
+
+        var due = AlertMonitor.Compute(Only(EventIds.Shugo) with { ShowNextEvent = true }, At0056);
+        Assert.Single(due.Alerts);
+        Assert.Null(due.Next); // a due notice replaces the next-event line
     }
 
     [Fact]
@@ -125,34 +130,121 @@ public sealed class AlertTests : IDisposable
     }
 
     [Fact]
-    public void TheMonitorSignalsEachNoticeOnceAndWakesAtTheNextChange()
+    public void TheSettingsListNamesEachPhaseInLocalTime()
+    {
+        var rules = EventCatalog.Default.ToDictionary(r => r.Id);
+        var offset = EventCatalog.DefaultServerOffset;
+        var utc = TimeZoneInfo.Utc;
+        string Status(string id, DateTimeOffset now) => EventText.Status(EventSchedule.Occurrence(rules[id], now, offset), now, utc);
+
+        var midnight = new DateTimeOffset(2026, 10, 24, 0, 0, 0, TimeSpan.Zero); // a Saturday
+        Assert.Equal("next 02:00", Status(EventIds.Rift, midnight));
+        Assert.Equal("portal open now", Status(EventIds.Rift, midnight.AddHours(2).AddMinutes(5)));
+        Assert.Equal("entry open now", Status(EventIds.Shugo, midnight.AddHours(1).AddMinutes(1)));
+        Assert.Equal("running, entry closed", Status(EventIds.Shugo, midnight.AddHours(1).AddMinutes(5)));
+        Assert.Equal("next Sun 12:00", Status(EventIds.Nahma, midnight)); // server Sun 21:00
+
+        var boss = EventSchedule.Occurrence(rules[EventIds.Nahma], midnight, offset) with { Phase = EventPhase.ScheduledActive };
+        Assert.Equal("started 12:00", EventText.Status(boss, midnight, utc));
+
+        var auckland = TimeZoneInfo.CreateCustomTimeZone("UTC+13", TimeSpan.FromHours(13), "UTC+13", "UTC+13");
+        Assert.Equal("next 15:00", EventText.Status(EventSchedule.Occurrence(rules[EventIds.Rift], midnight, offset), midnight, auckland));
+    }
+
+    [Fact]
+    public void TheMonitorAnnouncesEachOccurrenceOnceAndWakesAtTheNextChange()
     {
         var clock = new FakeClock(At0056.AddMinutes(-1)); // 00:55, Shugo's notice opens now
-        var store = new SettingsStore(directory.FullPath, NullLogger<SettingsStore>.Instance);
-        using var settings = new SettingsService(store, new EngineSettings(), NullLogger<SettingsService>.Instance);
-        settings.Update(s => s with { Alerts = Only(EventIds.Shugo) });
+        using var settings = NewSettings(Only(EventIds.Shugo));
         using var monitor = new AlertMonitor(settings, clock, NullLogger<AlertMonitor>.Instance);
-        var appeared = new List<EventAlert>();
-        monitor.AlertAppeared += (_, alert) => appeared.Add(alert);
+        var approaching = new List<EventAlert>();
+        monitor.EventApproaching += (_, alert) => approaching.Add(alert);
 
         monitor.Start();
-        Assert.Equal(AlertKind.Soon, Assert.Single(appeared).Kind);
+        Assert.Equal(AlertKind.Soon, Assert.Single(approaching).Kind);
         Assert.Equal(TimeSpan.FromMinutes(1), clock.Due); // capped at a minute, though the next change is the 01:00 start
 
         clock.Fire(TimeSpan.FromMinutes(1));          // 00:56: same notice, no new signal
-        Assert.Single(appeared);
-        clock.Fire(TimeSpan.FromMinutes(4));          // 01:00: the entry opens
-        Assert.Equal(2, appeared.Count);
-        Assert.Equal(AlertKind.Open, appeared[1].Kind);
+        Assert.Single(approaching);
+        clock.Fire(TimeSpan.FromSeconds(210));        // 00:59:30: wake just after the 01:00 start
+        Assert.Equal(TimeSpan.FromSeconds(30) + TimeSpan.FromMilliseconds(20), clock.Due);
+        clock.Fire(clock.Due);                        // the entry opens: shown, but not announced again
         Assert.Equal(AlertKind.Open, Assert.Single(monitor.Current.Alerts).Kind);
+        Assert.Single(approaching);
+
+        clock.Fire(TimeSpan.FromMinutes(55));         // 01:55: the next occurrence is announced
+        Assert.Equal(2, approaching.Count);
+        Assert.Equal(approaching[0].Start.AddHours(1), approaching[1].Start);
+
+        // Turning the event off and on, or changing the lead time, does not announce the same occurrence again.
+        settings.Update(s => s with { Alerts = s.Alerts with { Events = [] } });
+        Assert.Empty(monitor.Current.Alerts);
+        settings.Update(s => s with { Alerts = s.Alerts with { Events = [EventIds.Shugo], LeadMinutes = 10 } });
+        Assert.Single(monitor.Current.Alerts);
+        Assert.Equal(2, approaching.Count);
 
         settings.Update(s => s with { Alerts = s.Alerts with { Enabled = false } });
         Assert.Empty(monitor.Current.Alerts);
     }
 
+    [Fact]
+    public void AFailingSubscriberOrComputationNeverEscapesTheTimer()
+    {
+        var clock = new FakeClock(At0056.AddMinutes(-1));
+        using var settings = NewSettings(Only(EventIds.Shugo));
+        using var monitor = new AlertMonitor(settings, clock, NullLogger<AlertMonitor>.Instance);
+        var approaching = 0;
+        monitor.Changed += (_, _) => throw new InvalidOperationException("subscriber");
+        monitor.EventApproaching += (_, _) => approaching++;
+
+        monitor.Start();                              // Changed throws; the signal is still raised
+        Assert.Equal(1, approaching);
+        Assert.Single(monitor.Current.Alerts);
+
+        clock.FailNextRead = true;                    // the computation fails: no notices, retry in a minute
+        clock.Fire(TimeSpan.FromMinutes(1));
+        Assert.Empty(monitor.Current.Alerts);
+        Assert.Equal(TimeSpan.FromMinutes(1), clock.Due);
+
+        clock.Fire(TimeSpan.FromMinutes(1));          // 00:57: back, and the occurrence is not announced twice
+        Assert.Single(monitor.Current.Alerts);
+        Assert.Equal(1, approaching);
+    }
+
+    [Fact]
+    public void StartingTwiceOrAfterDisposalDoesNothing()
+    {
+        var clock = new FakeClock(At0056);
+        using var settings = NewSettings(Only(EventIds.Shugo));
+        var monitor = new AlertMonitor(settings, clock, NullLogger<AlertMonitor>.Instance);
+        var changes = 0;
+        monitor.Changed += (_, _) => changes++;
+
+        monitor.Start();
+        monitor.Start();
+        changes = 0;
+        settings.Update(s => s with { Alerts = s.Alerts with { LeadMinutes = 7 } });
+        Assert.Equal(1, changes); // subscribed to settings once
+
+        monitor.Dispose();
+        var timers = clock.TimersCreated;
+        monitor.Start();
+        settings.Update(s => s with { Alerts = s.Alerts with { LeadMinutes = 8 } });
+        Assert.Equal(1, changes);
+        Assert.Equal(timers, clock.TimersCreated);
+    }
+
+    private SettingsService NewSettings(AlertSettings alerts)
+    {
+        var store = new SettingsStore(directory.FullPath, NullLogger<SettingsStore>.Instance);
+        var settings = new SettingsService(store, new EngineSettings(), NullLogger<SettingsService>.Instance);
+        settings.Update(s => s with { Alerts = alerts });
+        return settings;
+    }
+
     public void Dispose() => directory.Dispose();
 
-    // A clock whose single timer fires only when the test says so.
+    // A clock whose single timer fires only when the test says so, and whose next read can be made to fail.
     private sealed class FakeClock(DateTimeOffset start) : TimeProvider
     {
         private DateTimeOffset now = start;
@@ -160,12 +252,22 @@ public sealed class AlertTests : IDisposable
 
         public TimeSpan Due { get; private set; }
 
-        public override DateTimeOffset GetUtcNow() => now;
+        public int TimersCreated { get; private set; }
+
+        public bool FailNextRead { get; set; }
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            if (!FailNextRead) return now;
+            FailNextRead = false;
+            throw new InvalidOperationException("clock");
+        }
 
         public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
         {
             this.callback = callback;
             Due = dueTime;
+            TimersCreated++;
             return new NoTimer();
         }
 

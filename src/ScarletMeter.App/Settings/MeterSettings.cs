@@ -64,8 +64,11 @@ public sealed record AlertSettings
     /// <summary>When nothing is due, show the next alerted event as one dim line.</summary>
     public bool ShowNextEvent { get; init; }
 
-    /// <summary>Bring a minimized meter back (without taking focus from the game) when a notice appears.</summary>
-    public bool RestoreMinimizedMeter { get; init; } = true;
+    /// <summary>
+    /// Bring a minimized meter back (without taking focus from the game) once per event occurrence, when its
+    /// Soon notice appears. Off by default: hiding the meter keeps it hidden unless the player opts in.
+    /// </summary>
+    public bool RestoreMinimizedMeter { get; init; }
 
     // Value equality including the event list.
     public bool Equals(AlertSettings? other) => other is not null

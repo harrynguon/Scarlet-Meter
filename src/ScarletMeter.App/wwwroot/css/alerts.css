@@ -85,6 +85,16 @@
     color: var(--muted);
 }
 
+/* Read by screen readers, never drawn. */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
 @keyframes alert-in {
     from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: none; }

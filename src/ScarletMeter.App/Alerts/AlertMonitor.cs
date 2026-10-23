@@ -7,7 +7,7 @@ namespace ScarletMeter.App.Alerts;
 /// <summary>What the overlay shows about world events right now.</summary>
 /// <param name="Alerts">Due notices, most urgent first (Soon before a start, Open while entry is possible).</param>
 /// <param name="Next">The next alerted event when "show the next event" is on and nothing is due, else null.</param>
-/// <param name="RefreshAt">When this view next changes, or null when nothing is alerted.</param>
+/// <param name="RefreshAt">When this view next changes, or null when no event is alerted at all.</param>
 public sealed record AlertView(IReadOnlyList<EventAlert> Alerts, EventOccurrence? Next, DateTimeOffset? RefreshAt, TimeSpan Lead)
 {
     public static AlertView None { get; } = new([], null, null, AlertPlanner.DefaultLeadTime);
@@ -16,8 +16,9 @@ public sealed record AlertView(IReadOnlyList<EventAlert> Alerts, EventOccurrence
 /// <summary>
 /// Keeps the overlay's world-event notices current. The plan comes from ScarletMeter.WorldEvents and says
 /// when it next changes, so the monitor sleeps until then (at most a minute, to survive clock changes and
-/// sleep) instead of polling; countdown text is the page's job. <see cref="AlertAppeared"/> fires once per
-/// notice, which the window layer uses to bring a minimized meter back.
+/// sleep) instead of polling; countdown text is the page's job. <see cref="EventApproaching"/> fires once
+/// per event occurrence, when its Soon notice first appears; the window layer uses it to bring a minimized
+/// meter back. A failure never escapes the timer thread: it is logged and the monitor tries again a minute later.
 /// </summary>
 public sealed class AlertMonitor : IDisposable
 {
@@ -28,9 +29,13 @@ public sealed class AlertMonitor : IDisposable
     private readonly TimeProvider clock;
     private readonly ILogger<AlertMonitor> logger;
     private readonly Lock gate = new();
-    private readonly HashSet<(string Id, AlertKind Kind, DateTimeOffset Start)> shown = [];
+
+    // Occurrences already announced, kept until they start, so re-enabling an event or changing the lead
+    // time does not announce the same occurrence twice. Holds at most one entry per enabled event.
+    private readonly HashSet<(string Id, DateTimeOffset Start)> announced = [];
     private ITimer? timer;
     private AlertView view = AlertView.None;
+    private bool started;
     private bool disposed;
 
     public AlertMonitor(SettingsService settings, TimeProvider clock, ILogger<AlertMonitor> logger)
@@ -48,14 +53,19 @@ public sealed class AlertMonitor : IDisposable
     /// <summary>Raised after <see cref="Current"/> changes, on a thread-pool thread or the settings caller's.</summary>
     public event EventHandler? Changed;
 
-    /// <summary>Raised once for each notice when it first appears.</summary>
-    public event EventHandler<EventAlert>? AlertAppeared;
+    /// <summary>Raised once per event occurrence, when its Soon notice first appears.</summary>
+    public event EventHandler<EventAlert>? EventApproaching;
 
-    /// <summary>Computes the first view and follows settings from now on.</summary>
+    /// <summary>Computes the first view and follows settings from now on. Later calls, and calls after disposal, do nothing.</summary>
     public void Start()
     {
-        settings.Changed += OnSettingsChanged;
-        Recompute();
+        lock (gate)
+        {
+            if (started || disposed) return;
+            started = true;
+            settings.Changed += OnSettingsChanged;
+        }
+        Refresh();
     }
 
     /// <summary>The view at <paramref name="now"/> for the given settings. Pure; the catalog's Global preset is the schedule.</summary>
@@ -80,48 +90,63 @@ public sealed class AlertMonitor : IDisposable
         return new AlertView(plan.Alerts, next, plan.NextChange, lead);
     }
 
-    private void OnSettingsChanged(object? sender, MeterSettings changed) => Recompute();
+    private void OnSettingsChanged(object? sender, MeterSettings changed) => Refresh();
 
-    private void Recompute()
+    // Recomputes the view, sets the timer for its next change and raises the events outside the lock.
+    private void Refresh()
     {
-        List<EventAlert> appeared = [];
+        List<EventAlert> approaching = [];
         lock (gate)
         {
             if (disposed) return;
-            var now = clock.GetUtcNow();
-            AlertView next;
+            var wait = MaxWait;
             try
             {
-                next = Compute(settings.Current.Alerts, now);
+                var now = clock.GetUtcNow();
+                var next = Compute(settings.Current.Alerts, now);
+                announced.RemoveWhere(key => key.Start <= now);
+                foreach (var alert in next.Alerts)
+                    if (alert.Kind == AlertKind.Soon && announced.Add((alert.Rule.Id, alert.Start))) approaching.Add(alert);
+                if (next.RefreshAt is { } at) wait = Clamp(at - now + BoundarySlack);
+                view = next;
             }
-            catch (ArgumentException ex)
+            catch (Exception ex)
             {
-                // The built-in schedule is valid; this guards the overlay against a future catalog mistake.
-                logger.LogError(ex, "World event alerts could not be computed.");
-                next = AlertView.None;
+                // The built-in schedule is valid; this keeps a future mistake from ending the meter or the notices.
+                logger.LogError(ex, "World event alerts could not be computed; trying again in a minute.");
+                approaching.Clear();
+                view = AlertView.None;
             }
-
-            foreach (var alert in next.Alerts)
-                if (shown.Add((alert.Rule.Id, alert.Kind, alert.Start))) appeared.Add(alert);
-            shown.RemoveWhere(key => !next.Alerts.Any(a => a.Rule.Id == key.Id && a.Kind == key.Kind && a.Start == key.Start));
-            view = next;
-
-            var wait = next.RefreshAt is { } at ? at - now + BoundarySlack : MaxWait;
-            wait = wait < TimeSpan.Zero ? TimeSpan.Zero : wait > MaxWait ? MaxWait : wait;
             timer?.Dispose();
-            timer = clock.CreateTimer(_ => Recompute(), null, wait, Timeout.InfiniteTimeSpan);
+            timer = clock.CreateTimer(_ => Refresh(), null, wait, Timeout.InfiniteTimeSpan);
         }
 
-        Changed?.Invoke(this, EventArgs.Empty);
-        foreach (var alert in appeared) AlertAppeared?.Invoke(this, alert);
+        Raise(() => Changed?.Invoke(this, EventArgs.Empty));
+        foreach (var alert in approaching) Raise(() => EventApproaching?.Invoke(this, alert));
+    }
+
+    private static TimeSpan Clamp(TimeSpan wait) => wait < TimeSpan.Zero ? TimeSpan.Zero : wait > MaxWait ? MaxWait : wait;
+
+    // A failing subscriber is logged, never thrown into the timer thread or the settings caller.
+    private void Raise(Action raise)
+    {
+        try
+        {
+            raise();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "A world event alert subscriber failed.");
+        }
     }
 
     public void Dispose()
     {
-        settings.Changed -= OnSettingsChanged;
         lock (gate)
         {
+            if (disposed) return;
             disposed = true;
+            settings.Changed -= OnSettingsChanged;
             timer?.Dispose();
             timer = null;
         }

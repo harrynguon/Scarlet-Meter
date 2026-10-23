@@ -20,6 +20,26 @@ public static class EventText
             : $"{(int)remaining.TotalMinutes}:{remaining.Seconds:00}";
     }
 
+    /// <summary>
+    /// A rule's state for the settings list, in <paramref name="zone"/>: "next 21:05" (with the weekday when
+    /// it is not today, "next Sun 21:00"), "portal open now", "entry open now", "running, entry closed", or
+    /// "started 21:00" for a window with no entry (a boss may already be dead).
+    /// </summary>
+    public static string Status(EventOccurrence occurrence, DateTimeOffset now, TimeZoneInfo zone)
+    {
+        var start = TimeZoneInfo.ConvertTime(occurrence.Start, zone);
+        var time = start.ToString("HH:mm", CultureInfo.InvariantCulture);
+        return occurrence.Phase switch
+        {
+            EventPhase.PortalOpen => "portal open now",
+            EventPhase.EntryOpen => "entry open now",
+            EventPhase.ActiveEntryClosed => "running, entry closed",
+            EventPhase.ScheduledActive => $"started {time}",
+            _ when start.Date != TimeZoneInfo.ConvertTime(now, zone).Date => $"next {DayNames[(int)start.DayOfWeek]} {time}",
+            _ => $"next {time}",
+        };
+    }
+
     /// <summary>An instant in the PC's local time ("21:05").</summary>
     public static string LocalTime(DateTimeOffset instant) =>
         instant.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture);

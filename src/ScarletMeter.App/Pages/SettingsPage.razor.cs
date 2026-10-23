@@ -13,7 +13,7 @@ namespace ScarletMeter.App.Pages;
 /// <summary>
 /// The settings window. Every control writes through <see cref="SettingsService.Update"/>, so values are
 /// validated, applied live and saved; the page re-renders when settings change anywhere (a window move,
-/// another control).
+/// another control) and, on the Alerts tab, whenever the world-event monitor wakes (at least once a minute).
 /// </summary>
 public partial class SettingsPage : IDisposable
 {
@@ -26,6 +26,8 @@ public partial class SettingsPage : IDisposable
     [Inject] private SettingsService Settings { get; set; } = default!;
 
     [Inject] private TimeProvider Clock { get; set; } = default!;
+
+    [Inject] private AlertMonitor Alerts { get; set; } = default!;
 
     [Inject] private IMeterWindows Windows { get; set; } = default!;
 
@@ -44,6 +46,7 @@ public partial class SettingsPage : IDisposable
     {
         Settings.Changed += OnSettingsChanged;
         Settings.SaveStatusChanged += OnSaveStatusChanged;
+        Alerts.Changed += OnAlertsChanged;
     }
 
     private void Change(Func<MeterSettings, MeterSettings> change) => Settings.Update(change);
@@ -75,15 +78,12 @@ public partial class SettingsPage : IDisposable
         offsetKey++;
     }
 
-    // When the rule next starts, in local time, or that it is on now.
+    // The rule's state in local time. No countdown: the page re-renders only when the monitor wakes.
     private string NextText(EventRule rule)
     {
         var offset = TimeSpan.FromMinutes(Math.Round(S.Alerts.ServerOffsetHours * 60));
         var now = Clock.GetUtcNow();
-        var occurrence = EventSchedule.Occurrence(rule, now, offset);
-        return occurrence.IsActive
-            ? "on now"
-            : $"next {EventText.LocalTime(occurrence.Start)} (in {EventText.Countdown(occurrence.Start - now)})";
+        return EventText.Status(EventSchedule.Occurrence(rule, now, offset), now, TimeZoneInfo.Local);
     }
 
     private async Task ChoosePicture()
@@ -128,10 +128,17 @@ public partial class SettingsPage : IDisposable
     // Saves run on a timer thread; a failure (or recovery) re-renders the notice at once.
     private void OnSaveStatusChanged(object? sender, EventArgs e) => _ = InvokeAsync(StateHasChanged);
 
+    // Keeps the Alerts tab's "next" times current; other tabs show nothing that moves.
+    private void OnAlertsChanged(object? sender, EventArgs e)
+    {
+        if (current == "Alerts") _ = InvokeAsync(StateHasChanged);
+    }
+
     public void Dispose()
     {
         disposed = true;
         Settings.Changed -= OnSettingsChanged;
         Settings.SaveStatusChanged -= OnSaveStatusChanged;
+        Alerts.Changed -= OnAlertsChanged;
     }
 }

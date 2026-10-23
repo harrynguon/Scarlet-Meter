@@ -28,7 +28,7 @@ Record the tested commit, observation date and Windows configuration. Pending:
 Wired as ARCHITECTURE.md "Overlay notices" describes. In the game:
 
 - [ ] A notice appears at the bottom of the overlay the chosen lead time before an enabled event, counts down, turns into "Portal open" or "Entry open" at the start and disappears when entry closes; it is readable over the game at the chosen opacity.
-- [ ] With the meter minimized by the shortcut, a new notice brings it back without taking keyboard focus from the game.
+- [ ] With "Bring the meter back before an event" on and the meter minimized by the shortcut, an event's warning brings it back once, without taking keyboard focus from the game; with the setting off (the default) it stays hidden.
 
 Still open: per-event time overrides in settings, for when an in-game check finds a time wrong. The module's `ScheduleValidation` and `EventCatalog.TryApplyOverrides` are the boundary for them; keep a player's saved rules when the presets change, and `SettingsStore` already caps `settings.json` at 1 MB before parsing.
 

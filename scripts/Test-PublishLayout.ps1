@@ -28,6 +28,7 @@ $required = @(
     'ScarletMeter.exe',
     'wwwroot\index.html',
     'wwwroot\css\app.css',
+    'wwwroot\css\alerts.css',
     'wwwroot\_framework\blazor.webview.js',
     'GameData\Assets\classes.json',
     'GameData\Assets\skills.json',

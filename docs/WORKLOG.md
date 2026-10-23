@@ -10,24 +10,26 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
   - "Soon" before an enabled event starts, with a countdown and a bar filling over the lead time.
   - "Portal open" or "Entry open" while it can be entered.
   - At most two notices; optionally, the next event as one dim line when nothing is due.
-- **`AlertMonitor`** sleeps until the plan's next change, at most a minute, and signals each new notice once.
-- **`MeterWindows`** brings a minimized meter back for a new notice without activating it (`SW_SHOWNOACTIVATE`), so the game keeps focus.
-- **Settings:** `AlertSettings` covers on/off, lead time 1–60 minutes (default 5), events (default: world events and bosses, not resets), server UTC offset (+9), the next-event line, and bringing the meter back. The new Alerts tab lists each event with its schedule and next local start, and carries the accuracy warning.
+- **`AlertMonitor`** sleeps until the plan's next change, at most a minute, and signals each event occurrence once, when its Soon notice appears. Failures are logged and retried a minute later, never thrown into the timer thread.
+- **`MeterWindows`**, if the player opts in, brings a minimized meter back once per occurrence without activating it (`SW_SHOWNOACTIVATE`), so the game keeps focus.
+- **Settings:** `AlertSettings` covers on/off, lead time 1–60 minutes (default 5), events (default: world events and bosses, not resets), server UTC offset (+9), the next-event line, and bringing the meter back (off). The new Alerts tab lists each event with its schedule and its state in local time ("next Sun 22:00", "entry open now", "running, entry closed"), and carries the accuracy warning.
+- **Settings file:** `SettingsStore` accepts a UTF-8 byte-order mark. Found in the smoke run: a `settings.json` written by Windows PowerShell (or saved as "UTF-8 with BOM") was treated as unreadable and set aside, so a hand edit lost every setting.
 - **Rules:** AGENTS.md and ARCHITECTURE now say the app references the engine and the dependency-free world-events module, never upstream.
 
 **Why:** Harry asked to be told about five minutes before a Spacetime Rift, Shugo Festival or another world event, "sleek and subtle in the overlay, doesn't have to be a popup". The schedule engine came first in its own PR.
 
 **Checks (SDK 10.0.402):**
 
-- `scripts/Build.ps1`, Debug and Release: 168/168 tests, 10 of them new (`AlertTests`):
-  - Soon at the lead time, Open until entry closes, the lead time from settings.
-  - Nothing when alerts are off or nothing is chosen.
-  - The next-event line, the server offset.
-  - Normalizing alert settings, and alert settings comparing by value.
-  - Wording for countdowns and schedules.
-  - The monitor on a fake clock: one signal per notice, the wait capped at a minute, the Open transition, switching off.
+- `scripts/Build.ps1`, Debug and Release: 174/174 tests, 16 of them new:
+  - `AlertTests`: Soon at the lead time, Open until entry closes, the lead time from settings; nothing when alerts are off or nothing is chosen; the next-event line (and none while a notice is due), the server offset; normalizing alert settings and comparing them by value; wording for countdowns, schedules and each phase of the settings list, in two time zones.
+  - `AlertTests`, the monitor on a fake clock: one signal per occurrence (none for Open, none again after switching the event off and on or changing the lead time, one for the next occurrence), the wait capped at a minute and otherwise the next change plus 20 ms; a throwing subscriber and a failed computation stay inside the monitor, which empties the view and retries a minute later; starting twice subscribes once, starting after disposal does nothing.
+  - `SettingsTests`: equality varies every `AlertSettings` member; a file from before alerts loads their defaults with no repair notice and restoring off; `"events": null` takes the defaults; a file with a byte-order mark loads.
 - `EqualityCoversEveryProperty` failed until `MeterSettings.Equals` and its test included the new section, as intended.
-- Smoke run through `Smoke-Meter.ps1`, with a seeded lead time of 60 minutes and Shugo only:
+- Smoke run after the audit fixes (`Smoke-Meter.ps1`, Debug, a seeded file written with a byte-order mark: lead 60 minutes, offset 9.0166, Nahma, rift, Invasion and Shugo):
+  - The file loaded (before the store fix it was set aside as unreadable and defaults were used).
+  - The strip showed Shugo and Invasion counting down; the only live region was the hidden summary "Shugo Festival starts at 05:59; Dimensional Invasion starts at 06:29" (1 by 1 px, clipped, not drawn).
+  - The Alerts tab read "next 05:59", "next Sun 22:59" for Nahma and "next Wed 18:00" for the weekly reset; the offset field showed "9.02". No warnings in the log; exit code 0.
+- First smoke run, before the audit, with a seeded lead time of 60 minutes and Shugo only:
   - The strip read "Shugo Festival · in 27:08" and ticked down second by second.
   - The Alerts tab rendered all events with schedules and next local starts (screenshots, not committed).
   - With the meter minimized by the real shortcut, switching on Dimensional Invasion (its entry was open at that moment) brought the overlay back to Normal on its own; the strip then read "Dimensional Invasion · Entry open · 0:03 left" above Shugo.
@@ -42,7 +44,15 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Not done:** per-event time overrides in settings (HANDOFF.md).
 
-**Next:** PR, audit, CI and merge; then the details and history UI on the engine PR.
+**Audit (pr-auditor, standard pass with a closer look at threading and windows): approve with nits.** Addressed:
+
+- Major: by default a minimized meter came back about four times an hour (Soon and Open of Shugo and Invasion each restored it), and editing the event list restored it again. Decision: restore once per event occurrence, on its Soon notice only, kept until the occurrence starts; and default "Bring the meter back" to off, so hiding the meter keeps it hidden unless the player opts in. Existing files have no `alerts` key, so nobody is opted in by upgrading.
+- Minor: only `ArgumentException` was caught on the timer thread; now every failure is caught and logged, and handlers are invoked inside the guard. `Start` is idempotent and does nothing after `Dispose`.
+- Minor: the Alerts tab's countdowns never ticked and "on now" showed after entry closed; it now shows local times and phase labels only, and re-renders when the monitor wakes.
+- Tests for the gaps the auditor's mutation runs left (listed under Checks). Nits: the `RefreshAt` doc, the live region on the per-second countdown, the raw offset double in the field, and `alerts.css` in `Test-PublishLayout.ps1`.
+- Downgrade: no version bump, as the section is additive. An older build ignores `alerts` and drops it on its next save.
+
+**Next:** CI and merge; then the details and history UI on the engine PR.
 
 ## 2026-10-24 — World event schedules
 
