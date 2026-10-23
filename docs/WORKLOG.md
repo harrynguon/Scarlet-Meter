@@ -2,6 +2,30 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Update notice in the overlay
+
+**What:** The upstream release check reaches the player (ARCHITECTURE.md "Updates", "Notice").
+
+- `UpdateNotice` asks `UpstreamReleaseChecker` 30 s after start-up and whenever its cached answer expires.
+- A newer release shows one quiet line above the alert strip ("RATmeter v… is out", "Release notes", a cross that hides it until the next release).
+- Settings, About: a switch (on by default), the release the build is on, the last result, and the update commands when a release is out.
+- `UpdateSettings` (`settings.json` `updates`): the switch and the dismissed release, validated as a release tag.
+- `MeterWindows.OpenReleasePage` opens only an https page under upstream's releases on github.com.
+
+**Why:** Harry asked for an automatic updater "if it's even possible, and reasonable"; the meter is for his own use and has no published binaries, so the reasonable form is a notice plus a one-command reinstall (PR #4). This is the notice.
+
+**Checks (SDK 10.0.402, on the update-check branch at fb24e0a):**
+
+- `scripts/Build.ps1`: 284/284, 16 of them new (`UpdateNoticeTests`), and `SettingsTests.EqualityCoversEveryProperty` extended for the new section.
+- Smoke run (`Smoke-Meter.ps1`, `--no-capture`, throwaway data directory). This branch was still pinned to v1.11.4.334, so the real check, one GET to api.github.com, found v1.11.5.341:
+  - no line at start; about 30 s later "RATmeter v1.11.5.341 is out | Release notes", its tooltip naming v1.11.4.334;
+  - Settings, About read "v1.11.5.341 is out (published 24 Oct); this build is on v1.11.4.334 (checked 06:24)" and gave `scripts\Update-Upstream.ps1 -Tag v1.11.5.341`, then `scripts\Install-Meter.ps1`;
+  - the cross removed the line and saved `"dismissedRelease": "v1.11.5.341"`; the checker logged its result once; exit code 0.
+
+**Not checked:** "Release notes" opening the browser (not clicked in the smoke run, so no browser was launched); the line over the game.
+
+**Next:** merge with PR #4's final head and main, PR, audit, CI and merge.
+
 ## 2026-10-24 — Upstream release check and installer
 
 **What:**

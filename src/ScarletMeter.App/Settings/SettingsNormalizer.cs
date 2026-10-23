@@ -1,3 +1,4 @@
+using ScarletMeter.App.Updates;
 using ScarletMeter.WorldEvents;
 
 namespace ScarletMeter.App.Settings;
@@ -59,6 +60,7 @@ public static class SettingsNormalizer
             Appearance = appearance with { BackgroundOpacity = opacity, RowScale = scale, BackgroundImage = image },
             Overlay = overlay with { ToggleHotkey = hotkey },
             Alerts = NormalizeAlerts(input.Alerts, repairs),
+            Updates = NormalizeUpdates(input.Updates, repairs),
             Windows = windows,
         };
         return (settings, repairs);
@@ -80,6 +82,15 @@ public static class SettingsNormalizer
             repairs.Add("Unknown world events were removed from the alert list.");
 
         return alerts with { LeadMinutes = lead, ServerOffsetHours = offset, Events = events };
+    }
+
+    // A dismissed release must be a release tag; anything else is dropped (the notice then shows again).
+    private static UpdateSettings NormalizeUpdates(UpdateSettings? input, List<string> repairs)
+    {
+        var updates = input ?? new UpdateSettings();
+        if (updates.DismissedRelease is null || UpstreamReleaseTag.TryParse(updates.DismissedRelease, out _)) return updates;
+        repairs.Add("A dismissed release that was not a release tag was cleared.");
+        return updates with { DismissedRelease = null };
     }
 
     private static double ClampFinite(double value, double min, double max, double fallback, string name, List<string> repairs)

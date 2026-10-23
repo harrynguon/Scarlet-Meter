@@ -85,6 +85,54 @@
     color: var(--muted);
 }
 
+/* The "newer RATmeter release" line, as quiet as the next-event line. */
+.update-note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 6px 4px;
+    padding: 2px 4px 2px 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--muted);
+    font-size: 11px;
+    animation: alert-in 0.25s ease-out;
+}
+
+.update-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #60a5fa;
+    flex: none;
+}
+
+.update-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.link-btn {
+    border: 0;
+    padding: 0;
+    background: none;
+    color: #93c5fd;
+    font: inherit;
+    cursor: pointer;
+}
+
+.link-btn:hover {
+    text-decoration: underline;
+}
+
+.icon-btn.small {
+    width: 18px;
+    height: 18px;
+}
+
 /* Read by screen readers, never drawn. */
 .sr-only {
     position: absolute;

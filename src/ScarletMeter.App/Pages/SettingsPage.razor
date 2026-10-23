@@ -149,6 +149,28 @@
                         <button type="button" class="btn" @onclick="Windows.OpenDataFolder">Open</button>
                     </div>
                 </section>
+                <section>
+                    <h2>RATmeter releases</h2>
+                    <ToggleSetting Label="Check for new RATmeter releases" Description="Asks GitHub at most every six hours while the meter runs; a slim line in the meter says when one is out. Game patches usually need one."
+                                   Value="@S.Updates.CheckUpstreamReleases" ValueChanged="@(v => Change(s => s with { Updates = s.Updates with { CheckUpstreamReleases = v } }))" />
+                    <div class="setting">
+                        <span class="text">
+                            <span class="label">Built on RATmeter @Build.UpstreamRelease</span>
+                            <span class="desc">@UpdateStatus</span>
+                        </span>
+                        @if (Updates.Result is UpstreamReleaseCheckResult.NewerAvailable newer)
+                        {
+                            <button type="button" class="btn" @onclick="() => Windows.OpenReleasePage(newer.ReleasePage)">Release notes</button>
+                        }
+                    </div>
+                    @if (Updates.Result is UpstreamReleaseCheckResult.NewerAvailable update)
+                    {
+                        <p class="hint">
+                            To update, in your Scarlet Meter checkout run <span class="mono">scripts\Update-Upstream.ps1 -Tag @update.Tag</span>,
+                            then <span class="mono">scripts\Install-Meter.ps1</span>, and start the meter again.
+                        </p>
+                    }
+                </section>
                 break;
         }
     </div>

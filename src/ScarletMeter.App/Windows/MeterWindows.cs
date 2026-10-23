@@ -37,6 +37,9 @@ public interface IMeterWindows
     /// <summary>Opens the data directory in Explorer.</summary>
     void OpenDataFolder();
 
+    /// <summary>Opens a RATmeter release page in the default browser; any other address is refused.</summary>
+    void OpenReleasePage(Uri page);
+
     /// <summary>Why the configured hotkey is not active, or null when it is (or none is set).</summary>
     string? HotkeyError { get; }
 
@@ -212,6 +215,33 @@ public sealed class MeterWindows : IMeterWindows
     }
 
     private IEnumerable<Window> AllWindows() => toolWindows.Values.Cast<Window>().Prepend(overlay).OfType<Window>();
+
+    // Only https pages under upstream's releases on GitHub: the checker validated it already, and the shell
+    // must never be handed anything else from a network answer.
+    public void OpenReleasePage(Uri page)
+    {
+        if (!IsUpstreamReleasePage(page))
+        {
+            logger.LogWarning("Refused to open {Page}: not a RATmeter release page.", page);
+            return;
+        }
+        try
+        {
+            using var _ = Process.Start(new ProcessStartInfo { FileName = page.AbsoluteUri, UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            logger.LogWarning(ex, "Opening the release page failed.");
+        }
+    }
+
+    /// <summary>True for https://github.com/Kuroukihime/AIon2-Dps-Meter/releases/... with no credentials, port or query.</summary>
+    public static bool IsUpstreamReleasePage(Uri page) =>
+        page.IsAbsoluteUri && page.Scheme == Uri.UriSchemeHttps && page.IsDefaultPort && page.UserInfo.Length == 0
+        && string.Equals(page.Host, "github.com", StringComparison.OrdinalIgnoreCase)
+        && page.AbsolutePath.StartsWith("/Kuroukihime/AIon2-Dps-Meter/releases/", StringComparison.OrdinalIgnoreCase)
+        && !page.AbsolutePath.Contains("..", StringComparison.Ordinal)
+        && page.Query.Length == 0;
 
     public void OpenDataFolder()
     {

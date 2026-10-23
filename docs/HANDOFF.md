@@ -8,9 +8,10 @@ What ARCHITECTURE.md describes exists: `upstream/` submodule at release v1.11.4.
 
 World-event notices are in the overlay: `src/ScarletMeter.WorldEvents` (ARCHITECTURE.md "World events") holds the schedules and the alert planner, ported from the fork's World Companion, and the overlay shows them ("Overlay notices"), five minutes ahead by default, with an Alerts tab in settings. The times are not verified in the game.
 
-Updates (2026-10-24, ARCHITECTURE.md "Updates"): builds stamp the pinned upstream release; `UpstreamReleaseChecker` tells whether upstream has a newer one but is not wired into the UI yet; `scripts/Install-Meter.ps1` builds and installs for the current user. Upstream published v1.11.5.341 on 2026-10-23 (a live run of the checker reported it); the pin is still v1.11.4.334.
+Updates (2026-10-24, ARCHITECTURE.md "Updates"): builds stamp the pinned upstream release; `UpstreamReleaseChecker` tells whether upstream has a newer one, and a quiet line in the overlay and Settings, About say so (`UpdateNotice`); `scripts/Install-Meter.ps1` builds and installs for the current user. Upstream published v1.11.5.341 on 2026-10-23 (a live run of the checker reported it); the pin is still v1.11.4.334.
 
-- [ ] Wire the checker into the UI: register it with `AddUpstreamReleaseChecker` in `App.xaml.cs`, show a quiet overlay notice for `NewerAvailable`, and add a settings switch that stops calling `CheckAsync`.
+- [x] Wire the checker into the UI (`UpdateNotice`, WORKLOG.md 2026-10-24 "Update notice in the overlay").
+- [ ] With the meter installed and a newer RATmeter release out, the overlay's line appears about 30 seconds after start, "Release notes" opens the release in the browser, the cross hides it until the next release, and the switch in Settings, About stops the check.
 - [ ] Move the pin to v1.11.5.341 with `Update-Upstream.ps1`, then reinstall.
 - [ ] Install once to the default location with `Install-Meter.ps1 -Shortcut` (tested so far only against a temporary directory).
 

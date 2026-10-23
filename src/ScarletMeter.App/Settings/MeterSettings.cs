@@ -21,6 +21,8 @@ public sealed record MeterSettings
 
     public AlertSettings Alerts { get; init; } = new();
 
+    public UpdateSettings Updates { get; init; } = new();
+
     /// <summary>Saved window positions and sizes, keyed by <see cref="WindowKeys"/>.</summary>
     public IReadOnlyDictionary<string, WindowPlacement> Windows { get; init; } = new Dictionary<string, WindowPlacement>();
 
@@ -28,11 +30,11 @@ public sealed record MeterSettings
     // update that changes nothing is recognised as such. A test checks every property takes part.
     public bool Equals(MeterSettings? other) => other is not null
         && Version == other.Version && Fight == other.Fight && Appearance == other.Appearance && Overlay == other.Overlay
-        && Alerts == other.Alerts
+        && Alerts == other.Alerts && Updates == other.Updates
         && Windows.Count == other.Windows.Count
         && Windows.All(pair => other.Windows.TryGetValue(pair.Key, out var placement) && placement == pair.Value);
 
-    public override int GetHashCode() => HashCode.Combine(Version, Fight, Appearance, Overlay, Alerts, Windows.Count);
+    public override int GetHashCode() => HashCode.Combine(Version, Fight, Appearance, Overlay, Alerts, Updates, Windows.Count);
 }
 
 /// <summary>
@@ -139,6 +141,19 @@ public sealed record OverlaySettings
     /// none. RATmeter's default, so the habit carries over. A saved empty value stays empty.
     /// </summary>
     public string ToggleHotkey { get; init; } = "Ctrl+Shift+D";
+}
+
+/// <summary>The upstream release check (Updates/UpdateNotice): whether to ask GitHub, and a dismissed release.</summary>
+public sealed record UpdateSettings
+{
+    /// <summary>
+    /// Ask GitHub, at most every six hours while the meter runs, whether RATmeter published a release newer than
+    /// the one this build is on. Game patches usually need one.
+    /// </summary>
+    public bool CheckUpstreamReleases { get; init; } = true;
+
+    /// <summary>A release tag whose notice the player dismissed, or null. A later release shows again.</summary>
+    public string? DismissedRelease { get; init; }
 }
 
 /// <summary>A window's position and size in device-independent pixels.</summary>

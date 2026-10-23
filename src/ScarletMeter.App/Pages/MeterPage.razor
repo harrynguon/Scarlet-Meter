@@ -61,5 +61,16 @@
         }
     </ul>
 
+    @if (Updates.Visible is { } release)
+    {
+        <div class="update-note" title="Scarlet Meter is built on RATmeter @release.PinnedRelease. Update the upstream pin and reinstall to get its fixes (Settings, About).">
+            <span class="update-dot"></span>
+            <span class="update-text">RATmeter @release.Tag is out</span>
+            <button type="button" class="link-btn" @onclick="() => Windows.OpenReleasePage(release.ReleasePage)">Release notes</button>
+            <button type="button" class="icon-btn small" title="Hide until the next release" aria-label="Hide until the next release" @onclick="() => Updates.Dismiss(release)">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7" /></svg>
+            </button>
+        </div>
+    }
     <AlertStrip View="Alerts.Current" Now="Clock.GetUtcNow()" />
 </div>
