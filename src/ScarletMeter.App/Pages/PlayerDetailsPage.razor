@@ -74,7 +74,7 @@
                                     <tr title="@buff.Description">
                                         <td class="icon-cell">@if (SkillIcons.Url(buff.Icon, icons) is { } url) { <img src="@url" alt="" /> }</td>
                                         <td class="left">@buff.Name</td>
-                                        <td>x@buff.Applications</td>
+                                        <td>x@(buff.Applications)</td>
                                         <td>@Compact.Duration(buff.Uptime)</td>
                                         <td class="bar-col"><span class="cell-bar" style="width:@Compact.Percent(buff.UptimePercent)"></span><span class="cell-bar-text">@Compact.Percent(buff.UptimePercent)</span></td>
                                     </tr>

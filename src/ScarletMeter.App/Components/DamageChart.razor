@@ -50,7 +50,7 @@ else
             <div class="lanes">
                 @foreach (var lane in Data.Lanes.Take(MaxLanes))
                 {
-                    <div class="lane" title="@lane.Name · x@lane.Count · @lane.UptimePercent.ToString("0.#", CultureInfo.InvariantCulture)% uptime">
+                    <div class="lane" title="@lane.Name · x@(lane.Count) · @lane.UptimePercent.ToString("0.#", CultureInfo.InvariantCulture)% uptime">
                         <span class="lane-name">
                             @if (SkillIcons.Url(lane.Icon) is { } icon)
                             {

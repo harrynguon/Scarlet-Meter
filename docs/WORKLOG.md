@@ -20,10 +20,17 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
   - Class icons by id.
   - Skill and buff icons only from NC's CDN path, behind a new "Skill icons" setting (on by default).
   - `views.css` (also checked by `Test-PublishLayout.ps1`).
+- **The engine's final contract:** a saved fight the engine cannot read says so (in history and in details), a player missing from a saved fight's details reads "missing from the saved fight, or could not be read", and an incomplete history page (`IsComplete` false) shows a notice that some fights are left out.
 
 **Why:** Harry asked for RATmeter's per-player details (skill breakdown, buffs, damage graph, combat log) and a history browser for past boss fights, with heavy inspiration from RATmeter. The Explore survey of upstream's UI gave the columns, filters, Copy DPS format and chart series.
 
-**Checks (SDK 10.0.402, on main plus the engine branch):**
+**Checks (SDK 10.0.402).** Final, on main 40206be (world-event notices, upstream v1.11.5.341) merged with the engine's final head a7777cb:
+
+- `scripts/Build.ps1` Debug and Release: 235/235, 12 of them new for this PR (`DetailFormatTests`, `RazorMarkupTests`).
+- `Smoke-Meter.ps1 --demo` (Debug), with alerts seeded for Shugo and the rift at a 60-minute lead: four demo rows and "Aultross"; the strip read "Spacetime Rift · in 44:10" and "Shugo Festival · in 44:10" (both at 07:00 local); details with Skills (five rows), Buffs, Graph (both series and buff lanes) and Log ("12 of 12 hits, newest first"); history listed the fight and opened its party of four. No warnings in the log; exit code 0.
+- **Found in that smoke:** the Buffs tab showed the literal text "x@buff.Applications", and the chart's lane tooltips "x@lane.Count": Razor reads a letter followed by `@` as an e-mail address and does not evaluate it. Fixed with `x@(...)`; the new `RazorMarkupTests` scans every `.razor` file for the pattern (it failed with the bug put back, and passes). The first smoke runs below counted buff rows without reading them, which is how it got through.
+
+Earlier, on main plus the engine branch before its review fixes:
 
 - `scripts/Build.ps1`: 203/203 tests, 11 of them new (`DetailFormatTests`):
   - lanes merge, clip and sort;
@@ -53,7 +60,7 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 - A saved fight with tens of thousands of hits (the log is virtualized and the fight loads off the UI thread, but load time is unmeasured).
 - Hover tooltips on the chart.
 
-**Next:** rebase onto main once the engine PR (#5) merges, then PR, audit, CI and merge.
+**Next:** PR and audit; merge after the engine PR (#5), then CI on the merged result.
 
 ## 2026-10-24 — Engine: player details, history, demo mode
 
