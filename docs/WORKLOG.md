@@ -2,6 +2,60 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Upstream release check and installer
+
+**What:**
+
+- Build stamp: `src/ScarletMeter.App/Updates/BuildStamp.targets`, imported by the app's project only, stamps `AssemblyMetadata("ScarletUpstreamRelease")` (the submodule's exact tag, else its short commit, else `unknown`) and `AssemblyMetadata("ScarletCommit")`. `BuildInfo` reads them.
+- `UpstreamReleaseChecker` (`ScarletMeter.App.Updates`): one anonymous GET to GitHub's latest-release API for upstream. It validates the answer, compares versions numerically, caches the result, requests at most once per six hours and never throws. `AddUpstreamReleaseChecker` registers it; it is deliberately not registered in `App.xaml.cs`, because the UI rewrite in progress wires it into the overlay and settings.
+- `scripts/Install-Meter.ps1`: Release build with tests, self-contained single-file publish into `<install>.staging`, layout check, then a reversible folder swap that keeps `<install>.previous`. `-Shortcut` adds a Start menu shortcut.
+- CI fetches the pinned upstream release tag, which its shallow submodule lacks, and fails if the pin is not a release. It now runs `Install-Meter.ps1 -SkipTests` under pwsh in place of the bare publish and layout steps.
+- Tests, 24 to 108 (84 new cases): `BuildInfoTests`, `UpstreamReleaseCheckerTests`. The test project gains Microsoft.Extensions.TimeProvider.Testing 10.10.0.
+- Docs: ARCHITECTURE "Updates", DEVELOPMENT "Install and update" and CI, README, SECURITY "Network", HANDOFF.
+
+**Why:** Harry asked for an automatic updater, if possible and reasonable, for a meter only he uses. A RATmeter-style self-updater (download a release, replace the exe) does not fit: Scarlet has no published binaries, and swapping one in would skip the build and its checks. What matters is knowing when upstream releases, since game-patch parser fixes arrive that way, plus one command to rebuild and reinstall.
+
+**Checks (SDK 10.0.402, `SCARLET_DOTNET` and `DOTNET_ROOT` set, Windows PowerShell 5.1):**
+
+- `scripts/Build.ps1` Debug and Release: 0 warnings, 0 errors, 108/108 passed.
+- Mutations, each caught by the new tests, then reverted:
+  - no cache: 4 failures;
+  - `$` instead of `\z` in the tag pattern: 2;
+  - no page-path check: 1;
+  - text instead of numeric comparison: 3;
+  - no timeout: 2 timeout tests failed by their wait limit;
+  - no read cap: 1.
+- Stamp:
+  - Generated assembly info carried `v1.11.4.334` and `9495922`, and both values are in the bundled exe.
+  - A temporary local commit, undone afterwards, was restamped by an incremental build, and the reset stamped the old value back.
+  - With the pinned tag deleted from this worktree's submodule clone, the stamp fell back to `57974f8`. The tag was then re-created at the same commit.
+  - With git removed from PATH: `unknown` for both, build exit 0.
+- CI checkout simulated in the scratch directory (the same fetch, then `git submodule update --init --force --depth=1`):
+  - The submodule held only `v1.11.5.341`, the tag at upstream master's tip. `describe --exact-match` failed, so CI would have stamped the commit.
+  - The CI step's script, run locally, fetched `v1.11.4.334` at depth 1; after that `describe` matched and the env file held the tag.
+- One manual live check, outside the tests, through `AddUpstreamReleaseChecker` and the production handler: `NewerAvailable`, v1.11.5.341, published 2026-10-23T17:19:58Z, page on upstream's repository. The second call was served from the cache.
+- `Install-Meter.ps1` against a temporary install directory in the scratch directory, never the default location:
+  - Fresh install with `-Shortcut` and tests: layout passed, the shortcut pointed at the installed exe.
+  - The installed exe started with `--no-capture --data-dir <temp>` and showed its window.
+  - While it ran, the script refused before building. It then closed with exit 0.
+  - A second install moved the first to `.previous`.
+  - With a file held open in the install, the rename failed and was undone: install and `.previous` unchanged, the new build left in staging, no `.retired`.
+  - A rerun replaced `.previous` and cleared staging.
+  - With a wrapper failing only `dotnet publish`, staging was removed and the install left untouched.
+  - Refusals before any build: relative path, drive root, the data directory, a folder inside it, its parent, a folder in the checkout, a foreign folder, a file, a foreign `.previous`. The foreign files were kept.
+  - `%LocalAppData%\ScarletMeter` and `%LocalAppData%\Programs\ScarletMeter` do not exist afterwards.
+  - Cleanup: the shortcut, the temporary install and the scratch projects were removed.
+
+**Not checked:**
+
+- pwsh: it is not installed here. CI runs `Install-Meter.ps1` and the tag step under pwsh.
+- CI itself: pending the PR.
+- An elevated meter: refused by design as "location unreadable", but not run.
+- The UI wiring: notice, settings switch and registration are left to the UI rewrite.
+- The default install location: never installed there.
+
+**Next:** CI on the PR, Harry's go-ahead and a squash merge. Then wire the checker into the UI and move the pin to v1.11.5.341 (HANDOFF.md).
+
 ## 2026-10-23 — Review fixes
 
 **What:** Applied the bootstrap review: 15 findings, 8 confirmed by independent verifiers and 7 more judged real when verification was cut short by a usage limit.

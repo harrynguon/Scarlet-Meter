@@ -6,6 +6,12 @@ Repository: https://github.com/harrynguon/ScarletMeter (private, default branch 
 
 The scaffold described in ARCHITECTURE.md exists: `upstream/` submodule at release v1.11.4.334, the engine over upstream's pipeline, a WPF window with a Blazor WebView meter page, boundary, mapping and close-ordering tests, build, upstream-update and publish-layout scripts, CI. CI has run: the bootstrap commit passed (run 39920164346), and the review fixes of 2026-10-23 (WORKLOG.md) go through a PR. Checks that have actually run are listed in WORKLOG.md; nothing has been tried in the game.
 
+Updates (2026-10-24, ARCHITECTURE.md "Updates"): builds stamp the pinned upstream release; `UpstreamReleaseChecker` tells whether upstream has a newer one but is not wired into the UI yet; `scripts/Install-Meter.ps1` builds and installs for the current user. Upstream published v1.11.5.341 on 2026-10-23 (a live run of the checker reported it); the pin is still v1.11.4.334.
+
+- [ ] Wire the checker into the UI: register it with `AddUpstreamReleaseChecker` in `App.xaml.cs`, show a quiet overlay notice for `NewerAvailable`, and add a settings switch that stops calling `CheckAsync`.
+- [ ] Move the pin to v1.11.5.341 with `Update-Upstream.ps1`, then reinstall.
+- [ ] Install once to the default location with `Install-Meter.ps1 -Shortcut` (tested so far only against a temporary directory).
+
 ## Next: in-game acceptance
 
 Record the tested commit, observation date and Windows configuration. Pending:

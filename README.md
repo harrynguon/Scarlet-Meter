@@ -12,7 +12,7 @@ Status: scaffold. Capture, decoding, fight tracking and history come from upstre
 | `src/ScarletMeter.Engine` | The only project that references upstream. Wraps its pipeline behind Scarlet's own contracts (`ICombatEngine`, `CombatSnapshot`). |
 | `src/ScarletMeter.App` | WPF window hosting a Blazor WebView; references the engine only. |
 | `tests/ScarletMeter.Tests` | Boundary guards and engine mapping tests (no Npcap needed). |
-| `scripts/` | `Build.ps1` (restore, build, test), `Update-Upstream.ps1 -Tag vX.Y.Z.N` and `Test-PublishLayout.ps1`. Each derives its paths from its own location. |
+| `scripts/` | `Build.ps1` (restore, build, test), `Install-Meter.ps1` (build and install for the current user), `Update-Upstream.ps1 -Tag vX.Y.Z.N` and `Test-PublishLayout.ps1`. Each derives its paths from its own location. |
 | `docs/` | Maintainer documentation. Start with [docs/README.md](docs/README.md). |
 
 ## Build and run
@@ -35,6 +35,14 @@ Run `src\ScarletMeter.App` from your IDE, or publish it as described in [docs/DE
 ```
 
 Releases only, never upstream's `dev` branch. The script moves the submodule, rebuilds and runs the tests; a compile error in `src/ScarletMeter.Engine/Upstream` is the signal that upstream changed an API the engine maps.
+
+## Install and update
+
+```powershell
+& "<checkout>\scripts\Install-Meter.ps1" -Shortcut
+```
+
+Builds and tests a Release, publishes it and installs it to `%LocalAppData%\Programs\ScarletMeter`, keeping the previous install in `ScarletMeter.previous` for a rollback by hand; close the meter first. Your data in `%LocalAppData%\ScarletMeter` is never touched. There is no self-updater, because the meter is built from source: when upstream publishes a release (the meter will say so, from one anonymous request to GitHub at most every six hours), run `Update-Upstream.ps1` with the new tag, then `Install-Meter.ps1` again. Details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), "Install and update".
 
 ## Licence and terms
 

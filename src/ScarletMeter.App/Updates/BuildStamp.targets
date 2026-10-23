@@ -1,0 +1,86 @@
+<Project>
+
+  <!-- Build stamp, imported by ScarletMeter.App.csproj only: upstream's projects never see it, so it is not part
+       of the upstream overlay (docs/ARCHITECTURE.md). It records what a build was made from as assembly
+       metadata, which Updates/BuildInfo.cs reads back:
+
+         ScarletUpstreamRelease  the tag naming the upstream submodule's checked-out commit (an exact-match
+                                 git describe over tags), else its short commit, else "unknown";
+         ScarletCommit           Scarlet Meter's own short commit, else "unknown".
+
+       Every git call is best effort: a missing git, repository, submodule or tag only changes the value and
+       never fails the build. Paths derive from $(ScarletUpstreamRoot) (src/Directory.Build.props), never from
+       the working directory. The target runs on every build; the SDK hashes the assembly attributes, so a
+       changed value regenerates the assembly info and an unchanged one leaves the build incremental. -->
+
+  <Target Name="ScarletStampBuildInfo" BeforeTargets="GetAssemblyAttributes">
+    <PropertyGroup>
+      <_ScarletStampPattern>^[0-9A-Za-z][0-9A-Za-z._+-]{0,99}$</_ScarletStampPattern>
+      <_ScarletRepositoryRoot Condition="'$(ScarletUpstreamRoot)' != ''">$([MSBuild]::NormalizeDirectory('$(ScarletUpstreamRoot)', '..'))</_ScarletRepositoryRoot>
+      <!-- A .git entry (a folder in a clone, a file in a submodule or worktree) must exist, or git -C would
+           walk up and describe an enclosing repository instead, for example Scarlet's for an empty upstream/. -->
+      <_ScarletUpstreamHasGit>false</_ScarletUpstreamHasGit>
+      <_ScarletUpstreamHasGit Condition="'$(ScarletUpstreamRoot)' != '' and Exists('$(ScarletUpstreamRoot).git')">true</_ScarletUpstreamHasGit>
+      <_ScarletRepositoryHasGit>false</_ScarletRepositoryHasGit>
+      <_ScarletRepositoryHasGit Condition="'$(_ScarletRepositoryRoot)' != '' and Exists('$(_ScarletRepositoryRoot).git')">true</_ScarletRepositoryHasGit>
+      <_ScarletUpstreamRelease></_ScarletUpstreamRelease>
+      <_ScarletCommit></_ScarletCommit>
+    </PropertyGroup>
+
+    <!-- The directories end in a separator; the appended "." keeps "\" from escaping the closing quote. Output
+         goes to the log at low importance, stderr to nul, and the exit code decides whether it is used. -->
+    <Exec Condition="'$(_ScarletUpstreamHasGit)' == 'true'"
+          Command="git -C &quot;$(ScarletUpstreamRoot).&quot; describe --tags --exact-match 2&gt;nul"
+          EchoOff="true" ConsoleToMSBuild="true" StandardOutputImportance="low"
+          IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_ScarletUpstreamTagOutput" />
+      <Output TaskParameter="ExitCode" PropertyName="_ScarletUpstreamTagExitCode" />
+    </Exec>
+    <PropertyGroup Condition="'$(_ScarletUpstreamTagExitCode)' == '0'">
+      <_ScarletUpstreamRelease>$(_ScarletUpstreamTagOutput.Trim())</_ScarletUpstreamRelease>
+      <_ScarletUpstreamRelease Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(_ScarletUpstreamRelease)', '$(_ScarletStampPattern)'))"></_ScarletUpstreamRelease>
+    </PropertyGroup>
+
+    <Exec Condition="'$(_ScarletUpstreamHasGit)' == 'true' and '$(_ScarletUpstreamRelease)' == ''"
+          Command="git -C &quot;$(ScarletUpstreamRoot).&quot; rev-parse --short HEAD 2&gt;nul"
+          EchoOff="true" ConsoleToMSBuild="true" StandardOutputImportance="low"
+          IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_ScarletUpstreamCommitOutput" />
+      <Output TaskParameter="ExitCode" PropertyName="_ScarletUpstreamCommitExitCode" />
+    </Exec>
+    <PropertyGroup Condition="'$(_ScarletUpstreamRelease)' == '' and '$(_ScarletUpstreamCommitExitCode)' == '0'">
+      <_ScarletUpstreamRelease>$(_ScarletUpstreamCommitOutput.Trim())</_ScarletUpstreamRelease>
+      <_ScarletUpstreamRelease Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(_ScarletUpstreamRelease)', '$(_ScarletStampPattern)'))"></_ScarletUpstreamRelease>
+    </PropertyGroup>
+
+    <Exec Condition="'$(_ScarletRepositoryHasGit)' == 'true'"
+          Command="git -C &quot;$(_ScarletRepositoryRoot).&quot; rev-parse --short HEAD 2&gt;nul"
+          EchoOff="true" ConsoleToMSBuild="true" StandardOutputImportance="low"
+          IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_ScarletCommitOutput" />
+      <Output TaskParameter="ExitCode" PropertyName="_ScarletCommitExitCode" />
+    </Exec>
+    <PropertyGroup Condition="'$(_ScarletCommitExitCode)' == '0'">
+      <_ScarletCommit>$(_ScarletCommitOutput.Trim())</_ScarletCommit>
+      <_ScarletCommit Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(_ScarletCommit)', '$(_ScarletStampPattern)'))"></_ScarletCommit>
+    </PropertyGroup>
+
+    <PropertyGroup>
+      <_ScarletUpstreamRelease Condition="'$(_ScarletUpstreamRelease)' == ''">unknown</_ScarletUpstreamRelease>
+      <_ScarletCommit Condition="'$(_ScarletCommit)' == ''">unknown</_ScarletCommit>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>ScarletUpstreamRelease</_Parameter1>
+        <_Parameter2>$(_ScarletUpstreamRelease)</_Parameter2>
+      </AssemblyAttribute>
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>ScarletCommit</_Parameter1>
+        <_Parameter2>$(_ScarletCommit)</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
+    <Message Importance="normal" Text="Build stamp: upstream $(_ScarletUpstreamRelease), Scarlet $(_ScarletCommit)" />
+  </Target>
+
+</Project>

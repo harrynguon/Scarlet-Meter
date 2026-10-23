@@ -6,6 +6,12 @@ Filesystem operations use absolute paths derived from trusted roots (AGENTS.md, 
 
 Raw packet logging, which upstream offers as a developer setting and which writes other players' data to disk, is not reachable here: the settings bridge reports it off and no packet writer is registered. The history database still stores other players' names and combat statistics for completed boss fights, as upstream does.
 
+## Network
+
+Capture is passive: Npcap reads the game's traffic and the meter sends nothing to the game. The meter's one request of its own is the upstream release check (ARCHITECTURE.md, "Updates"): an unauthenticated HTTPS GET to `api.github.com` for RATmeter's latest release, at most once every six hours while the meter runs, carrying a fixed User-Agent and the two headers GitHub's API asks for. It sends no token, no cookies and nothing about the player, the game or combat; GitHub sees the address it comes from and when. Redirects are not followed. The answer is untrusted: only the tag, the release page and the date are read, the tag must be a release tag, the page must be an https page on upstream's repository, at most 1 MiB is read, and the answer's text is never logged. A build that does not know its pinned release sends nothing. The check is not wired into the UI yet; when it is, a settings switch turns it off and then no request is made.
+
+`scripts/Install-Meter.ps1` uses the network only as a build does (NuGet restore); CI's tag step lists and fetches upstream's tags from GitHub.
+
 ## Dependencies
 
 Restore runs with NuGet audit advisories as errors (`-warnaserror:NU1901..NU1904`). Upstream's `AionDpsMeter.Services` at the pinned release pulls the vulnerable native SQLite package (CVE-2025-6965, GHSA-2m69-gcr7-jv3q); Scarlet's root `Directory.Build.props` overlays it with SQLitePCLRaw.bundle_e_sqlite3 3.0.5, mirroring the override the harrynguon/AIon2-Dps-Meter fork carries in its copy of that project (ARCHITECTURE.md, "Upstream overlay"). Upstream itself does not carry it. Audit results are time-dependent, not a security review.
