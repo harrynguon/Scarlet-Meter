@@ -58,8 +58,10 @@ public sealed class MeterWindows : IMeterWindows
     private readonly Dictionary<string, ToolWindow> toolWindows = new(StringComparer.Ordinal);
     private OverlayWindow? overlay;
     private GlobalHotkey? hotkey;
-    private string registeredHotkey = string.Empty;
+    private HotkeyBinding? hotkeyBinding;
     private bool hotkeySuspended;
+    private bool modalOpen;
+    private bool closing;
 
     public MeterWindows(IServiceProvider services, SettingsService settings, ILogger<MeterWindows> logger)
     {
@@ -68,19 +70,26 @@ public sealed class MeterWindows : IMeterWindows
         this.logger = logger;
     }
 
-    public string? HotkeyError { get; private set; }
+    public string? HotkeyError => hotkeyBinding?.Error;
 
     public event EventHandler? HotkeyStatusChanged;
 
     /// <summary>Creates and shows the overlay. The app shuts down when it closes.</summary>
     public OverlayWindow ShowOverlay()
     {
-        overlay = new OverlayWindow(services, CloseToolWindowsAsync);
+        overlay = new OverlayWindow(services, CloseToolWindowsAsync) { CloseBlocked = () => modalOpen };
         overlay.SourceInitialized += (_, _) =>
         {
             hotkey = new GlobalHotkey(overlay);
             hotkey.Pressed += (_, _) => ToggleOverlay();
-            ApplyHotkey(settings.Current.Overlay.ToggleHotkey);
+            hotkeyBinding = new HotkeyBinding(hotkey);
+            hotkeyBinding.ErrorChanged += (_, _) =>
+            {
+                if (hotkeyBinding.Error is { } error) logger.LogWarning("Hotkey not registered: {Error}", error);
+                HotkeyStatusChanged?.Invoke(this, EventArgs.Empty);
+            };
+            hotkeyBinding.Suspend(hotkeySuspended);
+            hotkeyBinding.Apply(settings.Current.Overlay.ToggleHotkey);
         };
         settings.Changed += OnSettingsChanged;
         overlay.Closed += (_, _) =>
@@ -88,6 +97,7 @@ public sealed class MeterWindows : IMeterWindows
             settings.Changed -= OnSettingsChanged;
             hotkey?.Dispose();
             hotkey = null;
+            hotkeyBinding = null;
         };
         overlay.Show();
         return overlay;
@@ -95,16 +105,20 @@ public sealed class MeterWindows : IMeterWindows
 
     public void OpenSettings() => Open(Settings);
 
-    /// <summary>Opens a tool window of the given kind, or restores and activates the open one.</summary>
-    public ToolWindow Open(ToolWindowSpec spec)
+    /// <summary>
+    /// Opens a tool window of the given kind, or restores and activates the open one. Does nothing once the
+    /// meter is closing, so no window is created after the overlay has collected the ones to close.
+    /// </summary>
+    public ToolWindow? Open(ToolWindowSpec spec)
     {
+        if (closing) return null;
         if (toolWindows.TryGetValue(spec.Key, out var open))
         {
             if (open.WindowState == WindowState.Minimized) open.WindowState = WindowState.Normal;
             open.Activate();
             return open;
         }
-        var window = new ToolWindow(services, spec, overlay);
+        var window = new ToolWindow(services, spec, overlay) { CloseBlocked = () => modalOpen };
         toolWindows[spec.Key] = window;
         window.Closed += (_, _) => toolWindows.Remove(spec.Key);
         window.Show();
@@ -115,12 +129,12 @@ public sealed class MeterWindows : IMeterWindows
 
     public void MinimizeOverlay()
     {
-        if (overlay is not null) overlay.WindowState = WindowState.Minimized;
+        if (overlay is not null && !closing && !modalOpen) overlay.WindowState = WindowState.Minimized;
     }
 
     public void ToggleOverlay()
     {
-        if (overlay is null) return;
+        if (overlay is null || closing || modalOpen) return;
         if (overlay.WindowState == WindowState.Minimized)
         {
             overlay.WindowState = WindowState.Normal;
@@ -132,33 +146,54 @@ public sealed class MeterWindows : IMeterWindows
         }
     }
 
-    public void CloseMeter() => overlay?.Close();
+    public void CloseMeter()
+    {
+        if (!modalOpen) overlay?.Close();
+    }
 
     public void SuspendHotkey(bool suspended)
     {
-        if (hotkeySuspended == suspended) return;
         hotkeySuspended = suspended;
-        registeredHotkey = string.Empty; // force re-registration
-        ApplyHotkey(settings.Current.Overlay.ToggleHotkey);
+        hotkeyBinding?.Suspend(suspended);
     }
 
     // The dialog runs from its own dispatcher operation, not inside the Blazor event handler that asked for
-    // it, so its modal loop cannot re-enter the renderer that is dispatching the click.
+    // it, so its modal loop cannot re-enter the renderer that is dispatching the click. While it is open every
+    // Scarlet window is disabled and refuses to close: closing one would release Blazor content under a
+    // modal loop, which terminated the process (reproduced in review).
     public async Task<string?> PickPictureAsync()
     {
+        if (closing || modalOpen) return null;
         var owner = toolWindows.GetValueOrDefault(Settings.Key) ?? (Window?)overlay;
-        return await Application.Current.Dispatcher.InvokeAsync(() =>
+        modalOpen = true;
+        var disabled = new List<IntPtr>();
+        try
         {
-            var dialog = new Microsoft.Win32.OpenFileDialog
+            return await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                Title = "Choose a background picture",
-                Filter = "Pictures|" + string.Join(';', BackgroundImages.Extensions.Select(e => "*" + e)),
-                CheckFileExists = true,
-                Multiselect = false,
-            };
-            return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
-        }, System.Windows.Threading.DispatcherPriority.Background);
+                foreach (var window in AllWindows().Where(w => w != owner))
+                {
+                    var handle = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+                    if (handle != IntPtr.Zero && !NativeMethods.EnableWindow(handle, false)) disabled.Add(handle);
+                }
+                var dialog = new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = "Choose a background picture",
+                    Filter = "Pictures|" + string.Join(';', BackgroundImages.Extensions.Select(e => "*" + e)),
+                    CheckFileExists = true,
+                    Multiselect = false,
+                };
+                return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
+            }, System.Windows.Threading.DispatcherPriority.Background);
+        }
+        finally
+        {
+            foreach (var handle in disabled) NativeMethods.EnableWindow(handle, true);
+            modalOpen = false;
+        }
     }
+
+    private IEnumerable<Window> AllWindows() => toolWindows.Values.Cast<Window>().Prepend(overlay).OfType<Window>();
 
     public void OpenDataFolder()
     {
@@ -182,11 +217,12 @@ public sealed class MeterWindows : IMeterWindows
     // with live Blazor content when the overlay (and the app) goes away.
     private async ValueTask CloseToolWindowsAsync()
     {
-        var closing = toolWindows.Values.ToList();
-        foreach (var window in closing) window.Close();
+        closing = true;
+        var windows = toolWindows.Values.ToList();
+        foreach (var window in windows) window.Close();
         try
         {
-            await Task.WhenAll(closing.Select(w => w.CloseCompletion)).WaitAsync(TimeSpan.FromSeconds(5));
+            await Task.WhenAll(windows.Select(w => w.CloseCompletion)).WaitAsync(TimeSpan.FromSeconds(5));
         }
         catch (TimeoutException)
         {
@@ -194,28 +230,5 @@ public sealed class MeterWindows : IMeterWindows
         }
     }
 
-    private void OnSettingsChanged(object? sender, MeterSettings changed) => ApplyHotkey(changed.Overlay.ToggleHotkey);
-
-    private void ApplyHotkey(string text)
-    {
-        if (hotkey is null) return;
-        var wanted = hotkeySuspended ? string.Empty : text;
-        if (wanted == registeredHotkey) return;
-        registeredHotkey = wanted;
-
-        string? error = null;
-        if (HotkeyGesture.TryParse(wanted, out var gesture, out var parseError))
-            hotkey.TrySet(gesture, out error);
-        else
-        {
-            hotkey.TrySet(null, out _);
-            error = parseError;
-        }
-        if (error is not null && !hotkeySuspended) logger.LogWarning("Hotkey not registered: {Error}", error);
-        if (!hotkeySuspended && error != HotkeyError)
-        {
-            HotkeyError = error;
-            HotkeyStatusChanged?.Invoke(this, EventArgs.Empty);
-        }
-    }
+    private void OnSettingsChanged(object? sender, MeterSettings changed) => hotkeyBinding?.Apply(changed.Overlay.ToggleHotkey);
 }

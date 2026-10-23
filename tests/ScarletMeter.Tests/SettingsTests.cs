@@ -157,6 +157,40 @@ public sealed class SettingsTests : IDisposable
     }
 
     [Fact]
+    public void ADamagedFileThatCannotBeSetAsideSwitchesSavingOff()
+    {
+        var store = NewStore();
+        File.WriteAllText(store.FilePath, "{ damaged");
+        // An open handle without delete sharing blocks the rename, as another program holding the file would.
+        using (new FileStream(store.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            using var service = new SettingsService(store, new EngineSettings(), NullLogger<SettingsService>.Instance);
+            Assert.Equal(SettingsLoadStatus.ReadOnly, service.LoadResult.Status);
+            Assert.False(service.CanSave);
+            service.Update(s => s with { Appearance = s.Appearance with { ShowDeaths = false } });
+            service.Flush();
+        }
+        Assert.Equal("{ damaged", File.ReadAllText(store.FilePath));
+    }
+
+    [Fact]
+    public void ABackupThatCannotBeOpenedSwitchesSavingOff()
+    {
+        var store = NewStore();
+        var good = new MeterSettings { Appearance = new AppearanceSettings { RowScale = 1.3 } };
+        store.Save(good);
+        store.Save(good);
+        File.WriteAllText(store.FilePath, "{ damaged");
+        using (new FileStream(store.BackupPath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            var result = store.Load();
+            Assert.Equal(SettingsLoadStatus.ReadOnly, result.Status);
+            Assert.False(result.CanSave);
+        }
+        Assert.Equal(good, NewStore().Load().Settings); // the backup survived; the damaged file was kept aside
+    }
+
+    [Fact]
     public void AnOversizedFileIsNotParsed()
     {
         var store = NewStore();
@@ -282,6 +316,7 @@ public sealed class SettingsTests : IDisposable
         Assert.Throws<ArgumentException>(() => BackgroundImages.Import(Path.Combine("relative", "a.png"), directory.FullPath));
         Assert.False(BackgroundImages.IsStoredName("background-1234abcd.exe"));
         Assert.False(BackgroundImages.IsStoredName(@"..\background-1234abcd.png"));
+        Assert.False(BackgroundImages.IsStoredName("background-1234abcd.png\n"));
     }
 
     [Fact]

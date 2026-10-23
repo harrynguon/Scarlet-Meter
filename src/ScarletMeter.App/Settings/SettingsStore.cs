@@ -67,6 +67,13 @@ public sealed class SettingsStore
         switch (main.Outcome)
         {
             case ReadOutcome.Missing:
+                // A previous run may have set a damaged file aside without saving again: restore its backup.
+                var previous = TryRead(BackupPath);
+                if (previous.Outcome == ReadOutcome.Read)
+                    return Loaded(previous.Settings!, SettingsLoadStatus.RecoveredFromBackup) with
+                    {
+                        Notice = "Your settings file was missing, so the previous save was restored.",
+                    };
                 return new SettingsLoadResult(SettingsNormalizer.Normalize(null).Settings, SettingsLoadStatus.Defaults, true, null);
             case ReadOutcome.Read:
                 return Loaded(main.Settings!, SettingsLoadStatus.Loaded);
@@ -80,21 +87,36 @@ public sealed class SettingsStore
                     $"Your settings file could not be opened ({main.Error?.Message}). Defaults are in use and changes are not saved.");
         }
 
-        // Unreadable: keep the file aside before anything is written, then fall back to the previous save.
+        // Unreadable: keep the file aside before anything is written, then fall back to the previous save. If
+        // a damaged file or the backup cannot be moved out of the way (another program holds it), saving is
+        // switched off, because the next save's File.Replace would otherwise overwrite it.
         var kept = KeepAside(FilePath);
+        if (kept is null)
+            return ReadOnlyDefaults($"Your settings file could not be read, and it could not be set aside ({main.Error?.Message}).");
         logger.LogWarning(main.Error, "settings.json could not be read; it was kept as {Kept}.", kept);
         var backup = TryRead(BackupPath);
-        if (backup.Outcome == ReadOutcome.Read)
+        switch (backup.Outcome)
         {
-            var recovered = Loaded(backup.Settings!, SettingsLoadStatus.RecoveredFromBackup);
-            return recovered with
-            {
-                Notice = $"Your settings file could not be read, so the previous save was restored. The unreadable file was kept as {Path.GetFileName(kept)}.",
-            };
+            case ReadOutcome.Read:
+                var recovered = Loaded(backup.Settings!, SettingsLoadStatus.RecoveredFromBackup);
+                return recovered with
+                {
+                    Notice = $"Your settings file could not be read, so the previous save was restored. The unreadable file was kept as {Path.GetFileName(kept)}.",
+                };
+            case ReadOutcome.Inaccessible:
+                return ReadOnlyDefaults($"Your settings file could not be read (kept as {Path.GetFileName(kept)}), and the previous save could not be opened.");
+            case ReadOutcome.Unreadable or ReadOutcome.NewerVersion when KeepAside(BackupPath) is null:
+                return ReadOnlyDefaults($"Your settings file could not be read (kept as {Path.GetFileName(kept)}), and the previous save could not be set aside.");
         }
-        if (backup.Outcome is ReadOutcome.Unreadable or ReadOutcome.NewerVersion) KeepAside(BackupPath);
         return new SettingsLoadResult(SettingsNormalizer.Normalize(null).Settings, SettingsLoadStatus.ResetToDefaults, true,
             $"Your settings file could not be read and there was no usable previous save, so defaults are in use. The unreadable file was kept as {Path.GetFileName(kept)}.");
+    }
+
+    private SettingsLoadResult ReadOnlyDefaults(string problem)
+    {
+        logger.LogWarning("Settings are read-only for this run: {Problem}", problem);
+        return new SettingsLoadResult(SettingsNormalizer.Normalize(null).Settings, SettingsLoadStatus.ReadOnly, false,
+            problem + " Defaults are in use and changes are not saved until the meter restarts with the file free.");
     }
 
     /// <summary>Writes the settings atomically, keeping the previous file as the backup. Throws on I/O failure.</summary>
@@ -154,12 +176,15 @@ public sealed class SettingsStore
         }
     }
 
-    // Renames a damaged file so nothing later overwrites it. Returns the new path (or the old one if renaming failed).
-    private string KeepAside(string path)
+    // Renames a damaged file so nothing later overwrites it. Returns the new path, or null if it could not be
+    // moved (the caller then must not save). A name already taken gets a counter rather than being replaced.
+    private string? KeepAside(string path)
     {
         var directory = Path.GetDirectoryName(path)!;
         var stem = Path.GetFileName(path).Replace(".json", string.Empty, StringComparison.Ordinal);
-        var target = Path.Combine(directory, $"{stem}.unreadable-{DateTime.UtcNow:yyyyMMdd'T'HHmmss'Z'}.json");
+        var stamp = $"{stem}.unreadable-{DateTime.UtcNow:yyyyMMdd'T'HHmmss'Z'}";
+        var target = Path.Combine(directory, stamp + ".json");
+        for (var n = 2; File.Exists(target) && n < 100; n++) target = Path.Combine(directory, $"{stamp}-{n}.json");
         try
         {
             File.Move(path, target, overwrite: false);
@@ -168,7 +193,7 @@ public sealed class SettingsStore
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             logger.LogWarning(ex, "Could not keep {Path} aside.", path);
-            return path;
+            return null;
         }
     }
 }

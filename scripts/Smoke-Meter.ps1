@@ -18,14 +18,14 @@ Window names are each page's data-window attribute. Never use this against a met
 the debugging port is open only while the script runs. Paths derive from this script's location.
 
 .EXAMPLE
-& "<checkout>\scripts\Smoke-Meter.ps1" -Arguments '--demo' -Steps { param($m) $m.WaitFor('overlay', "document.querySelectorAll('.row').length > 0", 15) }
+& "<checkout>\scripts\Smoke-Meter.ps1" -Steps { param($m) $m.WaitFor('overlay', "document.querySelector('.target-name')?.textContent", 15) }
 #>
 [CmdletBinding()]
 param(
     [string]$Exe,
     [string[]]$Arguments = @('--no-capture'),
     [string]$DataDirectory,
-    [int]$DevToolsPort = 9333,
+    [int]$DevToolsPort = 0,
     [scriptblock]$Steps,
     [switch]$KeepData,
     [switch]$KeepRunning
@@ -52,9 +52,11 @@ if (-not ('ScarletSmoke.Mouse' -as [type])) {
 $script:sockets = @{}
 $script:nextId = 0
 
+# Only the meter's own pages (BlazorWebView serves them from https://0.0.0.1/), so a different program that
+# happens to listen on the port never has script evaluated in its pages.
 function Get-Targets {
     $list = Invoke-RestMethod -Uri "http://127.0.0.1:$DevToolsPort/json/list" -TimeoutSec 5
-    @($list | Where-Object { $_.type -eq 'page' })
+    @($list | Where-Object { $_.type -eq 'page' -and $_.url -like 'https://0.0.0.1/*' })
 }
 
 function Send-Cdp([string]$wsUrl, [string]$method, [hashtable]$params) {
@@ -109,6 +111,11 @@ function Wait-Window([string]$name, [int]$seconds) {
     throw "No '$name' window within $seconds s."
 }
 
+# A free port unless one was given, so a second meter (or anything else) on a fixed port is never driven by mistake.
+if ($DevToolsPort -eq 0) {
+    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    $listener.Start(); $DevToolsPort = $listener.LocalEndpoint.Port; $listener.Stop()
+}
 $previousArgs = $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
 $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$DevToolsPort"
 $allArgs = @($Arguments) + @('--data-dir', "`"$DataDirectory`"")

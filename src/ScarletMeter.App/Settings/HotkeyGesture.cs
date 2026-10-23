@@ -102,9 +102,23 @@ public sealed record HotkeyGesture(HotkeyModifiers Modifiers, string Key, int Vi
             error = "Add Ctrl, Alt, Shift or Win, so the shortcut doesn't take a key from the game.";
             return false;
         }
-        gesture = new HotkeyGesture(modifiers, key, vk);
+        var candidate = new HotkeyGesture(modifiers, key, vk);
+        if (Reserved.Contains(candidate.ToString()))
+        {
+            error = $"{candidate} is used by Windows or by most programs; choose another shortcut.";
+            return false;
+        }
+        gesture = candidate;
         return true;
     }
+
+    // Shortcuts a global hotkey would take from every program (closing, switching, editing).
+    private static readonly HashSet<string> Reserved = new(StringComparer.Ordinal)
+    {
+        "Alt+F4", "Alt+Tab", "Alt+Space", "Ctrl+F4", "Ctrl+Tab",
+        "Ctrl+A", "Ctrl+C", "Ctrl+V", "Ctrl+X", "Ctrl+Y", "Ctrl+Z", "Ctrl+S", "Ctrl+F",
+        "Ctrl+Alt+Delete", "Win+L", "Win+D", "Win+Tab",
+    };
 
     private static bool IsModifierCode(string code) => code is "ControlLeft" or "ControlRight" or "AltLeft"
         or "AltRight" or "ShiftLeft" or "ShiftRight" or "MetaLeft" or "MetaRight" or "OSLeft" or "OSRight";

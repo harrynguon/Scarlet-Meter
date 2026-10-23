@@ -46,19 +46,45 @@
 
     protected override void OnInitialized() => Windows.HotkeyStatusChanged += OnHotkeyStatusChanged;
 
+    // Recording ends on blur, a key, Escape, Clear or disposal; the timeout is the backstop for a lost blur
+    // (focus leaving the whole window), so the real hotkey is never left suspended.
+    private static readonly TimeSpan RecordingTimeout = TimeSpan.FromSeconds(15);
+    private CancellationTokenSource? recordingTimeout;
+
     private void StartRecording()
     {
         if (recording) return;
         recording = true;
         error = null;
         Windows.SuspendHotkey(true);
+        recordingTimeout = new CancellationTokenSource();
+        _ = EndRecordingAfterTimeoutAsync(recordingTimeout.Token);
     }
 
     private void StopRecording()
     {
         if (!recording) return;
         recording = false;
+        recordingTimeout?.Cancel();
+        recordingTimeout = null;
         Windows.SuspendHotkey(false);
+    }
+
+    private async Task EndRecordingAfterTimeoutAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(RecordingTimeout, token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        await InvokeAsync(() =>
+        {
+            StopRecording();
+            StateHasChanged();
+        });
     }
 
     private async Task OnKeyDown(KeyboardEventArgs e)

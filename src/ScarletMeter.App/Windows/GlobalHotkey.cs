@@ -8,7 +8,7 @@ namespace ScarletMeter.App.Windows;
 /// One system-wide hotkey registered on a window (RegisterHotKey), raising <see cref="Pressed"/> on that
 /// window's UI thread. Auto-repeat is suppressed, so holding the keys toggles once.
 /// </summary>
-internal sealed class GlobalHotkey : IDisposable
+internal sealed class GlobalHotkey : IHotkeyTarget, IDisposable
 {
     private const int HotkeyId = 0x5C41;
 

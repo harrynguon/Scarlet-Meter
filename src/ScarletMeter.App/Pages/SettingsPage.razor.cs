@@ -35,21 +35,35 @@ public partial class SettingsPage : IDisposable
     private static string Version =>
         typeof(SettingsPage).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "";
 
-    protected override void OnInitialized() => Settings.Changed += OnSettingsChanged;
+    protected override void OnInitialized()
+    {
+        Settings.Changed += OnSettingsChanged;
+        Settings.SaveStatusChanged += OnSaveStatusChanged;
+    }
 
     private void Change(Func<MeterSettings, MeterSettings> change) => Settings.Update(change);
+
+    // A value the normalizer clamps back to what is already stored is "no change" to Blazor's diff, so the
+    // field would keep showing what was typed; a new key re-creates it with the stored value.
+    private int retentionKey;
 
     private void OnRetentionChanged(ChangeEventArgs e)
     {
         if (int.TryParse(e.Value?.ToString(), out var days))
             Change(s => s with { Fight = s.Fight with { HistoryRetentionDays = days } });
+        retentionKey++;
     }
 
     private async Task ChoosePicture()
     {
         pictureError = null;
+        if (!Settings.CanSave)
+        {
+            pictureError = "Settings are read-only, so the picture cannot be changed.";
+            return;
+        }
         var path = await Windows.PickPictureAsync();
-        if (path is null) return;
+        if (path is null || disposed) return;
         try
         {
             var stored = BackgroundImages.Import(path, Options.DataDirectory);
@@ -62,14 +76,30 @@ public partial class SettingsPage : IDisposable
         }
     }
 
+    // In read-only mode the protected settings file still names its picture, so nothing is deleted.
     private void RemovePicture()
     {
         pictureError = null;
+        if (!Settings.CanSave)
+        {
+            pictureError = "Settings are read-only, so the picture cannot be changed.";
+            return;
+        }
         Change(s => s with { Appearance = s.Appearance with { BackgroundImage = null } });
         BackgroundImages.RemoveExcept(BackgroundImages.Folder(Options.DataDirectory), keep: null);
     }
 
+    private bool disposed;
+
     private void OnSettingsChanged(object? sender, MeterSettings changed) => _ = InvokeAsync(StateHasChanged);
 
-    public void Dispose() => Settings.Changed -= OnSettingsChanged;
+    // Saves run on a timer thread; a failure (or recovery) re-renders the notice at once.
+    private void OnSaveStatusChanged(object? sender, EventArgs e) => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        disposed = true;
+        Settings.Changed -= OnSettingsChanged;
+        Settings.SaveStatusChanged -= OnSaveStatusChanged;
+    }
 }

@@ -71,7 +71,7 @@ public sealed record AppearanceSettings
     /// <summary>Colour each player's bar by class.</summary>
     public bool ClassColors { get; init; } = true;
 
-    /// <summary>Replace other players' names with their class (your own name stays).</summary>
+    /// <summary>Mask every player's name, yours included, with RATmeter's masking (for screenshots and streams).</summary>
     public bool HideNicknames { get; init; }
 
     /// <summary>Show each player's death count.</summary>

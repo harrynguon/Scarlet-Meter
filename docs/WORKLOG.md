@@ -61,7 +61,45 @@ The overlay is the base the alerts and other windows build on.
 - The game: the overlay over a borderless game window, the hotkey while the game has focus, and DPI scaling or multiple monitors.
 - Rows with real players (the demo mode comes with the engine PR).
 
-**Next:** the engine, events and update-check PRs (in progress), then the details, history, alerts and update-notice UI on top of this.
+**Audit (deep pass, PR 2, head 3acbde5):** request changes, with two major defects reproduced in the built meter. Both are fixed:
+
+- **Recording a shortcut did not unregister the current one.** `SuspendHotkey` reset its "registered" marker to the same empty string it then wanted, so nothing changed; pressing Ctrl+Shift+D while recording minimized the meter.
+  - Fix: the decisions moved into `HotkeyBinding` (a null marker forces the first registration), with `HotkeyBindingTests` on a fake target. Recording also ends after 15 seconds as a backstop for a lost blur.
+- **Closing the overlay while the picture dialog was open killed the process** (0xE0434352, `ObjectDisposedException` inside the dispatcher's handler). This is the crash the deferred close exists to prevent.
+  - Fix: while the picker is open every meter window is disabled (`EnableWindow`) and refuses to close (`ScarletWindow.CloseBlocked`), and the hotkey and minimize do nothing. The settings page ignores a picker result after it has been disposed.
+
+The minor findings and nits, all applied:
+
+- **Settings store:** a damaged file or backup that cannot be renamed aside, or a backup that cannot be opened, now switches saving off. Without that, two saves destroyed the damaged file. A missing file with a usable backup restores it. Unreadable files keep unique names.
+- **Picture names:** the stored-name regex uses `\z`, so a trailing newline is rejected.
+- **CSP:** tightened to `script-src 'self'`, `object-src 'none'`, `base-uri 'self'`, without `data:`.
+- **Boundary docs:** ARCHITECTURE "Upstream boundary" names the class-icon copy as the one build-time contact with upstream's UI files; the "What breaks" table has a row for it.
+- **Closing guard:** `MeterWindows` refuses to open windows once the overlay is closing.
+- **Placement:** tool windows use the overlay's monitor's work area.
+- **Comments:** fixed for hidden names and for tool-window placement.
+- **Hotkeys:** shortcuts Windows or most programs use (Alt+F4, Ctrl+C and similar) are refused.
+- **Settings page:**
+  - save errors re-render it at once (`SaveStatusChanged`)
+  - the retention field shows the clamped value
+  - in read-only mode the picture is neither imported nor deleted
+- **Smoke script:** picks a free DevTools port and drives only pages on BlazorWebView's origin, `https://0.0.0.1/`. The earlier fixed port could drive another running meter.
+- **Masking test:** checks upstream's exact masked value ("Ab**3**").
+
+**Checks after the fixes:**
+
+- `Build.ps1`, Debug and Release: 68/68 tests (7 new).
+- The auditor's hotkey reproduction (`keybd_event` while the field records): the overlay stays Normal.
+- A full real-mouse and real-key flow:
+  - opened settings, the Overlay tab and the shortcut field with real clicks
+  - pressing the current Ctrl+Shift+D was recorded, and the overlay stayed Normal
+  - recording Ctrl+Alt+K saved it
+  - Ctrl+Alt+K then minimized and restored the overlay
+  - the old Ctrl+Shift+D did nothing
+- The auditor's dialog reproduction: with the picture dialog open, clicking ✕ did not close the meter (it was still running after 3 s). After the dialog was cancelled, ✕ closed it with exit code 0 and only the usual WebView2 disposal lines in the log.
+- Under the tightened CSP, a class icon loaded from the assets host and an image from another host was blocked.
+- No `%TEMP%\scarlet-*` leftovers.
+
+**Next:** CI on the fixes and a squash merge, then the engine, events and update-check PRs, then the details, history, alerts and update-notice UI on top of this.
 
 ## 2026-10-23 — Review fixes
 

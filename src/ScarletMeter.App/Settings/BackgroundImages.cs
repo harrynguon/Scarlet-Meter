@@ -64,6 +64,7 @@ public static partial class BackgroundImages
         }
     }
 
-    [GeneratedRegex(@"^background-[0-9a-f]{8}\.(png|jpg|jpeg|gif|webp|bmp)$", RegexOptions.CultureInvariant)]
+    // \z, not $: in .NET "$" also matches before a final newline.
+    [GeneratedRegex(@"^background-[0-9a-f]{8}\.(png|jpg|jpeg|gif|webp|bmp)\z", RegexOptions.CultureInvariant)]
     private static partial Regex StoredName();
 }

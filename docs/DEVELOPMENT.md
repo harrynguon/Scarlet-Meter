@@ -36,7 +36,7 @@ The apphost needs a .NET 10 runtime it can find: an installed .NET 10 Desktop Ru
 
 ## Smoke-testing the UI
 
-`scripts/Smoke-Meter.ps1` starts the built meter (Debug by default; `-Exe` for another absolute path) with a throwaway data directory, runs a script block against its pages and closes it the way a player would, then prints the exit code. The meter is started with WebView2 remote debugging on `-DevToolsPort` (default 9333, localhost) for that run only. Set `DOTNET_ROOT` as above for a framework-dependent build.
+`scripts/Smoke-Meter.ps1` starts the built meter (Debug by default; `-Exe` for another absolute path) with a throwaway data directory, runs a script block against its pages and closes it the way a player would, then prints the exit code. The meter is started with WebView2 remote debugging on a free localhost port (or `-DevToolsPort`) for that run only, and only pages served from `https://0.0.0.1/` (BlazorWebView's app origin) are driven. Set `DOTNET_ROOT` as above for a framework-dependent build.
 
 ```powershell
 & "<checkout>\scripts\Smoke-Meter.ps1" -Steps {

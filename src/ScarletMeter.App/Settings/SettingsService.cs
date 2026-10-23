@@ -70,12 +70,17 @@ public sealed class SettingsService : IDisposable
         Changed?.Invoke(this, next);
     }
 
+    /// <summary>Raised when <see cref="SaveError"/> changes, usually on the save timer's thread.</summary>
+    public event EventHandler? SaveStatusChanged;
+
     /// <summary>Writes a pending change now. Failures are logged and reported through <see cref="SaveError"/>.</summary>
     public void Flush()
     {
+        string? before, after;
         lock (gate)
         {
             if (!dirty || !CanSave) return;
+            before = SaveError;
             try
             {
                 store.Save(current);
@@ -87,7 +92,9 @@ public sealed class SettingsService : IDisposable
                 logger.LogError(ex, "Saving settings to {Path} failed.", store.FilePath);
                 SaveError = $"Settings could not be saved: {ex.Message}";
             }
+            after = SaveError;
         }
+        if (before != after) SaveStatusChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public void Dispose()

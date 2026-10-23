@@ -78,7 +78,7 @@
                             <span class="desc">Older fights are removed when the meter starts.</span>
                         </span>
                         <span class="number-field">
-                            <input type="number" min="@FightSettings.MinRetentionDays" max="@FightSettings.MaxRetentionDays"
+                            <input type="number" @key="retentionKey" min="@FightSettings.MinRetentionDays" max="@FightSettings.MaxRetentionDays"
                                    value="@S.Fight.HistoryRetentionDays" @onchange="OnRetentionChanged" /> days
                         </span>
                     </label>

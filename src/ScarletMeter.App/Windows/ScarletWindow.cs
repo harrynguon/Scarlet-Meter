@@ -62,6 +62,12 @@ public abstract class ScarletWindow : Window
     /// <summary>The colour the WebView paints before and under the page.</summary>
     protected virtual System.Drawing.Color WebViewBackground => System.Drawing.Color.FromArgb(0x0B, 0x0B, 0x0F);
 
+    /// <summary>
+    /// When it returns true a close is refused (while a modal dialog runs from one of the meter's windows,
+    /// releasing Blazor content would happen under its modal loop). Forced closes at system shutdown ignore it.
+    /// </summary>
+    public Func<bool>? CloseBlocked { get; init; }
+
     /// <summary>Restores the saved placement; subclasses call it at the end of their constructor, after their defaults.</summary>
     protected bool RestorePlacement() => placement.Restore();
 
@@ -73,6 +79,11 @@ public abstract class ScarletWindow : Window
     protected override void OnClosing(CancelEventArgs e)
     {
         base.OnClosing(e);
+        if (!e.Cancel && CloseBlocked?.Invoke() == true)
+        {
+            e.Cancel = true;
+            return;
+        }
         if (!e.Cancel && deferredClose is not null)
             e.Cancel = deferredClose.ShouldCancelClose();
     }

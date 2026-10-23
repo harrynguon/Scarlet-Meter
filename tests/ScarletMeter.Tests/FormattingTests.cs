@@ -16,7 +16,7 @@ public sealed class FormattingTests
     public void LongNamesKeepTwoLettersAndOneStableDigit()
     {
         var masked = NicknameMask.Mask("Abcdefg");
-        Assert.Matches("^Ab\\*\\*[0-9]\\*\\*$", masked);
+        Assert.Equal("Ab**3**", masked); // FNV-1a("Abcdefg") = 1531417303, as upstream computes it
         Assert.Equal(masked, NicknameMask.Mask("Abcdefg"));
         Assert.Equal("Abcdefg".Length, masked.Length);
     }
