@@ -28,6 +28,7 @@ public sealed class UpdateNotice : IDisposable
     private ITimer? timer;
     private UpstreamReleaseCheckResult? result;
     private DateTimeOffset? checkedAt;
+    private UpdateSettings? lastUpdates;
     private bool started;
     private bool disposed;
 
@@ -74,6 +75,7 @@ public sealed class UpdateNotice : IDisposable
         {
             if (started || disposed) return;
             started = true;
+            lastUpdates = settings.Current.Updates;
             settings.Changed += OnSettingsChanged;
             if (settings.Current.Updates.CheckUpstreamReleases) Schedule(StartupDelay);
         }
@@ -83,14 +85,15 @@ public sealed class UpdateNotice : IDisposable
     public void Dismiss(UpstreamReleaseCheckResult.NewerAvailable release) =>
         settings.Update(s => s with { Updates = s.Updates with { DismissedRelease = release.Tag } });
 
-    // Switching checks on checks at once (outside the lock; the checker answers from its cache when it can);
-    // switching off stops the timer. Either way the page re-renders.
+    // Only a change to the Updates section matters. Switching checks on checks at once (outside the lock; the
+    // checker answers from its cache when it can); switching off stops the timer. Either way the page re-renders.
     private void OnSettingsChanged(object? sender, MeterSettings changed)
     {
         var checkNow = false;
         lock (gate)
         {
-            if (disposed) return;
+            if (disposed || changed.Updates == lastUpdates) return;
+            lastUpdates = changed.Updates;
             if (!changed.Updates.CheckUpstreamReleases)
             {
                 timer?.Dispose();
@@ -116,7 +119,15 @@ public sealed class UpdateNotice : IDisposable
     {
         try
         {
-            var answer = await checker.CheckAsync(stopping.Token).ConfigureAwait(false);
+            // A timer callback already queued when the switch went off or the meter closed must not send a
+            // request: Dispose on a timer does not stop a callback that is on its way.
+            CancellationToken token;
+            lock (gate)
+            {
+                if (disposed || !settings.Current.Updates.CheckUpstreamReleases) return;
+                token = stopping.Token;
+            }
+            var answer = await checker.CheckAsync(token).ConfigureAwait(false);
             lock (gate)
             {
                 if (disposed) return;

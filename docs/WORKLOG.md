@@ -24,7 +24,18 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Not checked:** "Release notes" opening the browser (not clicked in the smoke run, so no browser was launched); the line over the game.
 
-**Next:** merge with PR #4's final head and main, PR, audit, CI and merge.
+**Compatibility:** no version bump, as the `updates` section is additive. A file without it, or with `"updates": null`, loads with checking on. An older build ignores the section and drops it on its next save, so a player who turned checking off finds it on again after going back and forth; a settings file reset to defaults does the same. SECURITY.md says so.
+
+**Audit (pr-auditor, deep pass on 3243ad0): approve with nits**, applied after merging main (#4, e30cbc1):
+
+- Minor: a timer callback already queued when the switch went off or the meter closed could still call the checker. `CheckAsync` now returns before asking when the switch is off or the notice is disposed.
+- Minor: tests missed the privacy paths (the auditor's mutations survived). New: a check in flight when the switch goes off books no other, one in flight when the meter closes sees its token cancelled and books no other, other settings changes neither ask nor redraw, dismissing asks nothing, switching off redraws.
+- Minor (docs): the opt-out can revert (above, and SECURITY.md).
+- Nits: the release-page check's comment and ARCHITECTURE say what it does (Uri resolves dot segments; the `..` test only catches what Uri leaves); a fragment or any `@` is now refused too, with test rows; a refused address is no longer logged; only a change to the `updates` section re-renders or re-checks.
+
+Checks after the fixes: `scripts/Build.ps1` 291/291 on the merged tree (upstream v1.11.5.341).
+
+**Next:** CI and merge.
 
 ## 2026-10-24 — Upstream release check and installer
 

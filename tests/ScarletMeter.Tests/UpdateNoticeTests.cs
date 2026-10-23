@@ -72,6 +72,7 @@ public sealed class UpdateNoticeTests : IDisposable
         clock.Advance(UpdateNotice.StartupDelay);
 
         notice.Dismiss(Newer);
+        Assert.Equal(1, checker.Calls); // dismissing asks nothing
         Assert.Null(notice.Visible);
         Assert.Equal("v1.11.6.350", settings.Current.Updates.DismissedRelease);
         Assert.IsType<NewerAvailable>(notice.Result); // still shown in Settings, About
@@ -98,10 +99,62 @@ public sealed class UpdateNoticeTests : IDisposable
         Assert.Equal(1, checker.Calls); // switching on checks at once (the checker answers from its cache if it can)
         Assert.Same(Newer, notice.Visible);
 
+        var changes = 0;
+        notice.Changed += (_, _) => changes++;
         settings.Update(s => s with { Updates = s.Updates with { CheckUpstreamReleases = false } });
+        Assert.Equal(1, changes); // the page re-renders without the line
         Assert.Null(notice.Visible);
         clock.Advance(TimeSpan.FromDays(1));
         Assert.Equal(1, checker.Calls);
+    }
+
+    [Fact]
+    public void ACheckInFlightWhenTheSwitchGoesOffBooksNoOther()
+    {
+        using var settings = NewSettings();
+        using var notice = NewNotice(settings);
+        checker.Pending = new TaskCompletionSource<UpstreamReleaseCheckResult>();
+        notice.Start();
+        clock.Advance(UpdateNotice.StartupDelay);
+        Assert.Equal(1, checker.Calls); // in flight
+
+        settings.Update(s => s with { Updates = s.Updates with { CheckUpstreamReleases = false } });
+        checker.Pending.SetResult(Newer);
+        clock.Advance(TimeSpan.FromDays(2));
+        Assert.Equal(1, checker.Calls);
+        Assert.Null(notice.Visible);
+    }
+
+    [Fact]
+    public void ACheckInFlightWhenTheMeterClosesBooksNoOther()
+    {
+        using var settings = NewSettings();
+        var notice = NewNotice(settings);
+        checker.Pending = new TaskCompletionSource<UpstreamReleaseCheckResult>();
+        notice.Start();
+        clock.Advance(UpdateNotice.StartupDelay);
+
+        notice.Dispose();
+        Assert.True(checker.LastToken.IsCancellationRequested);
+        checker.Pending.SetResult(Newer);
+        clock.Advance(TimeSpan.FromDays(2));
+        Assert.Equal(1, checker.Calls);
+    }
+
+    [Fact]
+    public void OtherSettingsChangesNeitherAskNorRedraw()
+    {
+        using var settings = NewSettings();
+        using var notice = NewNotice(settings);
+        checker.Answer = Newer;
+        notice.Start();
+        clock.Advance(UpdateNotice.StartupDelay);
+        var changes = 0;
+        notice.Changed += (_, _) => changes++;
+
+        settings.Update(s => s with { Appearance = s.Appearance with { BackgroundOpacity = 0.5 } });
+        Assert.Equal(1, checker.Calls);
+        Assert.Equal(0, changes);
     }
 
     [Fact]
@@ -137,6 +190,9 @@ public sealed class UpdateNoticeTests : IDisposable
     [InlineData("https://github.com/Kuroukihime/AIon2-Dps-Meter/releases/../../other/repo", false)]
     [InlineData("https://github.com/Someone/AIon2-Dps-Meter/releases/tag/v1", false)]
     [InlineData("https://github.com/Kuroukihime/AIon2-Dps-Meter/releases/tag/v1?x=1", false)]
+    [InlineData("https://github.com/Kuroukihime/AIon2-Dps-Meter/releases/tag/v1#notes", false)]
+    [InlineData("https://@github.com/Kuroukihime/AIon2-Dps-Meter/releases/tag/v1", false)]
+    [InlineData("https://github.com/Kuroukihime/AIon2-Dps-Meter/releases/%2e%2e/%2e%2e/evil/repo", false)]
     [InlineData("file:///C:/Windows/System32/calc.exe", false)]
     public void OnlyUpstreamReleasePagesMayBeOpened(string address, bool allowed) =>
         Assert.Equal(allowed, MeterWindows.IsUpstreamReleasePage(new Uri(address)));
@@ -161,21 +217,28 @@ public sealed class UpdateNoticeTests : IDisposable
 
     public void Dispose() => directory.Dispose();
 
-    // Answers at once with whatever the test set, or throws (which the real checker never does).
+    // Answers at once with whatever the test set, stays in flight until the test completes Pending, or throws
+    // (which the real checker never does). Pending's continuations run synchronously, so tests stay deterministic.
     private sealed class FakeChecker : IUpstreamReleaseChecker
     {
         public UpstreamReleaseCheckResult Answer { get; set; } = new Unknown(UpstreamReleaseCheckFailure.Network, "Not set.");
 
+        public TaskCompletionSource<UpstreamReleaseCheckResult>? Pending { get; set; }
+
         public bool Throw { get; set; }
 
         public int Calls { get; private set; }
+
+        public CancellationToken LastToken { get; private set; }
 
         public UpstreamReleaseCheckResult? LastResult { get; private set; }
 
         public Task<UpstreamReleaseCheckResult> CheckAsync(CancellationToken cancellationToken = default)
         {
             Calls++;
+            LastToken = cancellationToken;
             if (Throw) throw new InvalidOperationException("checker");
+            if (Pending is { } pending) return pending.Task;
             LastResult = Answer;
             return Task.FromResult(Answer);
         }

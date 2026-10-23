@@ -222,7 +222,7 @@ public sealed class MeterWindows : IMeterWindows
     {
         if (!IsUpstreamReleasePage(page))
         {
-            logger.LogWarning("Refused to open {Page}: not a RATmeter release page.", page);
+            logger.LogWarning("Refused to open a page that is not a RATmeter release page."); // the address is untrusted: not logged
             return;
         }
         try
@@ -235,13 +235,19 @@ public sealed class MeterWindows : IMeterWindows
         }
     }
 
-    /// <summary>True for https://github.com/Kuroukihime/AIon2-Dps-Meter/releases/... with no credentials, port or query.</summary>
+    /// <summary>
+    /// True for an https page under https://github.com/Kuroukihime/AIon2-Dps-Meter/releases/ with no port,
+    /// credentials (not even an empty "@"), query or fragment. Uri resolves dot segments, percent-encoded ones
+    /// included, before the prefix check, so "releases/../../other" fails it; a ".." Uri leaves in the path (around
+    /// an encoded slash) is refused too.
+    /// </summary>
     public static bool IsUpstreamReleasePage(Uri page) =>
-        page.IsAbsoluteUri && page.Scheme == Uri.UriSchemeHttps && page.IsDefaultPort && page.UserInfo.Length == 0
+        page.IsAbsoluteUri && page.Scheme == Uri.UriSchemeHttps && page.IsDefaultPort
+        && page.UserInfo.Length == 0 && !page.OriginalString.Contains('@')
         && string.Equals(page.Host, "github.com", StringComparison.OrdinalIgnoreCase)
         && page.AbsolutePath.StartsWith("/Kuroukihime/AIon2-Dps-Meter/releases/", StringComparison.OrdinalIgnoreCase)
         && !page.AbsolutePath.Contains("..", StringComparison.Ordinal)
-        && page.Query.Length == 0;
+        && page.Query.Length == 0 && page.Fragment.Length == 0;
 
     public void OpenDataFolder()
     {
