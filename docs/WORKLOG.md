@@ -2,6 +2,26 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Upstream v1.11.5.341
+
+**What:** `upstream/` moves from release v1.11.4.334 (57974f8) to release v1.11.5.341 (aa3ffc6), published 2026-10-23, with `scripts/Update-Upstream.ps1`. Upstream's changes that reach Scarlet:
+
+- Boss data: "Fixed incorrect reading of some bosses max hp" (`MobPacketProcessor`, and a new `PacketReader.ReadVarInt64`). Taken as is; the engine's mapping is unchanged.
+- "My Style" colours for the player's own name and bar: eight new `IAppSettingsService` members used only by upstream's UI. The interface change stopped the engine compiling, as designed; `UpstreamSettingsBridge` implements them as inert in-memory values with upstream's defaults.
+- Not used here: upstream's UI changes, and the `appsettings.user.json` it removed from its repository.
+
+**Why:** a release with a parsing fix; Scarlet takes upstream releases only, never `dev` (AGENTS.md).
+
+**Checks (SDK 10.0.402):**
+
+- `scripts/Build.ps1`, Debug and Release: 174/174. Release shows five compiler warnings, all in upstream's own code (`ServerMap`, `FilePacketCaptureDevice`, `DotDamagePacketProcessor`, `PartyProcessor`), none in Scarlet's.
+- A self-contained single-file publish (the CI command) and `Test-PublishLayout.ps1`: complete.
+- The published `ScarletMeter.exe` with `--no-capture` and a throwaway data directory (`Smoke-Meter.ps1`): the overlay opened ("Capture is off"), upstream registered its 15 opcode processor mappings, no warnings in the log, exit code 0.
+
+**Not checked:** the boss HP fix itself, which needs the game (HANDOFF.md, in-game acceptance).
+
+**Next:** PR, deep audit (it touches packet parsing), CI and merge.
+
 ## 2026-10-24 — World event notices in the overlay
 
 **What:**

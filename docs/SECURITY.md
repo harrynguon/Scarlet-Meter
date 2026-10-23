@@ -16,7 +16,7 @@ Restore runs with NuGet audit advisories as errors (`-warnaserror:NU1901..NU1904
 
 ## Provenance
 
-Upstream: https://github.com/Kuroukihime/AIon2-Dps-Meter at the release tag recorded by the `upstream` submodule (v1.11.4.334, commit 57974f8, at this baseline), GPLv3, "RATmeter, Copyright (c) 2026 Kuroukihime" (`upstream/LICENSE`). Scarlet Meter is GPLv3 as well, because the built program links upstream's code; private use carries no obligation, and any distribution must ship the source under the same licence. The root `LICENSE` carries Scarlet Meter's own notice and names upstream's.
+Upstream: https://github.com/Kuroukihime/AIon2-Dps-Meter at the release tag recorded by the `upstream` submodule (v1.11.5.341, commit aa3ffc6, since 2026-10-24), GPLv3, "RATmeter, Copyright (c) 2026 Kuroukihime" (`upstream/LICENSE`). Scarlet Meter is GPLv3 as well, because the built program links upstream's code; private use carries no obligation, and any distribution must ship the source under the same licence. The root `LICENSE` carries Scarlet Meter's own notice and names upstream's.
 
 `src/ScarletMeter.App/DeferredWindowClose.cs` and `tests/ScarletMeter.Tests/DeferredWindowCloseTests.cs` are ported from the harrynguon/AIon2-Dps-Meter fork (GPLv3), where they are fork-owned files.
 
