@@ -14,10 +14,13 @@ namespace ScarletMeter.Engine.Upstream.Demo;
 /// </summary>
 /// <remarks>
 /// Lifecycle invariant: at most one feed thread exists, and <see cref="StopCapture"/> returns only once it has
-/// ended (or after <see cref="StopTimeout"/>, logged), so no thread outlives a stop. Nothing escapes the thread:
-/// the feed logs a failing event and carries on (<see cref="DemoCombatFeed.Step"/>); anything that still
-/// escapes a step is logged and retried after a pause, and the feed gives up, logged, after
-/// <see cref="MaxConsecutiveFailures"/> such failures in a row; capture then reads as off.
+/// ended (or after <see cref="StopTimeout"/>, logged), so no thread outlives a stop. A step checks the stop
+/// request between events and never replays a clock jump (<see cref="DemoCombatFeed.MaxClockJump"/>), so a stop
+/// is answered within a step interval. Nothing escapes the thread: the feed logs a failing event and carries on
+/// (<see cref="DemoCombatFeed.Step"/>); anything that still escapes a step is logged and retried after a pause,
+/// and the feed gives up, logged, after <see cref="MaxConsecutiveFailures"/> such failures in a row; capture then
+/// reads as off. Upstream's pipeline still counts itself running then, so the engine's Start does nothing until
+/// Stop has been called; Stop then Start begins a fresh feed thread.
 /// </remarks>
 internal sealed class DemoCaptureDevice : IPacketCaptureDevice
 {
@@ -137,7 +140,7 @@ internal sealed class DemoCaptureDevice : IPacketCaptureDevice
             {
                 try
                 {
-                    running.Step(DateTime.Now);
+                    running.Step(DateTime.Now, token);
                     failures = 0;
                 }
                 catch (Exception ex)

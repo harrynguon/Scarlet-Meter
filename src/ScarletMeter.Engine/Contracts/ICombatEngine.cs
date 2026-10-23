@@ -37,24 +37,33 @@ public interface ICombatEngine : IDisposable
     /// One player's breakdown of the active fight, or null when the player has dealt no damage in it (or no
     /// fight is active). Like <see cref="GetSnapshot"/> it is a composition of consecutive reads, each under
     /// upstream's session lock: a hit landing between them can show in one part (say the skills) and not yet
-    /// in another (the log). Reads that straddle a change of fight are retried, so all parts describe the same
-    /// fight. Its cost grows with the fight's hits; polling it a few times a second for one player is fine.
+    /// in another (the log). The active fight is compared before and after the reads, and a read during which
+    /// it changed (the fight ended, or the party switched targets) is taken again; if three reads in a row
+    /// straddle a change, the result is null and the next call reads afresh. The comparison is by identity, so a
+    /// switch to another target and back between the two checks goes unnoticed: against several targets at once
+    /// the parts can, rarely, mix two targets. Its cost grows with the fight's hits; polling it a few times a
+    /// second for one player is fine.
     /// </summary>
     PlayerDetails? GetPlayerDetails(long playerId);
 
     /// <summary>
     /// A page of boss-fight history: the running boss fight first, then the saved ones, newest first. Upstream
     /// runs the database query under its session lock, which holds up hit processing for that time, so read it
-    /// on demand rather than on a timer.
+    /// on demand rather than on a timer. A damaged row in the history database does not make it throw: the
+    /// fights that can be read are returned with <see cref="HistoryPage.IsComplete"/> false, and the damage is
+    /// logged.
     /// </summary>
     /// <exception cref="ArgumentException">The query is invalid (see <see cref="HistoryQuery.Validate"/>).</exception>
     HistoryPage GetHistory(HistoryQuery query);
 
     /// <summary>
-    /// A whole fight from history, saved or still running, or null when the id is unknown. A fight that has
-    /// just ended can be missing for a moment: upstream saves it in the background. Saved fights are read
-    /// without upstream's session lock, so loading a large fight never holds up live capture; it still takes a
-    /// while (the store decompresses and deserialises every hit), so call it off the UI thread.
+    /// A whole fight from history, saved or still running, or null when the id is unknown or its row cannot be
+    /// read (logged). A fight that has just ended can be missing for a moment: upstream saves it in the
+    /// background. Saved fights are read from upstream's history store directly rather than through its
+    /// session manager, which would hold its session lock while it deserialises every hit; that choice keeps
+    /// loading a large fight from holding up live capture. Loading still takes a while (the store decompresses
+    /// and deserialises every hit), so call it off the UI thread. Damaged saved data is left out (see
+    /// <see cref="HistoryFight"/>).
     /// </summary>
     HistoryFight? GetHistoryFight(Guid fightId);
 

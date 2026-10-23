@@ -21,7 +21,9 @@ namespace ScarletMeter.Engine.Upstream.Demo;
 /// Not thread-safe: one thread drives it, through <see cref="Begin"/> and then <see cref="Step"/> with the
 /// current time. Time is a parameter, so tests can run a whole fight in milliseconds. Events are handled at the
 /// time they were due, not the time of the step, so the step rate does not change the fight; each event
-/// schedules its successor before it touches upstream, so one that throws does not stop its schedule.
+/// schedules its successor before it touches upstream, so one that throws does not stop its schedule. When the
+/// clock jumps (sleep and resume, a time change), the schedule moves with it instead of replaying or waiting
+/// out the gap (see <see cref="MaxClockJump"/>).
 /// </remarks>
 internal sealed class DemoCombatFeed
 {
@@ -30,6 +32,17 @@ internal sealed class DemoCombatFeed
 
     /// <summary>Time between one fight's end and the next one's first event.</summary>
     public static readonly TimeSpan BreakLength = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// How far the earliest scheduled event may lag behind the step's time, or run ahead of it, before the clock
+    /// counts as having jumped. The ping is always due within a second, so in normal running the earliest event
+    /// is never more than a second ahead, and with steps a tenth of a second apart never far behind. Past this,
+    /// every event moves by the same amount so the earliest falls due now: a jump forward does not replay the
+    /// gap in one step (an hour late would be 3,600 pings and dozens of fights), and a jump back does not
+    /// freeze the demo until the clock catches up. Upstream sees a pause in the hits, and after 45 seconds of
+    /// one ends the fight in progress and starts another on the same boss, as it would in a real fight.
+    /// </summary>
+    public static readonly TimeSpan MaxClockJump = TimeSpan.FromSeconds(5);
 
     // A fight's damage strays a few percent from the expectation (a few hundred hits of varying size), so HP for
     // 70 to 82 seconds of it keeps kills well inside 60 to 90 seconds: 69 to 84 seconds over 60 simulated fights.
@@ -90,11 +103,14 @@ internal sealed class DemoCombatFeed
     /// Handles every event due at or before <paramref name="now"/>, in time order. An event that throws (a
     /// ping subscriber's fault, say) is logged and the next one handled, as upstream's packet dispatch logs a
     /// failing processor and goes on; a failure that repeats is logged again only after that kind of event has
-    /// succeeded once more, so a persistent fault cannot flood the log.
+    /// succeeded once more, so a persistent fault cannot flood the log. A clock jump moves the schedule first
+    /// (<see cref="MaxClockJump"/>), and <paramref name="cancellation"/> is checked between events, so a step
+    /// never holds up a stop.
     /// </summary>
-    public void Step(DateTime now)
+    public void Step(DateTime now, CancellationToken cancellation = default)
     {
-        while (schedule.TryPeek(out var next, out var due) && due <= now)
+        Realign(now);
+        while (!cancellation.IsCancellationRequested && schedule.TryPeek(out var next, out var due) && due <= now)
         {
             schedule.Dequeue();
             // Events of a fight that has ended are dropped here rather than searched out of the queue.
@@ -110,6 +126,21 @@ internal sealed class DemoCombatFeed
                     logger.LogError(ex, "A demo {Event} event failed; the demo carries on.", next.Kind);
             }
         }
+    }
+
+    // Moves every event by the same amount when the earliest is more than MaxClockJump away from now, so the
+    // earliest falls due now. The fight in progress keeps its HP and its order of events; only its times move.
+    private void Realign(DateTime now)
+    {
+        if (!schedule.TryPeek(out _, out var earliest)) return;
+        var drift = now - earliest;
+        if (drift.Duration() <= MaxClockJump) return;
+
+        var events = schedule.UnorderedItems.ToList();
+        schedule.Clear();
+        foreach (var (pending, due) in events) schedule.Enqueue(pending, due + drift);
+        if (fight is not null) fight.Start += drift;
+        logger.LogInformation("The clock jumped by {Seconds:0} s; the demo carries on from now.", drift.TotalSeconds);
     }
 
     // Damage per second one combatant deals on average, from its skills, cast rate and hit profile.
@@ -324,12 +355,12 @@ internal sealed class DemoCombatFeed
         public static HitFlagsRoll None { get; } = new(false, false, false, false, false, false, 1);
     }
 
-    /// <summary>One boss: its entity, when the fight began and the HP it has left.</summary>
+    /// <summary>One boss: its entity, when the fight began (moved with the schedule after a clock jump) and the HP it has left.</summary>
     private sealed class Fight(int number, int entityId, DateTime start, long hpTotal)
     {
         public int Number { get; } = number;
         public int EntityId { get; } = entityId;
-        public DateTime Start { get; } = start;
+        public DateTime Start { get; set; } = start;
         public long Hp { get; set; } = hpTotal;
     }
 }

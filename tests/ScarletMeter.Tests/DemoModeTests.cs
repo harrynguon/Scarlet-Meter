@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO;
 using AionDpsMeter.Core.GameData.Services;
 using AionDpsMeter.Services.PacketCapture;
@@ -56,20 +56,19 @@ public sealed class DemoModeTests
         var engine = host.Services.GetRequiredService<ICombatEngine>();
         var pings = 0;
         engine.PingUpdated += (_, _) => pings++;
-        var feed = new DemoCombatFeed(
-            host.Services.GetRequiredService<EntityTracker>(), host.Services.GetRequiredService<CombatSessionManager>(),
-            host.Services.GetRequiredService<ICombatHistoryStore>(), NullLogger.Instance, new Random(seed));
+        var feed = NewFeed(host, seed);
+        var token = TestContext.Current.CancellationToken;
 
         var start = DateTime.Now;
         var clock = start;
         feed.Begin(clock);
-        feed.Step(clock);
+        feed.Step(clock, token);
         var firstBoss = Assert.IsType<int>(feed.CurrentBossEntityId);
         CombatSnapshot? midFight = null;
         while (feed.CurrentBossEntityId is not null && clock - start < TimeSpan.FromMinutes(2))
         {
             clock = clock.AddMilliseconds(100);
-            feed.Step(clock);
+            feed.Step(clock, token);
             if (midFight is null && clock - start >= TimeSpan.FromSeconds(30)) midFight = engine.GetSnapshot();
         }
 
@@ -126,11 +125,11 @@ public sealed class DemoModeTests
         while (feed.CurrentBossEntityId is null && clock - ended < TimeSpan.FromSeconds(20))
         {
             clock = clock.AddMilliseconds(100);
-            feed.Step(clock);
+            feed.Step(clock, token);
         }
         Assert.Equal(DemoCombatFeed.BreakLength.TotalSeconds, (clock - ended).TotalSeconds, 0.15);
         Assert.Equal(firstBoss + 1, feed.CurrentBossEntityId);
-        feed.Step(clock.AddSeconds(3));
+        feed.Step(clock.AddSeconds(3), token);
         Assert.Equal("Fediv Wraith", engine.GetSnapshot().Target?.Name);
     }
 
@@ -213,6 +212,95 @@ public sealed class DemoModeTests
         Assert.Single(log.Errors, e => e.Contains("Synthetic subscriber failure.", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void AClockJumpForwardMovesTheScheduleRatherThanReplayingTheGap()
+    {
+        using var host = new TestEngineHost(CaptureMode.Demo);
+        var engine = host.Services.GetRequiredService<ICombatEngine>();
+        var pings = 0;
+        engine.PingUpdated += (_, _) => pings++;
+        var feed = NewFeed(host, seed: 5);
+        var start = DateTime.Now;
+        feed.Begin(start);
+        var clock = Run(feed, start, TimeSpan.FromSeconds(20));
+        var boss = Assert.IsType<int>(feed.CurrentBossEntityId);
+        var pingsBefore = pings;
+
+        // An hour late, as after sleep and resume: one step must not replay 3,600 pings and dozens of fights.
+        var timer = Stopwatch.StartNew();
+        feed.Step(clock.AddHours(1), TestContext.Current.CancellationToken);
+        timer.Stop();
+        Assert.InRange(pings - pingsBefore, 0, 2);
+        Assert.Equal(boss, feed.CurrentBossEntityId); // the same fight carries on from the new time
+        Assert.True(timer.Elapsed < TimeSpan.FromSeconds(2), $"The late step took {timer.Elapsed}.");
+
+        // Upstream sees an hour without hits, so it starts a new fight on the same boss, which goes on as usual.
+        Run(feed, clock.AddHours(1), TimeSpan.FromSeconds(5));
+        var snapshot = engine.GetSnapshot();
+        Assert.Equal(boss, snapshot.Target?.Id);
+        Assert.NotEmpty(snapshot.Players);
+        Assert.True(snapshot.Duration < TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public void AClockJumpBackDoesNotFreezeTheFeed()
+    {
+        using var host = new TestEngineHost(CaptureMode.Demo);
+        var engine = host.Services.GetRequiredService<ICombatEngine>();
+        var pings = 0;
+        engine.PingUpdated += (_, _) => pings++;
+        var feed = NewFeed(host, seed: 6);
+        var start = DateTime.Now;
+        feed.Begin(start);
+        Run(feed, start, TimeSpan.FromSeconds(20));
+        var pingsBefore = pings;
+        var damageBefore = engine.GetSnapshot().Players.Sum(p => p.TotalDamage);
+
+        // An hour earlier, as after a time change: events must keep coming rather than wait an hour.
+        Run(feed, start.AddHours(-1), TimeSpan.FromSeconds(5));
+        Assert.InRange(pings - pingsBefore, 4, 7);
+        Assert.True(engine.GetSnapshot().Players.Sum(p => p.TotalDamage) > damageBefore);
+    }
+
+    [Fact]
+    public void AStepAskedToStopHandlesNothing()
+    {
+        using var host = new TestEngineHost(CaptureMode.Demo);
+        var engine = host.Services.GetRequiredService<ICombatEngine>();
+        var pings = 0;
+        engine.PingUpdated += (_, _) => pings++;
+        var feed = NewFeed(host, seed: 7);
+        using var stopped = new CancellationTokenSource();
+        stopped.Cancel();
+        var now = DateTime.Now;
+
+        feed.Begin(now);
+        feed.Step(now, stopped.Token);
+        Assert.Equal(0, pings);
+        Assert.Null(feed.CurrentBossEntityId);
+
+        feed.Step(now, TestContext.Current.CancellationToken);
+        Assert.Equal(1, pings);
+        Assert.NotNull(feed.CurrentBossEntityId);
+    }
+
+    // A feed on the host's upstream services, driven by the test's own clock.
+    private static DemoCombatFeed NewFeed(TestEngineHost host, int seed) => new(
+        host.Services.GetRequiredService<EntityTracker>(), host.Services.GetRequiredService<CombatSessionManager>(),
+        host.Services.GetRequiredService<ICombatHistoryStore>(), NullLogger.Instance, new Random(seed));
+
+    // Steps the feed a tenth of a second at a time for the given span from start; returns the time after the last step.
+    private static DateTime Run(DemoCombatFeed feed, DateTime start, TimeSpan span)
+    {
+        var clock = start;
+        while (clock - start < span)
+        {
+            feed.Step(clock, TestContext.Current.CancellationToken);
+            clock = clock.AddMilliseconds(100);
+        }
+        return clock;
+    }
+
     // Polls until the condition holds, failing after a few seconds.
     private static T WaitFor<T>(Func<T> read, Func<T, bool> condition)
     {
@@ -223,30 +311,6 @@ public sealed class DemoModeTests
             if (condition(value)) return value;
             Assert.True(DateTime.UtcNow < deadline, $"The demo did not reach the expected state within {Patience.TotalSeconds} s.");
             Thread.Sleep(50);
-        }
-    }
-
-    // Collects error entries (message and exception) from every logger.
-    private sealed class CapturingLoggerProvider : ILoggerProvider
-    {
-        public ConcurrentQueue<string> Errors { get; } = new();
-
-        public ILogger CreateLogger(string categoryName) => new Logger(Errors);
-
-        public void Dispose()
-        {
-        }
-
-        private sealed class Logger(ConcurrentQueue<string> errors) : ILogger
-        {
-            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-
-            public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Error;
-
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-            {
-                if (logLevel >= LogLevel.Error) errors.Enqueue($"{formatter(state, exception)} {exception?.Message}");
-            }
         }
     }
 }

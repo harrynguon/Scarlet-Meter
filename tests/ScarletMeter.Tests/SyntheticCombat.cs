@@ -27,7 +27,7 @@ internal sealed class SyntheticCombat(TestEngineHost host)
     public ICombatHistoryStore History { get; } = host.Services.GetRequiredService<ICombatHistoryStore>();
 
     // Upstream models are mutable, so each call builds a fresh instance.
-    public static CharacterClass Class(int id, string name) => new() { Id = id, Name = name, Icon = $"synthetic/class-{id}.png" };
+    public static CharacterClass Class(int id, string name) => new() { Id = id, Name = name };
 
     public static Skill Skill(int id, string name, bool[]? specialization = null) =>
         new() { Id = id, Name = name, Icon = $"synthetic/skill-{id}.png", SpecializationFlags = specialization ?? [] };
