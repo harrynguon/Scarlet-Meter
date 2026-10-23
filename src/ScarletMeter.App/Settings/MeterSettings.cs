@@ -19,6 +19,8 @@ public sealed record MeterSettings
 
     public OverlaySettings Overlay { get; init; } = new();
 
+    public AlertSettings Alerts { get; init; } = new();
+
     /// <summary>Saved window positions and sizes, keyed by <see cref="WindowKeys"/>.</summary>
     public IReadOnlyDictionary<string, WindowPlacement> Windows { get; init; } = new Dictionary<string, WindowPlacement>();
 
@@ -26,10 +28,55 @@ public sealed record MeterSettings
     // update that changes nothing is recognised as such. A test checks every property takes part.
     public bool Equals(MeterSettings? other) => other is not null
         && Version == other.Version && Fight == other.Fight && Appearance == other.Appearance && Overlay == other.Overlay
+        && Alerts == other.Alerts
         && Windows.Count == other.Windows.Count
         && Windows.All(pair => other.Windows.TryGetValue(pair.Key, out var placement) && placement == pair.Value);
 
-    public override int GetHashCode() => HashCode.Combine(Version, Fight, Appearance, Overlay, Windows.Count);
+    public override int GetHashCode() => HashCode.Combine(Version, Fight, Appearance, Overlay, Alerts, Windows.Count);
+}
+
+/// <summary>
+/// World event notices in the overlay (ScarletMeter.WorldEvents decides what is due). Event ids are the
+/// module's <c>EventIds</c>; the schedule itself is the module's Global preset, not stored here.
+/// </summary>
+public sealed record AlertSettings
+{
+    public const int MinLeadMinutes = 1;
+    public const int MaxLeadMinutes = 60;
+    public const double MinServerOffsetHours = -12;
+    public const double MaxServerOffsetHours = 14;
+
+    /// <summary>Events alerted by default: the world events and bosses, not the daily and weekly resets.</summary>
+    public static IReadOnlyList<string> DefaultEvents { get; } = ["kaira", "nahma", "executors", "rift", "siege", "invasion", "shugo"];
+
+    /// <summary>Show notices at all.</summary>
+    public bool Enabled { get; init; } = true;
+
+    /// <summary>How long before an event starts its notice appears.</summary>
+    public int LeadMinutes { get; init; } = 5;
+
+    /// <summary>The game server's UTC offset in hours (whole minutes); Asia is +9, the fork's assumption.</summary>
+    public double ServerOffsetHours { get; init; } = 9;
+
+    /// <summary>The event ids with notices, in catalog order.</summary>
+    public IReadOnlyList<string> Events { get; init; } = DefaultEvents;
+
+    /// <summary>When nothing is due, show the next alerted event as one dim line.</summary>
+    public bool ShowNextEvent { get; init; }
+
+    /// <summary>
+    /// Bring a minimized meter back (without taking focus from the game) once per event occurrence, when its
+    /// Soon notice appears. Off by default: hiding the meter keeps it hidden unless the player opts in.
+    /// </summary>
+    public bool RestoreMinimizedMeter { get; init; }
+
+    // Value equality including the event list.
+    public bool Equals(AlertSettings? other) => other is not null
+        && Enabled == other.Enabled && LeadMinutes == other.LeadMinutes && ServerOffsetHours.Equals(other.ServerOffsetHours)
+        && ShowNextEvent == other.ShowNextEvent && RestoreMinimizedMeter == other.RestoreMinimizedMeter
+        && Events.SequenceEqual(other.Events, StringComparer.Ordinal);
+
+    public override int GetHashCode() => HashCode.Combine(Enabled, LeadMinutes, ServerOffsetHours, ShowNextEvent, RestoreMinimizedMeter, Events.Count);
 }
 
 /// <summary>Fight rules upstream applies to every hit; mirrored into the engine's EngineSettings.</summary>

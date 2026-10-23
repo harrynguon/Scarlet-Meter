@@ -4,9 +4,9 @@ Repository: https://github.com/harrynguon/ScarletMeter (private, default branch 
 
 ## State
 
-What ARCHITECTURE.md describes exists: `upstream/` submodule at release v1.11.4.334, the engine over upstream's pipeline, a chromeless translucent overlay with a settings window (appearance, fight options, hotkey, remembered positions, all saved in `settings.json`), boundary, mapping, settings and close-ordering tests, build, upstream-update, publish-layout and UI smoke scripts, CI. Player details, history and world event alerts are being added in separate PRs (WORKLOG.md). Checks that have actually run are listed in WORKLOG.md; nothing has been tried in the game.
+What ARCHITECTURE.md describes exists: `upstream/` submodule at release v1.11.4.334, the engine over upstream's pipeline, a chromeless translucent overlay with a settings window (appearance, fight options, hotkey, remembered positions, all saved in `settings.json`), boundary, mapping, settings and close-ordering tests, build, upstream-update, publish-layout and UI smoke scripts, CI. Player details and history are being added in separate PRs (WORKLOG.md). Checks that have actually run are listed in WORKLOG.md; nothing has been tried in the game.
 
-The world-events module (`src/ScarletMeter.WorldEvents`, ARCHITECTURE.md "World events") holds the world event schedules and the alert planner for the overlay's notices, ported from the fork's World Companion. It is not wired into the app yet, and its times are not verified in the game.
+World-event notices are in the overlay: `src/ScarletMeter.WorldEvents` (ARCHITECTURE.md "World events") holds the schedules and the alert planner, ported from the fork's World Companion, and the overlay shows them ("Overlay notices"), five minutes ahead by default, with an Alerts tab in settings. The times are not verified in the game.
 
 Updates (2026-10-24, ARCHITECTURE.md "Updates"): builds stamp the pinned upstream release; `UpstreamReleaseChecker` tells whether upstream has a newer one but is not wired into the UI yet; `scripts/Install-Meter.ps1` builds and installs for the current user. Upstream published v1.11.5.341 on 2026-10-23 (a live run of the checker reported it); the pin is still v1.11.4.334.
 
@@ -31,13 +31,12 @@ Record the tested commit, observation date and Windows configuration. Pending:
 
 ## Next: world-event notices
 
-The overlay that shows the notices is a separate change. Wiring notes for it:
+Wired as ARCHITECTURE.md "Overlay notices" describes. In the game:
 
-- Call `AlertPlanner.Plan` when the overlay opens, at `AlertPlan.NextChange`, and whenever the enabled set, lead time, server offset or rules change; between calls, count down to each alert's `Deadline` locally. Pass the current instant in; the module never reads the clock.
-- A timer set for `NextChange` does not notice the PC resuming from sleep or its clock being changed. Cap the wait (for example at one minute) and re-plan on resume and on a system time change, so a missed change is corrected within the cap.
-- The app will then reference this module as well as the engine: update AGENTS.md ("Upstream boundary", which says the app references the engine only) and ARCHITECTURE.md in that change. The boundary tests forbid upstream references, not Scarlet modules, so they keep passing.
-- Persisting the enabled ids, the lead time, the server offset and any rule overrides is the app's: validate with `ScheduleValidation` and merge with `EventCatalog.TryApplyOverrides` on load, and preserve a player's saved rules when the presets change.
-- Bound the settings file's size before deserialising it: validation bounds its own work (at most 18 entries examined, 50 errors returned), but not the cost of parsing a huge file. `SettingsStore` already refuses a `settings.json` over 1 MB (`MaxFileBytes`) before reading it.
+- [ ] A notice appears at the bottom of the overlay the chosen lead time before an enabled event, counts down, turns into "Portal open" or "Entry open" at the start and disappears when entry closes; it is readable over the game at the chosen opacity.
+- [ ] With "Bring the meter back before an event" on and the meter minimized by the shortcut, an event's warning brings it back once, without taking keyboard focus from the game; with the setting off (the default) it stays hidden.
+
+Still open: per-event time overrides in settings, for when an in-game check finds a time wrong. The module's `ScheduleValidation` and `EventCatalog.TryApplyOverrides` are the boundary for them; keep a player's saved rules when the presets change, and `SettingsStore` already caps `settings.json` at 1 MB before parsing.
 
 ## Next: world-event times in game
 

@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../ScarletMeter.Engine/ScarletMeter.Engine.csproj" />
+    <ProjectReference Include="../ScarletMeter.WorldEvents/ScarletMeter.WorldEvents.csproj" />
   </ItemGroup>
 
   <ItemGroup>
