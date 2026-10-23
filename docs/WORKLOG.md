@@ -54,6 +54,58 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 - The UI wiring: notice, settings switch and registration are left to the UI rewrite.
 - The default install location: never installed there.
 
+**Audit (deep pass, PR 4): request changes.** Merged origin/main first (#2 overlay and settings, #3 world events), keeping both sides in README, ARCHITECTURE, WORKLOG and the app project. CI keeps its steps plus the tag step, and the layout check still runs on the published output inside `Install-Meter.ps1`. Then:
+
+- Major: `Install-Meter.ps1` accepted any folder holding a `ScarletMeter.exe`. The auditor's Downloads-like folder (a dummy exe, `important.txt` and a junction) was renamed to `.previous` by one install and deleted by the next. Fixed:
+  - A checked publish now gets an install marker, `.scarlet-install` with fixed text, which stays in the install.
+  - The install, `.previous` and `.retired` are renamed or deleted only when they carry that marker or are empty. Staging is accepted with the staging marker or the install marker.
+  - Any folder that is or holds a link or junction is refused; the tree is walked without following links.
+  - New `-CheckOnly` runs every check and stops before building.
+  - New `scripts/Test-InstallMeter.ps1` runs the refusals against throwaway folders, and CI runs it. It checks the auditor's folder stays byte for byte as it was.
+  - The "a mistyped path cannot move other files" claims are corrected.
+- The overlap guards compared strings. Now:
+  - Only local drive paths are accepted (no UNC, admin shares, `\\?\` or `\\.\`), and no names Windows would change (trailing dot or space) or cannot create.
+  - The parent of the install, the data directory and the checkout are compared by their final paths from `GetFinalPathNameByHandle`, which resolves links, junctions, 8.3 names and substituted drives. A path resolving to a network share is refused.
+  - The process check resolves the running exe's folder the same way.
+- Rollback: each undo rename has its own try/catch; failures are collected, and the error reports every folder's state. A leftover `.retired` is deleted only while an install exists, otherwise refused up front, since it may be the only copy.
+- Checker: Network and Timeout results stand for `RetryInterval` (10 minutes); answered failures (rate limit, 404, invalid) stay six hours. Disposing mid-check, or calling after disposal, gives `Unknown(Cancelled)` with no warning.
+- Nits:
+  - Tests for an answer of exactly 1 MiB (read) and 1 MiB + 1 (rejected), with and without a length.
+  - A gzip answer inflated by the production handler, plus a gzip answer over the cap once inflated, both through a one-shot server on 127.0.0.1.
+  - Dispose mid-check.
+  - CI retries the tag fetch like `ls-remote` and no longer sleeps after the last attempt.
+  - `Get-GitLine` requires the `.git` entry, as BuildStamp.targets does.
+
+Checks after the fixes (SDK 10.0.402, Windows PowerShell 5.1):
+
+- `scripts/Build.ps1` Debug and Release: Scarlet's projects had 0 warnings (the six are upstream's), and 252/252 tests passed.
+- `Test-InstallMeter.ps1`: every case passed. The short-name case was skipped because this volume has no 8.3 names. No temp folder was left.
+- Five installer mutations, each failing the named cases:
+  - any folder counted as owned;
+  - no final-path resolution;
+  - no link walk;
+  - UNC allowed (the admin share was still refused, by the final-path layer);
+  - no `.retired` guard.
+- Five checker mutations, each caught:
+  - `>=` in the read cap;
+  - `>=` in the length cap;
+  - no retry window;
+  - the retry for every failure;
+  - dispose reported as Unexpected.
+  - (A first form of the dispose mutation, `when (false)`, did not compile under warnings-as-errors and was replaced.)
+- Install-Meter end to end, in a uniquely named scratch folder:
+  - Two installs left the install and `.previous`, both marked, with no staging or `.retired` left.
+  - With a file held open, the swap rolled back and the error listed the folders: install and `.previous` intact, the checked build left in staging (marked).
+  - The running installed meter was refused under `-CheckOnly`; it then closed with exit 0.
+  - A rerun recovered.
+  - The folder was removed afterwards. `%LocalAppData%\ScarletMeter` and `%LocalAppData%\Programs\ScarletMeter` do not exist.
+
+Not checked:
+
+- A failing undo (no way to inject one).
+- pwsh locally; CI runs both scripts under pwsh.
+
+A local dry-run of CI's tag step made this worktree's own submodule clone shallow; `git fetch --unshallow --tags` restored it (334 commits, 38 tags, still v1.11.4.334), and the CI comment now warns about it.
 **Next:** CI on the PR, Harry's go-ahead and a squash merge. Then wire the checker into the UI and move the pin to v1.11.5.341 (HANDOFF.md).
 
 ## 2026-10-24 — World event schedules

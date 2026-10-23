@@ -13,7 +13,7 @@ Status: in development, not yet tried in the game. Capture, decoding, fight trac
 | `src/ScarletMeter.App` | WPF windows hosting Blazor WebViews (overlay, settings), the settings store and the upstream release check (`Updates/`); references the engine only. |
 | `src/ScarletMeter.WorldEvents` | World event schedules (Global preset) and the alert planner for overlay notices; pure .NET, no dependencies, not wired into the app yet. Times are not verified in the game. |
 | `tests/ScarletMeter.Tests` | Boundary guards, engine mapping, settings, close-ordering, world-event schedule, build-stamp and release-check tests (no Npcap needed). |
-| `scripts/` | `Build.ps1` (restore, build, test), `Install-Meter.ps1` (build and install for the current user), `Update-Upstream.ps1 -Tag vX.Y.Z.N`, `Test-PublishLayout.ps1` and `Smoke-Meter.ps1` (drives the UI for checks). Each derives its paths from its own location. |
+| `scripts/` | `Build.ps1` (restore, build, test), `Install-Meter.ps1` (build and install for the current user) with `Test-InstallMeter.ps1` (its refusal checks), `Update-Upstream.ps1 -Tag vX.Y.Z.N`, `Test-PublishLayout.ps1` and `Smoke-Meter.ps1` (drives the UI for checks). Each derives its paths from its own location. |
 | `docs/` | Maintainer documentation. Start with [docs/README.md](docs/README.md). |
 
 ## Build and run
@@ -43,7 +43,7 @@ Releases only, never upstream's `dev` branch. The script moves the submodule, re
 & "<checkout>\scripts\Install-Meter.ps1" -Shortcut
 ```
 
-Builds and tests a Release, publishes it and installs it to `%LocalAppData%\Programs\ScarletMeter`, keeping the previous install in `ScarletMeter.previous` for a rollback by hand; close the meter first. Your data in `%LocalAppData%\ScarletMeter` is never touched. There is no self-updater, because the meter is built from source: when upstream publishes a release (the meter will say so, from one anonymous request to GitHub at most every six hours), run `Update-Upstream.ps1` with the new tag, then `Install-Meter.ps1` again. Details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), "Install and update".
+Builds and tests a Release, publishes it and installs it to `%LocalAppData%\Programs\ScarletMeter`, keeping the previous install in `ScarletMeter.previous` for a rollback by hand; close the meter first. It only replaces folders it made itself, and your data in `%LocalAppData%\ScarletMeter` is never touched. There is no self-updater, because the meter is built from source: when upstream publishes a release (the meter will say so, from one anonymous request to GitHub at most every six hours), run `Update-Upstream.ps1` with the new tag, then `Install-Meter.ps1` again. Details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), "Install and update".
 
 ## Licence and terms
 

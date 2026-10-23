@@ -20,27 +20,29 @@ jobs:
       # the tags that follow upstream's default-branch tip, not the pinned release's, so the build stamp
       # (src/ScarletMeter.App/Updates/BuildStamp.targets) would fall back to the commit. Fetch just the release
       # tag that names the pinned commit. Finding none fails the run: the pin must be a release (AGENTS.md,
-      # "Upstream boundary"). BuildInfoTests then checks that the build stamped this tag.
+      # "Upstream boundary"). BuildInfoTests then checks that the build stamped this tag. The --depth=1 fetch suits this
+      # already shallow clone only: on a full clone it would make the submodule shallow.
       - name: Fetch the pinned upstream release tag
         shell: pwsh
         run: |
+          # Runs git up to three times, waiting 10 s and then 20 s between attempts (never after the last one).
+          function Invoke-GitWithRetry([string[]]$Arguments) {
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              $output = @(git @Arguments)
+              if ($LASTEXITCODE -eq 0) { return ,$output }
+              if ($attempt -lt 3) { Start-Sleep -Seconds (10 * $attempt) }
+            }
+            throw "git $($Arguments -join ' ') failed three times."
+          }
           $upstream = Join-Path '${{ github.workspace }}' 'upstream'
           $pinned = (git -C $upstream rev-parse HEAD).Trim()
-          $listing = $null
-          foreach ($attempt in 1..3) {
-            $listing = @(git -C $upstream ls-remote --tags origin 'refs/tags/v*')
-            if ($LASTEXITCODE -eq 0) { break }
-            $listing = $null
-            Start-Sleep -Seconds (10 * $attempt)
-          }
-          if ($null -eq $listing) { throw 'Listing upstream tags failed three times.' }
+          $listing = Invoke-GitWithRetry @('-C', $upstream, 'ls-remote', '--tags', 'origin', 'refs/tags/v*')
           $tags = @($listing | ForEach-Object {
             if ($_ -match "^$pinned\trefs/tags/(v[0-9]+(\.[0-9]+){3})(\^\{\})?$") { $Matches[1] }
           } | Select-Object -Unique | Sort-Object { [version]$_.Substring(1) } -Descending)
           if (-not $tags) { throw "Upstream commit $pinned is not a release tag. Move the pin with scripts/Update-Upstream.ps1." }
           $tag = $tags[0]
-          git -C $upstream fetch --quiet --no-tags --depth=1 origin "+refs/tags/${tag}:refs/tags/${tag}"
-          if ($LASTEXITCODE) { throw "Fetching $tag failed." }
+          Invoke-GitWithRetry @('-C', $upstream, 'fetch', '--quiet', '--no-tags', '--depth=1', 'origin', "+refs/tags/${tag}:refs/tags/${tag}") | Out-Null
           "SCARLET_EXPECTED_UPSTREAM_RELEASE=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "Pinned upstream release: $tag ($pinned)"
 
@@ -53,9 +55,27 @@ jobs:
         shell: pwsh
         run: '& "${{ github.workspace }}/scripts/Build.ps1" -Configuration Release'
 
-      # The player's install path under pwsh, into the runner's temp directory: a Release build (the tests ran
-      # above), the self-contained single-file win-x64 publish into a staging folder, Test-PublishLayout.ps1 on it,
-      # then the folder swap. Nothing here launches the meter.
-      - name: Install smoke (publish, layout check, folder swap)
+      # Install-Meter.ps1's refusals (someone's folder, links, overlaps with the data directory or the checkout in
+      # any spelling) against throwaway folders, with -CheckOnly: nothing is built or moved.
+      - name: Installer refusals
         shell: pwsh
-        run: '& "${{ github.workspace }}/scripts/Install-Meter.ps1" -InstallDirectory "${{ runner.temp }}\ScarletMeter" -SkipTests'
+        run: '& "${{ github.workspace }}/scripts/Test-InstallMeter.ps1"'
+
+      # The player's install path under pwsh, twice, into the runner's temp directory: a Release build (the tests ran
+      # above), the self-contained single-file win-x64 publish into a staging folder, Test-PublishLayout.ps1 on that
+      # published output, the install marker, then the folder swap. The second install must accept the first by its
+      # marker and keep it as .previous. Nothing here launches the meter.
+      - name: Install smoke (publish, layout check, folder swap, twice)
+        shell: pwsh
+        run: |
+          $installer = Join-Path '${{ github.workspace }}' 'scripts/Install-Meter.ps1'
+          $install = Join-Path '${{ runner.temp }}' 'ScarletMeter'
+          & $installer -InstallDirectory $install -SkipTests
+          & $installer -InstallDirectory $install -SkipTests
+          foreach ($folder in $install, "$install.previous") {
+            if (-not (Test-Path -LiteralPath (Join-Path $folder 'ScarletMeter.exe') -PathType Leaf)) { throw "$folder holds no ScarletMeter.exe." }
+            if (-not (Test-Path -LiteralPath (Join-Path $folder '.scarlet-install') -PathType Leaf)) { throw "$folder has no install marker." }
+          }
+          foreach ($folder in "$install.staging", "$install.retired") {
+            if (Test-Path -LiteralPath $folder) { throw "$folder was left behind." }
+          }

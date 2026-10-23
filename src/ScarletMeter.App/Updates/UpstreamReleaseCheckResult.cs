@@ -33,10 +33,10 @@ public enum UpstreamReleaseCheckFailure
     /// <summary>The build stamped a commit or "unknown" rather than a release tag, so nothing was requested.</summary>
     PinnedReleaseUnknown,
 
-    /// <summary>GitHub did not answer within <see cref="UpstreamReleaseChecker.RequestTimeout"/>.</summary>
+    /// <summary>GitHub did not answer within <see cref="UpstreamReleaseChecker.RequestTimeout"/>; retried after <see cref="UpstreamReleaseChecker.RetryInterval"/>.</summary>
     Timeout,
 
-    /// <summary>No connection, a DNS or TLS failure, or a broken response stream.</summary>
+    /// <summary>No connection, a DNS or TLS failure, or a broken response stream; retried after <see cref="UpstreamReleaseChecker.RetryInterval"/>.</summary>
     Network,
 
     /// <summary>GitHub's limit for unauthenticated requests from this address was reached (HTTP 403 or 429).</summary>
@@ -54,7 +54,10 @@ public enum UpstreamReleaseCheckFailure
     /// </summary>
     InvalidResponse,
 
-    /// <summary>The caller stopped waiting. The shared request carries on, and its result is cached.</summary>
+    /// <summary>
+    /// The caller stopped waiting (the shared request carries on, and its result is cached), or the checker was
+    /// disposed because the meter is closing.
+    /// </summary>
     Cancelled,
 
     /// <summary>Anything else; the exception is in the log.</summary>

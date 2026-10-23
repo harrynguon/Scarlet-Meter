@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
@@ -100,17 +102,76 @@ public sealed class UpstreamReleaseCheckerTests
         Assert.Equal(first, second);
     }
 
-    [Fact]
-    public async Task FailuresAreCachedToo()
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task AnsweredFailuresAreCachedForSixHours(HttpStatusCode status)
     {
-        // At most one request per window even when GitHub refuses, so a rate limit is never made worse.
-        var github = FakeGitHub.Answering(HttpStatusCode.NotFound);
+        // At most one request per window when GitHub answered at all, so a rate limit is never made worse.
+        var github = FakeGitHub.Answering(status);
         using var checker = Checker(github);
 
         var failed = Assert.IsType<Unknown>(await checker.CheckAsync(Token));
-        time.Advance(TimeSpan.FromHours(1));
+        time.Advance(UpstreamReleaseChecker.CheckInterval - TimeSpan.FromSeconds(1));
         Assert.Same(failed, await checker.CheckAsync(Token));
         Assert.Single(github.Requests);
+    }
+
+    [Fact]
+    public async Task InvalidAnswersAreCachedForSixHours()
+    {
+        var github = FakeGitHub.Answering("not json");
+        using var checker = Checker(github);
+
+        AssertFailure(UpstreamReleaseCheckFailure.InvalidResponse, await checker.CheckAsync(Token));
+        time.Advance(UpstreamReleaseChecker.RetryInterval);
+        AssertFailure(UpstreamReleaseCheckFailure.InvalidResponse, await checker.CheckAsync(Token));
+        Assert.Single(github.Requests);
+    }
+
+    [Fact]
+    public async Task AnUnreachableGitHubIsRetriedAfterTenMinutes()
+    {
+        // The first request fails to connect; the retry, ten minutes later rather than six hours, gets the release.
+        var attempts = 0;
+        var github = new FakeGitHub(_ => Interlocked.Increment(ref attempts) == 1
+            ? Task.FromException<HttpResponseMessage>(new HttpRequestException("No such host is known."))
+            : Task.FromResult(FakeGitHub.Ok(Release("v1.11.5.341"))));
+        using var checker = Checker(github);
+
+        var offline = await checker.CheckAsync(Token);
+        AssertFailure(UpstreamReleaseCheckFailure.Network, offline);
+        time.Advance(UpstreamReleaseChecker.RetryInterval - TimeSpan.FromSeconds(1));
+        Assert.Same(offline, await checker.CheckAsync(Token));
+        Assert.Single(github.Requests);
+
+        time.Advance(TimeSpan.FromSeconds(1));
+        Assert.IsType<NewerAvailable>(await checker.CheckAsync(Token));
+        Assert.Equal(2, github.Requests.Count);
+    }
+
+    [Fact]
+    public async Task ATimedOutCheckIsRetriedAfterTenMinutes()
+    {
+        var attempts = 0;
+        var github = new FakeGitHub(async cancellationToken =>
+        {
+            if (Interlocked.Increment(ref attempts) == 1) await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return FakeGitHub.Ok(Release("v1.11.5.341"));
+        });
+        using var checker = Checker(github);
+
+        var check = checker.CheckAsync(Token);
+        await github.Entered.Task.WaitAsync(Wait, Token);
+        time.Advance(UpstreamReleaseChecker.RequestTimeout);
+        AssertFailure(UpstreamReleaseCheckFailure.Timeout, await check.WaitAsync(Wait, Token));
+
+        time.Advance(UpstreamReleaseChecker.RetryInterval - UpstreamReleaseChecker.RequestTimeout - TimeSpan.FromSeconds(1));
+        AssertFailure(UpstreamReleaseCheckFailure.Timeout, await checker.CheckAsync(Token));
+        time.Advance(TimeSpan.FromSeconds(1));
+        Assert.IsType<NewerAvailable>(await checker.CheckAsync(Token).WaitAsync(Wait, Token));
+        Assert.Equal(2, github.Requests.Count);
     }
 
     [Fact]
@@ -242,18 +303,67 @@ public sealed class UpstreamReleaseCheckerTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task OversizedAnswersAreRejected(bool declaresLength)
+    public async Task AnAnswerOfExactlyTheCapIsRead(bool declaresLength)
     {
-        var answer = Release("v1.11.5.341", notes: new string('x', UpstreamReleaseChecker.MaxResponseBytes));
-        var github = new FakeGitHub(_ =>
-        {
-            var content = new StringContent(answer);
-            if (!declaresLength) content.Headers.ContentLength = null; // read until the cap, as for a chunked answer
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
-        });
-        using var checker = Checker(github);
+        var answer = ReleaseOfSize(UpstreamReleaseChecker.MaxResponseBytes);
+        using var checker = Checker(AnsweringBytes(answer, declaresLength));
+        Assert.IsType<NewerAvailable>(await checker.CheckAsync(Token));
+    }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AnAnswerOneByteOverTheCapIsRejected(bool declaresLength)
+    {
+        var answer = ReleaseOfSize(UpstreamReleaseChecker.MaxResponseBytes + 1);
+        using var checker = Checker(AnsweringBytes(answer, declaresLength));
         AssertFailure(UpstreamReleaseCheckFailure.InvalidResponse, await checker.CheckAsync(Token));
+    }
+
+    [Fact]
+    public async Task ACompressedAnswerIsDecompressedByTheProductionHandler()
+    {
+        // Through the real SocketsHttpHandler, against a one-shot HTTP server on the loopback address: the
+        // handler asks for compression and inflates the gzip body before the checker reads it.
+        await using var server = await LoopbackServer.StartAsync(Gzip(Encoding.UTF8.GetBytes(Release("v1.11.5.341"))));
+        using var checker = new UpstreamReleaseChecker(
+            new RedirectToLoopback(server.Address) { InnerHandler = UpstreamReleaseChecker.CreateDefaultHandler() },
+            new BuildInfo(Pinned, "9495922"), time, logger);
+
+        Assert.IsType<NewerAvailable>(await checker.CheckAsync(Token).WaitAsync(Wait, Token));
+        Assert.Contains("gzip", await server.AcceptEncoding.WaitAsync(Wait, Token), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task TheCapCountsDecompressedBytes()
+    {
+        // About 1 KiB on the wire, over 1 MiB once inflated: rejected, not buffered.
+        await using var server = await LoopbackServer.StartAsync(Gzip(Encoding.UTF8.GetBytes(ReleaseOfSize(UpstreamReleaseChecker.MaxResponseBytes + 1))));
+        using var checker = new UpstreamReleaseChecker(
+            new RedirectToLoopback(server.Address) { InnerHandler = UpstreamReleaseChecker.CreateDefaultHandler() },
+            new BuildInfo(Pinned, "9495922"), time, logger);
+
+        AssertFailure(UpstreamReleaseCheckFailure.InvalidResponse, await checker.CheckAsync(Token).WaitAsync(Wait, Token));
+    }
+
+    [Fact]
+    public async Task DisposingMidCheckEndsItAsCancelled()
+    {
+        var github = new FakeGitHub(async cancellationToken =>
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("Unreachable: the delay only ends by cancellation.");
+        });
+        var checker = Checker(github);
+
+        var check = checker.CheckAsync(Token);
+        await github.Entered.Task.WaitAsync(Wait, Token);
+        checker.Dispose();
+
+        AssertFailure(UpstreamReleaseCheckFailure.Cancelled, await check.WaitAsync(Wait, Token));
+        AssertFailure(UpstreamReleaseCheckFailure.Cancelled, await checker.CheckAsync(Token));
+        Assert.Single(github.Requests);
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level >= LogLevel.Warning);
     }
 
     [Fact]
@@ -411,6 +521,117 @@ public sealed class UpstreamReleaseCheckerTests
     }
 
     private sealed record RecordedRequest(HttpMethod Method, Uri? Uri, Dictionary<string, string> Headers, bool HasContent);
+
+    // A valid release answer of exactly `bytes` UTF-8 bytes, padded through its notes (one byte per character).
+    private static string ReleaseOfSize(int bytes)
+    {
+        var unpadded = Encoding.UTF8.GetByteCount(Release("v1.11.5.341", notes: ""));
+        var answer = Release("v1.11.5.341", notes: new string('x', bytes - unpadded));
+        Assert.Equal(bytes, Encoding.UTF8.GetByteCount(answer));
+        return answer;
+    }
+
+    // Answers with the body, declaring its length or not (then the checker reads until its cap, as for chunked data).
+    private static FakeGitHub AnsweringBytes(string body, bool declaresLength) => new(_ =>
+    {
+        var content = new StringContent(body, Encoding.UTF8, "application/json");
+        if (!declaresLength) content.Headers.ContentLength = null;
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
+    });
+
+    private static byte[] Gzip(byte[] data)
+    {
+        using var compressed = new MemoryStream();
+        using (var gzip = new GZipStream(compressed, CompressionLevel.Optimal, leaveOpen: true))
+            gzip.Write(data);
+        return compressed.ToArray();
+    }
+
+    /// <summary>Sends the checker's request to a loopback server instead of api.github.com, keeping its path.</summary>
+    private sealed class RedirectToLoopback(Uri server) : DelegatingHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            request.RequestUri = new Uri(server, request.RequestUri!.PathAndQuery);
+            return base.SendAsync(request, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// A one-shot HTTP/1.1 server on 127.0.0.1 that answers one request with a gzip-encoded 200 and reports the
+    /// request's Accept-Encoding. Loopback only: nothing leaves the machine.
+    /// </summary>
+    private sealed class LoopbackServer : IAsyncDisposable
+    {
+        private readonly TcpListener listener = new(IPAddress.Loopback, 0);
+        private readonly TaskCompletionSource<string> acceptEncoding = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private Task serving = Task.CompletedTask;
+
+        public Uri Address { get; private set; } = null!;
+
+        /// <summary>The Accept-Encoding header of the request the server answered.</summary>
+        public Task<string> AcceptEncoding => acceptEncoding.Task;
+
+        public static Task<LoopbackServer> StartAsync(byte[] gzipBody)
+        {
+            var server = new LoopbackServer();
+            server.listener.Start();
+            server.Address = new Uri($"http://127.0.0.1:{((IPEndPoint)server.listener.LocalEndpoint).Port}/");
+            server.serving = server.ServeOnceAsync(gzipBody);
+            return Task.FromResult(server);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            listener.Stop();
+            try
+            {
+                await serving;
+            }
+            catch (Exception)
+            {
+                // Stopping the listener ends an accept that never happened; nothing to report.
+            }
+        }
+
+        private async Task ServeOnceAsync(byte[] body)
+        {
+            try
+            {
+                using var client = await listener.AcceptTcpClientAsync(Token);
+                using var stream = client.GetStream();
+                var headers = await ReadHeadersAsync(stream);
+                var encoding = headers.Split("\r\n")
+                    .FirstOrDefault(line => line.StartsWith("Accept-Encoding:", StringComparison.OrdinalIgnoreCase));
+                acceptEncoding.TrySetResult(encoding?["Accept-Encoding:".Length..].Trim() ?? "");
+                var head = Encoding.ASCII.GetBytes(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Encoding: gzip\r\n" +
+                    $"Content-Length: {body.Length}\r\nConnection: close\r\n\r\n");
+                await stream.WriteAsync(head, Token);
+                await stream.WriteAsync(body, Token);
+            }
+            catch (Exception ex)
+            {
+                acceptEncoding.TrySetException(ex);
+            }
+        }
+
+        // The request's header block, read up to the blank line (at most 64 KiB).
+        private static async Task<string> ReadHeadersAsync(NetworkStream stream)
+        {
+            var received = new MemoryStream();
+            var buffer = new byte[4096];
+            while (received.Length < 64 * 1024)
+            {
+                var read = await stream.ReadAsync(buffer, Token);
+                if (read == 0) break;
+                received.Write(buffer, 0, read);
+                var text = Encoding.ASCII.GetString(received.GetBuffer(), 0, (int)received.Length);
+                if (text.Contains("\r\n\r\n", StringComparison.Ordinal)) return text;
+            }
+            return Encoding.ASCII.GetString(received.ToArray());
+        }
+    }
 
     /// <summary>A response body that never yields a byte; reading ends only by cancellation.</summary>
     private sealed class StalledStream : Stream

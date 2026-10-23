@@ -10,17 +10,29 @@ namespace ScarletMeter.App.Updates;
 /// Asks GitHub for upstream RATmeter's latest release and compares it with the release this build is pinned to
 /// (<see cref="BuildInfo.UpstreamRelease"/>). One unauthenticated GET to <see cref="LatestReleaseApi"/> with a
 /// User-Agent and an Accept header and nothing else: no token, no cookies, no data about the player or the
-/// game. At most one request per <see cref="CheckInterval"/> per process; the last result is cached in memory
-/// only. A build that does not know its pinned release makes no request at all. Nothing is requested until
-/// <see cref="CheckAsync"/> is called, so the UI decides whether checks happen (a settings switch).
+/// game. At most one request per <see cref="CheckInterval"/> per process after GitHub answered (rate limits and
+/// errors included), or per <see cref="RetryInterval"/> after GitHub could not be reached in time; the last
+/// result is cached in memory only. A build that does not know its pinned release makes no request at all.
+/// Nothing is requested until <see cref="CheckAsync"/> is called, so the UI decides whether checks happen (a
+/// settings switch).
 /// </summary>
 public sealed class UpstreamReleaseChecker : IUpstreamReleaseChecker, IDisposable
 {
     /// <summary>The only URL this checker requests.</summary>
     public static Uri LatestReleaseApi { get; } = new("https://api.github.com/repos/Kuroukihime/AIon2-Dps-Meter/releases/latest");
 
-    /// <summary>The minimum time between two requests, measured from the start of the previous one.</summary>
+    /// <summary>
+    /// The minimum time between two requests after GitHub answered, whatever the answer (a rate limit, a 404 or an
+    /// invalid release included), measured from the start of the previous request.
+    /// </summary>
     public static TimeSpan CheckInterval { get; } = TimeSpan.FromHours(6);
+
+    /// <summary>
+    /// The shorter wait after a request that got no answer (<see cref="UpstreamReleaseCheckFailure.Network"/> or
+    /// <see cref="UpstreamReleaseCheckFailure.Timeout"/>), so a meter started while offline still finds a release
+    /// the same session. GitHub counted no request it did not answer, so this cannot worsen a rate limit.
+    /// </summary>
+    public static TimeSpan RetryInterval { get; } = TimeSpan.FromMinutes(10);
 
     /// <summary>How long one request, headers and body, may take.</summary>
     public static TimeSpan RequestTimeout { get; } = TimeSpan.FromSeconds(10);
@@ -38,6 +50,7 @@ public sealed class UpstreamReleaseChecker : IUpstreamReleaseChecker, IDisposabl
     private Task<UpstreamReleaseCheckResult>? latestCheck; // in flight or completed; guarded by gate
     private long latestCheckStarted; // TimeProvider timestamp, monotonic so a clock change cannot stretch the window
     private volatile UpstreamReleaseCheckResult? lastResult;
+    private volatile bool disposed;
 
     /// <summary>
     /// Creates a checker that sends through <paramref name="handler"/> and owns it (disposed with the checker).
@@ -75,10 +88,11 @@ public sealed class UpstreamReleaseChecker : IUpstreamReleaseChecker, IDisposabl
     /// <inheritdoc />
     public async Task<UpstreamReleaseCheckResult> CheckAsync(CancellationToken cancellationToken = default)
     {
+        if (disposed) return Closing();
         Task<UpstreamReleaseCheckResult> check;
         lock (gate)
         {
-            if (latestCheck is null || time.GetElapsedTime(latestCheckStarted) >= CheckInterval)
+            if (latestCheck is null || time.GetElapsedTime(latestCheckStarted) >= WaitAfter(latestCheck))
             {
                 latestCheckStarted = time.GetTimestamp();
                 // On the thread pool: the caller (a Blazor component, say) never runs the request, and the lock
@@ -103,8 +117,26 @@ public sealed class UpstreamReleaseChecker : IUpstreamReleaseChecker, IDisposabl
         }
     }
 
-    /// <summary>Disposes the HTTP client and its handler. A check still in flight ends as Unknown.</summary>
-    public void Dispose() => client.Dispose();
+    /// <summary>
+    /// Disposes the HTTP client and its handler. A check still in flight, and any later call, ends as
+    /// <see cref="UpstreamReleaseCheckFailure.Cancelled"/>.
+    /// </summary>
+    public void Dispose()
+    {
+        disposed = true;
+        client.Dispose();
+    }
+
+    // How long a check's result stands: the short retry only once a check has completed without an answer from
+    // GitHub; a check in flight is always shared.
+    private static TimeSpan WaitAfter(Task<UpstreamReleaseCheckResult> check) =>
+        check.IsCompletedSuccessfully
+        && check.Result is Unknown { Failure: UpstreamReleaseCheckFailure.Network or UpstreamReleaseCheckFailure.Timeout }
+            ? RetryInterval
+            : CheckInterval;
+
+    private static Unknown Closing() =>
+        new(UpstreamReleaseCheckFailure.Cancelled, "The check stopped because the meter is closing.");
 
     // The shared check behind CheckAsync. Never throws, so every waiter gets a result.
     private async Task<UpstreamReleaseCheckResult> RunCheckAsync()
@@ -113,6 +145,11 @@ public sealed class UpstreamReleaseChecker : IUpstreamReleaseChecker, IDisposabl
         try
         {
             result = await QueryAsync().ConfigureAwait(false);
+        }
+        catch (Exception) when (disposed)
+        {
+            // Disposing the client cancels the request; not a failure worth a warning.
+            result = Closing();
         }
         catch (Exception ex)
         {
@@ -169,7 +206,7 @@ public sealed class UpstreamReleaseChecker : IUpstreamReleaseChecker, IDisposabl
                 UpstreamReleaseCheckFailure.Timeout,
                 $"GitHub did not answer within {RequestTimeout.TotalSeconds:0} seconds.");
         }
-        catch (Exception ex) when (ex is HttpRequestException or IOException)
+        catch (Exception ex) when (ex is HttpRequestException or IOException && !disposed)
         {
             return Fail(UpstreamReleaseCheckFailure.Network, "GitHub could not be reached.", ex);
         }

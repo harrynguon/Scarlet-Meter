@@ -74,12 +74,14 @@ The meter is built from this checkout: there are no published Scarlet binaries a
 & "<checkout>\scripts\Install-Meter.ps1" -Shortcut
 ```
 
-It runs `Build.ps1 -Configuration Release` (with the tests), publishes the self-contained single-file build into `<install>.staging`, checks it with `Test-PublishLayout.ps1`, then swaps it in. The install is `%LocalAppData%\Programs\ScarletMeter`; `-InstallDirectory <absolute path>` picks another. `-Shortcut` adds a "Scarlet Meter" Start menu shortcut; once is enough, since the install path stays the same. `-SkipTests` skips the tests.
+It runs `Build.ps1 -Configuration Release` (with the tests), publishes the self-contained single-file build into `<install>.staging`, checks it with `Test-PublishLayout.ps1`, marks it as an install (a `.scarlet-install` file) and swaps it in. The install is `%LocalAppData%\Programs\ScarletMeter`; `-InstallDirectory <absolute path on a local drive>` picks another. `-Shortcut` adds a "Scarlet Meter" Start menu shortcut; once is enough, since the install path stays the same. `-SkipTests` skips the tests. `-CheckOnly` runs the path checks below and stops, building and changing nothing.
 
-- Close the meter first: the script refuses while `ScarletMeter.exe` runs from the install or its `.previous` folder (checked before building and again before the swap).
+- Close the meter first: the script refuses while `ScarletMeter.exe` runs from the install, its `.previous` or its `.retired` folder (checked before building and again before the swap).
 - The old install stays in `<install>.previous` until the next install. To roll back, close the meter, rename the install folder away and rename `.previous` to the install's name.
-- A failed build, publish or layout check leaves the install as it was. The swap is a series of renames; if one fails (a file held open, for example by Explorer or a virus scan), the earlier ones are undone and the new build stays in `<install>.staging`.
-- The data directory (`%LocalAppData%\ScarletMeter`: history, logs, WebView2 profile) is never touched. The script refuses an install directory that overlaps it or this checkout, and any folder it would replace that is not a Scarlet Meter install (it must be absent, empty, or hold `ScarletMeter.exe`), so a mistyped path cannot move other files.
+- A failed build, publish or layout check leaves the install as it was. The swap is a series of renames; if one fails (a file held open, for example by Explorer or a virus scan), each earlier one is undone on its own, the new build stays in `<install>.staging`, and the error lists which folders exist. If an undo fails too, the error says so and which renames to make by hand.
+- The data directory (`%LocalAppData%\ScarletMeter`: history, settings, logs, backgrounds, WebView2 profile) is never touched.
+- The script renames or deletes only folders it made, recognised by their marker (`.scarlet-install`, or `.scarlet-install-staging` while building), and empty folders. It refuses, leaving everything as it was: any other existing folder at the install, `.previous`, `.retired` or `.staging` names, even one holding a `ScarletMeter.exe`; a folder that is, or holds, a link or junction; a `.retired` folder without an install (it may be the only copy); a path that is not on a local drive (UNC, admin shares such as `\\localhost\C$`, `\\?\` and `\\.\` forms) or has a folder name Windows would change; and an install directory that overlaps the data directory or this checkout, compared after Windows resolves links, junctions, 8.3 names and substituted drives. A mistyped path therefore fails rather than moves files, unless it names a folder an earlier install made.
+- `scripts/Test-InstallMeter.ps1` checks those refusals (and that owned folders still pass) against throwaway folders in the temp directory, with `-CheckOnly`; CI runs it.
 - A warning says when the checkout has uncommitted changes: they are in the installed build, but its stamped commit does not show them.
 
 When upstream publishes a release (the meter will show a notice once the UI wires `UpstreamReleaseChecker` in; until then, see below), move the pin, then reinstall:
@@ -105,8 +107,9 @@ Checking what the latest release is: `gh release list -R Kuroukihime/AIon2-Dps-M
 `.github/workflows/ci.yml` runs on every push and pull request on `windows-latest`:
 
 1. Checkout with submodules. actions/checkout clones the submodule with `--depth=1`, which brings the pinned commit and only the tags that follow upstream's default-branch tip, not the pinned release's tag.
-2. Fetch the pinned release tag: `git ls-remote` finds the release tag naming the pinned commit, and that tag alone is fetched (depth 1). Finding none fails the run, since the pin must be a release. The tag goes into `SCARLET_EXPECTED_UPSTREAM_RELEASE`, and `BuildInfoTests` checks that the build stamped exactly it rather than the commit fallback.
+2. Fetch the pinned release tag: `git ls-remote` finds the release tag naming the pinned commit, and that tag alone is fetched (depth 1); each git call is tried up to three times. Finding none fails the run, since the pin must be a release. The tag goes into `SCARLET_EXPECTED_UPSTREAM_RELEASE`, and `BuildInfoTests` checks that the build stamped exactly it rather than the commit fallback.
 3. .NET 10, then `scripts/Build.ps1 -Configuration Release`.
-4. `scripts/Install-Meter.ps1 -SkipTests` into the runner's temp directory, under pwsh: the self-contained single-file publish, `Test-PublishLayout.ps1` on it and the folder swap.
+4. `scripts/Test-InstallMeter.ps1`: the installer's refusals, building and moving nothing.
+5. `scripts/Install-Meter.ps1 -SkipTests` twice into the runner's temp directory, under pwsh: the self-contained single-file publish, `Test-PublishLayout.ps1` on the published output, the install marker and the folder swap. The second install must accept the first by its marker and keep it as `.previous`; the step checks both carry the marker and that no staging or `.retired` folder is left.
 
 CI does not exercise capture, WebView rendering or the window lifecycle, and does not launch the meter.

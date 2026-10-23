@@ -12,7 +12,8 @@ public interface IUpstreamReleaseChecker
 
     /// <summary>
     /// Checks upstream's latest release, or returns the cached result when a check started less than
-    /// <see cref="UpstreamReleaseChecker.CheckInterval"/> ago; concurrent callers share one request. Never
+    /// <see cref="UpstreamReleaseChecker.CheckInterval"/> ago (<see cref="UpstreamReleaseChecker.RetryInterval"/> when it
+    /// got no answer); concurrent callers share one request. Never
     /// throws: every failure, the caller's cancellation included, is an <see cref="UpstreamReleaseCheckResult.Unknown"/>.
     /// </summary>
     Task<UpstreamReleaseCheckResult> CheckAsync(CancellationToken cancellationToken = default);
