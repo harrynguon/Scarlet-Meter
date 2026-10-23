@@ -32,7 +32,7 @@ Run `src\ScarletMeter.App` from your IDE, or publish it as described in [docs/DE
 ## Updating upstream
 
 ```powershell
-& "<checkout>\scripts\Update-Upstream.ps1" -Tag v1.11.4.334
+& "<checkout>\scripts\Update-Upstream.ps1" -Tag v1.11.5.341
 ```
 
 Releases only, never upstream's `dev` branch. The script moves the submodule, rebuilds and runs the tests; a compile error in `src/ScarletMeter.Engine/Upstream` is the signal that upstream changed an API the engine maps.

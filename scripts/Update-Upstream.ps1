@@ -3,12 +3,12 @@
 Moves the upstream submodule to a RATmeter release tag, then builds and tests Scarlet Meter against it.
 
 .DESCRIPTION
-Releases only: the tag must look like v1.11.4.334 and exist on upstream. Never point the submodule at
+Releases only: the tag must look like v1.11.5.341 and exist on upstream. Never point the submodule at
 upstream's dev branch or an unreleased commit (AGENTS.md, "Upstream boundary"). Paths derive from this
 script's location, so it runs from any working directory.
 
 .EXAMPLE
-& "<checkout>\scripts\Update-Upstream.ps1" -Tag v1.11.4.334
+& "<checkout>\scripts\Update-Upstream.ps1" -Tag v1.11.5.341
 #>
 [CmdletBinding()]
 param(
