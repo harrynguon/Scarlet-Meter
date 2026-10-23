@@ -27,7 +27,9 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Not checked:** the next-event line in the running app at the exact moment an entry closes (the computation is tested; the strip renders whatever `Next` holds).
 
-**Next:** PR, audit, Codex's review of the PR, CI and merge. Offer to ask Codex to review #1 to #3 again.
+**Review of this PR (#12):** Codex reviewed 8bca709 with no findings (thumbs-up). pr-auditor, standard pass: approve with nits, applied: AGENTS.md no longer says docs-only changes need "no review beyond CI" (they need no audit, but still get Codex's review), and the markup guard matches only `scripts<name>.ps1` commands, so a web asset path cannot trip it (it still fails with the old line put back; 354/354).
+
+**Next:** Codex's review of the fix commit, CI and merge. Offer to ask Codex to review #1 to #3 again.
 
 ## 2026-10-24 — Agent tooling: auditor and skills
 

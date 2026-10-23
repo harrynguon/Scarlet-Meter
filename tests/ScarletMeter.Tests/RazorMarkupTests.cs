@@ -23,8 +23,9 @@ public sealed partial class RazorMarkupTests
     [GeneratedRegex(@"[A-Za-z0-9]@[A-Za-z_]")]
     private static partial Regex EmailLikeExpression();
 
-    // "scripts\" (or "scripts/") not directly preceded by "&lt;checkout&gt;\" or "<checkout>\".
-    [GeneratedRegex(@"(?<!&lt;checkout&gt;[\\/])(?<!<checkout>[\\/])\bscripts[\\/]", RegexOptions.IgnoreCase)]
+    // A script command ("scripts\Name.ps1", either slash) not directly preceded by "&lt;checkout&gt;\" or
+    // "<checkout>\". A web asset such as "scripts/app.js" is not a command and does not match.
+    [GeneratedRegex(@"(?<!&lt;checkout&gt;[\\/])(?<!<checkout>[\\/])\bscripts[\\/][\w-]+\.ps1\b", RegexOptions.IgnoreCase)]
     private static partial Regex RelativeScriptPath();
 
     // Lines of the app's .razor files (outside bin and obj) that match, as "file:line: text".
