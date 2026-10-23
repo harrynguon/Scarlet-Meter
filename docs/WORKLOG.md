@@ -2,6 +2,48 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — World event notices in the overlay
+
+**What:**
+
+- **Notices:** `ScarletMeter.WorldEvents` is wired into the overlay. A slim strip at the bottom of the meter (`AlertStrip`) shows:
+  - "Soon" before an enabled event starts, with a countdown and a bar filling over the lead time.
+  - "Portal open" or "Entry open" while it can be entered.
+  - At most two notices; optionally, the next event as one dim line when nothing is due.
+- **`AlertMonitor`** sleeps until the plan's next change, at most a minute, and signals each new notice once.
+- **`MeterWindows`** brings a minimized meter back for a new notice without activating it (`SW_SHOWNOACTIVATE`), so the game keeps focus.
+- **Settings:** `AlertSettings` covers on/off, lead time 1–60 minutes (default 5), events (default: world events and bosses, not resets), server UTC offset (+9), the next-event line, and bringing the meter back. The new Alerts tab lists each event with its schedule and next local start, and carries the accuracy warning.
+- **Rules:** AGENTS.md and ARCHITECTURE now say the app references the engine and the dependency-free world-events module, never upstream.
+
+**Why:** Harry asked to be told about five minutes before a Spacetime Rift, Shugo Festival or another world event, "sleek and subtle in the overlay, doesn't have to be a popup". The schedule engine came first in its own PR.
+
+**Checks (SDK 10.0.402):**
+
+- `scripts/Build.ps1`, Debug and Release: 168/168 tests, 10 of them new (`AlertTests`):
+  - Soon at the lead time, Open until entry closes, the lead time from settings.
+  - Nothing when alerts are off or nothing is chosen.
+  - The next-event line, the server offset.
+  - Normalizing alert settings, and alert settings comparing by value.
+  - Wording for countdowns and schedules.
+  - The monitor on a fake clock: one signal per notice, the wait capped at a minute, the Open transition, switching off.
+- `EqualityCoversEveryProperty` failed until `MeterSettings.Equals` and its test included the new section, as intended.
+- Smoke run through `Smoke-Meter.ps1`, with a seeded lead time of 60 minutes and Shugo only:
+  - The strip read "Shugo Festival · in 27:08" and ticked down second by second.
+  - The Alerts tab rendered all events with schedules and next local starts (screenshots, not committed).
+  - With the meter minimized by the real shortcut, switching on Dimensional Invasion (its entry was open at that moment) brought the overlay back to Normal on its own; the strip then read "Dimensional Invasion · Entry open · 0:03 left" above Shugo.
+  - The saved events were `invasion,shugo`; no warning in the log; exit code 0.
+
+**Not checked:**
+
+- Real event times in the game (HANDOFF.md).
+- Whether the restored meter really leaves the game's focus alone in a fullscreen or borderless game.
+- Readability over the game.
+- A single-file publish of this branch, which CI runs with the layout check.
+
+**Not done:** per-event time overrides in settings (HANDOFF.md).
+
+**Next:** PR, audit, CI and merge; then the details and history UI on the engine PR.
+
 ## 2026-10-24 — World event schedules
 
 **What:** New module `src/ScarletMeter.WorldEvents`, a net10.0 class library with no project, upstream or package references, added to the solution and referenced by the tests. It ports the schedule engine of the harrynguon/AIon2-Dps-Meter fork's World Companion (JavaScript, at 4feb72b) and adds the alert planner the overlay will use. No UI and no app wiring.

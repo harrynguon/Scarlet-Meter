@@ -2,9 +2,11 @@ using System.IO;
 using System.Reflection;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
+using ScarletMeter.App.Alerts;
 using ScarletMeter.App.Settings;
 using ScarletMeter.App.Windows;
 using ScarletMeter.Engine;
+using ScarletMeter.WorldEvents;
 
 namespace ScarletMeter.App.Pages;
 
@@ -15,12 +17,15 @@ namespace ScarletMeter.App.Pages;
 /// </summary>
 public partial class SettingsPage : IDisposable
 {
-    private static readonly string[] Tabs = ["Appearance", "Tracking", "Overlay", "About"];
+    private static readonly string[] Tabs = ["Appearance", "Tracking", "Overlay", "Alerts", "About"];
 
     private string current = Tabs[0];
     private string? pictureError;
+    private int offsetKey;
 
     [Inject] private SettingsService Settings { get; set; } = default!;
+
+    [Inject] private TimeProvider Clock { get; set; } = default!;
 
     [Inject] private IMeterWindows Windows { get; set; } = default!;
 
@@ -52,6 +57,33 @@ public partial class SettingsPage : IDisposable
         if (int.TryParse(e.Value?.ToString(), out var days))
             Change(s => s with { Fight = s.Fight with { HistoryRetentionDays = days } });
         retentionKey++;
+    }
+
+    // Event ids are kept in catalog order; the normalizer enforces that anyway.
+    private void ToggleEvent(string id, bool on) => Change(s => s with
+    {
+        Alerts = s.Alerts with
+        {
+            Events = EventCatalog.Ids.Where(e => e == id ? on : s.Alerts.Events.Contains(e)).ToList(),
+        },
+    });
+
+    private void OnOffsetChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var hours))
+            Change(s => s with { Alerts = s.Alerts with { ServerOffsetHours = hours } });
+        offsetKey++;
+    }
+
+    // When the rule next starts, in local time, or that it is on now.
+    private string NextText(EventRule rule)
+    {
+        var offset = TimeSpan.FromMinutes(Math.Round(S.Alerts.ServerOffsetHours * 60));
+        var now = Clock.GetUtcNow();
+        var occurrence = EventSchedule.Occurrence(rule, now, offset);
+        return occurrence.IsActive
+            ? "on now"
+            : $"next {EventText.LocalTime(occurrence.Start)} (in {EventText.Countdown(occurrence.Start - now)})";
     }
 
     private async Task ChoosePicture()

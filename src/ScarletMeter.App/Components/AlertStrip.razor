@@ -1,0 +1,67 @@
+@using ScarletMeter.App.Alerts
+@using ScarletMeter.WorldEvents
+@*
+    The overlay's world-event notices: a slim strip at the bottom of the meter. "Soon" counts down to the
+    start with a bar that fills over the lead time; "Open" counts down to the end of the entry or portal
+    window. At most two notices show; the rest are summarised. Countdowns use the time the parent passes in,
+    so they tick with the overlay's own refresh.
+*@
+@if (View.Alerts.Count > 0)
+{
+    <div class="alerts" role="status" aria-live="polite">
+        @foreach (var alert in View.Alerts.Take(MaxShown))
+        {
+            var remaining = alert.Deadline - Now;
+            <div class="alert @Kind(alert)" @key="@($"{alert.Rule.Id}-{alert.Kind}-{alert.Start.UtcTicks}")"
+                 title="@alert.Rule.Name · @alert.Rule.Location · @(alert.Kind == AlertKind.Soon ? "starts" : "closes") @EventText.LocalTime(alert.Deadline)">
+                <span class="alert-dot"></span>
+                <span class="alert-name">@alert.Rule.Name</span>
+                <span class="alert-when">
+                    @if (alert.Kind == AlertKind.Soon)
+                    {
+                        <text>in @EventText.Countdown(remaining)</text>
+                    }
+                    else
+                    {
+                        <text>@EventText.OpenLabel(alert.Rule) · @EventText.Countdown(remaining) left</text>
+                    }
+                </span>
+                <span class="alert-progress" style="width:@Compact.Percent(Progress(alert, remaining))"></span>
+            </div>
+        }
+        @if (View.Alerts.Count > MaxShown)
+        {
+            <div class="alert more">+@(View.Alerts.Count - MaxShown) more</div>
+        }
+    </div>
+}
+else if (View.Next is { } next)
+{
+    <div class="alerts">
+        <div class="alert next" title="@next.Rule.Location">
+            <span class="alert-dot"></span>
+            <span class="alert-name">Next: @next.Rule.Name</span>
+            <span class="alert-when">@EventText.LocalTime(next.Start) · in @EventText.Countdown(next.Start - Now)</span>
+        </div>
+    </div>
+}
+
+@code {
+    private const int MaxShown = 2;
+
+    [Parameter, EditorRequired] public AlertView View { get; set; } = AlertView.None;
+
+    [Parameter] public DateTimeOffset Now { get; set; }
+
+    private static string Kind(EventAlert alert) =>
+        (alert.Kind == AlertKind.Open ? "open" : "soon") + " kind-" + alert.Rule.Kind.ToString().ToLowerInvariant();
+
+    // Soon: how much of the lead time has passed. Open: how much of the window is left.
+    private double Progress(EventAlert alert, TimeSpan remaining)
+    {
+        if (alert.Kind == AlertKind.Soon)
+            return View.Lead.TotalSeconds > 0 ? (1 - remaining.TotalSeconds / View.Lead.TotalSeconds) * 100 : 100;
+        var window = (alert.Deadline - alert.Start).TotalSeconds;
+        return window > 0 ? remaining.TotalSeconds / window * 100 : 0;
+    }
+}

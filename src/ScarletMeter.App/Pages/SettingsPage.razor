@@ -97,6 +97,46 @@
                 </section>
                 break;
 
+            case "Alerts":
+                <section>
+                    <h2>World event alerts</h2>
+                    <ToggleSetting Label="Show alerts in the meter" Description="A slim notice at the bottom of the meter before an event starts, and while its entry or portal is open."
+                                   Value="@S.Alerts.Enabled" ValueChanged="@(v => Change(s => s with { Alerts = s.Alerts with { Enabled = v } }))" />
+                    <RangeSetting Label="Warn this long before" Value="@S.Alerts.LeadMinutes" Min="1" Max="60" Step="1"
+                                  Format="@(v => $"{v:0} min")"
+                                  ValueChanged="@(v => Change(s => s with { Alerts = s.Alerts with { LeadMinutes = (int)Math.Round(v) } }))" />
+                    <ToggleSetting Label="Bring the meter back for an alert" Description="If the meter is minimized, show it when a notice appears, without taking focus from the game."
+                                   Value="@S.Alerts.RestoreMinimizedMeter" ValueChanged="@(v => Change(s => s with { Alerts = s.Alerts with { RestoreMinimizedMeter = v } }))" />
+                    <ToggleSetting Label="Show the next event" Description="When nothing is due, show the next alerted event as one dim line."
+                                   Value="@S.Alerts.ShowNextEvent" ValueChanged="@(v => Change(s => s with { Alerts = s.Alerts with { ShowNextEvent = v } }))" />
+                </section>
+                <section>
+                    <h2>Events</h2>
+                    @foreach (var rule in EventCatalog.Default)
+                    {
+                        <ToggleSetting Label="@rule.Name" Description="@($"{EventText.Schedule(rule)} · {NextText(rule)}")"
+                                       Value="@S.Alerts.Events.Contains(rule.Id)" ValueChanged="@(v => ToggleEvent(rule.Id, v))" />
+                    }
+                </section>
+                <section>
+                    <h2>Server clock</h2>
+                    <label class="setting number">
+                        <span class="text">
+                            <span class="label">Server UTC offset</span>
+                            <span class="desc">Asia servers use +9. Times shown here are in this PC's time zone.</span>
+                        </span>
+                        <span class="number-field">
+                            <input type="number" @key="offsetKey" step="0.25" min="@AlertSettings.MinServerOffsetHours" max="@AlertSettings.MaxServerOffsetHours"
+                                   value="@S.Alerts.ServerOffsetHours.ToString(System.Globalization.CultureInfo.InvariantCulture)" @onchange="OnOffsetChanged" /> hours
+                        </span>
+                    </label>
+                    <p class="hint">
+                        Event times follow the Global preset ported from the World Companion (A2Tools event data) and are not yet
+                        verified on Nezekan. Check the in-game calendar before relying on them.
+                    </p>
+                </section>
+                break;
+
             case "About":
                 <section>
                     <h2>Scarlet Meter @Version</h2>

@@ -24,7 +24,8 @@ network adapters --SharpPcap/Npcap--> upstream CaptureDevice (finds the game's p
 | `src/ScarletMeter.App/DeferredWindowClose.cs` | The close ordering that keeps Blazor from crashing the process. |
 | `src/ScarletMeter.App/Settings/` | `MeterSettings` (the model), `SettingsNormalizer` (validation), `SettingsStore` (durable file), `SettingsService` (live settings), `HotkeyGesture`, `BackgroundImages`. |
 | `src/ScarletMeter.App/Pages/`, `Components/`, `wwwroot/` | The UI: `MeterPage` (overlay), `SettingsPage`, shared setting controls, one stylesheet. |
-| `src/ScarletMeter.WorldEvents` | World event schedules and the overlay's alert planner (see World events). Not wired into the app yet. |
+| `src/ScarletMeter.WorldEvents` | World event schedules and the overlay's alert planner (see World events). |
+| `src/ScarletMeter.App/Alerts/`, `Components/AlertStrip.razor` | The overlay's world-event notices: `AlertMonitor` and the strip (see Overlay notices). |
 
 ## Upstream boundary
 
@@ -32,7 +33,7 @@ The boundary keeps upstream updates a one-line pin change and keeps Scarlet's ow
 
 - **Never edit `upstream/`.** It is a submodule; a change there would be lost on the next pin and would fork upstream silently. A fix upstream needs goes to upstream, or to the harrynguon/AIon2-Dps-Meter fork, which carries minimal generic fixes.
 - **Releases only.** The pin moves with `scripts/Update-Upstream.ps1 -Tag vX.Y.Z.N`, which refuses anything that is not a release tag. Upstream's `dev` branch is never used.
-- **One project references upstream.** `ScarletMeter.Engine` references `AionDpsMeter.Core` and `AionDpsMeter.Services` through `$(ScarletUpstreamRoot)` (src/Directory.Build.props). `ScarletMeter.App` references the engine only. The one other contact is build-time content: the App project copies upstream's class icons (`AionDpsMeter.UI/wwwroot/images/classes/*.png`) beside the executable (see Image hosts). That reads files from the submodule; it adds no code or assembly reference.
+- **One project references upstream.** `ScarletMeter.Engine` references `AionDpsMeter.Core` and `AionDpsMeter.Services` through `$(ScarletUpstreamRoot)` (src/Directory.Build.props). `ScarletMeter.App` references the engine and `ScarletMeter.WorldEvents` (which references nothing), never upstream. The one other contact is build-time content: the App project copies upstream's class icons (`AionDpsMeter.UI/wwwroot/images/classes/*.png`) beside the executable (see Image hosts). That reads files from the submodule; it adds no code or assembly reference.
 - **No upstream type in the engine's public surface.** The app and future modules program against Scarlet's records and interfaces.
 - **Build settings do not leak into upstream.** Scarlet's settings live in `src/Directory.Build.props` (imported by `tests/`), never at the repository root. MSBuild imports only the nearest `Directory.Build.props` above a project, so the root file reaches only the upstream projects, which ship none: that file is the upstream overlay (below), nothing else.
 
@@ -121,7 +122,7 @@ Nothing is written next to the executable or in the working directory. Upstream'
 
 ## World events
 
-`src/ScarletMeter.WorldEvents` holds the schedule behind the overlay's world-event notices: the built-in rules, their validation, the occurrence calculation and the alert planner. It is ported from the World Companion of the harrynguon/AIon2-Dps-Meter fork (`AionDpsMeter.Companion/wwwroot/schedule.mjs`, `presets.mjs` and `state.mjs`, JavaScript, at 4feb72b), together with its tests; the alert planner is new. No UI and no app wiring yet.
+`src/ScarletMeter.WorldEvents` holds the schedule behind the overlay's world-event notices: the built-in rules, their validation, the occurrence calculation and the alert planner. It is ported from the World Companion of the harrynguon/AIon2-Dps-Meter fork (`AionDpsMeter.Companion/wwwroot/schedule.mjs`, `presets.mjs` and `state.mjs`, JavaScript, at 4feb72b), together with its tests; the alert planner is new. The overlay's notices use it (Overlay notices, below).
 
 The module is pure .NET and independent: it references no project in this repository, no upstream assembly, no UI framework and no package (`WorldEventsBoundaryTests`), so it can move to another meter unchanged. Storage, the settings format and every other host policy belong to the host. Nothing in it reads the system clock or the PC's time zone: the current instant and the server offset are parameters, instants are compared in UTC and every instant it returns is UTC (offset zero).
 
@@ -178,6 +179,16 @@ Scarlet's default, as the fork's: its legacy defaults with the times and window 
 | Weekly reset | UTC | Wed | 07:00 | instant |
 
 `EventCatalog.Legacy` keeps the fork's original defaults for comparison: Kaira on the UTC clock with a 30-minute window, estimated 45/30/45-minute Nahma, Executors and siege windows, rifts at 00:00 UTC every three hours with a 10-minute portal and 60 minutes of activity, 15-minute Shugo and Invasion windows without an entry window, and resets at 09:00 server.
+
+### Overlay notices
+
+The app shows the planner's alerts as a slim strip at the bottom of the overlay (`Components/AlertStrip.razor`): a pulsing dot, the event's name and "in 4:59" before a start, with a bar filling over the lead time; "Portal open · 7:12 left" or "Entry open · 2:10 left" while entry is possible. At most two show, the rest are summarised; hovering one shows its location and local time. With "show the next event" on, a dim line names the next alerted event when nothing is due.
+
+- `Alerts/AlertMonitor` (singleton) computes the view from `AlertSettings` and the clock (`TimeProvider`), and sleeps until the plan's `NextChange` plus 20 ms, never more than a minute, so a sleep, resume or clock change is corrected within a minute. It raises `Changed` (the overlay re-renders) and `AlertAppeared` once per notice (rule, kind and start).
+- Countdowns are the page's: `MeterPage` passes the current time to the strip on every 100 ms render.
+- `MeterWindows.FollowAlerts`: when a notice appears and the meter is minimized, it is shown again with `ShowWindow(SW_SHOWNOACTIVATE)`, so the game keeps keyboard focus (setting "Bring the meter back for an alert", on by default). Owned tool windows come back with it.
+- `AlertSettings` (settings.json `alerts`): on/off, lead time 1 to 60 minutes (default 5), the alerted event ids (default: the world events and bosses, not the resets), the server UTC offset in whole minutes (default +9), the next-event line (off) and bringing the meter back (on). The normalizer keeps only catalog ids, once each, in catalog order. The schedule itself is always the catalog's Global preset; per-event time overrides (the module's `TryApplyOverrides`) are not in the settings yet.
+- The settings window's Alerts tab lists each event with its schedule ("Every 3 h from 02:00 server time · portal 10 min") and next start in the PC's local time, and repeats the accuracy warning below.
 
 **Accuracy: not verified against Global Asia / Nezekan.** UTC+9 is an assumption. The fork's evidence (its HANDOFF.md) is consistent with the preset but proves no exact transition: a daily-completion countdown consistent with 16:00 server (07:00 UTC), the player's report of the weekly reset at Wednesday 18:00 Melbourne during AEDT (07:00 UTC), and two rift reports, rounded to the minute, at about 08:00 and 11:01 server. Entry closures (Shugo and Invasion after 3 minutes, the rift portal after 10), boss and siege times, and resets outside Australian daylight saving are unobserved. A scheduled window is not a live report: a boss may already be dead. The A2Tools reproduction cases of the fork's TIMER-COMPARISON.md are tests here; passing them shows agreement with A2Tools' arithmetic, not with the game. In-game verification is listed in HANDOFF.md.
 

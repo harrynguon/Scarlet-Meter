@@ -10,6 +10,12 @@ internal static class NativeMethods
     public const int HtCaption = 2;
     public const uint ModNoRepeat = 0x4000;
     public const int DwmUseImmersiveDarkMode = 20;
+    public const int SwShowNoActivate = 4;
+
+    /// <summary>Shows a window in its last size and position; with <see cref="SwShowNoActivate"/> it restores a minimized one without taking focus.</summary>
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool ShowWindow(IntPtr hWnd, int command);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
+using ScarletMeter.App.Alerts;
 using ScarletMeter.App.Formatting;
 using ScarletMeter.App.Settings;
 using ScarletMeter.App.Windows;
@@ -39,6 +40,13 @@ public partial class MeterPage : IAsyncDisposable
     [Inject]
     private ILogger<MeterPage> Logger { get; set; } = default!;
 
+    // World-event notices; their countdowns tick with the refresh loop's renders.
+    [Inject]
+    private AlertMonitor Alerts { get; set; } = default!;
+
+    [Inject]
+    private TimeProvider Clock { get; set; } = default!;
+
     // Upstream's rule: hide players the game has not named unless they already matter. Highest damage first.
     private IEnumerable<PlayerRow> Visible => snapshot.Players
         .Where(p => p.IsIdentified || p.DamageShare > 1)
@@ -67,8 +75,11 @@ public partial class MeterPage : IAsyncDisposable
         appearance = Settings.Current.Appearance;
         Settings.Changed += OnSettingsChanged;
         Engine.PingUpdated += OnPingUpdated;
+        Alerts.Changed += OnAlertsChanged;
         refreshLoop = RefreshLoopAsync();
     }
+
+    private void OnAlertsChanged(object? sender, EventArgs e) => _ = RenderAsync();
 
     private string DisplayName(PlayerRow player) => appearance.HideNicknames ? NicknameMask.Mask(player.Name) : player.Name;
 
@@ -160,6 +171,7 @@ public partial class MeterPage : IAsyncDisposable
     {
         Settings.Changed -= OnSettingsChanged;
         Engine.PingUpdated -= OnPingUpdated;
+        Alerts.Changed -= OnAlertsChanged;
         await stopping.CancelAsync();
         if (refreshLoop is not null) await refreshLoop;
         stopping.Dispose();
