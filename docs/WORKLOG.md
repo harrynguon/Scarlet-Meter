@@ -60,7 +60,18 @@ Earlier, on main plus the engine branch before its review fixes:
 - A saved fight with tens of thousands of hits (the log is virtualized and the fight loads off the UI thread, but load time is unmeasured).
 - Hover tooltips on the chart.
 
-**Next:** PR and audit; merge after the engine PR (#5), then CI on the merged result.
+**Audit (pr-auditor, deep pass on 7d4a41a): request changes**, now addressed:
+
+- Major: the "Skill icons" setting did not stop the graph's buff-lane icons (`DamageChart` called `SkillIcons.Url` with its default `enabled = true`), so turning it off still sent requests to NC's CDN. `DamageChart` now takes `IconsEnabled` from the page, and `SkillIcons.Url` has no default.
+- Minor: "Show deaths" was ignored in the details header and the saved fight's party; both follow it now.
+- Minor: a slower saved-fight load for an earlier click could label the details window with the wrong fight; the load goes into a local and applies only if the selection is still current.
+- Minor: the history window applied results in arrival order; a request counter keeps only the latest search and fight load, going back to the list drops a fight still loading, and closing the window cancels.
+- Minor: Log filters and expanded summon groups carried over to another player; the tab body is keyed by the selection, so they reset.
+- Nits: a page past the end (retention shrank the history) is replaced by the last page; the chart's empty text no longer says "yet" for saved fights. Left as is: the live details loop keeps polling while the window is minimized (500 ms, acceptable for now); `NewestFirst` relies on the engine's order.
+
+Checks after the fixes: `scripts/Build.ps1` 235/235. `Smoke-Meter.ps1 --demo` with `showDeaths` off: the Graph showed two lane icons, and after switching "Skill icons" off in Settings it showed none and the page had no image at all; a Log filter ("Combustion", 3 of 16 hits) reset to all skills (19 of 19) when the details window was re-targeted to another player from the overlay; exit code 0. Deaths were not exercised (the demo party did not die), so hiding them is checked by reading the code only.
+
+**Next:** CI; merge after the engine PR (#5), then CI on the merged result.
 
 ## 2026-10-24 — Engine: player details, history, demo mode
 

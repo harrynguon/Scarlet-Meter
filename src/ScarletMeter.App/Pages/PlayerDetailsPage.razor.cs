@@ -27,6 +27,7 @@ public partial class PlayerDetailsPage : IAsyncDisposable
     private bool stale;
     private bool icons = true;
     private bool hideNames;
+    private bool showDeaths = true;
     private bool loadFailed;
 
     [Inject] private ICombatEngine Engine { get; set; } = default!;
@@ -91,9 +92,12 @@ public partial class PlayerDetailsPage : IAsyncDisposable
             }
             else
             {
-                if (fight?.Entry.FightId != subject.FightId)
-                    fight = await Task.Run(() => Engine.GetHistoryFight(subject.FightId!.Value), stopping.Token);
+                // Loaded into a local first: a slower load for an earlier selection must not label this one.
+                var saved = fight?.Entry.FightId == subject.FightId
+                    ? fight
+                    : await Task.Run(() => Engine.GetHistoryFight(subject.FightId!.Value), stopping.Token);
                 if (subject != source) return;
+                fight = saved;
                 loadFailed = fight is null; // the engine logs and returns null for a saved fight it cannot read
                 stale = false;
                 loaded = fight?.Details.GetValueOrDefault(subject.PlayerId);
@@ -139,6 +143,7 @@ public partial class PlayerDetailsPage : IAsyncDisposable
     {
         icons = settings.Appearance.SkillIcons;
         hideNames = settings.Appearance.HideNicknames;
+        showDeaths = settings.Appearance.ShowDeaths;
     }
 
     private async Task RenderAsync()

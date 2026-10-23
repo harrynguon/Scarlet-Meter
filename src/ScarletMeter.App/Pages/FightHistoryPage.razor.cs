@@ -26,6 +26,12 @@ public partial class FightHistoryPage : IDisposable
     private string? error;
     private bool copied;
     private bool hideNames;
+    private bool showDeaths = true;
+    private int listRequest;
+    private int fightRequest;
+
+    // Cancelled when the window closes; not disposed, since a load's continuation may still check it.
+    private readonly CancellationTokenSource stopping = new();
 
     [Inject] private ICombatEngine Engine { get; set; } = default!;
 
@@ -47,29 +53,46 @@ public partial class FightHistoryPage : IDisposable
     protected override async Task OnInitializedAsync()
     {
         hideNames = Settings.Current.Appearance.HideNicknames;
+        showDeaths = Settings.Current.Appearance.ShowDeaths;
         Settings.Changed += OnSettingsChanged;
         await SearchAsync(1);
     }
 
     private string Name(PlayerRow player) => hideNames ? NicknameMask.Mask(player.Name) : player.Name;
 
+    // Only the latest search applies: a slower, older one (Next clicked twice, Search during a slow query) is
+    // dropped, as is any result arriving after the window closed. A page past the end, left by retention
+    // shrinking the history since the page count was shown, is replaced by the last page.
     private async Task SearchAsync(int pageNumber)
     {
         error = null;
+        var request = ++listRequest;
         try
         {
             // The "To" date covers that whole day.
             var query = new HistoryQuery(nameFilter, fromFilter, toFilter?.Date.AddDays(1).AddTicks(-1), pageNumber, PageSize).Validate();
-            results = await Task.Run(() => Engine.GetHistory(query));
+            var page = await Task.Run(() => Engine.GetHistory(query), stopping.Token);
+            if (request != listRequest || stopping.IsCancellationRequested) return;
+            var last = Math.Max(1, (page.TotalCount + page.PageSize - 1) / page.PageSize);
+            if (page.Entries.Count == 0 && page.Page > last)
+            {
+                await SearchAsync(last);
+                return;
+            }
+            results = page;
+        }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested)
+        {
+            // Closing.
         }
         catch (ArgumentException ex)
         {
-            error = ex.Message;
+            if (request == listRequest) error = ex.Message;
         }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Loading the history failed.");
-            error = "The history could not be loaded. The log has the details.";
+            if (request == listRequest) error = "The history could not be loaded. The log has the details.";
         }
     }
 
@@ -89,21 +112,30 @@ public partial class FightHistoryPage : IDisposable
     {
         error = null;
         copied = false;
+        var request = ++fightRequest;
         try
         {
-            fight = await Task.Run(() => Engine.GetHistoryFight(fightId));
+            var loaded = await Task.Run(() => Engine.GetHistoryFight(fightId), stopping.Token);
+            // A later click, going back to the list, or closing the window wins over this late result.
+            if (request != fightRequest || stopping.IsCancellationRequested) return;
+            fight = loaded;
             // Null: removed by retention, or a saved row the engine could not read (it logs which).
-            if (fight is null) error = "That fight is no longer in the history, or could not be read. The log has the details.";
+            if (loaded is null) error = "That fight is no longer in the history, or could not be read. The log has the details.";
+        }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested)
+        {
+            // Closing.
         }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Loading a saved fight failed.");
-            error = "That fight could not be loaded. The log has the details.";
+            if (request == fightRequest) error = "That fight could not be loaded. The log has the details.";
         }
     }
 
     private void CloseFight()
     {
+        fightRequest++; // a fight still loading must not reopen
         fight = null;
         copied = false;
     }
@@ -125,8 +157,13 @@ public partial class FightHistoryPage : IDisposable
     private void OnSettingsChanged(object? sender, MeterSettings changed)
     {
         hideNames = changed.Appearance.HideNicknames;
+        showDeaths = changed.Appearance.ShowDeaths;
         _ = InvokeAsync(StateHasChanged);
     }
 
-    public void Dispose() => Settings.Changed -= OnSettingsChanged;
+    public void Dispose()
+    {
+        Settings.Changed -= OnSettingsChanged;
+        stopping.Cancel(); // loads still running drop their results; the token is not read after this
+    }
 }

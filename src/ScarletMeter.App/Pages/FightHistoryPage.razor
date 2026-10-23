@@ -81,7 +81,7 @@
                             <td class="icon-cell">@if (WebAssetHosts.ClassIconUrl(player.ClassId) is { } icon) { <span class="class-icon" style="background-image:url('@icon')"></span> }</td>
                             <td class="left">
                                 @Name(player)
-                                <small class="muted"> @player.ClassName@(player.CombatPower > 0 ? $" · CP {DetailFormat.Full(player.CombatPower)}" : "")@(player.Deaths > 0 ? $" · \U0001F480 {player.Deaths}" : "")</small>
+                                <small class="muted"> @player.ClassName@(player.CombatPower > 0 ? $" · CP {DetailFormat.Full(player.CombatPower)}" : "")@(showDeaths && player.Deaths > 0 ? $" · \U0001F480 {player.Deaths}" : "")</small>
                             </td>
                             <td>@DetailFormat.Full(player.TotalDamage)</td>
                             <td class="accent">@Compact.Number(player.Dps)/s</td>

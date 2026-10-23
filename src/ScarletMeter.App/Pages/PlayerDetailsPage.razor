@@ -23,7 +23,7 @@
                         @player.ClassName
                         @if (!string.IsNullOrEmpty(player.ServerName)) { <text> · @player.ServerName</text> }
                         @if (player.CombatPower > 0) { <text> · CP @DetailFormat.Full(player.CombatPower)</text> }
-                        @if (player.Deaths > 0) { <text> · &#x1F480; @player.Deaths</text> }
+                        @if (showDeaths && player.Deaths > 0) { <text> · &#x1F480; @player.Deaths</text> }
                     </div>
                 </div>
             </div>
@@ -53,7 +53,7 @@
             }
         </nav>
 
-        <div class="tab-body @(current == "Log" ? "log-body" : "")">
+        <div class="tab-body @(current == "Log" ? "log-body" : "")" @key="source">
             @switch (current)
             {
                 case "Skills":
@@ -84,7 +84,7 @@
                     }
                     break;
                 case "Graph":
-                    <DamageChart Data="chart" />
+                    <DamageChart Data="chart" IconsEnabled="icons" />
                     break;
                 case "Log":
                     <CombatLogView Entries="details.CombatLog" IconsEnabled="icons" NewestFirst="true" />

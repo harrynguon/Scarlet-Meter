@@ -57,7 +57,7 @@ public sealed class DetailFormatTests
     [InlineData("https://assets.playnccdn.com/static-aion2-gamedata/resources/../../x.png", false)]
     [InlineData(null, false)]
     public void SkillIconsOnlyComeFromNcsCdn(string? icon, bool allowed) =>
-        Assert.Equal(allowed ? icon : null, SkillIcons.Url(icon));
+        Assert.Equal(allowed ? icon : null, SkillIcons.Url(icon, enabled: true));
 
     [Fact]
     public void SkillIconsCanBeTurnedOff() =>

@@ -6,7 +6,7 @@
 *@
 @if (Data is null || Data.Points.Count < 2)
 {
-    <div class="chart-empty">No combat data yet.</div>
+    <div class="chart-empty">Not enough combat to chart.</div>
 }
 else
 {
@@ -52,7 +52,7 @@ else
                 {
                     <div class="lane" title="@lane.Name · x@(lane.Count) · @lane.UptimePercent.ToString("0.#", CultureInfo.InvariantCulture)% uptime">
                         <span class="lane-name">
-                            @if (SkillIcons.Url(lane.Icon) is { } icon)
+                            @if (SkillIcons.Url(lane.Icon, IconsEnabled) is { } icon)
                             {
                                 <img src="@icon" alt="" />
                             }
@@ -91,6 +91,9 @@ else
     private List<(double X, double Width, string Tip)> columns = [];
 
     [Parameter] public ChartData? Data { get; set; }
+
+    /// <summary>The player's "Skill icons" setting: buff lanes show icons from NC's CDN only when it is on.</summary>
+    [Parameter] public bool IconsEnabled { get; set; }
 
     // Geometry is computed once per new data object, not on every render.
     private ChartData? computedFor;

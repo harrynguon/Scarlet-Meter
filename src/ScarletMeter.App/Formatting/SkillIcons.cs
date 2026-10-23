@@ -9,8 +9,8 @@ public static class SkillIcons
 {
     public const string CdnPrefix = "https://assets.playnccdn.com/static-aion2-gamedata/resources/";
 
-    /// <summary>The icon URL when it is on NC's CDN and icons are enabled, otherwise null.</summary>
-    public static string? Url(string? icon, bool enabled = true) =>
+    /// <summary>The icon URL when it is on NC's CDN and icons are enabled, otherwise null. No default: every caller passes the player's "Skill icons" setting.</summary>
+    public static string? Url(string? icon, bool enabled) =>
         enabled && icon is not null && icon.StartsWith(CdnPrefix, StringComparison.Ordinal)
             && Uri.TryCreate(icon, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps && uri.Host == "assets.playnccdn.com"
             && !icon.Contains("..", StringComparison.Ordinal)
