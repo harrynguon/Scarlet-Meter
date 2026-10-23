@@ -51,11 +51,12 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         }
         catch (InvalidOperationException ex)
         {
-            // Upstream's CaptureDevice.StartCapture: Npcap listed the adapters, but every one is of a kind
-            // upstream skips (Hyper-V, VMware, VirtualBox, TAP, WAN Miniport).
+            // Upstream's CaptureDevice.StartCapture: Npcap loaded, but listed no adapter, or only kinds upstream
+            // skips (Hyper-V, VMware, VirtualBox, TAP, WAN Miniport). Upstream logs nothing about which.
             throw new CaptureStartException(
-                "Packet capture could not start: no eligible network adapter was found (virtual, TAP and WAN " +
-                "Miniport adapters are skipped). The log in the data directory has the details.", ex);
+                "Packet capture could not start: no eligible network adapter was found. Virtual, TAP and WAN " +
+                "Miniport adapters are skipped. If Npcap was installed with access restricted to administrators, " +
+                "start the meter as administrator.", ex);
         }
         catch (Exception ex)
         {

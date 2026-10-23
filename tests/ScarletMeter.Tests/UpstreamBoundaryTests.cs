@@ -75,18 +75,28 @@ public sealed class UpstreamBoundaryTests
     }
 
     // Every upstream type a type's shape shows: its base type, interfaces, generic constraints and the
-    // signatures of its own public members.
+    // signatures of its own public and protected members (a derived type outside the engine sees both).
     private static IEnumerable<string> UpstreamTypesShownBy(Type type)
     {
         foreach (var inherited in InheritedTypesOf(type).Where(IsUpstreamType))
             yield return $"{type.Name}: base, interface or constraint {inherited}";
-        var members = type.GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
-        foreach (var member in members)
+        var members = type.GetMembers(
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
+        foreach (var member in members.Where(IsVisibleOutsideAssembly))
         {
             foreach (var memberType in TypesOf(member).Where(IsUpstreamType))
                 yield return $"{type.Name}.{member.Name}: {memberType}";
         }
     }
+
+    private static bool IsVisibleOutsideAssembly(MemberInfo member) => member switch
+    {
+        MethodBase method => method.IsPublic || method.IsFamily || method.IsFamilyOrAssembly,
+        FieldInfo field => field.IsPublic || field.IsFamily || field.IsFamilyOrAssembly,
+        PropertyInfo property => property.GetAccessors(nonPublic: true).Any(IsVisibleOutsideAssembly),
+        EventInfo @event => @event.AddMethod is { } add && IsVisibleOutsideAssembly(add),
+        _ => false,
+    };
 
     private static IEnumerable<Type> InheritedTypesOf(Type type)
     {

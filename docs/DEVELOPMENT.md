@@ -30,7 +30,7 @@ Switches: `--no-capture` opens the window without Npcap (status reads "Capture i
 
 Data and logs: `%LocalAppData%\ScarletMeter` (`combat-history.db`, `logs\scarlet-<date>.log`, `webview2\`). The log is where "[CAPTURE] !!! LOCKED !!!" appears once upstream's capture finds the game's connection.
 
-A startup failure (a data directory that cannot be created, missing game data, an unusable history database, capture that cannot start) shows a dialog and exits with code 1. Once the data directory exists it is also logged, at Critical (Error for capture).
+A startup failure (a data directory that cannot be created, missing game data, an unusable history database, capture that cannot start) shows a dialog and exits with code 1. Once the host (and with it the log) exists it is also logged, at Critical (Error for capture).
 
 The apphost needs a .NET 10 runtime it can find: an installed .NET 10 Desktop Runtime or SDK, or `DOTNET_ROOT` set to one (an absolute path). Without it `ScarletMeter.exe` shows the .NET install prompt and exits with 0x80008096. A self-contained publish carries its own runtime.
 

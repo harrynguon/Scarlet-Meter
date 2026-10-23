@@ -1,3 +1,5 @@
+using System.IO;
+using System.Runtime.ExceptionServices;
 using AionDpsMeter.Services.Services.Session.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -18,12 +20,13 @@ internal sealed class TestEngineHost : IDisposable
 
     private readonly TestDataDirectory directory = new();
     private readonly HistoryCleanupWatcher cleanup = new();
+    private readonly EngineOptions options;
 
     /// <param name="configure">Runs after AddScarletEngine, so its registrations win.</param>
     public TestEngineHost(CaptureMode capture, Action<IServiceCollection>? configure = null)
     {
-        var services = new ServiceCollection()
-            .AddScarletEngine(new EngineOptions { DataDirectory = directory.FullPath, Capture = capture });
+        options = new EngineOptions { DataDirectory = directory.FullPath, Capture = capture };
+        var services = new ServiceCollection().AddScarletEngine(options);
         services.AddLogging(logging => logging.AddProvider(cleanup));
         configure?.Invoke(services);
         // ValidateOnBuild stays off: upstream registers every type in its processor namespace, including nested
@@ -37,17 +40,32 @@ internal sealed class TestEngineHost : IDisposable
     /// <summary>The absolute data directory the graph writes to.</summary>
     public string DataDirectory => directory.FullPath;
 
+    // A timeout is reported after the graph and directory are released, together with any failure there, so
+    // neither hides the other.
     public void Dispose()
     {
+        Exception? cleanupFailure = null;
         try
         {
-            cleanup.WaitUntilFinished(CleanupTimeout);
+            // The store creates the database before it starts the cleanup. No file means the store was never
+            // built or failed first (the test then fails with that error), so there is nothing to wait for.
+            if (File.Exists(options.HistoryDatabasePath)) cleanup.WaitUntilFinished(CleanupTimeout);
         }
-        finally
+        catch (TimeoutException ex)
         {
-            Services.Dispose();
-            directory.Dispose();
+            cleanupFailure = ex;
         }
+
+        try
+        {
+            try { Services.Dispose(); }
+            finally { directory.Dispose(); }
+        }
+        catch (Exception ex) when (cleanupFailure is not null)
+        {
+            throw new AggregateException(cleanupFailure, ex);
+        }
+        if (cleanupFailure is not null) ExceptionDispatchInfo.Capture(cleanupFailure).Throw();
     }
 
     /// <summary>
@@ -74,8 +92,9 @@ internal sealed class TestEngineHost : IDisposable
         {
             if (storeCreated && !finished.Task.Wait(timeout))
                 throw new TimeoutException(
-                    "Upstream's history cleanup did not report finishing. If an upstream release reworded its " +
-                    "\"Combat history startup cleanup\" log entries, update TestEngineHost.HistoryCleanupWatcher.");
+                    "Upstream's history cleanup did not report finishing. Either the history store failed after " +
+                    "creating its database (see the test's own failure), or an upstream release reworded its " +
+                    "\"Combat history startup cleanup\" log entries: then update TestEngineHost.HistoryCleanupWatcher.");
         }
 
         public void Dispose()

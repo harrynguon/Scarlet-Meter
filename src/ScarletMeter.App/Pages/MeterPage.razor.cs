@@ -5,8 +5,8 @@ using ScarletMeter.Engine;
 namespace ScarletMeter.App.Pages;
 
 /// <summary>
-/// Live meter view. Polls the engine ten times a second on a background loop and renders the active fight;
-/// ping arrives by event from a capture thread. A failed refresh is logged and retried on the next tick, so
+/// Live meter view. Polls the engine ten times a second in a loop that resumes on the renderer's dispatcher
+/// (the UI thread) and renders the active fight; ping arrives by event from a capture thread. A failed refresh is logged and retried on the next tick, so
 /// the meter never freezes silently. Everything stops in <see cref="DisposeAsync"/>, which the window's
 /// deferred close awaits before the WebView goes away.
 /// </summary>
@@ -56,7 +56,9 @@ public partial class MeterPage : IAsyncDisposable
                     if (refreshFailing) Logger.LogInformation("Refreshing the meter works again.");
                     refreshFailing = false;
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+                // Only cancellation from disposal ends the loop; any other failure, an unrelated cancellation
+                // included, is logged and retried.
+                catch (Exception ex) when (ex is not OperationCanceledException || !stopping.IsCancellationRequested)
                 {
                     // Upstream's EntityTracker dictionaries are read here while the capture thread writes them,
                     // as in upstream's own UI, so a read can fail now and then. Keep the last snapshot and log

@@ -44,10 +44,12 @@ public partial class MainWindow : Window
         Closed += (_, _) => deferredClose.MarkClosed();
     }
 
+    // deferredClose is null when the constructor threw after WPF registered the window: App's Shutdown then
+    // closes the half-built window, which has no Blazor content to release.
     protected override void OnClosing(CancelEventArgs e)
     {
         base.OnClosing(e);
-        if (!e.Cancel)
+        if (!e.Cancel && deferredClose is not null)
             e.Cancel = deferredClose.ShouldCancelClose();
     }
 

@@ -20,8 +20,17 @@ internal sealed class TestDataDirectory : IDisposable
         var deadline = DateTime.UtcNow + DeleteTimeout;
         while (true)
         {
-            // Microsoft.Data.Sqlite pools connections; release them so the database file can be deleted.
-            SqliteConnection.ClearAllPools();
+            // Microsoft.Data.Sqlite pools connections; release them so the database file can be deleted. When
+            // SQLite itself is unusable (often the reason a test failed), this throws; delete regardless.
+            try
+            {
+                SqliteConnection.ClearAllPools();
+            }
+            catch (Exception)
+            {
+                // Nothing pooled can be holding the file then.
+            }
+
             try
             {
                 if (Directory.Exists(FullPath)) Directory.Delete(FullPath, recursive: true);
