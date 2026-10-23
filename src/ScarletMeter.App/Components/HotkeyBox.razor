@@ -1,0 +1,130 @@
+@using ScarletMeter.App.Settings
+@using ScarletMeter.App.Windows
+@implements IDisposable
+@*
+    Records a global shortcut: click the field, press the keys. Escape cancels, Backspace or Delete alone
+    clears. While recording, the current hotkey is unregistered so pressing it does not toggle the overlay.
+*@
+<div class="setting hotkey">
+    <span class="text">
+        <span class="label">@Label</span>
+        @if (Description is not null)
+        {
+            <span class="desc">@Description</span>
+        }
+    </span>
+    <div class="hotkey-field">
+        <input readonly
+               class="@(recording ? "recording" : "")"
+               value="@(recording ? "Press a shortcut..." : (string.IsNullOrEmpty(Value) ? "None" : Value))"
+               @onclick="StartRecording"
+               @onfocus="StartRecording"
+               @onblur="StopRecording"
+               @onkeydown="OnKeyDown"
+               @onkeydown:preventDefault="true" />
+        <button type="button" class="btn" @onclick="Clear" disabled="@string.IsNullOrEmpty(Value)">Clear</button>
+    </div>
+    @if ((error ?? Windows.HotkeyError) is { } message)
+    {
+        <span class="error">@message</span>
+    }
+</div>
+
+@code {
+    private bool recording;
+    private string? error;
+
+    [Inject] private IMeterWindows Windows { get; set; } = default!;
+
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+
+    [Parameter] public string? Description { get; set; }
+
+    [Parameter] public string Value { get; set; } = string.Empty;
+
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    protected override void OnInitialized() => Windows.HotkeyStatusChanged += OnHotkeyStatusChanged;
+
+    // Recording ends on blur, a key, Escape, Clear or disposal; the timeout is the backstop for a lost blur
+    // (focus leaving the whole window), so the real hotkey is never left suspended.
+    private static readonly TimeSpan RecordingTimeout = TimeSpan.FromSeconds(15);
+    private CancellationTokenSource? recordingTimeout;
+
+    private void StartRecording()
+    {
+        if (recording) return;
+        recording = true;
+        error = null;
+        Windows.SuspendHotkey(true);
+        recordingTimeout = new CancellationTokenSource();
+        _ = EndRecordingAfterTimeoutAsync(recordingTimeout.Token);
+    }
+
+    private void StopRecording()
+    {
+        if (!recording) return;
+        recording = false;
+        recordingTimeout?.Cancel();
+        recordingTimeout = null;
+        Windows.SuspendHotkey(false);
+    }
+
+    private async Task EndRecordingAfterTimeoutAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(RecordingTimeout, token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        await InvokeAsync(() =>
+        {
+            StopRecording();
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (!recording) return;
+        var bare = !e.CtrlKey && !e.AltKey && !e.ShiftKey && !e.MetaKey;
+        if (e.Code == "Escape" && bare)
+        {
+            StopRecording();
+            return;
+        }
+        if (e.Code is "Backspace" or "Delete" && bare)
+        {
+            StopRecording();
+            await ValueChanged.InvokeAsync(string.Empty);
+            return;
+        }
+        if (HotkeyGesture.TryFromBrowserKey(e.Code, e.CtrlKey, e.AltKey, e.ShiftKey, e.MetaKey, out var gesture, out var problem))
+        {
+            StopRecording();
+            await ValueChanged.InvokeAsync(gesture.ToString());
+        }
+        else if (problem is not null)
+        {
+            error = problem;
+        }
+    }
+
+    private async Task Clear()
+    {
+        StopRecording();
+        error = null;
+        await ValueChanged.InvokeAsync(string.Empty);
+    }
+
+    private void OnHotkeyStatusChanged(object? sender, EventArgs e) => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Windows.HotkeyStatusChanged -= OnHotkeyStatusChanged;
+        StopRecording();
+    }
+}
