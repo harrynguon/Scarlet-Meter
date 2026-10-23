@@ -2,6 +2,16 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Agent tooling: auditor and skills
+
+**What:** `.claude/agents/scarlet-auditor.md`, an independent read-only pre-merge reviewer (standard or deep pass, verdict with evidence), and three skills in `.claude/skills/`: `scarlet-ship` (worktree, checks, docs, PR, audit, CI, squash merge pinned to the tested commit), `scarlet-smoke` (driving the real app's pages through WebView2 remote debugging with `Smoke-Meter.ps1`, including `--demo`, seeded settings, alerts and the release notice) and `scarlet-upstream-update` (moving the upstream pin to a release and what to check). AGENTS.md "Review and merge" now names the auditor and the skills.
+
+**Why:** Harry asked for agents and skills that will be useful again. They capture the workflow used for PRs #2 to #8 and the pitfalls met on the way (DOM nodes in `Eval`, Razor's e-mail rule, PowerShell quoting, long paths, stacked PRs and docs conflicts).
+
+**Checks:** Markdown only, so no audit (AGENTS.md); CI. The skills' commands and selectors are the ones used in this session's smoke runs.
+
+**Next:** use them; correct a skill when a step it describes turns out wrong.
+
 ## 2026-10-24 — Upstream v1.11.5.341
 
 **What:** `upstream/` moves from release v1.11.4.334 (57974f8) to release v1.11.5.341 (aa3ffc6), published 2026-10-23, with `scripts/Update-Upstream.ps1`. Upstream's changes that reach Scarlet:
