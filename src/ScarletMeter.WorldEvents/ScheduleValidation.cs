@@ -22,6 +22,15 @@ public static class ScheduleValidation
     /// <summary>Highest accepted server offset, UTC+14.</summary>
     public static TimeSpan MaximumServerOffset { get; } = TimeSpan.FromHours(14);
 
+    /// <summary>
+    /// Most entries <see cref="ValidateRules"/> examines: twice the catalog. A longer list gets one error, so
+    /// hostile input cannot make validation slow or its result large.
+    /// </summary>
+    public static int MaximumEntries { get; } = 2 * EventCatalog.Ids.Count;
+
+    /// <summary>Most errors <see cref="ValidateRules"/> returns; when there are more, the last one says so.</summary>
+    public const int MaximumReportedErrors = 50;
+
     // Constant messages, so the calculations' precondition check allocates nothing.
     private const string BasisMessage = "Choose UTC or server time.";
     private const string HoursMessage = "Hours must be one or more of 0–23.";
@@ -39,11 +48,14 @@ public static class ScheduleValidation
     /// unknown entries are reported), a defined clock, at least one hour and only 0–23, days null or at least
     /// one and only 0–6, minute 0–59, duration 0–1440, entry window 0 to the duration, activity from the duration
     /// to 1440, and an activity length for the rift. Kinds come from the catalog, not from the input. Empty
-    /// means valid. Unsorted or repeated hours and days are not errors: rules normalise them.
+    /// means valid. Unsorted or repeated hours and days are not errors: rules normalise them. The work and the
+    /// result are bounded: more than <see cref="MaximumEntries"/> entries get a single error, and at most
+    /// <see cref="MaximumReportedErrors"/> errors are returned.
     /// </summary>
     public static IReadOnlyList<ScheduleError> ValidateRules(IReadOnlyList<EventRule>? rules)
     {
         if (rules is null) return [new ScheduleError(null, "The schedule has no entries.")];
+        if (rules.Count > MaximumEntries) return [new ScheduleError(null, "The schedule has too many entries.")];
 
         var errors = new List<ScheduleError>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -70,6 +82,12 @@ public static class ScheduleValidation
         foreach (var id in EventCatalog.Ids)
         {
             if (!seen.Contains(id)) errors.Add(new ScheduleError(id, "The schedule is missing this entry."));
+        }
+
+        if (errors.Count > MaximumReportedErrors)
+        {
+            errors.RemoveRange(MaximumReportedErrors - 1, errors.Count - MaximumReportedErrors + 1);
+            errors.Add(new ScheduleError(null, "The schedule has more problems than are listed."));
         }
 
         return errors;

@@ -24,8 +24,10 @@ Record the tested commit, observation date and Windows configuration. Pending:
 The overlay that shows the notices is a separate change. Wiring notes for it:
 
 - Call `AlertPlanner.Plan` when the overlay opens, at `AlertPlan.NextChange`, and whenever the enabled set, lead time, server offset or rules change; between calls, count down to each alert's `Deadline` locally. Pass the current instant in; the module never reads the clock.
+- A timer set for `NextChange` does not notice the PC resuming from sleep or its clock being changed. Cap the wait (for example at one minute) and re-plan on resume and on a system time change, so a missed change is corrected within the cap.
 - The app will then reference this module as well as the engine: update AGENTS.md ("Upstream boundary", which says the app references the engine only) and ARCHITECTURE.md in that change. The boundary tests forbid upstream references, not Scarlet modules, so they keep passing.
 - Persisting the enabled ids, the lead time, the server offset and any rule overrides is the app's: validate with `ScheduleValidation` and merge with `EventCatalog.TryApplyOverrides` on load, and preserve a player's saved rules when the presets change.
+- Bound the settings file's size before deserialising it: validation bounds its own work (at most 18 entries examined, 50 errors returned), but not the cost of parsing a huge file. The `overlay-settings` branch's `SettingsStore` already refuses a `settings.json` over 1 MB (`MaxFileBytes`) before reading it.
 
 ## Next: world-event times in game
 

@@ -248,4 +248,18 @@ public sealed class EventScheduleTests
 
         Assert.Throws<ArgumentException>(() => EventSchedule.Timeline([Global(EventIds.Shugo), null!], At("2026-10-23T00:00:00Z"), Asia));
     }
+
+    [Fact]
+    public void InstantsOutsideDateTimeOffsetsRangeThrow()
+    {
+        // The next start must be representable; a day before the upper limit, the next Wednesday is in the year 10000.
+        var nearMax = DateTimeOffset.MaxValue.AddDays(-1);
+        Assert.Throws<ArgumentOutOfRangeException>(() => EventSchedule.Occurrence(Global(EventIds.Weekly), nearMax, Asia));
+        Assert.Throws<ArgumentOutOfRangeException>(() => AlertPlanner.Plan(EventCatalog.Global, EventCatalog.Ids.ToHashSet(), nearMax, Asia));
+
+        // At the lower limit both presets work, but a window that opened before it and is still running cannot be returned.
+        Assert.Equal(18, EventSchedule.Timeline([.. EventCatalog.Global, .. EventCatalog.Legacy], DateTimeOffset.MinValue, Asia).Count);
+        var lateLongWindow = new EventRule("x", "X", "Somewhere", EventKind.Event, ScheduleBasis.Utc, null, [23], 0, 120);
+        Assert.Throws<ArgumentOutOfRangeException>(() => EventSchedule.Occurrence(lateLongWindow, DateTimeOffset.MinValue.AddMinutes(30), Asia));
+    }
 }

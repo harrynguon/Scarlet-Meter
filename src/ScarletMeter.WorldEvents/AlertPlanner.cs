@@ -77,7 +77,11 @@ public static class AlertPlanner
     /// <param name="now">The instant to plan for, in any offset.</param>
     /// <param name="serverOffset">The game server's fixed UTC offset.</param>
     /// <param name="leadTime">How long before a start Soon appears: <see cref="MinimumLeadTime"/> to <see cref="MaximumLeadTime"/>.</param>
-    /// <exception cref="ArgumentOutOfRangeException">The lead time or the server offset is out of range.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The lead time or the server offset is out of range, or an enabled rule's instants lie outside
+    /// <see cref="DateTimeOffset"/>'s range: <paramref name="now"/> within a week of <see cref="DateTimeOffset.MaxValue"/>
+    /// (see <see cref="EventSchedule.Occurrence"/>).
+    /// </exception>
     /// <exception cref="ArgumentException">An enabled rule cannot be scheduled, or a rule is null.</exception>
     public static AlertPlan Plan(
         IReadOnlyList<EventRule> rules,

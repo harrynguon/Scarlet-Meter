@@ -46,10 +46,27 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 - The game: the times are not verified against Global Asia / Nezekan (HANDOFF.md, "Next: world-event times in game").
 - The overlay, which is not built here.
-- Instants within a week of `DateTimeOffset`'s limits, which throw.
+- Instants next to `DateTimeOffset`'s limits. Correction (audit): this was not checked when the entry was first written. The test added during the audit (below) shows which limits throw.
 - Regions with daylight saving: the offset is fixed, as in the fork.
 
-**Next:** review, CI, the player's go-ahead and a squash merge. The overlay change then wires `AlertPlanner` into the app and updates AGENTS.md, where the app references the engine only (HANDOFF.md, "Next: world-event notices"). Then settings persistence for the enabled ids, lead time, offset and overrides, and in-game verification.
+**Audit (PR 3, standard pass with a deeper look at validation):** approve with nits. Applied:
+
+- M1, merge coverage: mutating the merge to take the catalog's days or minute left every test green. `CustomScheduleValuesAreKept` now changes every editable field (basis, days added and removed, hours, minute, duration, entry minutes, and the rift's active minutes) and asserts each survives. With the test extended, both mutations fail it; they were then reverted.
+- M2, bounded validation: a list of 1,000,000 entries used to return 1,000,009 errors. `ValidateRules` now returns a single "too many entries" error for more than `MaximumEntries` (18, twice the catalog), and at most `MaximumReportedErrors` (50) errors, the last saying more exist. `HostileInputGetsABoundedAnswer` covers both bounds, and removing either cap fails it. HANDOFF.md now says the host must bound the settings file before deserialising; the `overlay-settings` branch's `SettingsStore` refuses a `settings.json` over 1 MB.
+- N1, range limits: the XML docs and ARCHITECTURE.md now list `ArgumentOutOfRangeException` for instants outside `DateTimeOffset`'s range. The new test `InstantsOutsideDateTimeOffsetsRangeThrow` shows when it happens:
+  - a `now` within a week of `MaxValue` throws, because the next start cannot be represented;
+  - both presets work at `MinValue`;
+  - a custom window that opened before `MinValue` and is still running throws as well.
+  This last case is slightly wider than the audit's note that `MinValue` does not throw.
+- N2: `Timeline`'s id tiebreak is documented as ordinal. The fork uses `localeCompare`, which orders the catalog's lowercase ASCII ids the same way.
+- N3: HANDOFF.md now says an overlay waiting for `NextChange` must cap the wait (for example at a minute) and re-plan after resume from sleep or a clock change.
+
+Re-run after the fixes:
+
+- `scripts/Build.ps1` Debug: 0 warnings, 0 errors, 114 tests passed (90 new).
+- `scripts/Build.ps1 -Configuration Release`: 0 warnings, 0 errors, 114 passed. The build was incremental, so upstream was not recompiled and its 6 known warnings did not reappear.
+
+**Next:** CI on the audit fixes, the player's go-ahead and a squash merge. The overlay change then wires `AlertPlanner` into the app and updates AGENTS.md, where the app references the engine only (HANDOFF.md, "Next: world-event notices"). Then settings persistence for the enabled ids, lead time, offset and overrides, and in-game verification.
 
 ## 2026-10-23 — Review fixes
 

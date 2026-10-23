@@ -112,6 +112,28 @@ public sealed class ScheduleValidationTests
     }
 
     [Fact]
+    public void HostileInputGetsABoundedAnswer()
+    {
+        var tooMany = new ScheduleError(null, "The schedule has too many entries.");
+        Assert.Equal(2 * EventCatalog.Ids.Count, ScheduleValidation.MaximumEntries);
+        Assert.Equal([tooMany], ScheduleValidation.ValidateRules(Enumerable.Repeat(Global(EventIds.Shugo), 1_000_000).ToList()));
+        Assert.Equal([tooMany], ScheduleValidation.ValidateRules([.. EventCatalog.Global, .. EventCatalog.Global, Global(EventIds.Rift)]));
+
+        // Up to the limit every entry is examined: nine duplicates.
+        Assert.Equal(9, ScheduleValidation.ValidateRules([.. EventCatalog.Global, .. EventCatalog.Global]).Count);
+
+        // Every value wrong on every entry is 63 problems, cut to the limit with a final note.
+        var broken = EventCatalog.Global.Select(rule => rule with
+        {
+            Basis = (ScheduleBasis)9, Hours = [], Days = [7], Minute = 60, DurationMinutes = -1, EntryMinutes = -1, ActiveMinutes = 2000,
+        }).ToList();
+        var errors = ScheduleValidation.ValidateRules(broken);
+        Assert.Equal(ScheduleValidation.MaximumReportedErrors, errors.Count);
+        Assert.Equal(new ScheduleError(null, "The schedule has more problems than are listed."), errors[^1]);
+        Assert.All(errors.Take(errors.Count - 1), error => Assert.NotNull(error.RuleId));
+    }
+
+    [Fact]
     public void AnUnknownIdIsReportedWithoutEchoingIt()
     {
         const string untrusted = "<script>alert(1)</script>";
@@ -163,10 +185,30 @@ public sealed class ScheduleValidationTests
     [Fact]
     public void CustomScheduleValuesAreKept()
     {
+        // Every editable field differs from the catalog on some entry, including days removed (Nahma) and added (Kaira).
         var saved = WithChange(EventCatalog.Legacy, EventIds.Daily, rule => rule with { Hours = [18] });
+        saved = WithChange(saved, EventIds.Kaira, rule => rule with
+        {
+            Basis = ScheduleBasis.Server, Days = [2, 4], Hours = [5], Minute = 15, DurationMinutes = 20, EntryMinutes = 5,
+        });
+        saved = WithChange(saved, EventIds.Nahma, rule => rule with { Basis = ScheduleBasis.Utc, Days = null, Minute = 45 });
+        saved = WithChange(saved, EventIds.Rift, rule => rule with
+        {
+            Basis = ScheduleBasis.Server, Days = [1], Minute = 5, DurationMinutes = 12, EntryMinutes = 8, ActiveMinutes = 45,
+        });
+
         Assert.True(EventCatalog.TryApplyOverrides(saved, out var rules, out _));
         Assert.Equal(saved, rules);
-        Assert.Equal([18], rules.Single(rule => rule.Id == EventIds.Daily).Hours);
+        var byId = rules.ToDictionary(rule => rule.Id);
+        Assert.Equal([18], byId[EventIds.Daily].Hours);
+        var kaira = byId[EventIds.Kaira];
+        Assert.Equal((ScheduleBasis.Server, 15, 20, (int?)5), (kaira.Basis, kaira.Minute, kaira.DurationMinutes, kaira.EntryMinutes));
+        Assert.Equal([2, 4], kaira.Days!);
+        Assert.Equal([5], kaira.Hours);
+        Assert.Equal((ScheduleBasis.Utc, (IReadOnlyList<int>?)null, 45), (byId[EventIds.Nahma].Basis, byId[EventIds.Nahma].Days, byId[EventIds.Nahma].Minute));
+        var rift = byId[EventIds.Rift];
+        Assert.Equal((ScheduleBasis.Server, 5, 12, (int?)8, (int?)45), (rift.Basis, rift.Minute, rift.DurationMinutes, rift.EntryMinutes, rift.ActiveMinutes));
+        Assert.Equal([1], rift.Days!);
     }
 
     [Fact]

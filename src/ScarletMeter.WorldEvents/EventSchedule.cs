@@ -63,7 +63,12 @@ public static class EventSchedule
     /// duration of 0 is never active (resets, unknown boss end times).
     /// </summary>
     /// <exception cref="ArgumentException">The rule fails <see cref="ScheduleValidation.ValidateRules"/>'s value checks.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">The server offset fails <see cref="ScheduleValidation.ValidateServerOffset"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The server offset fails <see cref="ScheduleValidation.ValidateServerOffset"/>, or an instant to return lies
+    /// outside <see cref="DateTimeOffset"/>'s range: the next start when <paramref name="now"/> is within a week of
+    /// <see cref="DateTimeOffset.MaxValue"/>, or the start of a window still running within a day of
+    /// <see cref="DateTimeOffset.MinValue"/> (the presets are fine at MinValue itself).
+    /// </exception>
     public static EventOccurrence Occurrence(EventRule rule, DateTimeOffset now, TimeSpan serverOffset)
     {
         ScheduleValidation.ThrowIfUnschedulable(rule, nameof(rule));
@@ -104,10 +109,11 @@ public static class EventSchedule
 
     /// <summary>
     /// Every rule's occurrence at <paramref name="now"/>, active ones first, then by time remaining, then by id
-    /// (ordinal), as the fork's <c>timeline()</c> orders them. Simultaneous events are all kept.
+    /// (ordinal). The fork's <c>timeline()</c> breaks ties with <c>localeCompare</c>, which orders the catalog's
+    /// lowercase ASCII ids the same way. Simultaneous events are all kept.
     /// </summary>
     /// <exception cref="ArgumentException">A rule is null or cannot be scheduled.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">The server offset is invalid.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The server offset is invalid, or an instant lies outside <see cref="DateTimeOffset"/>'s range (see <see cref="Occurrence"/>).</exception>
     public static IReadOnlyList<EventOccurrence> Timeline(IReadOnlyList<EventRule> rules, DateTimeOffset now, TimeSpan serverOffset)
     {
         ArgumentNullException.ThrowIfNull(rules);
@@ -178,6 +184,6 @@ public static class EventSchedule
         return false;
     }
 
-    // Throws ArgumentOutOfRangeException within a week of DateTimeOffset's limits, which no real clock reaches.
+    // Throws ArgumentOutOfRangeException for ticks outside DateTimeOffset's range (see Occurrence); no real clock gets there.
     private static DateTimeOffset Utc(long ticks) => new(ticks, TimeSpan.Zero);
 }
