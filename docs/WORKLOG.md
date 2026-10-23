@@ -6,7 +6,8 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **What:** `upstream/` moves from release v1.11.4.334 (57974f8) to release v1.11.5.341 (aa3ffc6), published 2026-10-23, with `scripts/Update-Upstream.ps1`. Upstream's changes that reach Scarlet:
 
-- Boss data: "Fixed incorrect reading of some bosses max hp" (`MobPacketProcessor`, and a new `PacketReader.ReadVarInt64`). Taken as is; the engine's mapping is unchanged.
+- Boss data: "Fixed incorrect reading of some bosses max hp". `MobPacketProcessor` replaces its byte-scanning heuristic with a structured parse: HP and max HP are 64-bit varints (the new `PacketReader.ReadVarInt64`), still handed on as `long`, which the engine maps whole (`TargetInfo.HpCurrent`/`HpTotal`, a new test above the `int` range). Taken as is.
+- The same rewrite changes how a summon's owner is read (a `u32` from the structured parse instead of a scanned `ushort`, feeding `EntityTracker.RegisterSummon`), no longer requires current HP to be at least max HP before a mob is created, and stops creating target entries for player summons. A layout it does not expect now throws `PacketParseException`, which upstream's dispatcher logs at Error level and drops that packet only.
 - "My Style" colours for the player's own name and bar: eight new `IAppSettingsService` members used only by upstream's UI. The interface change stopped the engine compiling, as designed; `UpstreamSettingsBridge` implements them as inert in-memory values with upstream's defaults.
 - Not used here: upstream's UI changes, and the `appsettings.user.json` it removed from its repository.
 
@@ -14,13 +15,15 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Checks (SDK 10.0.402):**
 
-- `scripts/Build.ps1`, Debug and Release: 174/174. Release shows five compiler warnings, all in upstream's own code (`ServerMap`, `FilePacketCaptureDevice`, `DotDamagePacketProcessor`, `PartyProcessor`), none in Scarlet's.
+- `scripts/Build.ps1`, Debug and Release: 174/174 before the audit, 175/175 after (`BossHpBeyondTheIntRangeIsMappedWhole`). Release shows five compiler warnings, all in upstream's own code (`ServerMap`, `FilePacketCaptureDevice`, `DotDamagePacketProcessor`, `PartyProcessor`), none in Scarlet's.
 - A self-contained single-file publish (the CI command) and `Test-PublishLayout.ps1`: complete.
 - The published `ScarletMeter.exe` with `--no-capture` and a throwaway data directory (`Smoke-Meter.ps1`): the overlay opened ("Capture is off"), upstream registered its 15 opcode processor mappings, no warnings in the log, exit code 0.
 
-**Not checked:** the boss HP fix itself, which needs the game (HANDOFF.md, in-game acceptance).
+**Not checked:** the boss HP fix and the rewritten summon-owner parsing, which need the game (HANDOFF.md, in-game acceptance). After the first session, look for `PacketParseException` errors in `logs/scarlet-*.log`: each unexpected mob packet logs one.
 
-**Next:** PR, deep audit (it touches packet parsing), CI and merge.
+**Audit (pr-auditor, deep pass): approve with nits.** Pin, release and an unmodified submodule confirmed; the HP path has no narrowing; no new registration, game data, package or capture-to-disk change reaches Scarlet. Applied: the summon parsing change above and an in-game item for it, a test for boss HP above the `int` range, and the example tag in `Update-Upstream.ps1`. Left as a follow-up: upstream now starts WebView2 with background and occlusion throttling turned off (`ConfigureWebView2Arguments` in its UI); whether Scarlet's overlay needs the same is untested.
+
+**Next:** CI and merge.
 
 ## 2026-10-24 — World event notices in the overlay
 

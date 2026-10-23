@@ -15,6 +15,8 @@ Record the tested commit, observation date and Windows configuration. Pending:
 - [ ] Normal launch with Npcap finds the game's connection ("[CAPTURE] !!! LOCKED !!!" in the log) and the header leaves "Waiting for the game's connection...".
 - [ ] Hits on a mob populate rows; party DPS, duration and HP bar move; ping shows.
 - [ ] A boss's HP bar starts full and reaches zero at its kill (upstream v1.11.5.341 fixed the max HP of some bosses); note any boss whose bar does not.
+- [ ] A summon's damage (an Elementalist's spirit, for example) lands on its owner's row, not on an unnamed player: v1.11.5.341 rewrote how a summon's owner is read.
+- [ ] After a session, `logs/scarlet-*.log` holds no stream of `PacketParseException` errors from mob packets.
 - [ ] Reset clears the fight; a new pull starts fresh. With a summon out across the reset, its damage still lands on its owner's row, not on an unnamed player.
 - [ ] Without Npcap (or with it uninstalled), a normal launch shows the "Install Npcap" dialog and exits.
 - [ ] Close the window during a fight: no crash, a completed boss fight appears in `combat-history.db`.
