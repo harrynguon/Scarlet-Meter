@@ -57,7 +57,9 @@ Design decisions:
 - Live capture and the game. Demo mode does not exercise upstream's packet decoders.
 - Whether real summons, buff descriptions and icons arrive as the demo models them. The demo follows upstream's processors as read in v1.11.4.334 (HANDOFF.md, acceptance).
 - `GetHistory` under concurrent capture load (the database query under the session lock).
-- CI on this branch (pending the PR).
+- No independent audit has been run on this PR.
+
+**CI:** PR 5 at 9cf4835 passed: push run 40002328567 in 2m22s and pull_request run 40002336279 in 2m16s, including the published-layout check.
 
 **Upstream quirks, new candidates to offer upstream:**
 
