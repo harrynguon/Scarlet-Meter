@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using ScarletMeter.App.Alerts;
 using ScarletMeter.App.Settings;
+using ScarletMeter.App.Updates;
 using ScarletMeter.App.Windows;
 using ScarletMeter.Engine;
 using ScarletMeter.WorldEvents;
@@ -29,6 +30,10 @@ public partial class SettingsPage : IDisposable
 
     [Inject] private AlertMonitor Alerts { get; set; } = default!;
 
+    [Inject] private UpdateNotice Updates { get; set; } = default!;
+
+    [Inject] private BuildInfo Build { get; set; } = default!;
+
     [Inject] private IMeterWindows Windows { get; set; } = default!;
 
     [Inject] private EngineOptions Options { get; set; } = default!;
@@ -47,6 +52,7 @@ public partial class SettingsPage : IDisposable
         Settings.Changed += OnSettingsChanged;
         Settings.SaveStatusChanged += OnSaveStatusChanged;
         Alerts.Changed += OnAlertsChanged;
+        Updates.Changed += OnUpdatesChanged;
     }
 
     private void Change(Func<MeterSettings, MeterSettings> change) => Settings.Update(change);
@@ -128,6 +134,25 @@ public partial class SettingsPage : IDisposable
     // Saves run on a timer thread; a failure (or recovery) re-renders the notice at once.
     private void OnSaveStatusChanged(object? sender, EventArgs e) => _ = InvokeAsync(StateHasChanged);
 
+    // The About tab's release line: what the last check found, in plain words. Reason texts are the checker's.
+    private string UpdateStatus => !S.Updates.CheckUpstreamReleases ? "Checking is off."
+        : Updates.Result switch
+        {
+            null => "Not checked yet; the first check runs shortly after the meter starts.",
+            UpstreamReleaseCheckResult.UpToDate up => $"Up to date: {up.LatestRelease} is the latest release{Checked}.",
+            UpstreamReleaseCheckResult.NewerAvailable newer =>
+                $"{newer.Tag} is out{(newer.PublishedAt is { } at ? $" (published {at.ToLocalTime():d MMM})" : "")}; this build is on {newer.PinnedRelease}{Checked}.",
+            UpstreamReleaseCheckResult.Unknown unknown => $"Could not check: {unknown.Reason}",
+            _ => string.Empty,
+        };
+
+    private string Checked => Updates.CheckedAt is { } at ? $" (checked {EventText.LocalTime(at)})" : string.Empty;
+
+    private void OnUpdatesChanged(object? sender, EventArgs e)
+    {
+        if (current == "About") _ = InvokeAsync(StateHasChanged);
+    }
+
     // Keeps the Alerts tab's "next" times current; other tabs show nothing that moves.
     private void OnAlertsChanged(object? sender, EventArgs e)
     {
@@ -140,5 +165,6 @@ public partial class SettingsPage : IDisposable
         Settings.Changed -= OnSettingsChanged;
         Settings.SaveStatusChanged -= OnSaveStatusChanged;
         Alerts.Changed -= OnAlertsChanged;
+        Updates.Changed -= OnUpdatesChanged;
     }
 }

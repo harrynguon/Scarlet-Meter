@@ -1,0 +1,80 @@
+@*
+    A player's skills, highest damage first, with RATmeter's columns. A summon group (its pet's skills folded
+    under the owner's class skill) expands to show each child skill. Rates are rounded percentages.
+*@
+<table class="grid-table skills">
+    <thead>
+        <tr>
+            <th></th>
+            <th class="left">Skill</th>
+            <th title="Specialization flags">Spec</th>
+            <th>Hits</th>
+            <th>Crit</th>
+            <th>Back</th>
+            <th>Front</th>
+            <th>Perf</th>
+            <th>x2</th>
+            <th>Parry</th>
+            <th>Avg</th>
+            <th>Min</th>
+            <th>Max</th>
+            <th class="bar-col">Damage</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var skill in Skills)
+        {
+            var expandable = skill.SummonChildren.Count > 0;
+            <tr class="@(expandable ? "expandable" : "")" @onclick="() => Toggle(skill)">
+                @Row(skill, child: false, expandable)
+            </tr>
+            @if (expandable && expanded.Contains(skill.SkillId))
+            {
+                foreach (var child in skill.SummonChildren)
+                {
+                    <tr class="child">@Row(child, child: true, expandable: false)</tr>
+                }
+            }
+        }
+    </tbody>
+</table>
+
+@code {
+    private readonly HashSet<long> expanded = [];
+
+    [Parameter, EditorRequired] public IReadOnlyList<SkillRow> Skills { get; set; } = [];
+
+    [Parameter] public bool IconsEnabled { get; set; } = true;
+
+    private void Toggle(SkillRow skill)
+    {
+        if (skill.SummonChildren.Count == 0) return;
+        if (!expanded.Remove(skill.SkillId)) expanded.Add(skill.SkillId);
+    }
+
+    private RenderFragment Row(SkillRow skill, bool child, bool expandable) => __builder =>
+    {
+        <td class="icon-cell">@if (SkillIcons.Url(skill.Icon, IconsEnabled) is { } url) { <img src="@url" alt="" /> }</td>
+        <td class="left skill-name">
+            @if (child) { <span class="child-rail">&#x2514;</span> }
+            @if (expandable) { <span class="chevron @(expanded.Contains(skill.SkillId) ? "open" : "")">&#x25B8;</span> }
+            @if (skill.IsDot) { <span class="tag">DoT</span> }
+            @skill.Name
+        </td>
+        <td><span class="spec">@foreach (var on in skill.SpecializationFlags) { <i class="@(on ? "on" : "")"></i> }</span></td>
+        <td>@DetailFormat.Full(skill.Hits)</td>
+        <td>@DetailFormat.Rate(skill.Rates.Critical)</td>
+        <td>@DetailFormat.Rate(skill.Rates.BackAttack)</td>
+        <td>@DetailFormat.Rate(skill.Rates.FrontAttack)</td>
+        <td>@DetailFormat.Rate(skill.Rates.Perfect)</td>
+        <td>@DetailFormat.Rate(skill.Rates.DoubleDamage)</td>
+        <td>@DetailFormat.Rate(skill.Rates.Parry)</td>
+        <td>@Compact.Number(skill.AverageHit)</td>
+        <td>@DetailFormat.Full(skill.MinHit)</td>
+        <td>@DetailFormat.Full(skill.MaxHit)</td>
+        <td class="bar-col">
+            <span class="cell-bar" style="width:@Compact.Percent(skill.DamageShare)"></span>
+            <span class="cell-bar-text">@Compact.Number(skill.TotalDamage) <small>@Compact.Percent(skill.DamageShare)</small></span>
+        </td>
+    };
+}
