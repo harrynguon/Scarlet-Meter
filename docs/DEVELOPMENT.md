@@ -1,6 +1,6 @@
 # Development
 
-Requires Windows, the .NET 10 SDK, the WebView2 runtime (ships with Windows 11), Git, and for live capture [Npcap](https://npcap.com) installed with "Install Npcap in WinPcap API-compatible Mode". Tests and `--no-capture` do not need Npcap.
+Requires Windows, the .NET 10 SDK, the WebView2 runtime (ships with Windows 11), Git, and for live capture [Npcap](https://npcap.com) installed with "Install Npcap in WinPcap API-compatible Mode". Tests, `--no-capture` and `--demo` do not need Npcap.
 
 ## Clone and build
 
@@ -24,11 +24,18 @@ The script uses the `dotnet` on PATH and insists on a .NET 10 SDK. When another 
 
 ```powershell
 dotnet run --project "<checkout>\src\ScarletMeter.App\ScarletMeter.App.csproj" -- --no-capture
+dotnet run --project "<checkout>\src\ScarletMeter.App\ScarletMeter.App.csproj" -- --demo
 ```
 
-Switches: `--no-capture` opens the window without Npcap (status reads "Capture is off"); `--data-dir <absolute path>` moves everything the meter writes (history database, logs, WebView2 profile) for a session, for example to keep a test run away from real data. Anything else is rejected with a dialog.
+Switches:
 
-Data and logs: `%LocalAppData%\ScarletMeter` (`combat-history.db`, `settings.json` and its `.bak`, `logs\scarlet-<date>.log`, `backgrounds\`, `webview2\`). The log is where "[CAPTURE] !!! LOCKED !!!" appears once upstream's capture finds the game's connection.
+- `--no-capture` opens the window without Npcap (status reads "Capture is off").
+- `--demo` opens it without Npcap on synthetic fights, for UI work: a party of four ("Demo Gladiator", the user, "Demo Cleric", "Demo Ranger", "Demo Elementalist" with a fire spirit) fights one boss after another, each fight lasting about 60 to 90 seconds with crits, back attacks, DoTs, summon damage, buffs, ping and falling boss HP, then saved to history; the next starts ten seconds later. Capture reads as running on adapter "Demo". Demo fights go to `demo-history.db`, never to the real `combat-history.db`. It cannot be combined with `--no-capture`. It exercises fight tracking, details and history, not packet decoding (docs/ARCHITECTURE.md, "Demo mode").
+- `--data-dir <absolute path>` moves everything the meter writes (history database, logs, WebView2 profile) for a session, for example to keep a test run away from real data.
+
+Anything else is rejected with a dialog.
+
+Data and logs: `%LocalAppData%\ScarletMeter` (`combat-history.db`, `demo-history.db` after a demo run, `settings.json` and its `.bak`, `logs\scarlet-<date>.log`, `backgrounds\`, `webview2\`). The log is where "[CAPTURE] !!! LOCKED !!!" appears once upstream's capture finds the game's connection.
 
 A startup failure (a data directory that cannot be created, missing game data, an unusable history database, capture that cannot start) shows a dialog and exits with code 1. Once the host (and with it the log) exists it is also logged, at Critical (Error for capture).
 
