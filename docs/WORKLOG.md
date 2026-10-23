@@ -2,6 +2,67 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Overlay, settings and hotkey
+
+**What:** The first of the feature PRs Harry asked for (details, history, settings, fight options, an updater and world event alerts).
+
+- **Window layer:** a shared `ScarletWindow` replaces the XAML `MainWindow`.
+- **Overlay:** chromeless and transparent. It is dragged by its header (posted `WM_NCLBUTTONDOWN`), resized from its edges (`WindowChrome`), and has reset, settings, minimize and close buttons and a ping indicator.
+- **Tool windows:** dark-framed and owned by the overlay; the settings window is the first.
+- **Hotkey:** global, `Ctrl+Shift+D` by default as in RATmeter; it minimizes or restores the meter.
+- **Window positions** are remembered.
+- **`settings.json`:**
+  - validation in `SettingsNormalizer`
+  - atomic save with a `.bak` of the previous save
+  - an unreadable file is kept aside, never deleted
+  - a file from a newer build is never overwritten
+  - live application, with fight options mirrored into `EngineSettings`
+- **Appearance:**
+  - background opacity (background only, so text stays solid)
+  - background picture (imported into the data directory, served through a WebView2 virtual host)
+  - RATmeter's class gradients and class icons (copied from upstream's UI at build time, never edited)
+  - relative bars, deaths, RATmeter-compatible name masking, row size
+- **Security:** a Content-Security-Policy on the page; the EF Core SQL log lowered to Warning.
+- **`scripts/Smoke-Meter.ps1`:** drives the built meter's pages through WebView2 remote debugging, for UI checks without the game.
+- **Docs:** ARCHITECTURE "Windows", "Settings", "Image hosts".
+
+**Why:** Harry asked for RATmeter's settings screen, fight switches and window handling in Scarlet, with heavy inspiration from RATmeter. An Explore survey of upstream's UI supplied its exact behaviour: gradients, masking, hotkey default and toggle semantics, ping bands. Two deliberate differences from RATmeter:
+
+- Opacity fades only the background. RATmeter fades the whole content.
+- The background picture is actually displayed. RATmeter's setting is stored but never rendered.
+
+The overlay is the base the alerts and other windows build on.
+
+**Checks (SDK 10.0.402):**
+
+- `scripts/Build.ps1`, Debug and Release: 0 warnings in Scarlet's projects (6 in upstream's, as before), 61 tests passed (37 new settings and formatting tests).
+- Smoke runs through `Smoke-Meter.ps1` on the Debug build:
+  - The overlay rendered "Capture is off"; clicking ⚙ opened the settings window with its four tabs.
+  - A real mouse drag on the header moved the overlay by exactly (120, 60) and (−150, 40).
+  - Clicking the Class colours row and moving the opacity slider to 40%:
+    - the overlay's `--panel-alpha` became 0.4 live
+    - `settings.json` held `classColors: false` and `backgroundOpacity: 0.4` within a second
+  - A second run on the same data directory restored the overlay at the saved position and size (1370, 606, 400×260) and opacity 0.4.
+  - Real `Ctrl+Shift+D` key presses minimized and then restored the overlay (UI Automation window state).
+  - Closing through the page's ✕ with the settings window open:
+    - exit code 0
+    - no warning or error in the log
+    - the UI-thread WebView2 disposal fallback logged
+  - A screen capture at 50% opacity showed the desktop through the panel (not committed).
+- Release self-contained single-file publish:
+  - `Test-PublishLayout.ps1` passed; class icons are now checked.
+  - In the published exe, `https://assets.scarlet.example/classes/11.png` and a background picture placed in `<data dir>\backgrounds` loaded (40 px wide).
+  - `--panel-image` pointed at the data host.
+  - An image from `https://example.com` was blocked by the policy.
+
+**Not checked:**
+
+- The file picker dialog itself (`BackgroundImages.Import` is unit-tested; the dialog was not driven).
+- The game: the overlay over a borderless game window, the hotkey while the game has focus, and DPI scaling or multiple monitors.
+- Rows with real players (the demo mode comes with the engine PR).
+
+**Next:** the engine, events and update-check PRs (in progress), then the details, history, alerts and update-notice UI on top of this.
+
 ## 2026-10-23 — Review fixes
 
 **What:** Applied the bootstrap review: 15 findings, 8 confirmed by independent verifiers and 7 more judged real when verification was cut short by a usage limit.

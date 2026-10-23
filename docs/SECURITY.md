@@ -2,7 +2,11 @@
 
 Never embed, print, log or commit credentials, tokens, game authentication data, personal progress, packet captures or private combat logs. Use synthetic fixtures. Treat anything read from the network or from files as untrusted; upstream validates packet fields before use, and the engine validates paths at its boundary.
 
-Filesystem operations use absolute paths derived from trusted roots (AGENTS.md, "Paths"). The meter writes only under its data directory (per-user by default, or `--data-dir`): history database, logs and the WebView2 browser profile (ARCHITECTURE.md, "Storage").
+Filesystem operations use absolute paths derived from trusted roots (AGENTS.md, "Paths"). The meter writes only under its data directory (per-user by default, or `--data-dir`): history database, settings, logs, the imported background picture and the WebView2 browser profile (ARCHITECTURE.md, "Storage").
+
+`settings.json` is untrusted input: it passes one validation boundary (`SettingsNormalizer`), is size-limited, and can only name a background picture the meter itself imported, so it cannot point the page at another file. A damaged file is kept aside, never deleted, and a file from a newer build is never overwritten (ARCHITECTURE.md, "Settings"). The pages reach local images only through two WebView2 virtual hosts that each map a single folder (the backgrounds folder and the class icons beside the executable), never the database, logs or settings, and a Content-Security-Policy limits images to those hosts, the app and NC's game-data CDN. Player names from the network are rendered as text (Blazor escapes them).
+
+`scripts/Smoke-Meter.ps1` opens a WebView2 remote-debugging port on localhost for the duration of a test run only; the meter itself never enables it. Do not run the script against a data directory holding real data.
 
 Raw packet logging, which upstream offers as a developer setting and which writes other players' data to disk, is not reachable here: the settings bridge reports it off and no packet writer is registered. The history database still stores other players' names and combat statistics for completed boss fights, as upstream does.
 

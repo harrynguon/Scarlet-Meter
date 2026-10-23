@@ -28,11 +28,28 @@ dotnet run --project "<checkout>\src\ScarletMeter.App\ScarletMeter.App.csproj" -
 
 Switches: `--no-capture` opens the window without Npcap (status reads "Capture is off"); `--data-dir <absolute path>` moves everything the meter writes (history database, logs, WebView2 profile) for a session, for example to keep a test run away from real data. Anything else is rejected with a dialog.
 
-Data and logs: `%LocalAppData%\ScarletMeter` (`combat-history.db`, `logs\scarlet-<date>.log`, `webview2\`). The log is where "[CAPTURE] !!! LOCKED !!!" appears once upstream's capture finds the game's connection.
+Data and logs: `%LocalAppData%\ScarletMeter` (`combat-history.db`, `settings.json` and its `.bak`, `logs\scarlet-<date>.log`, `backgrounds\`, `webview2\`). The log is where "[CAPTURE] !!! LOCKED !!!" appears once upstream's capture finds the game's connection.
 
 A startup failure (a data directory that cannot be created, missing game data, an unusable history database, capture that cannot start) shows a dialog and exits with code 1. Once the host (and with it the log) exists it is also logged, at Critical (Error for capture).
 
 The apphost needs a .NET 10 runtime it can find: an installed .NET 10 Desktop Runtime or SDK, or `DOTNET_ROOT` set to one (an absolute path). Without it `ScarletMeter.exe` shows the .NET install prompt and exits with 0x80008096. A self-contained publish carries its own runtime.
+
+## Smoke-testing the UI
+
+`scripts/Smoke-Meter.ps1` starts the built meter (Debug by default; `-Exe` for another absolute path) with a throwaway data directory, runs a script block against its pages and closes it the way a player would, then prints the exit code. The meter is started with WebView2 remote debugging on `-DevToolsPort` (default 9333, localhost) for that run only. Set `DOTNET_ROOT` as above for a framework-dependent build.
+
+```powershell
+& "<checkout>\scripts\Smoke-Meter.ps1" -Steps {
+    param($m)
+    $m.WaitFor('overlay', "document.querySelector('.target-name')?.textContent", 15)
+    $m.Eval('overlay', "document.querySelector('button[title=Settings]').click(); true")
+    $m.WaitFor('settings', "document.querySelectorAll('.tab').length", 15)
+    $m.Capture('settings', "<absolute path>\settings.png")
+    $m.Drag(120, 60)   # real mouse: moves the cursor
+}
+```
+
+Windows are named by their page's `data-window` attribute (`overlay`, `settings`). `-DataDirectory <absolute path> -KeepData` reuses and keeps a data directory, for example to check that settings and window positions survive a restart. Close other programs' windows away from the overlay before `Drag`, which uses the real mouse.
 
 ## Publish
 

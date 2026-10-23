@@ -9,7 +9,7 @@ network adapters --SharpPcap/Npcap--> upstream CaptureDevice (finds the game's p
   -> upstream TcpStreamBuffer (TCP reassembly) -> upstream PacketProcessor (framing, LZ4)
   -> upstream PacketDispatchService -> opcode processors -> upstream EntityTracker + CombatSessionManager
   -> ScarletMeter.Engine UpstreamCombatEngine.GetSnapshot() -> CombatSnapshot (Scarlet types)
-  -> ScarletMeter.App MeterPage (polls ten times a second) -> BlazorWebView in MainWindow
+  -> ScarletMeter.App MeterPage (polls ten times a second) -> BlazorWebView in the overlay window
 ```
 
 | Source | Responsibility |
@@ -20,8 +20,10 @@ network adapters --SharpPcap/Npcap--> upstream CaptureDevice (finds the game's p
 | `src/ScarletMeter.Engine/Upstream` | The only code that maps upstream types: `UpstreamCombatEngine`, `UpstreamSettingsBridge`, `NoCaptureDevice`. |
 | `src/ScarletMeter.Engine/ScarletEngineServiceCollectionExtensions.cs` | `AddScarletEngine`: the upstream service graph, as upstream's own App.xaml.cs builds it, minus UI, updater and packet logger. |
 | `src/ScarletMeter.App/App.xaml.cs` | Composition root: host, Serilog file log, engine start, window; startup failures end in a dialog. |
-| `src/ScarletMeter.App/MainWindow.xaml(.cs)`, `DeferredWindowClose.cs` | The window and the close ordering that keeps Blazor from crashing the process. |
-| `src/ScarletMeter.App/Pages/MeterPage.razor(.cs)`, `wwwroot/` | The meter UI. |
+| `src/ScarletMeter.App/Windows/` | `ScarletWindow` (shared Blazor hosting and close ordering), `OverlayWindow`, `ToolWindow`, `MeterWindows` (opens windows, owns the hotkey), `GlobalHotkey`, `WindowPlacementTracker`, `WebAssetHosts`. |
+| `src/ScarletMeter.App/DeferredWindowClose.cs` | The close ordering that keeps Blazor from crashing the process. |
+| `src/ScarletMeter.App/Settings/` | `MeterSettings` (the model), `SettingsNormalizer` (validation), `SettingsStore` (durable file), `SettingsService` (live settings), `HotkeyGesture`, `BackgroundImages`. |
+| `src/ScarletMeter.App/Pages/`, `Components/`, `wwwroot/` | The UI: `MeterPage` (overlay), `SettingsPage`, shared setting controls, one stylesheet. |
 
 ## Upstream boundary
 
@@ -69,13 +71,37 @@ Threading: upstream's opcode processors write `EntityTracker` and `CombatSession
 
 Deliberately unsupported through the bridge: upstream's raw packet logging (`IsPacketLoggingEnabled` is always false and no `FilePacketWriter` is registered) and its buff and skill-cooldown overlays (disabled, so the timed trackers track nothing). Upstream's update checker is not registered.
 
+## Windows
+
+Every window is a `ScarletWindow`: a WPF window whose content is one `BlazorWebView` with one root component. The base class sets the WebView2 profile folder and image hosts (below), remembers the window's placement, and applies the deferred close. There is no XAML window; windows are built in code.
+
+- **Overlay** (`OverlayWindow`, root `MeterPage`): chromeless (`WindowStyle=None`, `AllowsTransparency`), transparent WebView2 background, always on top, resizable from every edge through `WindowChrome` (`ResizeBorderThickness` 6, no caption area). The page paints its own panel; only the panel's `::before` layer takes the background opacity and picture, so text and bars stay solid. A left-button press on the header calls `IMeterWindows.BeginOverlayDrag`, which releases mouse capture and *posts* `WM_NCLBUTTONDOWN`/`HTCAPTION`, so Windows' modal move loop starts after the Blazor event handler has returned instead of inside it. Aero Snap's maximize is undone. Closing it closes the tool windows first (each through its own deferred close, awaited for at most five seconds), then the app.
+- **Tool windows** (`ToolWindow`): standard frame in dark mode (`DWMWA_USE_IMMERSIVE_DARK_MODE`), topmost, owned by the overlay, so they stay above it and minimize and restore with it. One of each kind; opening an open one restores and activates it. They open beside the overlay (right if it fits on the work area, else left) unless a placement is saved. This build has the settings window.
+- **`MeterWindows`** (`IMeterWindows` to the pages) creates the windows, runs the file picker from its own dispatcher operation (a modal dialog must not run inside the Blazor event that asked for it), and owns the global hotkey.
+- **Hotkey** (`GlobalHotkey`): `RegisterHotKey` on the overlay's handle with `MOD_NOREPEAT`; `WM_HOTKEY` minimizes the overlay (and so its tool windows) or restores and activates it, RATmeter's behaviour. Default `Ctrl+Shift+D`, as RATmeter. A combination another program owns is reported in settings rather than failing silently. While the settings page records a new shortcut the hotkey is unregistered, so pressing the old one is captured rather than acted on.
+- **Placement** (`WindowPlacementTracker`): saved in settings 400 ms after a move or resize stops and on close, normal state only; restored before the window is shown unless it would overlap the virtual screen by less than 80×40 DIPs (a monitor was removed).
+
+## Settings
+
+`MeterSettings` holds four sections: `Fight` (boss-only capture, combined summon damage, one-minute dummy mode, history retention; mirrored into the engine's `EngineSettings` on load and on every change), `Appearance` (background opacity 0.1 to 1, background picture, class colours, relative bars, show deaths, hide names, row size 0.75 to 1.5), `Overlay` (the hotkey) and `Windows` (placements). Changes apply live: pages subscribe to `SettingsService.Changed`.
+
+- **Validation** (`SettingsNormalizer`) is the single boundary for both the file and every update: missing or null sections take their defaults, numbers are clamped, the hotkey must parse and is stored canonically, unknown window keys and non-finite or absurd placements are dropped, and the background picture must be a name `BackgroundImages` writes (`background-<8 hex>.<ext>`), so the file cannot point the page at another path. Each repair is logged and shown once in settings.
+- **Durability** (`SettingsStore`): `settings.json` in the data directory, at most 1 MB, written to a temporary file that replaces the old one (`File.Replace`), keeping the previous save as `settings.json.bak`. A file that cannot be parsed is renamed to `settings.unreadable-<UTC time>.json` before anything is written, then the backup is tried, then defaults. A file whose version is newer than this build, or that cannot be opened, is used but never overwritten (`CanSave` false, shown in settings).
+- **Saving** (`SettingsService`): 500 ms after the last change (so a slider drag writes once), and on exit when the host disposes the service. A failed save is logged and shown in settings.
+- **Background picture**: picked with the system file dialog, at most 8 MB, copied into `<data dir>\backgrounds` under a content-hash name (the page reloads it when it changes; the original may move), earlier pictures deleted.
+- **Hide names** masks every name, yours included, with RATmeter's algorithm (`NicknameMask`), so a masked name reads the same in both meters.
+
+### Image hosts
+
+The pages load images not shipped in `wwwroot` through WebView2 virtual hosts (`WebAssetHosts`), each mapped to exactly one folder so the page can never read the database, logs or settings: `https://data.scarlet.example/` is `<data dir>\backgrounds`, and `https://assets.scarlet.example/` is `assets\` beside the executable, which holds the class icons copied at build time from upstream's `AionDpsMeter.UI/wwwroot/images/classes` (read from the submodule, never edited). `index.html` carries a Content-Security-Policy that allows images only from the app, those two hosts and NC's game-data CDN (for skill icons).
+
 ## Window lifecycle
 
-WPF disposes a window's WebView2 control when the window closes, but BlazorWebView is never disposed automatically, and a Blazor message sent afterwards terminates the process. `MainWindow` therefore cancels its first close, awaits `BlazorWebView.DisposeAsync` on a later dispatcher turn (components first, so `MeterPage.DisposeAsync` stops the refresh loop and unsubscribes from ping events), then closes again. `DeferredWindowClose` is ported from the fork, where the crash was reproduced and the fix is covered by unit tests and a native lifecycle check. The unit tests are ported here (`DeferredWindowCloseTests`); the native check is not yet (see HANDOFF.md).
+WPF disposes a window's WebView2 control when the window closes, but BlazorWebView is never disposed automatically, and a Blazor message sent afterwards terminates the process. `ScarletWindow` therefore cancels its first close, awaits `BlazorWebView.DisposeAsync` on a later dispatcher turn (components first, so `MeterPage.DisposeAsync` stops the refresh loop and unsubscribes from settings and ping events), then closes again. `DeferredWindowClose` is ported from the fork, where the crash was reproduced and the fix is covered by unit tests and a native lifecycle check. The unit tests are ported here (`DeferredWindowCloseTests`); the native check is not yet (see HANDOFF.md).
 
-BlazorWebView 10's `DisposeAsync` disposes the components and then the WebView2 composition control on whichever thread the component disposal completed on; the control refuses cross-thread COM access with an `InvalidCastException` (E_NOINTERFACE). `MainWindow.ReleaseBlazorContentAsync` catches that and disposes the control again on the UI thread, which succeeds; both steps are logged at Information. The fork's companion window logs the same failure, so the fallback is a candidate fix to offer it.
+BlazorWebView 10's `DisposeAsync` disposes the components and then the WebView2 composition control on whichever thread the component disposal completed on; the control refuses cross-thread COM access with an `InvalidCastException` (E_NOINTERFACE). `ScarletWindow.ReleaseBlazorContentAsync` catches that and disposes the control again on the UI thread, which succeeds; both steps are logged at Information. The fork's companion window logs the same failure, so the fallback is a candidate fix to offer it.
 
-Shutdown order: window closes, `App.OnExit` disposes the engine (stops capture, completes open fights, flushes history), then the host.
+Shutdown order: tool windows close (deferred, awaited), the overlay closes, `App.OnExit` disposes the engine (stops capture, completes open fights, flushes history), then the host.
 
 Startup failures: any exception while creating the data directory, building the host, constructing upstream's graph (game data, history database) or showing the window ends in a "could not start" dialog and exit code 1; a failed capture start gets its own dialog. Once the host exists the failure is also logged at Critical (Error for capture). Before that (bad arguments, a data directory that cannot be created) there is no log file, and the dialog is the only report. Unhandled exceptions on the UI thread or elsewhere are logged at Critical, not handled, so the process still terminates.
 
@@ -85,20 +111,26 @@ Everything the meter writes lives under `EngineOptions.DataDirectory`:
 
 - `combat-history.db`: upstream's EF Core SQLite store of completed boss fights, retention per `EngineSettings.HistoryRetentionDays`.
 - `logs/scarlet-<date>.log`: Serilog, 14 days.
-- `webview2/`: the WebView2 browser profile (cache, local storage, GPU cache; no meter data). `MainWindow` sets it through `BlazorWebViewInitializing`; otherwise BlazorWebView would use `%LocalAppData%\ScarletMeter.WebView2` and `--data-dir` would not isolate a run.
+- `settings.json`, `settings.json.bak` (the previous save), and any `settings.unreadable-<UTC time>.json` kept from a damaged file (see Settings).
+- `backgrounds/`: the imported background picture.
+- `webview2/`: the WebView2 browser profile (cache, local storage, GPU cache; no meter data). `ScarletWindow` sets it through `BlazorWebViewInitializing`; otherwise BlazorWebView would use `%LocalAppData%\ScarletMeter.WebView2` and `--data-dir` would not isolate a run.
 
-Nothing is written next to the executable or in the working directory. Upstream's `appsettings.user.json` is not used; Scarlet's own settings persistence is still to be designed.
+Nothing is written next to the executable or in the working directory. Upstream's `appsettings.user.json` is not used.
 
 ## Tests
 
 - `UpstreamBoundaryTests`: the app references no upstream assembly; no Scarlet project but the engine declares an upstream project reference (and the check confirms it sees the engine's); the engine's public surface (public and protected members) exposes no upstream type, with a self-check that the surface scan sees an upstream interface.
 - `EngineRegistrationTests`: the real upstream graph resolves without Npcap, for `CaptureMode.None` and the production `Live` graph (scope validation on; every opcode processor is constructed through the registry; `ValidateOnBuild` stays off because upstream also registers nested and compiler-generated types from its processor namespace that nothing resolves); a snapshot maps synthetic hits fed to upstream's session manager (identity, totals, share, critical rate, duration, party DPS); reset empties it and keeps summon ownership; the two capture-start failures get their own messages; packet logging cannot be enabled; settings and their change event reach upstream.
 - `DeferredWindowCloseTests`: the Blazor window's close ordering, on a WPF dispatcher thread as in a window (first close cancelled and the window closed once, release never inside the `Close()` caller, a release failure is reported and still closes, a forced close skips release and close). Ported from the fork.
+- `SettingsTests`: defaults, every repair the normalizer makes (including null sections from a file), canonical hotkeys, value equality covering every property (a new property fails the test until `Equals` includes it), save/load round trip with the backup, an unreadable file kept aside with the backup restored, defaults when there is no backup, an oversized file, a newer-version file never overwritten, live application to `EngineSettings` with one event per real change, saved fight rules reaching the engine at load, hotkey parsing and browser key capture, background picture import and validation.
+- `FormattingTests`: RATmeter-compatible name masking, ping bands, and that pages only get image URLs on the two local hosts.
 - `EngineOptionsTests`, `LaunchOptionsTests`: absolute-path rules at the engine and command-line boundaries.
 - `SqliteRuntimeTests`: the native SQLite that actually loads carries the CVE-2025-6965 fix (the upstream overlay works).
 
 `TestEngineHost` gives each engine test its own graph and data directory. Upstream's `CombatHistoryStore` starts an expired-session cleanup (DELETE, VACUUM, ANALYZE) fire-and-forget in its constructor; it outlives the provider and re-creates the database if the directory is deleted under it. The host waits for the store's "startup cleanup" log entry before deleting (only when the database exists, since the store creates it before starting the cleanup), and `TestDataDirectory` fails the test if the directory still cannot be deleted after five seconds, so leaked handles surface.
 
 `scripts/Test-PublishLayout.ps1` (run by CI after the publish) checks that a single-file publish holds `wwwroot` (host page, stylesheet, `blazor.webview.js`) and `GameData\Assets\*.json` beside `ScarletMeter.exe`, with the app's assembly bundled. Upstream's `GameDataProvider` reads `GameData\Assets` and falls back to a legacy `Data\` folder, so a missing data folder is reported as `Data\classes.json`.
+
+`scripts/Smoke-Meter.ps1` drives the built meter for UI checks: it starts it with a throwaway data directory and WebView2 remote debugging on a localhost port for that run only, finds each window's page by its `data-window` attribute, evaluates JavaScript (read text, click, set inputs), captures pages, drags the overlay with the real mouse, then closes the overlay through UI Automation and reports the exit code. See DEVELOPMENT.md.
 
 None of these validate live capture or decoding. That needs the game (HANDOFF.md, in-game acceptance).

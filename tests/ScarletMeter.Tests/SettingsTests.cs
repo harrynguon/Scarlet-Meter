@@ -1,0 +1,294 @@
+using System.IO;
+using System.Reflection;
+using Microsoft.Extensions.Logging.Abstractions;
+using ScarletMeter.App.Settings;
+using ScarletMeter.Engine;
+
+namespace ScarletMeter.Tests;
+
+/// <summary>
+/// Settings validation, durable storage and live application. The file is untrusted input: out-of-range
+/// values are repaired, unreadable files are kept aside (never deleted) before the backup or defaults are
+/// used, and a file from a newer build is never overwritten.
+/// </summary>
+public sealed class SettingsTests : IDisposable
+{
+    private readonly TestDataDirectory directory = new();
+
+    public SettingsTests() => Directory.CreateDirectory(directory.FullPath);
+
+    [Fact]
+    public void DefaultsNeedNoRepair()
+    {
+        var (settings, repairs) = SettingsNormalizer.Normalize(null);
+        Assert.Empty(repairs);
+        Assert.Equal(new MeterSettings(), settings);
+        Assert.True(settings.Fight.GroupSummonDamage);
+        Assert.Equal(30, settings.Fight.HistoryRetentionDays);
+        Assert.Equal("Ctrl+Shift+D", settings.Overlay.ToggleHotkey);
+    }
+
+    [Fact]
+    public void AClearedHotkeyStaysClearedAcrossSaves()
+    {
+        var store = NewStore();
+        store.Save(new MeterSettings { Overlay = new OverlaySettings { ToggleHotkey = string.Empty } });
+        Assert.Equal(string.Empty, store.Load().Settings.Overlay.ToggleHotkey);
+    }
+
+    [Fact]
+    public void OutOfRangeValuesAreRepairedAndReported()
+    {
+        var input = new MeterSettings
+        {
+            Fight = new FightSettings { HistoryRetentionDays = 0 },
+            Appearance = new AppearanceSettings { BackgroundOpacity = double.NaN, RowScale = 9, BackgroundImage = @"..\..\secret.png" },
+            Overlay = new OverlaySettings { ToggleHotkey = "Ctrl+Nope" },
+            Windows = new Dictionary<string, WindowPlacement>
+            {
+                [WindowKeys.Overlay] = new(10, 20, 400, 260),
+                ["somewhere-else"] = new(0, 0, 400, 300),
+                [WindowKeys.Settings] = new(double.PositiveInfinity, 0, 400, 300),
+                [WindowKeys.History] = new(0, 0, 5, 300),
+            },
+        };
+
+        var (settings, repairs) = SettingsNormalizer.Normalize(input);
+
+        Assert.Equal(1, settings.Fight.HistoryRetentionDays);
+        Assert.Equal(0.9, settings.Appearance.BackgroundOpacity);
+        Assert.Equal(AppearanceSettings.MaxRowScale, settings.Appearance.RowScale);
+        Assert.Null(settings.Appearance.BackgroundImage);
+        Assert.Equal(string.Empty, settings.Overlay.ToggleHotkey);
+        Assert.Equal(new[] { WindowKeys.Overlay }, settings.Windows.Keys);
+        Assert.Equal(8, repairs.Count);
+    }
+
+    [Fact]
+    public void NullSectionsFromAFileTakeDefaults()
+    {
+        File.WriteAllText(Path.Combine(directory.FullPath, "settings.json"),
+            """{ "version": 1, "fight": null, "appearance": { "classColors": false }, "windows": null }""");
+        var result = NewStore().Load();
+        Assert.Equal(SettingsLoadStatus.Loaded, result.Status);
+        Assert.Equal(new FightSettings(), result.Settings.Fight);
+        Assert.False(result.Settings.Appearance.ClassColors);
+        Assert.Equal(0.9, result.Settings.Appearance.BackgroundOpacity); // missing field keeps its default
+        Assert.Empty(result.Settings.Windows);
+    }
+
+    [Fact]
+    public void HotkeysAreStoredInCanonicalForm()
+    {
+        var settings = SettingsNormalizer.Normalize(new MeterSettings { Overlay = new OverlaySettings { ToggleHotkey = " shift + ctrl + d " } }).Settings;
+        Assert.Equal("Ctrl+Shift+D", settings.Overlay.ToggleHotkey);
+    }
+
+    [Fact]
+    public void EqualityCoversEveryProperty()
+    {
+        // Adding a property to MeterSettings must extend its Equals; this count is the reminder.
+        var properties = typeof(MeterSettings).GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.Name != "EqualityContract").Select(p => p.Name).Order().ToList();
+        Assert.Equal(new[] { "Appearance", "Fight", "Overlay", "Version", "Windows" }, properties);
+
+        var baseline = SettingsNormalizer.Normalize(null).Settings with
+        {
+            Windows = new Dictionary<string, WindowPlacement> { [WindowKeys.Overlay] = new(1, 2, 300, 200) },
+        };
+        var same = baseline with { Windows = new Dictionary<string, WindowPlacement> { [WindowKeys.Overlay] = new(1, 2, 300, 200) } };
+        Assert.Equal(baseline, same);
+        Assert.NotEqual(baseline, baseline with { Version = 2 });
+        Assert.NotEqual(baseline, baseline with { Fight = baseline.Fight with { BossOnlyCapture = true } });
+        Assert.NotEqual(baseline, baseline with { Appearance = baseline.Appearance with { RowScale = 1.2 } });
+        Assert.NotEqual(baseline, baseline with { Overlay = baseline.Overlay with { ToggleHotkey = "F10" } });
+        Assert.NotEqual(baseline, baseline with { Windows = new Dictionary<string, WindowPlacement> { [WindowKeys.Overlay] = new(1, 3, 300, 200) } });
+    }
+
+    [Fact]
+    public void SaveThenLoadRoundTripsAndKeepsThePreviousSave()
+    {
+        var store = NewStore();
+        Assert.Equal(SettingsLoadStatus.Defaults, store.Load().Status);
+
+        var first = new MeterSettings { Appearance = new AppearanceSettings { HideNicknames = true } };
+        store.Save(first);
+        var second = first with { Fight = new FightSettings { BossOnlyCapture = true } };
+        store.Save(second);
+
+        var loaded = store.Load();
+        Assert.Equal(SettingsLoadStatus.Loaded, loaded.Status);
+        Assert.True(loaded.CanSave);
+        Assert.Null(loaded.Notice);
+        Assert.Equal(second, loaded.Settings);
+        Assert.True(File.Exists(store.BackupPath));
+        Assert.False(File.Exists(store.FilePath + ".tmp"));
+    }
+
+    [Fact]
+    public void AnUnreadableFileIsKeptAsideAndThePreviousSaveRestored()
+    {
+        var store = NewStore();
+        var saved = new MeterSettings { Appearance = new AppearanceSettings { ShowDeaths = false } };
+        store.Save(saved);
+        store.Save(saved); // the second save leaves the first as settings.json.bak
+        File.WriteAllText(store.FilePath, "{ this is not json");
+
+        var result = store.Load();
+
+        Assert.Equal(SettingsLoadStatus.RecoveredFromBackup, result.Status);
+        Assert.Equal(saved, result.Settings);
+        Assert.True(result.CanSave);
+        Assert.Contains("previous save was restored", result.Notice);
+        var kept = Assert.Single(Directory.GetFiles(directory.FullPath, "settings.unreadable-*.json"));
+        Assert.Equal("{ this is not json", File.ReadAllText(kept));
+    }
+
+    [Fact]
+    public void WithoutABackupAnUnreadableFileFallsBackToDefaultsAndIsKept()
+    {
+        var store = NewStore();
+        File.WriteAllText(store.FilePath, "[1, 2, 3]");
+        var result = store.Load();
+        Assert.Equal(SettingsLoadStatus.ResetToDefaults, result.Status);
+        Assert.Equal(SettingsNormalizer.Normalize(null).Settings, result.Settings);
+        Assert.Single(Directory.GetFiles(directory.FullPath, "settings.unreadable-*.json"));
+        Assert.False(File.Exists(store.FilePath));
+    }
+
+    [Fact]
+    public void AnOversizedFileIsNotParsed()
+    {
+        var store = NewStore();
+        File.WriteAllText(store.FilePath, "{\"version\":1,\"pad\":\"" + new string('x', (int)SettingsStore.MaxFileBytes) + "\"}");
+        Assert.Equal(SettingsLoadStatus.ResetToDefaults, store.Load().Status);
+    }
+
+    [Fact]
+    public void AFileFromANewerBuildIsReadButNeverOverwritten()
+    {
+        var store = NewStore();
+        const string newer = """{ "version": 99, "appearance": { "rowScale": 1.25 }, "futureSection": { "x": 1 } }""";
+        File.WriteAllText(store.FilePath, newer);
+
+        using var service = new SettingsService(store, new EngineSettings(), NullLogger<SettingsService>.Instance);
+        Assert.Equal(SettingsLoadStatus.ReadOnly, service.LoadResult.Status);
+        Assert.False(service.CanSave);
+        Assert.Equal(1.25, service.Current.Appearance.RowScale);
+
+        service.Update(s => s with { Appearance = s.Appearance with { RowScale = 1.0 } });
+        service.Flush();
+        Assert.Equal(newer, File.ReadAllText(store.FilePath));
+    }
+
+    [Fact]
+    public void UpdatesApplyToTheEngineRaiseOneEventAndSaveOnFlush()
+    {
+        var store = NewStore();
+        var engineSettings = new EngineSettings();
+        using var service = new SettingsService(store, engineSettings, NullLogger<SettingsService>.Instance);
+        var raised = 0;
+        service.Changed += (_, _) => raised++;
+
+        service.Update(s => s with { Fight = s.Fight with { BossOnlyCapture = true, GroupSummonDamage = false, HistoryRetentionDays = 12_000 } });
+        service.Update(s => s); // no change: no event, no save
+
+        Assert.Equal(1, raised);
+        Assert.True(engineSettings.BossOnlyCapture);
+        Assert.False(engineSettings.GroupSummonDamage);
+        Assert.Equal(FightSettings.MaxRetentionDays, engineSettings.HistoryRetentionDays);
+
+        service.Flush();
+        Assert.Equal(service.Current, NewStore().Load().Settings);
+    }
+
+    [Fact]
+    public void SavedFightRulesReachTheEngineAtLoad()
+    {
+        var store = NewStore();
+        store.Save(new MeterSettings { Fight = new FightSettings { OneMinuteDummyMode = true } });
+        var engineSettings = new EngineSettings();
+        using var service = new SettingsService(store, engineSettings, NullLogger<SettingsService>.Instance);
+        Assert.True(engineSettings.OneMinuteDummyMode);
+    }
+
+    [Theory]
+    [InlineData("Ctrl+Shift+D", "Ctrl+Shift+D", 0x44)]
+    [InlineData("control+alt+num5", "Ctrl+Alt+Num5", 0x65)]
+    [InlineData("F10", "F10", 0x79)]
+    [InlineData("Win+Shift+Up", "Shift+Win+Up", 0x26)]
+    [InlineData("Ctrl+Backquote", "Ctrl+Backquote", 0xC0)]
+    public void HotkeysParse(string text, string canonical, int virtualKey)
+    {
+        Assert.True(HotkeyGesture.TryParse(text, out var gesture, out var error), error);
+        Assert.Equal(canonical, gesture.ToString());
+        Assert.Equal(virtualKey, gesture.VirtualKey);
+    }
+
+    [Theory]
+    [InlineData("D")]                 // a plain key would be taken from the game
+    [InlineData("Ctrl+Ctrl+D")]
+    [InlineData("Hyper+D")]
+    [InlineData("Ctrl+")]
+    [InlineData("Ctrl+NotAKey")]
+    public void BadHotkeysAreRejectedWithAReason(string text)
+    {
+        Assert.False(HotkeyGesture.TryParse(text, out _, out var error));
+        Assert.False(string.IsNullOrWhiteSpace(error));
+    }
+
+    [Fact]
+    public void BrowserKeyPressesBecomeHotkeys()
+    {
+        Assert.True(HotkeyGesture.TryFromBrowserKey("KeyD", ctrl: true, alt: false, shift: true, meta: false, out var gesture, out _));
+        Assert.Equal("Ctrl+Shift+D", gesture.ToString());
+        Assert.True(HotkeyGesture.TryFromBrowserKey("Digit1", ctrl: false, alt: true, shift: false, meta: false, out gesture, out _));
+        Assert.Equal("Alt+1", gesture.ToString());
+
+        Assert.False(HotkeyGesture.TryFromBrowserKey("ShiftLeft", false, false, true, false, out _, out var modifierOnly));
+        Assert.Null(modifierOnly); // still waiting for the main key
+        Assert.False(HotkeyGesture.TryFromBrowserKey("KeyQ", false, false, false, false, out _, out var bare));
+        Assert.NotNull(bare);
+        Assert.False(HotkeyGesture.TryFromBrowserKey("MediaPlayPause", true, false, false, false, out _, out var unknown));
+        Assert.NotNull(unknown);
+    }
+
+    [Fact]
+    public void BackgroundPicturesAreCopiedUnderAContentNameAndOldOnesRemoved()
+    {
+        var source = Path.Combine(directory.FullPath, "picked.png");
+        File.WriteAllBytes(source, [1, 2, 3, 4]);
+        var first = BackgroundImages.Import(source, directory.FullPath);
+        Assert.True(BackgroundImages.IsStoredName(first));
+        Assert.StartsWith("background-", first);
+
+        File.WriteAllBytes(source, [5, 6, 7, 8]);
+        var second = BackgroundImages.Import(source, directory.FullPath);
+        Assert.NotEqual(first, second);
+        Assert.Equal(new[] { second }, Directory.GetFiles(BackgroundImages.Folder(directory.FullPath)).Select(Path.GetFileName));
+    }
+
+    [Fact]
+    public void BackgroundPicturesAreValidated()
+    {
+        var text = Path.Combine(directory.FullPath, "notes.txt");
+        File.WriteAllText(text, "hello");
+        Assert.Throws<InvalidDataException>(() => BackgroundImages.Import(text, directory.FullPath));
+
+        var huge = Path.Combine(directory.FullPath, "huge.png");
+        using (var stream = File.Create(huge)) stream.SetLength(BackgroundImages.MaxBytes + 1);
+        Assert.Throws<InvalidDataException>(() => BackgroundImages.Import(huge, directory.FullPath));
+
+        Assert.Throws<ArgumentException>(() => BackgroundImages.Import(Path.Combine("relative", "a.png"), directory.FullPath));
+        Assert.False(BackgroundImages.IsStoredName("background-1234abcd.exe"));
+        Assert.False(BackgroundImages.IsStoredName(@"..\background-1234abcd.png"));
+    }
+
+    [Fact]
+    public void ARelativeDataDirectoryIsRejected() =>
+        Assert.Throws<ArgumentException>(() => new SettingsStore(Path.Combine("data", "scarlet"), NullLogger<SettingsStore>.Instance));
+
+    private SettingsStore NewStore() => new(directory.FullPath, NullLogger<SettingsStore>.Instance);
+
+    public void Dispose() => directory.Dispose();
+}
