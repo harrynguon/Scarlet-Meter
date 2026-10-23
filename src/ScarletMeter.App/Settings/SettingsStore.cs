@@ -14,7 +14,7 @@ public enum SettingsLoadStatus
     Loaded,
     /// <summary>The file could not be read; it was kept aside and the previous save was used.</summary>
     RecoveredFromBackup,
-    /// <summary>Neither the file nor the previous save could be read; both were kept aside, defaults are used.</summary>
+    /// <summary>Neither the file nor the previous save could be read; whichever existed was kept aside, defaults are used.</summary>
     ResetToDefaults,
     /// <summary>The file comes from a newer build, or could not be opened: it is used but never overwritten.</summary>
     ReadOnly,
@@ -69,14 +69,33 @@ public sealed class SettingsStore
         switch (main.Outcome)
         {
             case ReadOutcome.Missing:
-                // A previous run may have set a damaged file aside without saving again: restore its backup.
+                // A previous run may have set a damaged file aside without saving again: restore its backup. Any
+                // other backup is protected as the main file would be, because the second save's File.Replace
+                // would overwrite it: one from a newer build is used but never overwritten, one that cannot be
+                // opened switches saving off, and a damaged one is kept aside (or saving is switched off).
                 var previous = TryRead(BackupPath);
-                if (previous.Outcome == ReadOutcome.Read)
-                    return Loaded(previous.Settings!, SettingsLoadStatus.RecoveredFromBackup) with
-                    {
-                        Notice = "Your settings file was missing, so the previous save was restored.",
-                    };
-                return new SettingsLoadResult(SettingsNormalizer.Normalize(null).Settings, SettingsLoadStatus.Defaults, true, null);
+                switch (previous.Outcome)
+                {
+                    case ReadOutcome.Read:
+                        return Loaded(previous.Settings!, SettingsLoadStatus.RecoveredFromBackup) with
+                        {
+                            Notice = "Your settings file was missing, so the previous save was restored.",
+                        };
+                    case ReadOutcome.Missing:
+                        return new SettingsLoadResult(SettingsNormalizer.Normalize(null).Settings, SettingsLoadStatus.Defaults, true, null);
+                    case ReadOutcome.NewerVersion:
+                        logger.LogWarning("settings.json was missing and its backup was written by a newer Scarlet Meter (version {Version}); it is used but not overwritten.", previous.Version);
+                        return new SettingsLoadResult(SettingsNormalizer.Normalize(previous.Settings).Settings, SettingsLoadStatus.ReadOnly, false,
+                            "Your settings file was missing, and the previous save comes from a newer version of Scarlet Meter. It is in use, and changes here are not saved.");
+                    case ReadOutcome.Inaccessible:
+                        return ReadOnlyDefaults($"Your settings file was missing, and the previous save could not be opened ({previous.Error?.Message}).");
+                }
+                var keptBackup = KeepAside(BackupPath);
+                if (keptBackup is null)
+                    return ReadOnlyDefaults("Your settings file was missing, and the previous save could not be read or set aside.");
+                logger.LogWarning(previous.Error, "settings.json was missing and its backup could not be read; the backup was kept as {Kept}.", keptBackup);
+                return new SettingsLoadResult(SettingsNormalizer.Normalize(null).Settings, SettingsLoadStatus.ResetToDefaults, true,
+                    $"Your settings file was missing and the previous save could not be read, so defaults are in use. The previous save was kept as {Path.GetFileName(keptBackup)}.");
             case ReadOutcome.Read:
                 return Loaded(main.Settings!, SettingsLoadStatus.Loaded);
             case ReadOutcome.NewerVersion:

@@ -90,6 +90,9 @@ public sealed class UpstreamBoundaryTests
         }
     }
 
+    // Whether code outside the engine can see a member: public, or protected (protected internal too), since a
+    // type deriving from a public engine type in another assembly sees protected members. A property or event
+    // counts when one of its accessors does.
     private static bool IsVisibleOutsideAssembly(MemberInfo member) => member switch
     {
         MethodBase method => method.IsPublic || method.IsFamily || method.IsFamilyOrAssembly,
@@ -99,6 +102,8 @@ public sealed class UpstreamBoundaryTests
         _ => false,
     };
 
+    // The types a type takes its shape from, and so exposes to whoever uses it: its base type, every interface
+    // it implements, and the constraints on its own generic parameters.
     private static IEnumerable<Type> InheritedTypesOf(Type type)
     {
         if (type.BaseType is { } baseType) yield return baseType;

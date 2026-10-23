@@ -22,12 +22,12 @@ Keep the path short (native SQLite fails under long paths). Parallel work goes i
 - `scripts\Build.ps1` and `scripts\Build.ps1 -Configuration Release` (set `SCARLET_DOTNET`/`DOTNET_ROOT` first; see the scarlet-smoke skill). Scarlet's projects build with warnings as errors; upstream's own warnings are expected.
 - Pages, styles, windows or startup changed: run the scarlet-smoke skill.
 - Web assets or project files changed: a Release self-contained single-file publish, then `scripts\Test-PublishLayout.ps1 -PublishDirectory <absolute path>`.
-- New behaviour has tests; a new guard is shown to fail when the protected code is wrong (then reverted).
+- New behaviour has tests; a new guard is shown to fail when the protected code is wrong (then reverted). That run counts only when its output names the new test as failed: a mutation that does not compile, or a test edit that did not apply, proves nothing.
 - No `%TEMP%\scarlet-*` leftovers.
 
 ## 3. Document
 
-Update the docs the change touches (ARCHITECTURE for structure, DEVELOPMENT for commands, SECURITY for data or network, HANDOFF for acceptance items) and add a `docs/WORKLOG.md` entry at the top: what, why, checks actually run with results, not checked, next. Never describe an unchecked acceptance item as done.
+Update the docs the change touches (ARCHITECTURE for structure, DEVELOPMENT for commands, SECURITY for data or network, HANDOFF for acceptance items) and add a `docs/WORKLOG.md` entry at the top: what, why, checks actually run with results, not checked, next. Never describe an unchecked acceptance item as done. A mistake found on the way (by a test, the audit, Codex, a smoke run or the player) gets an entry in `docs/LESSONS.md`, with the guard that now catches it.
 
 ## 4. Pull request
 
@@ -61,4 +61,4 @@ gh pr merge <number> -R harrynguon/ScarletMeter --squash --match-head-commit <fu
 
 Then sync the main checkout (`git switch main`, `git pull --ff-only`), check the merged tree equals the tested commit's tree (`git rev-parse HEAD^{tree}` vs `<sha>^{tree}`), and remove the worktree and branch (deleting the remote branch also needs the player's go-ahead). When later branches were built on this one, merge the new `origin/main` into them (or `git rebase --onto origin/main <old base> <branch>` for unpushed ones) before their own PRs merge.
 
-Conflicts between parallel PRs are usually only in `README.md` and `docs/` (WORKLOG entries, HANDOFF state lines). Keep both sides' content, WORKLOG newest first with a blank line between entries, then fix any state line that one side made stale (for example the pinned release). Run `git submodule update` after a merge that moved `upstream`.
+Conflicts between parallel PRs are usually only in `README.md` and `docs/` (WORKLOG entries, HANDOFF state lines). Keep both sides' content, WORKLOG newest first with a blank line between entries, then fix any state line that one side made stale (for example the pinned release). Run `git submodule update` after a merge that moved `upstream`, before staging, and check `git ls-tree HEAD upstream` against `main` (a `git add -A` once re-staged an old pin).
