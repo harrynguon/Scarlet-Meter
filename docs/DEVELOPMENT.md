@@ -71,7 +71,34 @@ Keep the whole published folder: the game-data JSON files (`GameData\Assets`) an
 & "<checkout>\scripts\Test-PublishLayout.ps1" -PublishDirectory "<absolute output directory>"
 ```
 
-It fails when a file the meter reads at runtime is missing or the app's assembly was left outside the bundle; it does not launch the meter. CI runs the same publish and check. No release process exists yet; see docs/SECURITY.md before publishing a binary.
+It fails when a file the meter reads at runtime is missing or the app's assembly was left outside the bundle; it does not launch the meter. `Install-Meter.ps1` (below) runs the same publish and check, and so does CI. No release process exists yet; see docs/SECURITY.md before publishing a binary.
+
+## Install and update
+
+The meter is built from this checkout: there are no published Scarlet binaries and no self-updater (ARCHITECTURE.md, "Updates"). To install or reinstall:
+
+```powershell
+& "<checkout>\scripts\Install-Meter.ps1" -Shortcut
+```
+
+It runs `Build.ps1 -Configuration Release` (with the tests), publishes the self-contained single-file build into `<install>.staging`, checks it with `Test-PublishLayout.ps1`, marks it as an install (a `.scarlet-install` file) and swaps it in. The install is `%LocalAppData%\Programs\ScarletMeter`; `-InstallDirectory <absolute path on a local drive>` picks another. `-Shortcut` adds a "Scarlet Meter" Start menu shortcut; once is enough, since the install path stays the same. `-SkipTests` skips the tests. `-CheckOnly` runs the path checks below and stops, building and changing nothing.
+
+- Close the meter first: the script refuses while `ScarletMeter.exe` runs from the install, its `.previous` or its `.retired` folder (checked before building and again before the swap).
+- The old install stays in `<install>.previous` until the next install. To roll back, close the meter, rename the install folder away and rename `.previous` to the install's name.
+- A failed build, publish or layout check leaves the install as it was. The swap is a series of renames; if one fails (a file held open, for example by Explorer or a virus scan), each earlier one is undone on its own, the new build stays in `<install>.staging`, and the error lists which folders exist. If an undo fails too, the error says so and which renames to make by hand.
+- The data directory (`%LocalAppData%\ScarletMeter`: history, settings, logs, backgrounds, WebView2 profile) is never touched.
+- The script renames or deletes only folders it made, recognised by their marker (`.scarlet-install`, or `.scarlet-install-staging` while building), and empty folders. It refuses, leaving everything as it was: any other existing folder at the install, `.previous`, `.retired` or `.staging` names, even one holding a `ScarletMeter.exe`; a folder that is, or holds, a link or junction; a `.retired` folder without an install (it may be the only copy); a path that is not on a local drive (UNC, admin shares such as `\\localhost\C$`, `\\?\` and `\\.\` forms) or has a folder name Windows would change; and an install directory that overlaps the data directory or this checkout, compared after Windows resolves links, junctions, 8.3 names and substituted drives in the install's parent and, when it exists, the install folder itself. A mistyped path therefore fails rather than moves files, unless it names a folder an earlier install made. The trailing dot or space check is defence in depth: `GetFullPath` usually strips those first, and the overlap checks then see the normalised name. A subst'd drive is resolved like a junction, but no test covers it.
+- Deletes remove the marker last, so a delete stopped by an open file (in a subfolder, say) leaves a folder the next install still recognises and removes. The ownership and running-meter checks run again just before the swap, since the build takes minutes.
+- `scripts/Test-InstallMeter.ps1` checks those refusals (and that owned folders still pass) against throwaway folders in the temp directory, with `-CheckOnly`. It also runs the delete and swap paths from `scripts/InstallFolders.ps1` (the installer's folder rules) on fake installs: a `.retired` with a file held open keeps its marker and blocks the swap, then goes once released, and a failed rename is undone. CI runs it.
+- A warning says when the checkout has uncommitted changes: they are in the installed build, but its stamped commit does not show them.
+
+When upstream publishes a release (the meter will show a notice once the UI wires `UpstreamReleaseChecker` in; until then, see below), move the pin, then reinstall:
+
+```powershell
+& "<checkout>\scripts\Update-Upstream.ps1" -Tag vX.Y.Z.N
+# Skim the release notes, record the update and commit (Updating upstream, below), then:
+& "<checkout>\scripts\Install-Meter.ps1"
+```
 
 ## Updating upstream
 
@@ -79,10 +106,18 @@ It fails when a file the meter reads at runtime is missing or the app's assembly
 & "<checkout>\scripts\Update-Upstream.ps1" -Tag v1.11.5.341
 ```
 
-The script targets Windows PowerShell 5.1 and pwsh; its git calls use `--quiet` so git's success messages on stderr cannot abort it in a host without a console (ISE, VS Code). It fetches upstream's tags, refuses anything that is not a release tag, moves the submodule, stages the new pin and runs the build and tests. Then skim upstream's release notes, record the update in docs/WORKLOG.md and the pinned release in docs/ARCHITECTURE.md, and commit. A compile error in `src/ScarletMeter.Engine/Upstream` means upstream changed an API the engine maps; the table in ARCHITECTURE.md says where each kind of change lands.
+The script targets Windows PowerShell 5.1 and pwsh; its git calls use `--quiet` so git's success messages on stderr cannot abort it in a host without a console (ISE, VS Code). It fetches upstream's tags, refuses anything that is not a release tag, moves the submodule, stages the new pin and runs the build and tests. Then skim upstream's release notes, record the update in docs/WORKLOG.md and the pinned release in docs/ARCHITECTURE.md, commit, and reinstall with `Install-Meter.ps1`. A compile error in `src/ScarletMeter.Engine/Upstream` means upstream changed an API the engine maps; the table in ARCHITECTURE.md says where each kind of change lands.
 
-Checking what the latest release is: `gh release list -R Kuroukihime/AIon2-Dps-Meter --limit 5`, or upstream's Releases page.
+Checking what the latest release is: `gh release list -R Kuroukihime/AIon2-Dps-Meter --limit 5`, or upstream's Releases page. Once the UI wires it in, the meter's own release check says so (ARCHITECTURE.md, "Updates").
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every push and pull request on `windows-latest`: checkout with submodules, .NET 10, `scripts/Build.ps1 -Configuration Release`, a self-contained single-file publish, then `scripts/Test-PublishLayout.ps1` on it. CI does not exercise capture, WebView rendering or the window lifecycle, and does not launch the meter.
+`.github/workflows/ci.yml` runs on every push and pull request on `windows-latest`:
+
+1. Checkout with submodules. actions/checkout clones the submodule with `--depth=1`, which brings the pinned commit and only the tags that follow upstream's default-branch tip, not the pinned release's tag.
+2. Fetch the pinned release tag: `git ls-remote` finds the release tag naming the pinned commit, and that tag alone is fetched (depth 1); each git call is tried up to three times. Finding none fails the run, since the pin must be a release. The tag goes into `SCARLET_EXPECTED_UPSTREAM_RELEASE`, and `BuildInfoTests` checks that the build stamped exactly it rather than the commit fallback.
+3. .NET 10, then `scripts/Build.ps1 -Configuration Release`.
+4. `scripts/Test-InstallMeter.ps1`: the installer's refusals, building and moving nothing.
+5. `scripts/Install-Meter.ps1 -SkipTests` twice into the runner's temp directory, under pwsh: the self-contained single-file publish, `Test-PublishLayout.ps1` on the published output, the install marker and the folder swap. The second install must accept the first by its marker and keep it as `.previous`; the step checks both carry the marker and that no staging or `.retired` folder is left.
+
+CI does not exercise capture, WebView rendering or the window lifecycle, and does not launch the meter.

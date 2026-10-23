@@ -4,11 +4,15 @@ Repository: https://github.com/harrynguon/ScarletMeter (private, default branch 
 
 ## State
 
-What ARCHITECTURE.md describes exists: `upstream/` submodule at release v1.11.5.341, the engine over upstream's pipeline, a chromeless translucent overlay with a settings window (appearance, fight options, hotkey, remembered positions, all saved in `settings.json`), a player details window (skills, buffs, damage graph, combat log; live or from a saved fight) and a history window of saved boss fights, a `--demo` mode with synthetic fights, world-event notices at the bottom of the overlay, boundary, mapping, settings and close-ordering tests, build, upstream-update, publish-layout and UI smoke scripts, CI. The upstream release check is being added in a separate PR (WORKLOG.md). Checks that have actually run are listed in WORKLOG.md; nothing has been tried in the game.
+What ARCHITECTURE.md describes exists: `upstream/` submodule at release v1.11.5.341, the engine over upstream's pipeline, a chromeless translucent overlay with a settings window (appearance, fight options, hotkey, remembered positions, all saved in `settings.json`), a player details window (skills, buffs, damage graph, combat log; live or from a saved fight) and a history window of saved boss fights, a `--demo` mode with synthetic fights, world-event notices at the bottom of the overlay, boundary, mapping, settings and close-ordering tests, build, upstream-update, publish-layout and UI smoke scripts, CI. The upstream release check and installer are in (see Updates below); the check is not shown in the UI yet (WORKLOG.md). Checks that have actually run are listed in WORKLOG.md; nothing has been tried in the game.
 
 World-event notices are in the overlay: `src/ScarletMeter.WorldEvents` (ARCHITECTURE.md "World events") holds the schedules and the alert planner, ported from the fork's World Companion, and the overlay shows them ("Overlay notices"), five minutes ahead by default, with an Alerts tab in settings. The times are not verified in the game.
 
 The engine also offers per-player details (`GetPlayerDetails`), boss-fight history (`GetHistory`, `GetHistoryFight`) and a demo mode (`--demo`: synthetic fights through upstream's fight tracking, for UI work without the game); see WORKLOG.md, 2026-10-24. The app's pages for them are being built separately.
+Updates (2026-10-24, ARCHITECTURE.md "Updates"): builds stamp the pinned upstream release; `UpstreamReleaseChecker` tells whether upstream has a newer one but is not wired into the UI yet; `scripts/Install-Meter.ps1` builds and installs for the current user. Upstream published v1.11.5.341 on 2026-10-23 (a live run of the checker reported it); the pin moved to it on 2026-10-24 (WORKLOG.md).
+
+- [ ] Wire the checker into the UI: register it with `AddUpstreamReleaseChecker` in `App.xaml.cs`, show a quiet overlay notice for `NewerAvailable`, and add a settings switch that stops calling `CheckAsync`.
+- [ ] Install once to the default location with `Install-Meter.ps1 -Shortcut`, which also brings in v1.11.5.341 (every install so far went to a temporary directory).
 
 ## Next: in-game acceptance
 

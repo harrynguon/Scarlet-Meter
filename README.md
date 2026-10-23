@@ -10,10 +10,10 @@ Status: in development, not yet tried in the game. Capture, decoding, fight trac
 | --- | --- |
 | `upstream/` | RATmeter at a release tag (submodule). Never edited here. |
 | `src/ScarletMeter.Engine` | The only project that references upstream. Wraps its pipeline behind Scarlet's own contracts (`ICombatEngine`, `CombatSnapshot`, `PlayerDetails`, the history records). |
-| `src/ScarletMeter.App` | WPF windows hosting Blazor WebViews (overlay, settings, player details, history) and the settings store; references the engine and the world-events module, never upstream. |
+| `src/ScarletMeter.App` | WPF windows hosting Blazor WebViews (overlay, settings, player details, history), the settings store and the upstream release check (`Updates/`); references the engine and the world-events module, never upstream. |
 | `src/ScarletMeter.WorldEvents` | World event schedules (Global preset) and the alert planner for overlay notices; pure .NET, no dependencies; drives the overlay's notices. Times are not verified in the game. |
-| `tests/ScarletMeter.Tests` | Boundary guards, engine mapping, settings, close-ordering and world-event schedule tests (no Npcap needed). |
-| `scripts/` | `Build.ps1` (restore, build, test), `Update-Upstream.ps1 -Tag vX.Y.Z.N`, `Test-PublishLayout.ps1` and `Smoke-Meter.ps1` (drives the UI for checks). Each derives its paths from its own location. |
+| `tests/ScarletMeter.Tests` | Boundary guards, engine mapping, settings, close-ordering, world-event schedule, build-stamp and release-check tests (no Npcap needed). |
+| `scripts/` | `Build.ps1` (restore, build, test), `Install-Meter.ps1` (build and install for the current user) with its folder rules `InstallFolders.ps1` and `Test-InstallMeter.ps1` (its refusal, delete and swap checks), `Update-Upstream.ps1 -Tag vX.Y.Z.N`, `Test-PublishLayout.ps1` and `Smoke-Meter.ps1` (drives the UI for checks). Each derives its paths from its own location. |
 | `docs/` | Maintainer documentation. Start with [docs/README.md](docs/README.md). |
 
 ## Build and run
@@ -36,6 +36,14 @@ Run `src\ScarletMeter.App` from your IDE, or publish it as described in [docs/DE
 ```
 
 Releases only, never upstream's `dev` branch. The script moves the submodule, rebuilds and runs the tests; a compile error in `src/ScarletMeter.Engine/Upstream` is the signal that upstream changed an API the engine maps.
+
+## Install and update
+
+```powershell
+& "<checkout>\scripts\Install-Meter.ps1" -Shortcut
+```
+
+Builds and tests a Release, publishes it and installs it to `%LocalAppData%\Programs\ScarletMeter`, keeping the previous install in `ScarletMeter.previous` for a rollback by hand; close the meter first. It only replaces folders it made itself, and your data in `%LocalAppData%\ScarletMeter` is never touched. There is no self-updater, because the meter is built from source: when upstream publishes a release (the meter will say so, from one anonymous request to GitHub at most every six hours), run `Update-Upstream.ps1` with the new tag, then `Install-Meter.ps1` again. Details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), "Install and update".
 
 ## Licence and terms
 

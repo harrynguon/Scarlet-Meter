@@ -38,4 +38,7 @@
           ExcludeFromSingleFile="true" />
   </ItemGroup>
 
+  <!-- Stamps the pinned upstream release and Scarlet's commit into this assembly (read by Updates/BuildInfo.cs). -->
+  <Import Project="$(MSBuildThisFileDirectory)Updates\BuildStamp.targets" />
+
 </Project>

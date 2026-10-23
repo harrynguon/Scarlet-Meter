@@ -160,8 +160,9 @@ internal static class UpstreamMapping
             }
             catch (Exception ex)
             {
-                // Defence in depth behind the sanitizer: saved data is not trusted, and one player's damage must
-                // not cost the whole fight.
+                // Defence in depth behind the sanitizer: no known damage reaches here once SavedFightSanitizer has
+                // cleaned the snapshot, so no test drives it; saved data is not trusted, and one player's damage
+                // must not cost the whole fight.
                 playerFailed?.Invoke(player.PlayerId, ex);
             }
         }
