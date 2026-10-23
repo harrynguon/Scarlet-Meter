@@ -1,10 +1,14 @@
 # Repository instructions
 
-Read docs/README.md and docs/HANDOFF.md before changes. Update relevant docs and docs/WORKLOG.md for each meaningful change: reason, actual checks, unresolved issues and next action. Keep architecture and reproducible commands current. Do not infer acceptance from unchecked items.
+Read docs/README.md, docs/HANDOFF.md and docs/LESSONS.md before changes. Update relevant docs and docs/WORKLOG.md for each meaningful change: reason, actual checks, unresolved issues and next action. Keep architecture and reproducible commands current. Do not infer acceptance from unchecked items.
 
 ## Security
 
 Security comes first in every change. Never store sensitive data in the repository, in code, configuration, fixtures, scripts, docs, commit messages or PR text: no API keys, tokens, passwords or other credentials, no authentication data, personal data or progress, packet captures or private combat logs. Never print or log them either. Use synthetic fixtures, validate untrusted data (network answers, `settings.json`, imported files) and preserve recovery protections (backups, keeping unreadable files aside, read-only for newer formats). Paths in the repository never depend on the starting directory (Paths, below).
+
+## Lessons
+
+When a mistake is found, by a test, the auditor, Codex, a smoke run or the player, record it in docs/LESSONS.md in the same change that fixes it: what went wrong, why it got through, and the guard that now catches it (a test, a check, a rule). Read docs/LESSONS.md before starting work, and prefer adding a guard to adding a note.
 
 ## Paths
 

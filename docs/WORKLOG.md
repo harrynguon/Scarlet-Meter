@@ -2,6 +2,24 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Codex reviews of PRs #1 to #3, and a lessons log
+
+**What:** Codex's review of #1, #2 and #3 never finished when those PRs were opened, so it was requested again (`@codex review`); it reviewed each PR's merged commit. #3: no findings. Three findings, all still true on `main` (871702e), are fixed here:
+
+- #1, P1: the boundary test's helpers `IsVisibleOutsideAssembly` and `InheritedTypesOf` had no purpose comments (AGENTS.md, "Structure and comments"). They now say what they count and why protected members do.
+- #2, P2, `SettingsStore`: with `settings.json` missing, a backup that was damaged, from a newer build or locked still left saving on, so the second save's `File.Replace` would have overwritten the only recoverable settings. That backup is now kept aside like a damaged main file, and saving is switched off when it cannot be opened or moved.
+- #2, P2, `WindowPlacementTracker`: a saved placement was checked against the virtual screen's bounding box, so after a layout change it could restore into the empty corner of an L-shaped layout, off every monitor. `ScreenPlacement` now checks each monitor (`EnumDisplayMonitors`, at the system DPI that SystemParameters uses), falling back to the virtual screen if none can be listed.
+
+Also docs/LESSONS.md: the mistakes found so far, why they got through and what now guards them; AGENTS.md "Lessons" asks for an entry with every fix.
+
+**Why:** Harry asked for Codex to review #1 to #3 and for anything still applicable to be fixed, and for mistakes to be learnt from and documented as work goes on.
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` Debug and Release: 362/362, 8 new (`SettingsTests` four, `ScreenPlacementTests` four). The four settings tests failed with the old missing-file behaviour put back (an early return to defaults), then passed.
+
+**Not checked:** a real L-shaped or mixed-DPI monitor layout (this machine has the layout it has; the check is tested on synthetic rectangles). A per-monitor-DPI layout uses system-DPI units, as `SystemParameters` and the old check did.
+
+**Next:** PR, audit (saved data: deep), Codex's review, CI and merge.
+
 ## 2026-10-24 — Codex review comments on PRs #1 to #11
 
 **What:** Every comment the Codex bot (chatgpt-codex-connector) left on PRs #1 to #11, checked against `main` at b76c148, and the two that still held fixed. AGENTS.md now has a Security section (no API keys, tokens, passwords or other credentials anywhere in the repository; no paths that depend on the starting directory) and makes reading every PR review comment, Codex's included, part of review and merge; the scarlet-ship skill and the scarlet-auditor agent say how.

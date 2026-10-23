@@ -239,6 +239,55 @@ public sealed class SettingsTests : IDisposable
         Assert.Equal(good, NewStore().Load().Settings); // the backup survived; the damaged file was kept aside
     }
 
+    // Codex review on PR #2: with settings.json missing, an unusable backup must survive the next saves.
+    [Theory]
+    [InlineData("{ damaged")]
+    [InlineData("""{ "version": 99, "appearance": { "rowScale": 1.25 } }""")]
+    public void WithoutTheMainFileAnUnusableBackupIsKeptAsideBeforeAnySave(string backup)
+    {
+        var store = NewStore();
+        File.WriteAllText(store.BackupPath, backup);
+
+        var result = store.Load();
+        Assert.Equal(SettingsLoadStatus.ResetToDefaults, result.Status);
+        Assert.True(result.CanSave);
+        Assert.False(File.Exists(store.BackupPath));
+        var kept = Assert.Single(Directory.GetFiles(directory.FullPath, "settings.bak.unreadable-*.json"));
+        Assert.Equal(backup, File.ReadAllText(kept));
+
+        store.Save(new MeterSettings());
+        store.Save(new MeterSettings { Appearance = new AppearanceSettings { RowScale = 1.2 } });
+        Assert.Equal(backup, File.ReadAllText(kept)); // two saves later, the old backup is intact
+    }
+
+    [Fact]
+    public void WithoutTheMainFileABackupThatCannotBeOpenedSwitchesSavingOff()
+    {
+        var store = NewStore();
+        File.WriteAllText(store.BackupPath, """{ "version": 1 }""");
+        using (new FileStream(store.BackupPath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            var result = store.Load();
+            Assert.Equal(SettingsLoadStatus.ReadOnly, result.Status);
+            Assert.False(result.CanSave);
+        }
+        Assert.Equal("""{ "version": 1 }""", File.ReadAllText(store.BackupPath));
+    }
+
+    [Fact]
+    public void WithoutTheMainFileAnUnusableBackupThatCannotBeMovedSwitchesSavingOff()
+    {
+        var store = NewStore();
+        File.WriteAllText(store.BackupPath, "{ damaged");
+        using (new FileStream(store.BackupPath, FileMode.Open, FileAccess.Read, FileShare.Read)) // readable, not movable
+        {
+            var result = store.Load();
+            Assert.Equal(SettingsLoadStatus.ReadOnly, result.Status);
+            Assert.False(result.CanSave);
+        }
+        Assert.Equal("{ damaged", File.ReadAllText(store.BackupPath));
+    }
+
     [Fact]
     public void AnOversizedFileIsNotParsed()
     {

@@ -6,15 +6,12 @@ namespace ScarletMeter.App.Windows;
 
 /// <summary>
 /// Remembers a window's position and size in settings. <see cref="Restore"/> runs before the window is
-/// shown and ignores a saved placement that would land off every screen (a monitor was unplugged); moves
-/// and resizes are saved shortly after they stop, and once more when the window closes. Only the normal
-/// (not minimized or maximized) state is saved.
+/// shown and ignores a saved placement that would land off every monitor (one was unplugged or the layout
+/// changed; see <see cref="ScreenPlacement"/>); moves and resizes are saved shortly after they stop, and once
+/// more when the window closes. Only the normal (not minimized or maximized) state is saved.
 /// </summary>
 internal sealed class WindowPlacementTracker
 {
-    // How much of a restored window must overlap the desktop for the saved placement to be used.
-    private const double MinVisibleWidth = 80;
-    private const double MinVisibleHeight = 40;
 
     private readonly Window window;
     private readonly string key;
@@ -62,12 +59,8 @@ internal sealed class WindowPlacementTracker
             : s with { Windows = new Dictionary<string, WindowPlacement>(s.Windows) { [key] = placement } });
     }
 
-    // The virtual screen spans every monitor; a placement that barely touches it is treated as lost.
-    private static bool IsOnDesktop(WindowPlacement p)
-    {
-        var desktop = new Rect(SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
-            SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
-        var overlap = Rect.Intersect(desktop, new Rect(p.Left, p.Top, p.Width, p.Height));
-        return !overlap.IsEmpty && overlap.Width >= MinVisibleWidth && overlap.Height >= MinVisibleHeight;
-    }
+    // A placement that barely touches any single monitor is treated as lost (Codex review on PR #2: the
+    // virtual screen's bounding box also covers the gaps between monitors).
+    private static bool IsOnDesktop(WindowPlacement p) =>
+        ScreenPlacement.IsVisible(new Rect(p.Left, p.Top, p.Width, p.Height), ScreenPlacement.Monitors());
 }

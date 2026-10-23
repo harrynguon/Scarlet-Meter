@@ -69,14 +69,28 @@ public sealed class SettingsStore
         switch (main.Outcome)
         {
             case ReadOutcome.Missing:
-                // A previous run may have set a damaged file aside without saving again: restore its backup.
+                // A previous run may have set a damaged file aside without saving again: restore its backup. A
+                // backup that cannot be used is protected like a damaged main file, because the second save's
+                // File.Replace would overwrite it: kept aside, or saving switched off if it cannot be moved.
                 var previous = TryRead(BackupPath);
-                if (previous.Outcome == ReadOutcome.Read)
-                    return Loaded(previous.Settings!, SettingsLoadStatus.RecoveredFromBackup) with
-                    {
-                        Notice = "Your settings file was missing, so the previous save was restored.",
-                    };
-                return new SettingsLoadResult(SettingsNormalizer.Normalize(null).Settings, SettingsLoadStatus.Defaults, true, null);
+                switch (previous.Outcome)
+                {
+                    case ReadOutcome.Read:
+                        return Loaded(previous.Settings!, SettingsLoadStatus.RecoveredFromBackup) with
+                        {
+                            Notice = "Your settings file was missing, so the previous save was restored.",
+                        };
+                    case ReadOutcome.Missing:
+                        return new SettingsLoadResult(SettingsNormalizer.Normalize(null).Settings, SettingsLoadStatus.Defaults, true, null);
+                    case ReadOutcome.Inaccessible:
+                        return ReadOnlyDefaults($"Your settings file was missing, and the previous save could not be opened ({previous.Error?.Message}).");
+                }
+                var keptBackup = KeepAside(BackupPath);
+                if (keptBackup is null)
+                    return ReadOnlyDefaults("Your settings file was missing, and the previous save could not be used or set aside.");
+                logger.LogWarning(previous.Error, "settings.json was missing and its backup could not be used; the backup was kept as {Kept}.", keptBackup);
+                return new SettingsLoadResult(SettingsNormalizer.Normalize(null).Settings, SettingsLoadStatus.ResetToDefaults, true,
+                    $"Your settings file was missing and the previous save could not be used, so defaults are in use. The previous save was kept as {Path.GetFileName(keptBackup)}.");
             case ReadOutcome.Read:
                 return Loaded(main.Settings!, SettingsLoadStatus.Loaded);
             case ReadOutcome.NewerVersion:

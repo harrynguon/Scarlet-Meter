@@ -62,6 +62,18 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
 
+    /// <summary>Called once per monitor by <see cref="EnumDisplayMonitors"/>; return true to continue.</summary>
+    public delegate bool MonitorEnumProc(IntPtr monitor, IntPtr deviceContext, IntPtr clip, IntPtr data);
+
+    /// <summary>Lists every display monitor (with no device context or clip, the whole desktop).</summary>
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool EnumDisplayMonitors(IntPtr deviceContext, IntPtr clip, MonitorEnumProc callback, IntPtr data);
+
+    /// <summary>The system DPI (96 at 100% scaling), which SystemParameters' device-independent units are based on.</summary>
+    [DllImport("user32.dll")]
+    public static extern uint GetDpiForSystem();
+
     [DllImport("dwmapi.dll")]
     public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 }
