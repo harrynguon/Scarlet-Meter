@@ -92,7 +92,7 @@ It runs `Build.ps1 -Configuration Release` (with the tests), publishes the self-
 - `scripts/Test-InstallMeter.ps1` checks those refusals (and that owned folders still pass) against throwaway folders in the temp directory, with `-CheckOnly`. It also runs the delete and swap paths from `scripts/InstallFolders.ps1` (the installer's folder rules) on fake installs: a `.retired` with a file held open keeps its marker and blocks the swap, then goes once released, and a failed rename is undone. CI runs it.
 - A warning says when the checkout has uncommitted changes: they are in the installed build, but its stamped commit does not show them.
 
-When upstream publishes a release (the meter will show a notice once the UI wires `UpstreamReleaseChecker` in; until then, see below), move the pin, then reinstall:
+When upstream publishes a release (a quiet line in the overlay says so, and Settings, About gives these two commands with the tag filled in), move the pin, then reinstall:
 
 ```powershell
 & "<checkout>\scripts\Update-Upstream.ps1" -Tag vX.Y.Z.N
@@ -108,7 +108,7 @@ When upstream publishes a release (the meter will show a notice once the UI wire
 
 The script targets Windows PowerShell 5.1 and pwsh; its git calls use `--quiet` so git's success messages on stderr cannot abort it in a host without a console (ISE, VS Code). It fetches upstream's tags, refuses anything that is not a release tag, moves the submodule, stages the new pin and runs the build and tests. Then skim upstream's release notes, record the update in docs/WORKLOG.md and the pinned release in docs/ARCHITECTURE.md, commit, and reinstall with `Install-Meter.ps1`. A compile error in `src/ScarletMeter.Engine/Upstream` means upstream changed an API the engine maps; the table in ARCHITECTURE.md says where each kind of change lands.
 
-Checking what the latest release is: `gh release list -R Kuroukihime/AIon2-Dps-Meter --limit 5`, or upstream's Releases page. Once the UI wires it in, the meter's own release check says so (ARCHITECTURE.md, "Updates").
+Checking what the latest release is: `gh release list -R Kuroukihime/AIon2-Dps-Meter --limit 5`, or upstream's Releases page. The meter's own release check also says so, in the overlay and in Settings, About (ARCHITECTURE.md, "Updates").
 
 ## CI
 
