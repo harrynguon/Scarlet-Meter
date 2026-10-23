@@ -3,6 +3,7 @@ using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ScarletMeter.App.Alerts;
 using ScarletMeter.App.Settings;
 using ScarletMeter.App.Windows;
 using ScarletMeter.Engine;
@@ -86,6 +87,8 @@ public partial class App : Application
         builder.Services.AddSingleton<MeterWindows>();
         builder.Services.AddSingleton<IMeterWindows>(services => services.GetRequiredService<MeterWindows>());
         builder.Services.AddSingleton<DetailsSelection>();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<AlertMonitor>();
         builder.Services.AddWpfBlazorWebView();
 
         host = builder.Build();
@@ -95,7 +98,9 @@ public partial class App : Application
         engine = host.Services.GetRequiredService<ICombatEngine>();
         engine.Start();
 
-        MainWindow = host.Services.GetRequiredService<MeterWindows>().ShowOverlay();
+        var windows = host.Services.GetRequiredService<MeterWindows>();
+        MainWindow = windows.ShowOverlay();
+        windows.FollowAlerts(host.Services.GetRequiredService<AlertMonitor>());
     }
 
     protected override void OnExit(ExitEventArgs e)

@@ -36,6 +36,8 @@ public sealed class SettingsStore
     /// <summary>Settings files are tiny; anything larger is not ours and is not parsed.</summary>
     public const long MaxFileBytes = 1024 * 1024;
 
+    private static ReadOnlySpan<byte> Utf8Bom => [0xEF, 0xBB, 0xBF];
+
     internal static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -164,7 +166,11 @@ public sealed class SettingsStore
 
         try
         {
-            var settings = JsonSerializer.Deserialize<MeterSettings>(bytes, JsonOptions);
+            // Editors that save "UTF-8 with BOM" (Windows PowerShell, older Notepad) prefix a byte-order mark,
+            // which the UTF-8 JSON reader rejects; a hand-edited file must still load.
+            var json = bytes.AsSpan();
+            if (json.StartsWith(Utf8Bom)) json = json[Utf8Bom.Length..];
+            var settings = JsonSerializer.Deserialize<MeterSettings>(json, JsonOptions);
             if (settings is null) return new ReadResult(ReadOutcome.Unreadable, Error: new InvalidDataException("The file holds no settings."));
             if (settings.Version > MeterSettings.CurrentVersion) return new ReadResult(ReadOutcome.NewerVersion, settings, settings.Version);
             if (settings.Version < 1) return new ReadResult(ReadOutcome.Unreadable, Error: new InvalidDataException($"Unknown settings version {settings.Version}."));
