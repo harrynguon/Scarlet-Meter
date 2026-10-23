@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using ScarletMeter.App.Alerts;
 using ScarletMeter.App.Pages;
 using ScarletMeter.App.Settings;
 using ScarletMeter.Engine;
@@ -149,6 +150,23 @@ public sealed class MeterWindows : IMeterWindows
     public void CloseMeter()
     {
         if (!modalOpen) overlay?.Close();
+    }
+
+    /// <summary>
+    /// Brings a minimized meter back once per event occurrence, when its Soon notice appears (if the player
+    /// wants that), without activating it, so the game keeps keyboard focus. Owned tool windows reappear with
+    /// the overlay.
+    /// </summary>
+    public void FollowAlerts(AlertMonitor alerts)
+    {
+        alerts.EventApproaching += (_, _) => Application.Current?.Dispatcher.InvokeAsync(() =>
+        {
+            if (overlay is null || closing || modalOpen || overlay.WindowState != WindowState.Minimized) return;
+            if (!settings.Current.Alerts.RestoreMinimizedMeter) return;
+            var handle = new System.Windows.Interop.WindowInteropHelper(overlay).Handle;
+            if (handle != IntPtr.Zero) NativeMethods.ShowWindow(handle, NativeMethods.SwShowNoActivate);
+        });
+        alerts.Start();
     }
 
     public void SuspendHotkey(bool suspended)
