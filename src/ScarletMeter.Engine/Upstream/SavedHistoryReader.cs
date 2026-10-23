@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Globalization;
 using AionDpsMeter.Services.Services.Session;
 using AionDpsMeter.Services.Services.Session.Persistence;
@@ -6,91 +7,96 @@ using Microsoft.EntityFrameworkCore;
 namespace ScarletMeter.Engine.Upstream;
 
 /// <summary>
-/// Reads the saved history list without trusting its columns, for when upstream's own query fails on a damaged
-/// row. Upstream's store parses each row's dates while it materialises the page, so one unparsable value fails
-/// the whole list. Here every list column is read as text and parsed in C#: rows that do not parse are skipped
-/// and counted, and the others are filtered, ordered and paged as upstream does (name contained, any case; end
-/// time within the range, both bounds inclusive; newest end first).
+/// Reads the saved history list row by row, for when upstream's own query fails on a damaged row: its store
+/// reads a whole page in one go, so one row that does not read fails every page it falls on. Here each row's
+/// list columns are read with the same SQLite provider calls EF Core makes for upstream's store (GetGuid,
+/// GetInt32, GetInt64, GetString, GetDateTime), so a row is skipped exactly when upstream could not read it,
+/// and reads the same when it can: text in a number column reads as 0, and any State number is accepted, as
+/// upstream reads them. The rows read are filtered, ordered and paged as upstream's query does, with two
+/// differences that only rows upstream would not write can show: dates are compared as read rather than as the
+/// stored text SQL compares, and so is the newest-first order.
 /// </summary>
 /// <remarks>
-/// Only the list columns are read, never the per-player JSON, so this stays cheap enough to run over the whole
-/// table. It reads upstream's schema (table CombatSessions, its entity's column names) directly; a schema change
-/// shows as HistoryTests' damaged-row test failing. Running fights are not included: they live in upstream's
-/// session manager, whose list is the query that failed.
+/// The name filter matches upstream's: the stored name lowered by SQLite's lower(), which folds ASCII letters
+/// only, contains the search lowered in the current culture, compared ordinally. Only the list columns are
+/// read, never the per-player JSON, so this stays cheap enough to run over the whole table. It reads upstream's
+/// schema (table CombatSessions, its entity's column names) directly; a schema change shows as HistoryTests'
+/// damaged-row tests failing. Running fights are not included: they live in upstream's session manager, whose
+/// list is the query that failed.
 /// </remarks>
 internal sealed class SavedHistoryReader(IDbContextFactory<CombatHistoryDbContext> contexts)
 {
     private const string ListQuery =
-        "SELECT CAST(SessionId AS TEXT) AS SessionId, CAST(TargetId AS TEXT) AS TargetId, " +
-        "CAST(TargetName AS TEXT) AS TargetName, CAST(TargetHpTotal AS TEXT) AS TargetHpTotal, " +
-        "CAST(SessionStart AS TEXT) AS SessionStart, CAST(SessionEnd AS TEXT) AS SessionEnd, " +
-        "CAST(State AS TEXT) AS State, CAST(TotalDamage AS TEXT) AS TotalDamage, " +
-        "CAST(PlayerCount AS TEXT) AS PlayerCount FROM CombatSessions";
+        "SELECT SessionId, TargetId, TargetName, TargetHpTotal, SessionStart, SessionEnd, State, TotalDamage, PlayerCount " +
+        "FROM CombatSessions";
 
-    /// <summary>The page the query asks for among the rows that parse, how many such rows match, and how many rows were skipped.</summary>
+    /// <summary>The page the query asks for among the rows that read, how many such rows match, and how many rows were skipped.</summary>
     public (IReadOnlyList<HistorySessionListItem> Items, int TotalCount, int Skipped) ReadPage(HistoryQuery query)
     {
-        using var db = contexts.CreateDbContext();
-        var rows = db.Database.SqlQueryRaw<RawRow>(ListQuery).ToList();
-
-        var items = new List<HistorySessionListItem>(rows.Count);
-        foreach (var row in rows)
-        {
-            if (TryParse(row) is { } item) items.Add(item);
-        }
-
-        var name = query.TargetNameContains;
+        var (items, skipped) = ReadAll();
+        // Upstream lowers the search in C# (current culture) and the stored name in SQL (ASCII only).
+        var search = query.TargetNameContains?.ToLower(CultureInfo.CurrentCulture);
         var matching = items
-            .Where(item => name is null || item.TargetName.Contains(name, StringComparison.OrdinalIgnoreCase))
+            .Where(item => search is null || AsciiLower(item.TargetName).Contains(search, StringComparison.Ordinal))
             .Where(item => query.From is not { } from || item.SessionEnd >= from)
             .Where(item => query.To is not { } to || item.SessionEnd <= to)
             .OrderByDescending(item => item.SessionEnd)
             .ToList();
         // HistoryQuery.Validate bounds the page, so the skip stays inside int.
         var page = matching.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToList();
-        return (page, matching.Count, rows.Count - items.Count);
+        return (page, matching.Count, skipped);
     }
 
-    // A row whose every column parses as upstream writes it, or null.
-    private static HistorySessionListItem? TryParse(RawRow row)
+    // Every row that reads, and how many did not. A failure to query at all (no table, a locked file) throws.
+    private (List<HistorySessionListItem> Items, int Skipped) ReadAll()
     {
-        var invariant = CultureInfo.InvariantCulture;
-        if (!Guid.TryParse(row.SessionId, out var id)
-            || !int.TryParse(row.TargetId, NumberStyles.Integer, invariant, out var targetId)
-            || !long.TryParse(row.TargetHpTotal, NumberStyles.Integer, invariant, out var hpTotal)
-            || !DateTime.TryParse(row.SessionStart, invariant, DateTimeStyles.None, out var start)
-            || !DateTime.TryParse(row.SessionEnd, invariant, DateTimeStyles.None, out var end)
-            || !int.TryParse(row.State, NumberStyles.Integer, invariant, out var state)
-            || !Enum.IsDefined((SessionState)state)
-            || !long.TryParse(row.TotalDamage, NumberStyles.Integer, invariant, out var totalDamage)
-            || !int.TryParse(row.PlayerCount, NumberStyles.Integer, invariant, out var playerCount))
-            return null;
+        using var db = contexts.CreateDbContext();
+        db.Database.OpenConnection();
+        using var command = db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = ListQuery;
+        using var reader = command.ExecuteReader();
 
-        return new HistorySessionListItem
+        var items = new List<HistorySessionListItem>();
+        var skipped = 0;
+        while (reader.Read())
         {
-            SessionId = id,
-            TargetId = targetId,
-            TargetName = row.TargetName ?? string.Empty,
-            TargetHpTotal = hpTotal,
-            SessionStart = start,
-            SessionEnd = end,
-            State = (SessionState)state,
-            TotalDamage = totalDamage,
-            PlayerCount = playerCount,
-        };
+            if (TryRead(reader) is { } item) items.Add(item);
+            else skipped++;
+        }
+        return (items, skipped);
     }
 
-    /// <summary>One row's list columns, as text.</summary>
-    private sealed class RawRow
+    // One row read as EF Core reads it for upstream's store, or null where that read throws.
+    private static HistorySessionListItem? TryRead(DbDataReader row)
     {
-        public string? SessionId { get; set; }
-        public string? TargetId { get; set; }
-        public string? TargetName { get; set; }
-        public string? TargetHpTotal { get; set; }
-        public string? SessionStart { get; set; }
-        public string? SessionEnd { get; set; }
-        public string? State { get; set; }
-        public string? TotalDamage { get; set; }
-        public string? PlayerCount { get; set; }
+        try
+        {
+            return new HistorySessionListItem
+            {
+                SessionId = row.GetGuid(0),
+                TargetId = row.GetInt32(1),
+                TargetName = row.GetString(2),
+                TargetHpTotal = row.GetInt64(3),
+                SessionStart = row.GetDateTime(4),
+                SessionEnd = row.GetDateTime(5),
+                State = (SessionState)row.GetInt32(6),
+                TotalDamage = row.GetInt64(7),
+                PlayerCount = row.GetInt32(8),
+            };
+        }
+        catch (Exception)
+        {
+            // The provider throws a range of types for a value it cannot read (format, cast, overflow, null);
+            // whichever it is, upstream's read of this row would have failed the same way.
+            return null;
+        }
     }
+
+    // SQLite's built-in lower(): ASCII letters only, everything else unchanged.
+    private static string AsciiLower(string value) =>
+        string.Create(value.Length, value, static (chars, source) =>
+        {
+            for (var i = 0; i < source.Length; i++)
+                chars[i] = source[i] is >= 'A' and <= 'Z' ? (char)(source[i] + 32) : source[i];
+        });
 }

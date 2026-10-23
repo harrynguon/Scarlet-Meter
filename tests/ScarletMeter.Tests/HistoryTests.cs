@@ -220,19 +220,30 @@ public sealed class HistoryTests : IDisposable
     [Fact]
     public void AFightSavedWithAnUnusableStartOrEndShowsItsPlayersOnly()
     {
-        var unset = SaveAndFind(901, Day1, 20);
-        var tooLong = SaveAndFind(902, Day1.AddDays(1), 20);
-        Damage(901, row => row.SessionStart = DateTime.MinValue);
-        Damage(902, row => row.SessionEnd = row.SessionStart.AddDays(3)); // longer than any fight
+        Guid[] fights =
+        [
+            SaveAndFind(901, Day1, 20),
+            SaveAndFind(902, Day1.AddDays(1), 20),
+            SaveAndFind(903, Day1.AddDays(2), 20),
+            SaveAndFind(904, Day1.AddDays(3), 20),
+            SaveAndFind(905, Day1.AddDays(4), 20),
+        ];
+        Damage(901, row => row.SessionStart = DateTime.MinValue);                  // unset
+        Damage(902, row => row.SessionEnd = row.SessionStart.AddDays(3));          // longer than any fight
+        Damage(903, row => row.SessionEnd = row.SessionStart.AddMinutes(-1));      // ends before it starts
+        // An hour long and in order, but so near DateTime's limits that the window's slack would overflow:
+        // only the margin from those limits rejects these two.
+        Damage(904, row => (row.SessionStart, row.SessionEnd) = (DateTime.MinValue.AddHours(1), DateTime.MinValue.AddHours(2)));
+        Damage(905, row => (row.SessionStart, row.SessionEnd) = (DateTime.MaxValue.AddHours(-2), DateTime.MaxValue.AddHours(-1)));
 
-        foreach (var fightId in new[] { unset, tooLong })
+        foreach (var fightId in fights)
         {
             var fight = Assert.IsType<HistoryFight>(Engine.GetHistoryFight(fightId));
             Assert.Equal(["Alpha", "Beta"], fight.Players.Select(p => p.Name).Order(StringComparer.Ordinal));
             Assert.Empty(fight.Details); // nothing in it can be timed
         }
-        Assert.Equal(2, Engine.GetHistory(new HistoryQuery()).TotalCount); // both still listed
-        Assert.Equal(2, log.Warnings.Count(w => w.Contains("unusable start", StringComparison.Ordinal)));
+        Assert.Equal(fights.Length, Engine.GetHistory(new HistoryQuery()).TotalCount); // all still listed
+        Assert.Equal(fights.Length, log.Warnings.Count(w => w.Contains("unusable start", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -240,7 +251,7 @@ public sealed class HistoryTests : IDisposable
     {
         var first = SaveAndFind(901, Day1, 60);
         var broken = SaveAndFind(902, Day1.AddDays(1), 60);
-        SaveAndFind(903, Day1.AddDays(2), 60);
+        SaveAndFind(903, Day1.AddDays(2), 60, SyntheticCombat.FedivWraithCode);
         Assert.Equal(1, Sql("UPDATE CombatSessions SET SessionEnd = 'not a date' WHERE TargetId = 902"));
         Assert.Throws<FormatException>(() => combat.History.GetSessionList()); // the premise: upstream's own read fails
 
@@ -249,28 +260,57 @@ public sealed class HistoryTests : IDisposable
         Assert.False(page.IsComplete);
         Assert.Equal(2, page.TotalCount);
         Assert.Equal([Day1.AddDays(2), Day1], page.Entries.Select(e => e.Start));
+        Assert.Equal(["Fediv Wraith", "Aultross"], page.Entries.Select(e => e.TargetName));
         Assert.All(page.Entries, entry => Assert.True(entry.Completed));
         Assert.Contains(log.Errors, e => e.Contains("could not be read as saved", StringComparison.Ordinal));
         Assert.Contains(log.Warnings, w => w.Contains("because they could not be read: 1", StringComparison.Ordinal));
 
         // Every later page is read the same way, so pages agree: this one would not contain the damaged row,
         // and upstream would have returned it whole yet counted the damaged row. Filters still apply.
-        var second = Engine.GetHistory(new HistoryQuery("aultross", PageSize: 1, Page: 2));
+        var second = Engine.GetHistory(new HistoryQuery(PageSize: 1, Page: 2));
         Assert.False(second.IsComplete);
         Assert.Equal(2, second.TotalCount);
         Assert.Equal([Day1], second.Entries.Select(e => e.Start));
+        Assert.Equal([Day1], Starts(new HistoryQuery("  aultross ")));   // trimmed, any case, as upstream matches
+        Assert.Equal([Day1.AddDays(2)], Starts(new HistoryQuery("WRAITH")));
+        Assert.Empty(Starts(new HistoryQuery("Nobody")));
         Assert.Empty(Engine.GetHistory(new HistoryQuery(From: Day1.AddDays(1), To: Day1.AddDays(1).AddHours(1))).Entries);
 
         Assert.Null(Engine.GetHistoryFight(broken)); // logged, not thrown
         Assert.Contains(log.Errors, e => e.Contains($"Fight {broken} could not be read", StringComparison.Ordinal));
         Assert.NotNull(Engine.GetHistoryFight(first));
 
-        // Once the row reads again, the next read finds nothing to leave out and hands back to upstream's query.
+        // Once upstream reads every row again, the very next call is upstream's own query.
         Assert.Equal(1, Sql("UPDATE CombatSessions SET SessionEnd = '2026-10-21 20:01:00.5' WHERE TargetId = 902"));
-        Assert.False(Engine.GetHistory(new HistoryQuery()).IsComplete);
         var healed = Engine.GetHistory(new HistoryQuery());
         Assert.True(healed.IsComplete);
         Assert.Equal(3, healed.TotalCount);
+    }
+
+    [Fact]
+    public void DamagedModeEndsWhenUpstreamCanReadEveryRowAgain()
+    {
+        // The second audit's probe: one row upstream cannot read (text in a date column) and one it reads its own
+        // way (text in a number column reads as 0). Only the first is left out, and once it is repaired upstream
+        // reads every row, so the history is whole again, however the row-by-row read would have judged the second.
+        SaveAndFind(901, Day1, 20);
+        SaveAndFind(902, Day1.AddDays(1), 20);
+        SaveAndFind(903, Day1.AddDays(2), 20);
+        Assert.Equal(1, Sql("UPDATE CombatSessions SET SessionEnd = 'not a date' WHERE TargetId = 902"));
+        Assert.Equal(1, Sql("UPDATE CombatSessions SET PlayerCount = 'x' WHERE TargetId = 903"));
+
+        var damaged = Engine.GetHistory(new HistoryQuery());
+        Assert.False(damaged.IsComplete);
+        Assert.Equal(2, damaged.TotalCount);
+        Assert.Equal(0, Assert.Single(damaged.Entries, e => e.Start == Day1.AddDays(2)).PlayerCount);
+
+        Assert.Equal(1, Sql("UPDATE CombatSessions SET SessionEnd = '2026-10-21 20:00:20.5' WHERE TargetId = 902"));
+        Assert.Equal(3, combat.History.GetSessionList().Count); // the premise: upstream reads every row again
+        var healed = Engine.GetHistory(new HistoryQuery());
+        Assert.True(healed.IsComplete);
+        Assert.Equal(3, healed.TotalCount);
+        // The rows both reads could read come out exactly as upstream reads them.
+        Assert.Equal(damaged.Entries, healed.Entries.Where(e => damaged.Entries.Any(d => d.FightId == e.FightId)));
     }
 
     [Fact]
@@ -349,10 +389,10 @@ public sealed class HistoryTests : IDisposable
         return total;
     }
 
-    // Saves an Aultross fight on the given entity and returns its id.
-    private Guid SaveAndFind(int entityId, DateTime start, int seconds)
+    // Saves a boss fight (Aultross unless told otherwise) on the given entity and returns its id.
+    private Guid SaveAndFind(int entityId, DateTime start, int seconds, int mobCode = SyntheticCombat.AultrossCode)
     {
-        Save(entityId, SyntheticCombat.AultrossCode, start, seconds);
+        Save(entityId, mobCode, start, seconds);
         using var db = Database();
         return db.Sessions.Single(row => row.TargetId == entityId).SessionId;
     }

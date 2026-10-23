@@ -71,7 +71,8 @@ public sealed record HistoryQuery(
 /// <param name="IsComplete">
 /// False when the history database holds a saved fight that cannot be read (a damaged row; the log says so):
 /// the page and count then cover only the fights that can be read, and leave out the running fight. Once a
-/// damaged row has been met, every page is read that way, so pages agree, until a read finds no damaged row.
+/// damaged row has been met, every page is read that way, so pages agree, until upstream can read every saved
+/// fight again.
 /// When nothing can be read at all, the page is empty with a count of 0. The UI can say so rather than show an
 /// empty or partial history as if it were whole.
 /// </param>

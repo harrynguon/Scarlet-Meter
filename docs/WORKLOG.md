@@ -109,6 +109,38 @@ Audit checks (SDK 10.0.402):
 - main at 45ecab3 (the world-event notices PR #6) was then merged in, with README and WORKLOG conflicts kept from both sides. On the merged result, `scripts/Build.ps1` Debug and `-Configuration Release` passed 222/222 each, with no diagnostics from Scarlet's projects.
 - `%TEMP%` held the same 20 old `scarlet-tests-*` directories before and after every run.
 
+**Second audit (deep pass, PR 5, head a7777cb): approve with nits.** What changed:
+
+- **Damaged mode could outlast the damage (minor).** The row-by-row reader was stricter than upstream's own reads: text in a number column reads as 0 upstream, a numeric date as a Julian date, and any `State` number is accepted. Damaged mode also ended only when a read skipped nothing. The auditor's probe:
+  - damage row 902 (`SessionEnd` set to 'not a date') and row 903 (`PlayerCount` set to 'x');
+  - repair 902;
+  - upstream's `GetSessionList` now read all three rows, yet `GetHistory` stayed incomplete with a total of 2 until restart.
+
+  Changes:
+  - `SavedHistoryReader` now reads each row with the same SQLite provider calls EF Core makes for upstream's store, so it skips exactly what upstream cannot read, and reads the rest the same way.
+  - While damaged, each `GetHistory` first asks upstream's store to read every row (`GetSessionList`, outside the session lock). Once that succeeds, damaged mode ends and the same call already goes through upstream's query.
+  - The probe is now the test `DamagedModeEndsWhenUpstreamCanReadEveryRowAgain`. It also checks that the rows both reads can read come out identical.
+  - ARCHITECTURE and the reader's comment name the two remaining differences: dates compared and ordered as read rather than as stored text, which only rows upstream never writes can show.
+- **Name filter (nit).** The reader now matches upstream's SQL: the stored name lowered ASCII-only by SQLite, the search lowered in the current culture, compared ordinally. `AnUnreadableRowLeavesTheRestOfTheHistoryReadable` saves a Fediv Wraith fight among the Aultross ones and filters on both names.
+- **Untested window guards (nit).** `AFightSavedWithAnUnusableStartOrEndShowsItsPlayersOnly` adds:
+  - a reversed start and end;
+  - an hour-long fight near `DateTime.MinValue`, which only the margin rejects;
+  - the same near `MaxValue`.
+
+  The per-player catch is now commented as defence in depth that no test drives.
+- **Log wording (nit).** The message for a failing upstream list query no longer assumes a damaged row. It says the history is read row by row until upstream can read it again.
+
+Second-audit checks:
+
+- 223 tests pass in Debug on a7777cb plus these changes.
+- Six mutations, each failing a test:
+  - the old exit rule (no upstream probe);
+  - a strict number read;
+  - the name filter off (reworded once to compile);
+  - the reversed check off;
+  - the MinValue margin off;
+  - the MaxValue margin off.
+
 **Next:** CI on the PR and Harry's go-ahead; the UI pages on top of these contracts (treat a missing `Details` entry and `IsComplete` false); the icon-serving decision for skill icons (HANDOFF.md); the new in-game acceptance items.
 
 ## 2026-10-24 — World event notices in the overlay

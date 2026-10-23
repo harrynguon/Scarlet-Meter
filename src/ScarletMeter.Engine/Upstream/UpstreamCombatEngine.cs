@@ -26,7 +26,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     private readonly ICombatHistoryStore history;
     private readonly SavedHistoryReader savedHistory;
     private readonly ILogger<UpstreamCombatEngine> logger;
-    private volatile bool savedHistoryDamaged; // set while the saved list holds a row upstream's query cannot read
+    private volatile bool savedHistoryDamaged; // set while upstream's store cannot read the saved list
     private bool disposed;
 
     public UpstreamCombatEngine(
@@ -139,7 +139,9 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     {
         ArgumentNullException.ThrowIfNull(query);
         var valid = query.Validate();
-        if (savedHistoryDamaged) return ReadDamagedHistory(valid);
+        // "Damaged" means exactly that upstream cannot read the saved list: it ends as soon as upstream's own
+        // read of every row succeeds again, whatever the row-by-row read would have made of it.
+        if (savedHistoryDamaged && !UpstreamReadsEverySavedFight()) return ReadDamagedHistory(valid);
         try
         {
             // Upstream merges the running boss fights with the saved ones and pages across both, under its lock.
@@ -156,13 +158,30 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         }
         catch (Exception ex)
         {
-            // Upstream's store parses the rows of a page as it reads them, so a damaged row fails every page it
-            // falls on (and only those: other pages would still count it). From now on the list is read column by
-            // column, leaving damaged rows out, so every page agrees, until a read finds none to leave out.
-            logger.LogError(ex, "The fight history could not be read as saved; reading it without damaged entries from now on.");
+            // Most often a damaged row: upstream's store reads a page in one go, so such a row fails every page it
+            // falls on (and only those: other pages would still count it). Whatever the cause, the list is read
+            // row by row from now on, so every page agrees, until upstream can read the whole list again.
+            logger.LogError(ex, "The fight history could not be read as saved; reading it row by row until upstream can read it again.");
             savedHistoryDamaged = true;
             return ReadDamagedHistory(valid);
         }
+    }
+
+    // Whether upstream's store reads every saved row's list columns again; once it does, damaged mode ends. It
+    // reads outside the session lock.
+    private bool UpstreamReadsEverySavedFight()
+    {
+        try
+        {
+            history.GetSessionList();
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+        savedHistoryDamaged = false;
+        logger.LogInformation("The fight history reads as saved again.");
+        return true;
     }
 
     public HistoryFight? GetHistoryFight(Guid fightId)
@@ -204,22 +223,13 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     }
 
     // The saved fights that can still be read, marked incomplete (running fights are left out: only upstream's own
-    // query lists them); an empty page if even that fails. A read that leaves nothing out hands the list back to
-    // upstream's query for the next call.
+    // query lists them); an empty page if even that fails.
     private HistoryPage ReadDamagedHistory(HistoryQuery valid)
     {
         try
         {
             var (items, total, skipped) = savedHistory.ReadPage(valid);
-            if (skipped == 0)
-            {
-                savedHistoryDamaged = false;
-                logger.LogInformation("The fight history reads as saved again.");
-            }
-            else
-            {
-                logger.LogWarning("Saved fights left out of the history because they could not be read: {Skipped}.", skipped);
-            }
+            logger.LogWarning("Saved fights left out of the history because they could not be read: {Skipped}.", skipped);
             return new HistoryPage(
                 items.Select(UpstreamMapping.ToHistoryEntry).ToList(), total, valid.Page, valid.PageSize, IsComplete: false);
         }
