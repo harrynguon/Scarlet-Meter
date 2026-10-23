@@ -1,0 +1,76 @@
+@*
+    A player's hits with RATmeter's filters: one skill, and any of crit, back, front, perfect, x2 (all must
+    match). The list is virtualized, so a long fight's log scrolls without rendering every row.
+*@
+<div class="log-filters">
+    <select @onchange="OnSkillChanged">
+        <option value="0" selected="@(skillFilter == 0)">All skills</option>
+        @foreach (var (id, name) in skillOptions)
+        {
+            <option value="@id" selected="@(skillFilter == id)">@name</option>
+        }
+    </select>
+    @foreach (var (flag, label) in FlagFilters)
+    {
+        <button type="button" class="chip @(required.HasFlag(flag) ? "on" : "")" @onclick="() => ToggleFlag(flag)">@label</button>
+    }
+    <span class="log-count">@filtered.Count of @Entries.Count hits@(NewestFirst ? ", newest first" : "")</span>
+</div>
+<div class="log-list">
+    <div class="log-row head"><span>Time</span><span></span><span>Skill</span><span class="num">Damage</span><span>Flags</span></div>
+    <Virtualize Items="filtered" ItemSize="26" Context="hit">
+        <div class="log-row @(hit.Flags.HasFlag(HitFlags.Critical) ? "crit" : "")">
+            <span class="time">@DetailFormat.LogTime(hit.Time)</span>
+            <span class="icon-cell">@if (SkillIcons.Url(hit.Icon, IconsEnabled) is { } url) { <img src="@url" alt="" /> }</span>
+            <span class="skill">
+                @if (hit.IsDot) { <span class="tag">DoT</span> }
+                @hit.SkillName
+                @if (hit.SummonName is not null) { <small> · @hit.SummonName</small> }
+            </span>
+            <span class="num">@DetailFormat.Full(hit.Damage)</span>
+            <span class="flags">@string.Join(" ", DetailFormat.Tags(hit.Flags))</span>
+        </div>
+    </Virtualize>
+</div>
+
+@code {
+    private static readonly (HitFlags Flag, string Label)[] FlagFilters =
+    [
+        (HitFlags.Critical, "Crit"), (HitFlags.BackAttack, "Back"), (HitFlags.FrontAttack, "Front"),
+        (HitFlags.Perfect, "Perfect"), (HitFlags.DoubleDamage, "x2"),
+    ];
+
+    private List<CombatLogEntry> filtered = [];
+    private List<(long Id, string Name)> skillOptions = [];
+    private long skillFilter;
+    private HitFlags required;
+
+    [Parameter, EditorRequired] public IReadOnlyList<CombatLogEntry> Entries { get; set; } = [];
+
+    [Parameter] public bool IconsEnabled { get; set; } = true;
+
+    [Parameter] public bool NewestFirst { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        skillOptions = Entries.GroupBy(e => e.SkillId).Select(g => (g.Key, g.First().SkillName))
+            .OrderBy(s => s.Item2, StringComparer.OrdinalIgnoreCase).ToList();
+        Apply();
+    }
+
+    private void Apply() => filtered = Entries
+        .Where(e => (skillFilter == 0 || e.SkillId == skillFilter) && (e.Flags & required) == required)
+        .ToList();
+
+    private void OnSkillChanged(ChangeEventArgs e)
+    {
+        skillFilter = long.TryParse(e.Value?.ToString(), out var id) ? id : 0;
+        Apply();
+    }
+
+    private void ToggleFlag(HitFlags flag)
+    {
+        required ^= flag;
+        Apply();
+    }
+}

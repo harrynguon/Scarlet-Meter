@@ -55,6 +55,8 @@
                                    Value="@S.Appearance.RelativeBars" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { RelativeBars = v } }))" />
                     <ToggleSetting Label="Show deaths" Value="@S.Appearance.ShowDeaths"
                                    ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { ShowDeaths = v } }))" />
+                    <ToggleSetting Label="Skill icons" Description="Skill and buff icons in player details load from NC's game-data site, as in RATmeter."
+                                   Value="@S.Appearance.SkillIcons" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { SkillIcons = v } }))" />
                     <ToggleSetting Label="Hide player names" Description="Masks every name, yours included, for screenshots and streams."
                                    Value="@S.Appearance.HideNicknames" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { HideNicknames = v } }))" />
                 </section>
