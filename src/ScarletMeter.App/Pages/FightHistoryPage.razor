@@ -46,7 +46,7 @@
         @if (results is { TotalCount: > 0 })
         {
             <footer class="pager">
-                <span class="muted">@results.TotalCount fights · showing @((results.Page - 1) * results.PageSize + 1)–@Math.Min(results.TotalCount, results.Page * results.PageSize)</span>
+                <span class="muted">@results.TotalCount @(results.TotalCount == 1 ? "fight" : "fights") · showing @((results.Page - 1) * results.PageSize + 1)–@Math.Min(results.TotalCount, results.Page * results.PageSize)</span>
                 <button type="button" class="btn" disabled="@(results.Page <= 1)" @onclick="() => SearchAsync(results.Page - 1)">Previous</button>
                 <span>Page @results.Page of @PageCount</span>
                 <button type="button" class="btn" disabled="@(results.Page >= PageCount)" @onclick="() => SearchAsync(results.Page + 1)">Next</button>
