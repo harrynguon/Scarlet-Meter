@@ -79,8 +79,10 @@ function Test-Accepted([string]$Name, [string]$Path) {
 }
 
 # Records a failure unless $Path's tree still matches $Before (a Get-TreeSnapshot taken earlier).
+# A folder that is gone counts as changed: a rename that was not undone must fail the case, not crash it.
 function Test-Unchanged([string]$Name, [string]$Path, [string]$Before) {
-    if ((Get-TreeSnapshot $Path) -ne $Before) { $failures.Add("$Name`: $Path changed") ; Write-Host "FAIL $Name (changed)" }
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) { $failures.Add("$Name`: $Path is gone"); Write-Host "FAIL $Name ($Path is gone)" }
+    elseif ((Get-TreeSnapshot $Path) -ne $Before) { $failures.Add("$Name`: $Path changed") ; Write-Host "FAIL $Name (changed)" }
 }
 
 # Every file and link under $Path, relative, with file contents: compared before and after the checks.
@@ -245,7 +247,9 @@ try {
             Write-Host 'FAIL a failed rename is undone (no error)'
         }
         catch {
-            if ($_.Exception.Message.Contains('left as it was')) { Write-Host 'ok   a failed rename is undone' }
+            $missing = @($undoBefore.Keys | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Container) })
+            if ($_.Exception.Message.Contains('left as it was') -and -not $missing) { Write-Host 'ok   a failed rename is undone' }
+            elseif ($missing) { $failures.Add("a failed rename was not undone: $($missing -join ', ') missing"); Write-Host 'FAIL a failed rename is undone (folders missing)' }
             else { $failures.Add("a failed rename: $($_.Exception.Message)"); Write-Host "FAIL a failed rename is undone ($($_.Exception.Message))" }
         }
     }

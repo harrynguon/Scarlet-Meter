@@ -136,7 +136,12 @@ Not checked:
 
 - A subst'd drive.
 - pwsh locally; CI runs both scripts under it.
-**Next:** CI on the PR, Harry's go-ahead and a squash merge. The overlay notice and settings switch for the checker follow in their own PR (HANDOFF.md).
+- The checks repeated just before the swap run after the build, so no test reaches them; code reading only.
+- The install folder's own 8.3 resolution: under Windows PowerShell 5.1, .NET Framework's `GetFullPath` already expands short names, so removing it fails nothing there; only pwsh needs it, and no case covers it.
+
+**Third audit (deep pass on the refactor, head b5ea0b2): approve with nits.** The merge 2c3e237 brought exactly main's change and kept the submodule at aa3ffc6; the library preserves every refusal and its order, `-CheckOnly` still touches nothing, dot-sourcing uses `$PSScriptRoot`, and `Remove-OwnedFolder` deletes links inside an owned folder without following them (probed with junctions). Applied: the undo case now fails, rather than printing "ok" and crashing, when a rename is not undone (`Test-Unchanged` treats a missing folder as changed); the two untested paths above are listed.
+
+**Next:** CI on the PR, Harry's go-ahead and a squash merge. The overlay notice and settings switch for the checker follow in their own PR (#10).
 
 ## 2026-10-24 — Upstream v1.11.5.341
 
