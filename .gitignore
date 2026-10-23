@@ -1,0 +1,22 @@
+# Build output
+bin/
+obj/
+publish/
+local-build/
+TestResults/
+.artifacts/
+
+# IDE and user files
+.vs/
+.idea/
+*.user
+*.suo
+*.swp
+
+# Local data that must never be committed (see AGENTS.md): history, logs, captures
+*.db
+*.db-shm
+*.db-wal
+PacketLogs/
+Logs/
+logs/

@@ -1,0 +1,16 @@
+﻿<Project>
+
+  <!-- Upstream build overlay. MSBuild imports only the nearest Directory.Build.props above a project. Scarlet
+       Meter's own projects have theirs in src/ and tests/, so this file reaches only the upstream submodule's
+       projects, which ship none. It is the one way to adjust how upstream builds here without editing a file
+       under upstream/. Keep it to minimal, generic fixes and list each one in docs/ARCHITECTURE.md
+       ("Upstream overlay"). -->
+
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'AionDpsMeter.Services'">
+    <!-- EF Core's legacy SQLite bundle pins the vulnerable native package SQLitePCLRaw.lib.e_sqlite3 2.1.11
+         (GHSA-2m69-gcr7-jv3q). The harrynguon/AIon2-Dps-Meter fork carries the same override in its copy of
+         this project; SqliteRuntimeTests checks the loaded SQLite version. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
+  </ItemGroup>
+
+</Project>

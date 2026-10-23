@@ -1,0 +1,38 @@
+<div class="meter">
+    <header class="meter-header">
+        <div class="target">
+            @if (snapshot.Target is { } target)
+            {
+                <div class="target-line">
+                    <span class="target-name">@target.Name</span>
+                    <span class="target-hp">@Compact.Number(target.HpCurrent) / @Compact.Number(target.HpTotal)</span>
+                </div>
+                <div class="hp-bar"><div class="hp-fill" style="width:@Compact.Percent(target.HpPercent)"></div></div>
+            }
+            else
+            {
+                <span class="target-name muted">@StatusText</span>
+            }
+        </div>
+        <div class="totals">
+            <span title="Combat duration">@Compact.Duration(snapshot.Duration)</span>
+            <span title="Party DPS" class="accent">@Compact.Number(snapshot.PartyDps)/s</span>
+            <span title="Ping" class="ping">@(ping is null ? "-- ms" : $"{ping} ms")</span>
+            <button type="button" class="btn" title="Drop the current fight" @onclick="Reset">Reset</button>
+        </div>
+    </header>
+
+    <ul class="rows">
+        @foreach (var player in Visible)
+        {
+            <li class="row @(player.IsUser ? "me" : "")">
+                <div class="fill" style="width:@Compact.Percent(player.DamageShare)"></div>
+                <span class="name">@player.Name <small class="cls">@player.ClassName</small></span>
+                <span class="num">@Compact.Number(player.TotalDamage)</span>
+                <span class="num dps">@Compact.Number(player.Dps)/s</span>
+                <span class="num pct">@Compact.Percent(player.DamageShare)</span>
+                <span class="num crit" title="Critical rate">@Compact.Percent(player.CriticalRate) crit</span>
+            </li>
+        }
+    </ul>
+</div>

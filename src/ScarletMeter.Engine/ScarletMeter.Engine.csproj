@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Scarlet Meter's only link to upstream RATmeter code (upstream/, a git submodule pinned to a release
+       tag). It wraps upstream's capture, decoding and combat-session services behind Scarlet-owned contracts
+       so the app never references an upstream type; see docs/ARCHITECTURE.md ("Upstream boundary"). -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>ScarletMeter.Engine</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- $(ScarletUpstreamRoot) is defined in src/Directory.Build.props. -->
+    <ProjectReference Include="$(ScarletUpstreamRoot)AionDpsMeter.Core/AionDpsMeter.Core.csproj" />
+    <ProjectReference Include="$(ScarletUpstreamRoot)AionDpsMeter.Services/AionDpsMeter.Services.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ScarletMeter.Tests" />
+  </ItemGroup>
+
+</Project>

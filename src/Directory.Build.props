@@ -1,0 +1,18 @@
+<Project>
+
+  <!-- Shared settings for Scarlet Meter's own projects. This file lives under src/ (tests/ imports it) rather
+       than at the repository root so that MSBuild never applies it to the upstream projects in upstream/,
+       which have no Directory.Build.props of their own and must build exactly as upstream ships them. -->
+
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Version>0.1.0</Version>
+    <Product>Scarlet Meter</Product>
+    <Authors>harrynguon</Authors>
+    <!-- The one place that knows where the upstream submodule lives; project references use it. -->
+    <ScarletUpstreamRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', 'upstream'))</ScarletUpstreamRoot>
+  </PropertyGroup>
+
+</Project>

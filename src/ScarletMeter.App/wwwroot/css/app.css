@@ -1,0 +1,168 @@
+/* Scarlet Meter theme: near-black background, scarlet accent, tabular numbers. */
+:root {
+    --bg: #0b0b0f;
+    --panel: #15151c;
+    --row: #1b1b24;
+    --text: #e8e6ef;
+    --muted: #8a879a;
+    --accent: #e63946;
+    --accent-soft: rgba(230, 57, 70, 0.28);
+    --me: #ffb703;
+    --me-soft: rgba(255, 183, 3, 0.22);
+    --hp: #2a9d8f;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+    user-select: none;
+    overflow: hidden;
+}
+
+#app, .meter {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.meter-header {
+    background: var(--panel);
+    padding: 8px 10px 6px;
+    border-bottom: 1px solid #26262f;
+}
+
+.target-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.target-name {
+    font-weight: 600;
+}
+
+.target-hp {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.hp-bar {
+    height: 4px;
+    margin-top: 4px;
+    background: #26262f;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.hp-fill {
+    height: 100%;
+    background: var(--hp);
+    transition: width 120ms linear;
+}
+
+.totals {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.totals .accent {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.totals .btn {
+    margin-left: auto;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid #33333f;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font: inherit;
+    cursor: pointer;
+}
+
+.totals .btn:hover {
+    color: var(--text);
+    border-color: var(--accent);
+}
+
+.muted {
+    color: var(--muted);
+    font-weight: 400;
+}
+
+.rows {
+    list-style: none;
+    margin: 0;
+    padding: 4px 6px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto auto auto auto;
+    gap: 10px;
+    align-items: center;
+    padding: 4px 8px;
+    margin-bottom: 3px;
+    background: var(--row);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.row .fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--accent-soft);
+    transition: width 120ms linear;
+}
+
+.row.me .fill {
+    background: var(--me-soft);
+}
+
+.row > span {
+    position: relative;
+}
+
+.row .name {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.row.me .name {
+    color: var(--me);
+}
+
+.row .cls {
+    color: var(--muted);
+    font-weight: 400;
+    margin-left: 4px;
+}
+
+.row .num {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.row .dps {
+    color: var(--accent);
+}
+
+.row .pct, .row .crit {
+    color: var(--muted);
+}

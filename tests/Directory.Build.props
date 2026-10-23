@@ -1,0 +1,4 @@
+<Project>
+  <!-- Tests share the settings of Scarlet Meter's own projects (see src/Directory.Build.props). -->
+  <Import Project="$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', 'src', 'Directory.Build.props'))" />
+</Project>

@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ScarletMeter.Engine/ScarletMeter.Engine.csproj" />
+    <Project Path="src/ScarletMeter.App/ScarletMeter.App.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ScarletMeter.Tests/ScarletMeter.Tests.csproj" />
+  </Folder>
+  <Folder Name="/upstream/">
+    <Project Path="upstream/AionDpsMeter.Core/AionDpsMeter.Core.csproj" />
+    <Project Path="upstream/AionDpsMeter.Services/AionDpsMeter.Services.csproj" />
+  </Folder>
+</Solution>
