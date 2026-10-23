@@ -99,6 +99,26 @@ public sealed class EngineRegistrationTests : IDisposable
     }
 
     [Fact]
+    public void BossHpBeyondTheIntRangeIsMappedWhole()
+    {
+        // Upstream v1.11.5.341 reads boss HP as a 64-bit varint; the mapping must not narrow it.
+        var engine = provider.GetRequiredService<ICombatEngine>();
+        var entities = provider.GetRequiredService<EntityTracker>();
+        var sessions = provider.GetRequiredService<CombatSessionManager>();
+        var player = entities.GetOrCreateSessionPlayer(7, Gladiator);
+        entities.SetSessionPlayerName(7, "Alpha", combatPower: 120_000, isUser: true);
+        var boss = entities.CreateOrUpdateTargetEntity(901, mobCode: 0, hpTotal: 5_000_000_000);
+        boss.HpCurrent = 4_000_000_000;
+
+        sessions.ProcessDamageEvent(Hit(player, boss, FightStart, 600));
+
+        var target = Assert.IsType<TargetInfo>(engine.GetSnapshot().Target);
+        Assert.Equal(5_000_000_000, target.HpTotal);
+        Assert.InRange(target.HpCurrent, 3_000_000_000, 4_000_000_000);
+        Assert.InRange(target.HpPercent, 60, 80);
+    }
+
+    [Fact]
     public void ResetKeepsSummonOwnership()
     {
         var engine = provider.GetRequiredService<ICombatEngine>();

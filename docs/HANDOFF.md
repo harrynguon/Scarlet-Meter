@@ -4,15 +4,14 @@ Repository: https://github.com/harrynguon/ScarletMeter (private, default branch 
 
 ## State
 
-What ARCHITECTURE.md describes exists: `upstream/` submodule at release v1.11.4.334, the engine over upstream's pipeline, a chromeless translucent overlay with a settings window (appearance, fight options, hotkey, remembered positions, all saved in `settings.json`), boundary, mapping, settings and close-ordering tests, build, upstream-update, publish-layout and UI smoke scripts, CI. Player details and history are being added in separate PRs (WORKLOG.md). Checks that have actually run are listed in WORKLOG.md; nothing has been tried in the game.
+What ARCHITECTURE.md describes exists: `upstream/` submodule at release v1.11.5.341, the engine over upstream's pipeline, a chromeless translucent overlay with a settings window (appearance, fight options, hotkey, remembered positions, all saved in `settings.json`), boundary, mapping, settings and close-ordering tests, build, upstream-update, publish-layout and UI smoke scripts, CI. Player details and history are being added in separate PRs (WORKLOG.md). Checks that have actually run are listed in WORKLOG.md; nothing has been tried in the game.
 
 World-event notices are in the overlay: `src/ScarletMeter.WorldEvents` (ARCHITECTURE.md "World events") holds the schedules and the alert planner, ported from the fork's World Companion, and the overlay shows them ("Overlay notices"), five minutes ahead by default, with an Alerts tab in settings. The times are not verified in the game.
 
-Updates (2026-10-24, ARCHITECTURE.md "Updates"): builds stamp the pinned upstream release; `UpstreamReleaseChecker` tells whether upstream has a newer one but is not wired into the UI yet; `scripts/Install-Meter.ps1` builds and installs for the current user. Upstream published v1.11.5.341 on 2026-10-23 (a live run of the checker reported it); the pin is still v1.11.4.334.
+Updates (2026-10-24, ARCHITECTURE.md "Updates"): builds stamp the pinned upstream release; `UpstreamReleaseChecker` tells whether upstream has a newer one but is not wired into the UI yet; `scripts/Install-Meter.ps1` builds and installs for the current user. Upstream published v1.11.5.341 on 2026-10-23 (a live run of the checker reported it); the pin moved to it on 2026-10-24 (WORKLOG.md).
 
 - [ ] Wire the checker into the UI: register it with `AddUpstreamReleaseChecker` in `App.xaml.cs`, show a quiet overlay notice for `NewerAvailable`, and add a settings switch that stops calling `CheckAsync`.
-- [ ] Move the pin to v1.11.5.341 with `Update-Upstream.ps1`, then reinstall.
-- [ ] Install once to the default location with `Install-Meter.ps1 -Shortcut` (tested so far only against a temporary directory).
+- [ ] Install once to the default location with `Install-Meter.ps1 -Shortcut`, which also brings in v1.11.5.341 (every install so far went to a temporary directory).
 
 ## Next: in-game acceptance
 
@@ -20,6 +19,9 @@ Record the tested commit, observation date and Windows configuration. Pending:
 
 - [ ] Normal launch with Npcap finds the game's connection ("[CAPTURE] !!! LOCKED !!!" in the log) and the header leaves "Waiting for the game's connection...".
 - [ ] Hits on a mob populate rows; party DPS, duration and HP bar move; ping shows.
+- [ ] A boss's HP bar starts full and reaches zero at its kill (upstream v1.11.5.341 fixed the max HP of some bosses); note any boss whose bar does not.
+- [ ] A summon's damage (an Elementalist's spirit, for example) lands on its owner's row, not on an unnamed player: v1.11.5.341 rewrote how a summon's owner is read.
+- [ ] After a session, `logs/scarlet-*.log` holds no stream of `PacketParseException` errors from mob packets.
 - [ ] Reset clears the fight; a new pull starts fresh. With a summon out across the reset, its damage still lands on its owner's row, not on an unnamed player.
 - [ ] Without Npcap (or with it uninstalled), a normal launch shows the "Install Npcap" dialog and exits.
 - [ ] Close the window during a fight: no crash, a completed boss fight appears in `combat-history.db`.

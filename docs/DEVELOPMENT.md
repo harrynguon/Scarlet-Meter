@@ -95,7 +95,7 @@ When upstream publishes a release (the meter will show a notice once the UI wire
 ## Updating upstream
 
 ```powershell
-& "<checkout>\scripts\Update-Upstream.ps1" -Tag v1.11.4.334
+& "<checkout>\scripts\Update-Upstream.ps1" -Tag v1.11.5.341
 ```
 
 The script targets Windows PowerShell 5.1 and pwsh; its git calls use `--quiet` so git's success messages on stderr cannot abort it in a host without a console (ISE, VS Code). It fetches upstream's tags, refuses anything that is not a release tag, moves the submodule, stages the new pin and runs the build and tests. Then skim upstream's release notes, record the update in docs/WORKLOG.md and the pinned release in docs/ARCHITECTURE.md, commit, and reinstall with `Install-Meter.ps1`. A compile error in `src/ScarletMeter.Engine/Upstream` means upstream changed an API the engine maps; the table in ARCHITECTURE.md says where each kind of change lands.
