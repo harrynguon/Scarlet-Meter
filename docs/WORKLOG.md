@@ -10,9 +10,11 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Checks (SDK 10.0.402):** `scripts/Build.ps1` 420/420 after merging main; `TheOverlayPanelFitsItsContent` new; fail-first, each failing it: `height: 100%` back on the panel, `flex: 1` back on the rows, and the picture without `fixed`.
 
+**Visual check (Harry out of game, the meter closed; `Smoke-Meter.ps1 --demo` in the default 400×260 window, throwaway data directories):** in the boss fight with the notices held the panel was 221 px tall, four rows unscrolled, and the 39 px below it see-through in the capture; with "Hide during boss fights" off, the two notices and "+1 more" took the rest (panel 260 px); expanded, the strip stayed within its cap; after the kill the panel shrank to 151 px (header, totals and the notices). With a picture at 50%, the picture layer computed as `fixed` and stood in the same place with the panel short and full. Exit codes 0; no log warnings. In the default 260 px window, two notices leave the four rows 73 px, so they scroll, and a 170 px window leaves them none: the same space as before the change (header, card and totals take 105 px, the strip 82, the rows the rest), not a regression; Harry's window is taller.
+
 **Not checked:** in the game, whether clicks on the see-through part reach the game (a fully transparent pixel of a layered window normally passes them on) and resizing from the edges (the bottom edge is see-through while the panel is short, so it resizes from the top and sides then; Harry was told before choosing).
 
-**Next:** build, a visual check with Harry's go-ahead, audit, Codex and CI; merge.
+**Next:** audit, Codex and CI; merge with Harry's go-ahead; rebuild Harry's copy.
 
 ## 2026-10-25 — v0.1.0 released; the repository is public
 
