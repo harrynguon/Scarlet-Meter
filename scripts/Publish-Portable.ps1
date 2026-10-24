@@ -12,13 +12,15 @@ Output, under the output root:
   ScarletMeter-<commit>-upstream-<release>\ScarletMeter\   the portable folder; run ScarletMeter.exe from it
   ScarletMeter-<commit>-upstream-<release>-win-x64.zip     the same folder zipped, with "ScarletMeter" at its top
 
-To update a portable copy: close the meter and extract the new zip over the old ScarletMeter folder. The zip holds
-no data folder, so settings and history stay. This script never deletes or overwrites anything: when a name is
+To update a portable copy: close the meter and extract the new zip into the folder that holds your ScarletMeter
+folder (not into ScarletMeter itself), replacing files. The zip holds no data folder, so settings and history stay.
+The build carries no debug symbols or API documentation files, so it names nothing of the builder's folders. This script never deletes or overwrites anything: when a name is
 taken, the new build gets a counter. Every path derives from this script's location; an output root given must
 be absolute. Targets Windows PowerShell 5.1 and pwsh.
 
 .PARAMETER OutputRoot
-Absolute folder for the build folder and the zip. Default: "<checkout>\portable", which git ignores.
+Absolute folder for the build folder and the zip. Default: "<checkout>\portable", which git ignores. Elsewhere
+inside the checkout is refused, so a copy run in place cannot leave the player's data where git sees it.
 
 .PARAMETER SkipTests
 Builds without running the tests (CI, where they ran in an earlier step).
@@ -38,9 +40,16 @@ $appProject = Join-Path $repoRoot 'src\ScarletMeter.App\ScarletMeter.App.csproj'
 # Must match PortableLayout.MarkerFileName in the app (PortableLayoutTests checks).
 $portableMarker = 'ScarletMeter.portable'
 
-if (-not $OutputRoot) { $OutputRoot = Join-Path $repoRoot 'portable' }
+$defaultRoot = Join-Path $repoRoot 'portable'
+if (-not $OutputRoot) { $OutputRoot = $defaultRoot }
 elseif ($OutputRoot -notmatch '^(?:[A-Za-z]:[\\/]|\\\\)') { throw "OutputRoot must be an absolute path, not `"$OutputRoot`"." }
 $OutputRoot = [IO.Path]::GetFullPath($OutputRoot).TrimEnd('\', '/')
+# Inside the checkout only the git-ignored default is allowed: a copy run from anywhere else in it would write the
+# player's history, logs and settings where git add could pick them up (AGENTS.md, "Security").
+$within = { param($path, $container) $path.Equals($container, [StringComparison]::OrdinalIgnoreCase) -or $path.StartsWith($container + '\', [StringComparison]::OrdinalIgnoreCase) }
+if ((& $within $OutputRoot $repoRoot) -and -not (& $within $OutputRoot $defaultRoot)) {
+    throw "OutputRoot $OutputRoot is inside this checkout; use the default ($defaultRoot) or a folder outside it."
+}
 
 # First line git prints for these arguments in $Directory, or $null when git, the repository or its .git entry is
 # missing. Never throws: stderr is discarded with the preference relaxed, because Windows PowerShell 5.1 turns
@@ -67,7 +76,7 @@ if (-not $upstreamRelease) { $upstreamRelease = Get-GitLine $upstreamDirectory @
 if (-not $upstreamRelease) { $upstreamRelease = 'unknown' }
 $commit = Get-GitLine $repoRoot @('rev-parse', '--short', 'HEAD')
 if (-not $commit) { $commit = 'unknown' }
-elseif (Get-GitLine $repoRoot @('status', '--porcelain', '--untracked-files=no')) {
+elseif (Get-GitLine $repoRoot @('status', '--porcelain')) { # untracked sources are compiled in too, as Install-Meter.ps1 counts them
     Write-Warning 'This checkout has uncommitted changes: they are in the build, but its stamped commit does not show them.'
     $commit += '-dirty'
 }
@@ -90,8 +99,13 @@ $dotnet = if ($env:SCARLET_DOTNET) { $env:SCARLET_DOTNET } else { (Get-Command d
 # global.json (the SDK band) is discovered from the working directory, so anchor it as Build.ps1 does.
 Push-Location -LiteralPath $repoRoot
 try {
+    # The zip is meant to be handed on, so it carries no debug symbols (their paths name the builder's folders and
+    # account) and no API documentation files: a deterministic build without PDBs or XML docs.
     & $dotnet publish $appProject --configuration Release --runtime win-x64 --self-contained true `
-        -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output $meterFolder
+        -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+        -p:DebugType=none -p:DebugSymbols=false -p:ContinuousIntegrationBuild=true `
+        -p:PublishDocumentationFiles=false -p:PublishReferencesDocumentationFiles=false `
+        --output $meterFolder
     if ($LASTEXITCODE) { throw 'Publish failed.' }
 }
 finally {
@@ -103,8 +117,19 @@ finally {
     "This file makes Scarlet Meter keep its settings, history and logs in the data folder beside it.`r`n" +
     "Delete it to use the per-user data folder (%LocalAppData%\ScarletMeter) instead.`r`n")
 
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-[IO.Compression.ZipFile]::CreateFromDirectory($meterFolder, $zip, [IO.Compression.CompressionLevel]::Optimal, $true)
+# Entries are written one by one with forward slashes under "ScarletMeter/": Windows PowerShell 5.1's
+# ZipFile.CreateFromDirectory writes backslashes, which the zip format does not allow.
+Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+$archive = [IO.Compression.ZipFile]::Open($zip, [IO.Compression.ZipArchiveMode]::Create)
+try {
+    foreach ($file in Get-ChildItem -LiteralPath $meterFolder -Recurse -File -Force) {
+        $relative = $file.FullName.Substring($meterFolder.Length).TrimStart('\') -replace '\\', '/'
+        [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $file.FullName, "ScarletMeter/$relative", [IO.Compression.CompressionLevel]::Optimal)
+    }
+}
+finally {
+    $archive.Dispose()
+}
 
 Write-Host "Portable folder: $meterFolder"
 Write-Host "Zip:             $zip"

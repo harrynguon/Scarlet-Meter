@@ -38,7 +38,7 @@ To **build** it (once, and again for each update):
 & "<checkout>\scripts\Publish-Portable.ps1"
 ```
 
-then unzip `<checkout>\portable\ScarletMeter-<version>-win-x64.zip` anywhere you can write to (not Program Files) and run `ScarletMeter\ScarletMeter.exe`. A portable copy keeps its settings, history and logs in the `data` folder beside the exe, so the whole folder can be moved, copied or deleted as one. To update, close the meter and extract a newer zip over the same folder: the zip holds no `data` folder, so your data stays. The unzipped folder beside the zip, `<checkout>\portable\ScarletMeter-<version>\ScarletMeter`, runs as it is too.
+then unzip `<checkout>\portable\ScarletMeter-<version>-win-x64.zip` outside the checkout, anywhere you can write to (not Program Files), and run `ScarletMeter\ScarletMeter.exe`. A portable copy keeps its settings, history and logs in the `data` folder beside the exe, so the whole folder can be moved, copied or deleted as one (Windows also unpacks a few native libraries to `%TEMP%\.net\ScarletMeter`, as for any single-file app). To update, close the meter and extract the newer zip into the folder that holds your `ScarletMeter` folder (not into `ScarletMeter` itself), replacing files: the zip holds no `data` folder, so your data stays.
 
 **Installed** instead (below, "Install and update"): the meter is `%LocalAppData%\Programs\ScarletMeter\ScarletMeter.exe`, with "Scarlet Meter" in the Start menu if installed with `-Shortcut`, and its data in `%LocalAppData%\ScarletMeter`.
 

@@ -56,6 +56,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - Why: the update flow (build from source, keep a rollback) was designed first, and how a player expects to run a meter was not asked.
 - Guard: `Publish-Portable.ps1` and the portable layout, checked by CI. Ask how the player wants to run a feature, starting from the tools they already use.
 
+**A shareable zip carried the builder's account path** (audit on #15).
+- What: the first portable zip had debug symbols (whose paths name the Windows account and checkout) and API documentation files.
+- Why: the publish settings were copied from the local install, which is never handed on.
+- Guard: the portable publish uses `DebugType=none` and no documentation files; before sharing any build, search its files for the account name.
+
 **The README did not say what running needs or where the exe is** (Harry asked, 2026-10-24).
 - What: one sentence mixed build and run requirements (it listed the .NET 10 SDK, which only building needs), and nothing said where the installed exe lives or how to start it.
 - Why: the docs were written from the developer's side (build, test, publish) and never read as a player installing it.

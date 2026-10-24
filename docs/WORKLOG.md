@@ -23,7 +23,17 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Not checked:** the message for a portable folder where `data` cannot be created (it is the start-up error path every other start failure uses); the portable copy in the game; Windows Explorer's own "Extract all" over a copy (it asks before replacing files, and the zip holds no `data`).
 
-**Next:** PR, audit, Codex's review, CI and merge.
+**Audit (pr-auditor, deep pass on ba769fe): approve with nits**, applied. It also checked, on a clean clone under Windows PowerShell 5.1, the publish (165 MB, 32 entries) and the "cannot create data" message (it names the path and the way out). Fixes:
+
+- The zip, meant to be handed on, held the builder's Windows account path (in the debug directory of the exe) plus five PDBs and three WebView2 XML docs. The publish now uses `DebugType=none`, `ContinuousIntegrationBuild` and no documentation files: 24 entries, 65 MB, and no file names the account or the checkout path (searched as ASCII and UTF-16). SECURITY.md says the zip is not reviewed for public release.
+- "Extract over this folder" was ambiguous; the README, the About tab and the docs now say to extract into the folder that holds `ScarletMeter`, replacing files.
+- An output root elsewhere inside the checkout is refused (a copy run there could leave history and logs where git sees them); the README says to unzip outside the checkout.
+- `Install-Meter.ps1` refuses an install, `.previous` or `.retired` folder holding `ScarletMeter.portable` or `data`: an install would move that data aside and delete it on the next install. New Test-InstallMeter case.
+- Zip entries are written one by one with forward slashes (Windows PowerShell 5.1's `CreateFromDirectory` wrote backslashes); "-dirty" now counts untracked files as Install-Meter does; the docs name `%TEMP%.netScarletMeter`, where single-file apps unpack native libraries.
+
+Checks after the fixes: `Build.ps1` 367/367; `Test-InstallMeter.ps1` all cases ok, the new one included; the inside-checkout refusal; `Publish-Portable.ps1 -SkipTests` (24 entries, forward slashes, no PDB or XML, no account or checkout path in any file); the extracted copy started with `--demo` without `DOTNET_ROOT`, filled `data` beside the exe, left `%LocalAppData%ScarletMeter` absent and exited 0.
+
+**Next:** Codex's review of the fix commit, CI and merge.
 
 ## 2026-10-24 — Requirements and how to run, in the README
 
