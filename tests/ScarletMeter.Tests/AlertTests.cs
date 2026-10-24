@@ -147,6 +147,40 @@ public sealed class AlertTests : IDisposable
     }
 
     [Fact]
+    public void TheStripShowsTwoNoticesUntilExpandedThenAll()
+    {
+        var alerts = FourDue();
+        Assert.Equal(alerts.Take(2), AlertStripLayout.Shown(alerts, expanded: false));
+        Assert.Equal(alerts, AlertStripLayout.Shown(alerts, expanded: true));
+        Assert.Equal(2, AlertStripLayout.HiddenCount(alerts));
+        Assert.Equal(1, AlertStripLayout.HiddenCount([.. alerts.Take(3)]));
+        Assert.Equal(0, AlertStripLayout.HiddenCount([.. alerts.Take(2)]));
+        Assert.Equal(0, AlertStripLayout.HiddenCount([]));
+    }
+
+    [Fact]
+    public void AnExpandedStripCollapsesOnceEveryNoticeFits()
+    {
+        var alerts = FourDue();
+        Assert.True(AlertStripLayout.StaysExpanded(true, alerts));
+        Assert.True(AlertStripLayout.StaysExpanded(true, [.. alerts.Take(3)])); // one hidden: still worth expanding
+        Assert.False(AlertStripLayout.StaysExpanded(false, alerts));
+        Assert.False(AlertStripLayout.StaysExpanded(true, [.. alerts.Take(2)]));
+        Assert.Equal("Show only the first 2", AlertStripLayout.CollapseHint);
+    }
+
+    [Fact]
+    public void TheMoreTooltipListsEachHiddenNoticeWithItsClockTime()
+    {
+        var alerts = FourDue();
+        string Line(EventAlert a, string verb) => $"{a.Rule.Name} · {a.Rule.Location} · {verb} {EventText.LocalTime(a.Deadline)}";
+        Assert.Equal(Line(alerts[0], "closes"), AlertStripLayout.Describe(alerts[0]));
+        Assert.Equal(Line(alerts[1], "starts"), AlertStripLayout.Describe(alerts[1]));
+        Assert.Equal(Line(alerts[2], "starts") + "\n" + Line(alerts[3], "starts"), AlertStripLayout.HiddenSummary(alerts));
+        Assert.Equal(string.Empty, AlertStripLayout.HiddenSummary([.. alerts.Take(2)]));
+    }
+
+    [Fact]
     public void TheSettingsListNamesEachPhaseInLocalTime()
     {
         var rules = EventCatalog.Default.ToDictionary(r => r.Id);
@@ -266,6 +300,24 @@ public sealed class AlertTests : IDisposable
     }
 
     public void Dispose() => directory.Dispose();
+
+    // Four due notices at 01:01, most urgent first: Shugo's entry open (01:00 to 01:03), then the rift, Nahma and
+    // Kaira about to start. Built directly, so the strip's rules are tested apart from the schedule.
+    private static IReadOnlyList<EventAlert> FourDue()
+    {
+        var rules = EventCatalog.Default.ToDictionary(r => r.Id);
+        var hour = new DateTimeOffset(2026, 10, 24, 1, 0, 0, TimeSpan.Zero);
+        var now = hour.AddMinutes(1);
+        EventAlert Soon(string id, int minute) =>
+            new(rules[id], AlertKind.Soon, hour.AddMinutes(minute), hour.AddMinutes(minute), hour.AddMinutes(minute) - now);
+        return
+        [
+            new EventAlert(rules[EventIds.Shugo], AlertKind.Open, hour, hour.AddMinutes(3), hour.AddMinutes(3) - now),
+            Soon(EventIds.Rift, 4),
+            Soon(EventIds.Nahma, 20),
+            Soon(EventIds.Kaira, 35),
+        ];
+    }
 
     // A clock whose single timer fires only when the test says so, and whose next read can be made to fail.
     private sealed class FakeClock(DateTimeOffset start) : TimeProvider

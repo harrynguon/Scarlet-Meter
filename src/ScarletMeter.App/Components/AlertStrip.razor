@@ -3,20 +3,22 @@
 @*
     The overlay's world-event notices: a slim strip at the bottom of the meter. "Soon" counts down to the
     start with a bar that fills over the lead time; "Open" counts down to the end of the entry or portal
-    window. At most two notices show; the rest are summarised. Countdowns use the time the parent passes in,
-    so they tick with the overlay's own refresh. Screen readers hear only the hidden summary, which changes
-    when a notice appears or changes kind, not every second. It is always rendered (empty when nothing is
-    due), because a live region inserted already filled is often not announced.
+    window. Two notices show; the rest are summarised as "+N more", which lists them on hover and expands the
+    strip to show all of them with their countdowns when clicked ("Show less" collapses it again, and it
+    collapses by itself once the extra events have passed; AlertStripLayout). Countdowns use the time the parent
+    passes in, so they tick with the overlay's own refresh. Screen readers hear only the hidden summary, which
+    changes when a notice appears or changes kind, not every second. It is always rendered (empty when nothing
+    is due), because a live region inserted already filled is often not announced.
 *@
 <span class="sr-only" role="status">@Announcement</span>
 @if (View.Alerts.Count > 0)
 {
-    <div class="alerts" aria-label="World event alerts">
-        @foreach (var alert in View.Alerts.Take(MaxShown))
+    <div class="alerts @(expanded ? "expanded" : "")" aria-label="World event alerts">
+        @foreach (var alert in AlertStripLayout.Shown(View.Alerts, expanded))
         {
             var remaining = alert.Deadline - Now;
             <div class="alert @Kind(alert)" @key="@($"{alert.Rule.Id}-{alert.Kind}-{alert.Start.UtcTicks}")"
-                 title="@alert.Rule.Name · @alert.Rule.Location · @(alert.Kind == AlertKind.Soon ? "starts" : "closes") @EventText.LocalTime(alert.Deadline)">
+                 title="@AlertStripLayout.Describe(alert)">
                 <span class="alert-dot"></span>
                 <span class="alert-name">@alert.Rule.Name</span>
                 <span class="alert-when">
@@ -32,9 +34,13 @@
                 <span class="alert-progress" style="width:@Compact.Percent(Progress(alert, remaining))"></span>
             </div>
         }
-        @if (View.Alerts.Count > MaxShown)
+        @if (AlertStripLayout.HiddenCount(View.Alerts) is var hidden && hidden > 0)
         {
-            <div class="alert more">+@(View.Alerts.Count - MaxShown) more</div>
+            <button type="button" class="alert more" aria-expanded="@(expanded ? "true" : "false")"
+                    title="@(expanded ? AlertStripLayout.CollapseHint : AlertStripLayout.HiddenSummary(View.Alerts))"
+                    @onclick="() => expanded = !expanded">
+                @(expanded ? "Show less" : $"+{hidden} more")
+            </button>
         }
     </div>
 }
@@ -50,13 +56,16 @@ else if (View.Next is { } next)
 }
 
 @code {
-    private const int MaxShown = 2;
+    // The player's choice, kept across the overlay's refreshes while extra notices are due.
+    private bool expanded;
 
     [Parameter, EditorRequired] public AlertView View { get; set; } = AlertView.None;
 
     [Parameter] public DateTimeOffset Now { get; set; }
 
-    private string Announcement => string.Join("; ", View.Alerts.Take(MaxShown).Select(a => a.Kind == AlertKind.Soon
+    protected override void OnParametersSet() => expanded = AlertStripLayout.StaysExpanded(expanded, View.Alerts);
+
+    private string Announcement => string.Join("; ", View.Alerts.Take(AlertStripLayout.CollapsedCount).Select(a => a.Kind == AlertKind.Soon
         ? $"{a.Rule.Name} starts at {EventText.LocalTime(a.Start)}"
         : $"{a.Rule.Name}: {EventText.OpenLabel(a.Rule)} until {EventText.LocalTime(a.Deadline)}"));
 

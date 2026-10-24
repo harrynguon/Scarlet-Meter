@@ -7,8 +7,11 @@
     padding: 0 6px 6px;
 }
 
+/* flex: none keeps each notice its full height in the strip's column; with overflow: hidden it could otherwise
+   shrink to fit the expanded strip's height cap instead of the strip scrolling. */
 .alert {
     position: relative;
+    flex: none;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -79,11 +82,50 @@
     animation: none;
 }
 
+/* "+N more" / "Show less": a button that expands the strip to every due notice and collapses it again. */
 .alert.more {
     justify-content: center;
+    width: 100%;
     height: 18px;
     color: var(--muted);
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    animation: none;
 }
+
+.alert.more:hover,
+.alert.more:focus-visible {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.08);
+    outline: none;
+}
+
+/* Expanded, the strip may take up to about half the meter and scrolls beyond that, so the rows stay visible. The
+   top line separates it from the rows above, which are cut by their own scroll area at the same edge. */
+.alerts.expanded {
+    max-height: 45vh;
+    overflow-y: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding-top: 3px;
+}
+
+/* "Show less" stays at the bottom of the expanded strip while the notices scroll under it, so collapsing never
+   needs a scroll first. Opaque, so scrolled notices do not show through it. */
+.alerts.expanded > .alert.more {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    background: #15151b;
+}
+
+.alerts.expanded > .alert.more:hover,
+.alerts.expanded > .alert.more:focus-visible {
+    background: #24242d;
+}
+
+.alerts.expanded::-webkit-scrollbar { width: 6px; }
+.alerts.expanded::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 3px; }
 
 /* The "newer RATmeter release" line, as quiet as the next-event line. */
 .update-note {
