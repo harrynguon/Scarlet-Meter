@@ -65,7 +65,10 @@ button {
 
 /* ---------- Overlay ---------- */
 
-/* The panel's background (colour and optional picture) sits on ::before so only it fades. */
+/* The panel's background (colour and optional picture) sits on ::before so only it fades. Over the picture, a layer
+   of the panel's own colour at 1 - --image-alpha fades the picture into the panel ("Picture opacity"), exactly as
+   the picture at that opacity over the colour would look; the dark veil above it keeps text readable. Without a
+   picture both layers are the panel's colour, so nothing changes. */
 .overlay {
     position: relative;
     isolation: isolate;
@@ -85,6 +88,7 @@ button {
     z-index: -1;
     background:
         linear-gradient(rgba(11, 11, 15, 0.55), rgba(11, 11, 15, 0.55)),
+        linear-gradient(rgba(11, 11, 15, calc(1 - var(--image-alpha, 1))), rgba(11, 11, 15, calc(1 - var(--image-alpha, 1)))),
         var(--panel-image, none) center / cover no-repeat,
         var(--bg);
     opacity: var(--panel-alpha, 0.9);

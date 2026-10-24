@@ -2,6 +2,16 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Picture opacity
+
+**What:** A "Picture opacity" slider (5% to 100%, default 100%, the picture as before) under the background picture in Settings, Appearance, shown once a picture is chosen. It fades only the picture; "Background opacity" still fades the whole panel, and text and bars stay solid. In `app.css` a layer of the panel's own colour at 1 minus the picture opacity sits over the picture, under the dark veil: the same result as the picture at that opacity over the panel's colour, with no change when there is no picture. `AppearanceSettings.PictureOpacity`, clamped by the normalizer (non-finite values fall back to 100%). ARCHITECTURE ("Windows"), a HANDOFF item.
+
+**Why:** Harry found the background picture "a bit too distracting".
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` 401/401, with the normalizer test extended (an out-of-range value clamped and reported, infinity back to 100%) and the earlier-build settings test checking the default. Fail-first: dropping the clamp failed `OutOfRangeValuesAreRepairedAndReported`.
+
+**Next:** visual check with Harry's OK (the game was running), audit, Codex, CI, merge, rebuild his copy.
+
 ## 2026-10-24 — Target card with "Kill in", class bar effects, overtake glide, combat power
 
 **What:** The overlay's header now shows the fight's state ("Boss combat" or "Combat", a live dot, the duration); the duration left the totals line, which keeps party DPS and ping. In a fight a target card shows the name (a skull for a boss), HP and percent, a thicker HP bar and "Kill in", from a new `Combat/KillTimer`: remaining HP over how fast it fell in the last 20 seconds, nothing for the first 5 seconds, while not falling or beyond an hour, starting over on another target or rising HP. Each row shows the player's combat power beside their name ("Show combat power", default on). "Bar effects" (default on) gives every bar a gloss and a bright tip and each bar its class's animated effect (`Components/BarEffect`, `Formatting/BarEffectThemes`, `app.css` `.bar-fx.theme-*`): Gladiator slashes, Templar sheen and facets, Assassin poison smoke, daggers and bubbles, Ranger arrows, Sorcerer fire and ice, Elementalist spirits, Cleric rays and sparkles, Chanter rings, Brawler one-two punches, lightning for an unknown class, each with a shimmer in its colour; the player's own at full strength with a glow in the theme's colour round the row, the others' at 60% ("Effects on every bar", default on; off: only the player's). Rows glide to their new places, with a flash on the one that moved up, when someone overtakes (`wwwroot/js/overlay-fx.js`, FLIP through a `MutationObserver`, loaded by `index.html`). Windows' reduce-motion hides the moving pieces and stops the glide. Settings, Appearance has the three toggles. `Test-PublishLayout.ps1` requires the script. ARCHITECTURE ("Windows", tests), HANDOFF in-game items.

@@ -88,13 +88,13 @@ public partial class MeterPage : IAsyncDisposable
         _ => "No active target",
     };
 
-    // Background opacity, picture and row size as CSS variables on the panel (see app.css, .overlay).
+    // Background opacity, picture and its opacity, and row size as CSS variables on the panel (see app.css, .overlay).
     private string PanelStyle
     {
         get
         {
             var style = string.Create(CultureInfo.InvariantCulture,
-                $"--panel-alpha:{appearance.BackgroundOpacity:0.###};--row-scale:{appearance.RowScale:0.###};");
+                $"--panel-alpha:{appearance.BackgroundOpacity:0.###};--image-alpha:{appearance.PictureOpacity:0.###};--row-scale:{appearance.RowScale:0.###};");
             return WebAssetHosts.BackgroundUrl(appearance.BackgroundImage) is { } url ? style + $"--panel-image:url('{url}');" : style;
         }
     }
