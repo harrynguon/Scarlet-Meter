@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**"Kill in", the glide and the effects assumed one steady target** (audit on #21, fixed before merge).
+- What: "Kill in" forgot the boss whenever the current target (upstream's: the one last hit) flipped to an add, so its estimate kept restarting; the glide measured row positions from the panel and kept them across a row-size change, so a later reorder glided and flashed rows that had not overtaken anyone; the effects ran on every row and would have run between pulls; two test guards (scripts, styles) matched too loosely to fail when broken.
+- Why: the features were built and checked against the demo, whose single boss is the only target and whose rows go when it dies; the tests were written alongside the code and checked for passing, not each broken on purpose until the audit did it.
+- Guard: per-target samples, `FightState` pausing the effects, an eight-bar cap, rank-based flashes and re-measured positions, each with a test or a visual check at other row sizes; whole-selector and every-tag guards, each shown to fail. Ask how a value behaves in a real fight (targets flipping, a full party, the time after a kill), not only in the demo, and break every new guard once before trusting it.
+
 **The expanded alert strip would have squashed its notices instead of scrolling** (audit on #20, fixed before merge).
 - What: the expanded strip was capped at 45% of the meter with `overflow-y: auto`, but each notice, a flex item with `overflow: hidden`, could shrink to nothing, so five due notices would have been squeezed into the cap with their text clipped and no scrollbar. Once drawn, the strip showed two more problems no reading had found: "Show less" scrolled out of sight, and the strip had no edge against the rows above.
 - Why: the layout was written and reasoned about but never drawn, since drawing it needs a window and the player may be in game; the tests cover the helper's lists, not the CSS.

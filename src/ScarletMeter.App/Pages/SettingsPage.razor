@@ -55,6 +55,15 @@
                                    Value="@S.Appearance.RelativeBars" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { RelativeBars = v } }))" />
                     <ToggleSetting Label="Show deaths" Value="@S.Appearance.ShowDeaths"
                                    ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { ShowDeaths = v } }))" />
+                    <ToggleSetting Label="Show combat power" Description="Each player's combat power beside their name, once the game has sent it."
+                                   Value="@S.Appearance.ShowCombatPower" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { ShowCombatPower = v } }))" />
+                    <ToggleSetting Label="Bar effects" Description="A shine on the bars, each class's animated effect (fire and ice, poison, arrows...), and rows that glide when someone overtakes. Off for plain bars; Windows' reduce-motion setting also stops the motion."
+                                   Value="@S.Appearance.BarEffects" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { BarEffects = v } }))" />
+                    @if (S.Appearance.BarEffects)
+                    {
+                        <ToggleSetting Label="Effects on every bar" Description="Every player's bar shows their class's effect, fainter than yours. Off: only your bar does."
+                                       Value="@S.Appearance.EffectsOnEveryBar" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { EffectsOnEveryBar = v } }))" />
+                    }
                     <ToggleSetting Label="Skill icons" Description="Skill and buff icons in player details load from NC's game-data site, as in RATmeter."
                                    Value="@S.Appearance.SkillIcons" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { SkillIcons = v } }))" />
                     <ToggleSetting Label="Hide player names" Description="Masks every name, yours included, for screenshots and streams."

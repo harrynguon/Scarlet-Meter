@@ -194,6 +194,24 @@ public sealed class SettingsTests : IDisposable
     }
 
     [Fact]
+    public void AFileFromAnEarlierBuildGetsTheNewAppearanceOptionsOnAndKeepsItsOwn()
+    {
+        var store = NewStore();
+        Directory.CreateDirectory(directory.FullPath); // TestDataDirectory names the folder; the test makes it
+        File.WriteAllText(store.FilePath, "{ \"version\": 1, \"appearance\": { \"showDeaths\": false } }");
+
+        var loaded = store.Load().Settings;
+        Assert.False(loaded.Appearance.ShowDeaths);
+        Assert.True(loaded.Appearance.BarEffects);
+        Assert.True(loaded.Appearance.EffectsOnEveryBar);
+        Assert.True(loaded.Appearance.ShowCombatPower);
+
+        var plain = loaded with { Appearance = loaded.Appearance with { BarEffects = false, EffectsOnEveryBar = false, ShowCombatPower = false } };
+        store.Save(plain);
+        Assert.Equal(plain, store.Load().Settings);
+    }
+
+    [Fact]
     public void WithoutABackupAnUnreadableFileFallsBackToDefaultsAndIsKept()
     {
         var store = NewStore();
