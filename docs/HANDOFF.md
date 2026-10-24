@@ -4,7 +4,7 @@ Repository: https://github.com/harrynguon/Scarlet-Meter (private until #23 merge
 
 ## Next: the public release (#23)
 
-- [ ] The player decides whether to publish with Microsoft's Windows SDK projection bundled (WebView2's composition control needs it for the see-through overlay; RATmeter's builds bundle it too; its licence is Microsoft's, and whether the GPL's system-library exception covers it is not settled: docs/SECURITY.md, "Public release").
+- [x] Publish with Microsoft's Windows SDK projection bundled: Harry's decision on 2026-10-25, as RATmeter does (WebView2's composition control needs it for the see-through overlay; RATmeter's builds bundle it too; its licence is Microsoft's, and whether the GPL's system-library exception covers it is not settled: docs/SECURITY.md, "Public release").
 - [ ] Merge #23, tag `v0.1.0` on `main`, and check the draft: both zips' SHA-256, the program zip's `licenses` folder and files, the source zip's `upstream/`, and no account name, home path or e-mail in any file (docs/DEVELOPMENT.md, "Releases").
 - [ ] Make the repository public, then publish the draft; update docs/SECURITY.md ("Game terms") and this line with the date.
 - [ ] Once public, with the player's go-ahead (repository settings): protect `main`, add a tag ruleset for `v*`, and require approval before outside contributors' pull requests run workflows (docs/SECURITY.md, "Public release").
