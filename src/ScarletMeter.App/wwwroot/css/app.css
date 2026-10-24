@@ -69,13 +69,16 @@ button {
 /* The panel's background (colour and optional picture) sits on ::before so only it fades. Over the picture, a layer
    of the panel's own colour at 1 - --image-alpha fades the picture into the panel ("Picture opacity"), exactly as
    the picture at that opacity over the colour would look; the dark veil above it keeps text readable. Without a
-   picture both layers are the panel's colour, so nothing changes. */
+   picture both layers are the panel's colour, so nothing changes.
+   The panel is only as tall as its content, up to the window (max-height; the rows scroll beyond it): what it does
+   not cover is see-through to the game, so the room the notices leave in a boss fight, or below a small party's
+   rows, never shows as an empty panel. The window keeps the size the player gave it. */
 .overlay {
     position: relative;
     isolation: isolate;
     display: flex;
     flex-direction: column;
-    height: 100%;
+    max-height: 100%;
     box-sizing: border-box;
     border-radius: var(--radius);
     border: 1px solid var(--line);
@@ -90,7 +93,9 @@ button {
     background:
         linear-gradient(rgba(11, 11, 15, 0.55), rgba(11, 11, 15, 0.55)),
         linear-gradient(rgba(11, 11, 15, calc(1 - var(--image-alpha, 1))), rgba(11, 11, 15, calc(1 - var(--image-alpha, 1)))),
-        var(--panel-image, none) center / cover no-repeat;
+        /* fixed: laid out against the window, not the panel, so the picture keeps its scale and place as the panel
+           grows and shrinks with its content. */
+        var(--panel-image, none) center / cover no-repeat fixed;
     /* Its own declaration, so a bad value in the layers above drops only them, never the panel's colour. */
     background-color: var(--bg);
     opacity: var(--panel-alpha, 0.9);
@@ -321,14 +326,16 @@ button {
 .ping.bad { color: var(--bad); }
 .ping.bad i:nth-child(1) { background: var(--bad); }
 
-/* Positioned, so a row's offsetTop (js/overlay-fx.js) is measured from the list, not the panel above it. */
+/* Positioned, so a row's offsetTop (js/overlay-fx.js) is measured from the list, not the panel above it. As tall as
+   its rows (the panel fits its content, .overlay), shrinking and scrolling only when the window is too short. */
 .rows {
     position: relative;
     list-style: none;
     margin: 0;
     padding: 2px 6px 6px;
     overflow-y: auto;
-    flex: 1;
+    flex: 0 1 auto;
+    min-height: 0;
     zoom: var(--row-scale, 1);
 }
 

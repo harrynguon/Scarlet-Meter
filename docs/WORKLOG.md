@@ -2,6 +2,18 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-25 — The overlay's panel fits its content
+
+**What:** The overlay's panel (`.overlay` in `app.css`) no longer fills the window: it is as tall as its content, up to the window (`max-height: 100%`), and the rows take their own height (`flex: 0 1 auto`), shrinking and scrolling only when the window is too short. What the panel does not cover is see-through to the game. The window keeps the size the player set, which is the most the panel grows to. The background picture is laid out against the window (`background-attachment: fixed`), so it keeps its scale and place as the panel grows and shrinks. `RazorMarkupTests.TheOverlayPanelFitsItsContent` guards the three rules. ARCHITECTURE ("Windows", tests), a HANDOFF item.
+
+**Why:** Harry, in game with the v0.1.0 build: the notices stepping aside in a boss fight is "great", but "there is a lot of empty space ... the area where the timers ends up being blank space". Of three ways offered (the panel fits its content, the window shrinks to fit, the rows grow to fill), Harry chose the panel fitting its content.
+
+**Checks (SDK 10.0.402):** `TheOverlayPanelFitsItsContent` new; fail-first, each failing it: `height: 100%` back on the panel, `flex: 1` back on the rows, and the picture without `fixed`.
+
+**Not checked:** in the game, whether clicks on the see-through part reach the game (a fully transparent pixel of a layered window normally passes them on) and resizing from the edges (the bottom edge is see-through while the panel is short, so it resizes from the top and sides then; Harry was told before choosing).
+
+**Next:** build, a visual check with Harry's go-ahead, audit, Codex and CI; merge.
+
 ## 2026-10-25 — Public release review and the release pipeline
 
 **What:** The public-release review (SECURITY.md, "Public release") and what a public GPLv3 release needs. `LICENSE` is now the plain GPLv3 text (identical to gnu.org's `gpl-3.0.txt`, so GitHub recognises it); Scarlet's notice and RATmeter's credit moved to a new `NOTICE`, with an NCSOFT trademark and risk line. New `THIRD-PARTY-NOTICES.md` credits RATmeter, the fork, .NET, the schedule data sources and every NuGet package of the build, the table written by the new `scripts/Write-ThirdPartyNotices.ps1` from the app's restore; `ThirdPartyNoticesTests` fails when a package is missing or `LICENSE` stops being the plain text. The publish now carries `README.txt` (a player's guide: Npcap, unzip, run, risk), `LICENSE.txt`, `NOTICE.txt` and `THIRD-PARTY-NOTICES.md` beside the exe (`ScarletMeter.App.csproj`), and `Test-PublishLayout.ps1` requires them. New `.github/workflows/release.yml`: on a `v*` tag it checks the tag against `src/Directory.Build.props`' version and that `docs/release-notes/<tag>.md` exists, builds and tests, publishes the portable zip, checks its contents, and creates a draft (pre-release below 1.0) with `ScarletMeter-<version>-win-x64.zip` and its SHA-256; the job alone gets `contents: write`. `docs/release-notes/v0.1.0.md`. README ("Download", "Status", licences), DEVELOPMENT ("Releases"), ARCHITECTURE (updates), SECURITY (review, game terms), HANDOFF, the auditor's description.

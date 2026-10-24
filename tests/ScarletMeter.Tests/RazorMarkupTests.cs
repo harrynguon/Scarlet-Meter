@@ -90,6 +90,23 @@ public sealed partial class RazorMarkupTests
         Assert.Equal(3, Regex.Matches(windows, @"\bRestoreForAlert\(\)").Count); // the two calls and its definition
     }
 
+    // The overlay's panel is only as tall as its content, up to the window, so the room the notices leave in a boss
+    // fight is see-through rather than empty panel; the rows take only their own height and scroll when the window is
+    // too short; and the picture is laid out against the window, so it does not rescale as the panel changes height.
+    [Fact]
+    public void TheOverlayPanelFitsItsContent()
+    {
+        var css = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "app.css"));
+        string Block(string selector) => Regex.Match(css, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
+        var overlay = Block(".overlay");
+        Assert.Matches(@"(?m)^\s*max-height:\s*100%;", overlay);
+        Assert.DoesNotMatch(@"(?m)^\s*height:", overlay);
+        var rows = Block(".rows");
+        Assert.Matches(@"(?m)^\s*flex:\s*0 1 auto;", rows);
+        Assert.Matches(@"(?m)^\s*min-height:\s*0;", rows);
+        Assert.Matches(@"var\(--panel-image, none\) center / cover no-repeat fixed;", Block(".overlay::before"));
+    }
+
     [GeneratedRegex(@"<span class=""(num[^""]*)""")]
     private static partial Regex RowNumberColumn();
 
