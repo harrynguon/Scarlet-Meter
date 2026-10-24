@@ -123,6 +123,10 @@ try {
     New-TestFolder (Join-Path $work 'Fake') @{ 'ScarletMeter.exe' = 'x'; '.scarlet-install' = 'hello' } | Out-Null
     [IO.File]::WriteAllText((Join-Path $work 'AFile'), 'a file')
     New-TestFolder (Join-Path $work 'Gone.retired') @{ 'ScarletMeter.exe' = 'x'; '.scarlet-install' = $markerText } | Out-Null
+    # An install folder someone made portable by hand: its data would be moved aside, then deleted.
+    $portableInstall = New-TestFolder (Join-Path $work 'PortableInstall') @{ 'ScarletMeter.exe' = 'x'; '.scarlet-install' = $markerText; 'ScarletMeter.portable' = 'portable' }
+    New-TestFolder (Join-Path $portableInstall 'data') @{ 'settings.json' = '{ "version": 1 }' } | Out-Null
+    $portableInstallBefore = Get-TreeSnapshot $portableInstall
     $toCheckout = New-TestJunction (Join-Path $work 'toCheckout') $repoRoot
     $toLocalAppData = New-TestJunction (Join-Path $work 'toLocalAppData') $localAppData
 
@@ -178,6 +182,8 @@ try {
     Test-Refused 'a marker with other text' (Join-Path $work 'Fake') @('not made by Install-Meter')
     Test-Refused 'a file' (Join-Path $work 'AFile') @('is a file')
     Test-Refused '.retired without an install' (Join-Path $work 'Gone') @('only copy')
+    Test-Refused 'an install that is a portable copy with data' $portableInstall @('portable copy')
+    Test-Unchanged 'a refused portable copy' $portableInstall $portableInstallBefore
 
     # What must still pass.
     Test-Accepted 'a new folder under a new parent' (Join-Path $work 'Fresh\ScarletMeter')

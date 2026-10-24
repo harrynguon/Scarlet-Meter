@@ -75,7 +75,27 @@ jobs:
           foreach ($folder in $install, "$install.previous") {
             if (-not (Test-Path -LiteralPath (Join-Path $folder 'ScarletMeter.exe') -PathType Leaf)) { throw "$folder holds no ScarletMeter.exe." }
             if (-not (Test-Path -LiteralPath (Join-Path $folder '.scarlet-install') -PathType Leaf)) { throw "$folder has no install marker." }
+            if (Test-Path -LiteralPath (Join-Path $folder 'ScarletMeter.portable')) { throw "$folder carries the portable marker, so it would keep its data beside the exe." }
           }
           foreach ($folder in "$install.staging", "$install.retired") {
             if (Test-Path -LiteralPath $folder) { throw "$folder was left behind." }
           }
+
+      # The portable build under pwsh, into the runner's temp directory: publish, layout check, the portable marker
+      # and the zip. The zip must hold the exe and the marker under a top "ScarletMeter" folder, and no data folder
+      # (extracting an update over a copy must not touch its data). Nothing here launches the meter.
+      - name: Portable build (publish, layout check, marker, zip)
+        shell: pwsh
+        run: |
+          $root = Join-Path '${{ runner.temp }}' 'portable'
+          & (Join-Path '${{ github.workspace }}' 'scripts/Publish-Portable.ps1') -OutputRoot $root -SkipTests
+          $zips = @(Get-ChildItem -LiteralPath $root -Filter '*-win-x64.zip')
+          if ($zips.Count -ne 1) { throw "Expected one zip in $root, found $($zips.Count)." }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [IO.Compression.ZipFile]::OpenRead($zips[0].FullName)
+          try { $entries = @($archive.Entries | ForEach-Object { $_.FullName -replace '\\', '/' }) } finally { $archive.Dispose() }
+          foreach ($required in 'ScarletMeter/ScarletMeter.exe', 'ScarletMeter/ScarletMeter.portable', 'ScarletMeter/wwwroot/index.html') {
+            if ($entries -notcontains $required) { throw "The zip lacks $required." }
+          }
+          if ($entries | Where-Object { $_ -notlike 'ScarletMeter/*' -or $_ -like 'ScarletMeter/data/*' }) { throw 'The zip holds an entry outside ScarletMeter/ or a data folder.' }
+          Write-Host "Portable zip checked: $($zips[0].Name), $([math]::Round($zips[0].Length / 1MB)) MB, $($entries.Count) entries"

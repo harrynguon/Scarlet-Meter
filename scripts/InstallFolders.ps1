@@ -157,6 +157,15 @@ function Assert-InstallFoldersOwned($Folders) {
     Assert-OwnedFolder $Folders.Previous @($InstallMarker)
     Assert-OwnedFolder $Folders.Retired @($InstallMarker)
     Assert-OwnedFolder $Folders.Staging @($StagingMarker, $InstallMarker)
+    # A portable copy keeps the player's settings and history in "data" beside the exe; an install would move
+    # that aside as .previous and delete it on the install after. Such folders are left for the player to move.
+    foreach ($folder in $Folders.Install, $Folders.Previous, $Folders.Retired) {
+        foreach ($entry in 'ScarletMeter.portable', 'data') {
+            if (Test-Path -LiteralPath (Join-Path $folder $entry)) {
+                throw "$folder holds $entry, so it is or was a portable copy with the player's data beside the exe. Nothing was changed; move the data out (or use another -InstallDirectory), then run the install again."
+            }
+        }
+    }
 }
 
 # Deletes a folder the install made so that a delete stopping part way (a file held open) leaves it still marked:

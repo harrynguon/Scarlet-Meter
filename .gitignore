@@ -2,6 +2,7 @@
 bin/
 obj/
 publish/
+portable/
 local-build/
 TestResults/
 .artifacts/

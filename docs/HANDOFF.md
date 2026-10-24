@@ -14,6 +14,7 @@ Updates (2026-10-24, ARCHITECTURE.md "Updates"): builds stamp the pinned upstrea
 
 - [x] Wire the checker into the UI (`UpdateNotice`, WORKLOG.md 2026-10-24 "Update notice in the overlay").
 - [ ] With the meter installed and a newer RATmeter release out, the overlay's line appears about 30 seconds after start, "Release notes" opens the release in the browser, the cross hides it until the next release, and the switch in Settings, About stops the check.
+- [ ] Unzip a portable build (`Publish-Portable.ps1`) somewhere other than the checkout and run it in the game: data appears in its `data` folder, nothing in `%LocalAppData%\ScarletMeter`; extracting a newer zip over it keeps the settings and history.
 - [ ] Install once to the default location with `Install-Meter.ps1 -Shortcut`, which also brings in v1.11.5.341 (every install so far went to a temporary directory).
 
 ## Next: in-game acceptance

@@ -2,7 +2,7 @@
 
 Never embed, print, log or commit credentials, tokens, game authentication data, personal progress, packet captures or private combat logs. Use synthetic fixtures. Treat anything read from the network or from files as untrusted; upstream validates packet fields before use, and the engine validates paths at its boundary.
 
-Filesystem operations use absolute paths derived from trusted roots (AGENTS.md, "Paths"). The meter writes only under its data directory (per-user by default, or `--data-dir`): history database, settings, logs, the imported background picture and the WebView2 browser profile (ARCHITECTURE.md, "Storage").
+Filesystem operations use absolute paths derived from trusted roots (AGENTS.md, "Paths"). The meter writes only under its data directory (per-user by default, the `data` folder beside the exe for a portable copy, or `--data-dir`), apart from the native libraries every single-file .NET app unpacks to `%TEMP%\.net`: history database, settings, logs, the imported background picture and the WebView2 browser profile (ARCHITECTURE.md, "Storage").
 
 `settings.json` is untrusted input: it passes one validation boundary (`SettingsNormalizer`), is size-limited, and can only name a background picture the meter itself imported, so it cannot point the page at another file. A damaged file is kept aside, never deleted; when it (or the backup) cannot be moved aside, or the file comes from a newer build, saving is off for that run so nothing overwrites it (ARCHITECTURE.md, "Settings"). The pages reach local images only through two WebView2 virtual hosts that each map a single folder (the backgrounds folder and the class icons beside the executable), never the database, logs or settings. A Content-Security-Policy allows scripts only from the app and images only from the app, those hosts and NC's game-data CDN, with no plugins. Player names from the network are rendered as text (Blazor escapes them).
 
@@ -34,6 +34,8 @@ World events (`src/ScarletMeter.WorldEvents`, `tests/ScarletMeter.Tests/WorldEve
 - The schedules are **not verified against Global Asia / Nezekan** (ARCHITECTURE.md, "World events"). They are scheduled times, not live reports from the game.
 
 Confirm the schedule data's redistribution terms before any public binary release.
+
+A portable zip from `Publish-Portable.ps1` carries no debug symbols or documentation files, so it does not name the builder's folders or Windows account. It has not been reviewed for public release (licence notices, schedule data terms; see Provenance): hand it only to people you would give the source to.
 
 ## Game terms
 
