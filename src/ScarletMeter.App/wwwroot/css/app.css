@@ -75,8 +75,9 @@ button {
    The panel is only as tall as its content: what it does not cover is see-through to the game, so the room the
    notices leave in a boss fight, or below a small party's rows, never shows as an empty panel. Nothing in it
    scrolls: when the content is taller than the window, the window grows to fit (js/overlay-size.js reports the
-   height, Windows/OverlayFit places the window) and returns to the player's size once it fits again; max-height
-   only clips it to the window for the moment until then. Its bottom padding adds 8 px
+   height, Windows/OverlayFit places the window) and returns to the player's size once it fits again. max-height
+   keeps the panel inside the window for the moment until then, and for good once the window is as tall as the
+   screen, when the rows give way (.overlay.cut .rows), never the notices. Its bottom padding adds 8 px
    under whatever ends the panel, on top of the rows' and the notices' own spacing: measured, 18 px from the last
    row to the panel's edge and 15 px from the last notice. */
 .overlay {
@@ -333,10 +334,10 @@ button {
 .ping.bad { color: var(--bad); }
 .ping.bad i:nth-child(1) { background: var(--bad); }
 
-/* Positioned, so a row's offsetTop (js/overlay-fx.js) is measured from the list, not the panel above it. Always as
-   tall as all its rows (flex: none): nothing in the overlay scrolls, and the window grows instead (.overlay). Its
-   overflow is clipped, not scrollable, so a row gliding into place (a transform) cannot stretch the panel's
-   measured height for a moment and make the window jump. */
+/* Positioned, so a row's offsetTop (js/overlay-fx.js) is measured from the list, not the panel above it. Nothing in
+   the overlay scrolls: the rows take their full height (flex: none) and the window grows to the content (.overlay).
+   Its overflow is clipped, not scrollable, so a row gliding into place (a transform) cannot stretch the measured
+   height for a moment and make the window jump. */
 .rows {
     position: relative;
     list-style: none;
@@ -345,6 +346,20 @@ button {
     overflow: clip;
     flex: none;
     zoom: var(--row-scale, 1);
+}
+
+/* Only where the window cannot grow to the content (it is as tall as the screen, or the player is resizing it:
+   Pages/MeterPage.razor.cs, "cut") do the rows give way, the lowest first, their edge faded rather than a row cut
+   in half, so the notices below are never cut. Never for the moment before the window grows, which would squeeze
+   the rows. They are still measured at full height (data-measuring, js/overlay-size.js; after .cut, so it wins). */
+.overlay.cut .rows {
+    flex: 0 1 auto;
+    min-height: 0;
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
+}
+
+.overlay[data-measuring] .rows {
+    flex: none;
 }
 
 .row {

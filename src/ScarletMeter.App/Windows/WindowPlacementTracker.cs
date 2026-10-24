@@ -9,17 +9,18 @@ namespace ScarletMeter.App.Windows;
 /// shown and ignores a saved placement that would land off every monitor (one was unplugged or the layout
 /// changed; see <see cref="ScreenPlacement"/>); moves and resizes are saved shortly after they stop, and once
 /// more when the window closes. Only the normal (not minimized or maximized) state is saved, and what is saved is
-/// <c>bounds</c>: the window's own placement, or the player's where the window sizes itself (the overlay).
+/// <c>bounds</c>: the window's own placement, or the player's where the window sizes itself (the overlay); null while
+/// that is not settled, which skips the save.
 /// </summary>
 internal sealed class WindowPlacementTracker
 {
     private readonly Window window;
     private readonly string key;
     private readonly SettingsService settings;
-    private readonly Func<Rect> bounds;
+    private readonly Func<Rect?> bounds;
     private readonly DispatcherTimer saveTimer;
 
-    public WindowPlacementTracker(Window window, string key, SettingsService settings, Func<Rect> bounds)
+    public WindowPlacementTracker(Window window, string key, SettingsService settings, Func<Rect?> bounds)
     {
         this.window = window;
         this.key = key;
@@ -44,7 +45,8 @@ internal sealed class WindowPlacementTracker
         return true;
     }
 
-    private void Schedule()
+    /// <summary>Saves the placement shortly, unless it moves again first.</summary>
+    public void Schedule()
     {
         if (!window.IsLoaded) return;
         saveTimer.Stop();
@@ -54,8 +56,7 @@ internal sealed class WindowPlacementTracker
     private void Save()
     {
         saveTimer.Stop();
-        if (!window.IsLoaded || window.WindowState != WindowState.Normal) return;
-        var b = bounds();
+        if (!window.IsLoaded || window.WindowState != WindowState.Normal || bounds() is not { } b) return;
         var placement = new WindowPlacement(b.X, b.Y, b.Width, b.Height);
         settings.Update(s => s.Windows.TryGetValue(key, out var old) && old == placement
             ? s

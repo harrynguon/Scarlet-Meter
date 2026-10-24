@@ -88,8 +88,9 @@ and adds it up per player and per fight.
 
 - **Alerts** at the bottom of the meter before world events and field bosses (Spacetime Rift, Shugo Festival,
   Dimensional Invasion, Watcher Kaira and more) and while their entry is open, with a countdown.
-- **Out of your way**: they step aside during boss fights, a **bell** in the header turns them off in one click,
-  and "+N more" folds extra ones away. Times follow the Global preset and are not yet verified in game.
+- **Out of your way**: they sit below the bars and never cover one, step aside during boss fights, and a **bell**
+  in the header turns them off in one click. "+N more" folds extra ones away; nothing scrolls, the meter grows to
+  fit instead. Times follow the Global preset and are not yet verified in game.
 
 **Convenient**
 
@@ -127,17 +128,62 @@ The meter only reads network traffic, as RATmeter does. Even so, NCSOFT's terms 
 using one can lead to an **account ban**: use it at your own risk. AION 2 and its names, artwork and data belong to
 NCSOFT; Scarlet Meter is not affiliated with or endorsed by NCSOFT.
 
-## FAQ
+## Q&A
 
-**A player shows as `Player_xxxx`.** The game sends names only at certain moments (teleporting, entering a
-dungeon). The meter shows a placeholder until then, as RATmeter does.
+**How does it work, in one breath?**
+Npcap lets the meter see the game's own network traffic on your PC. RATmeter's decoder turns that traffic into
+hits, heals and buffs, and the meter adds them up per player and per fight. It never touches the game itself.
+More in [How it works](#how-it-works).
 
-**It says "Waiting for the game's connection...".** Start the game (or change zone) and give it a moment. If it
-stays, check that Npcap is installed with WinPcap API-compatible mode.
+**Where are my settings, saved fights and logs?**
+All in the `data` folder beside `ScarletMeter.exe`, so you can back it up, move it or delete it as one:
 
-**It closes with a message about Npcap.** Install Npcap as in step 1.
+| What | Where |
+| --- | --- |
+| Logs, one file a day, kept 14 days | `data\logs\scarlet-<date>.log` |
+| Settings, and the previous save | `data\settings.json`, `data\settings.json.bak` |
+| Saved boss fights | `data\combat-history.db` (demo fights: `data\demo-history.db`) |
+| Your background picture | `data\backgrounds\` |
+| The meter's browser cache (WebView2) | `data\webview2\` |
 
-**Where is my data?** In the `data` folder beside `ScarletMeter.exe`: settings, saved fights, logs.
+A copy built and installed from source keeps the same files in `%LocalAppData%\ScarletMeter` instead.
+
+**Does it send anything anywhere?**
+Your settings, fights and logs never leave your PC. The meter makes only two kinds of request, both optional: an
+anonymous check for a newer RATmeter release on GitHub (at most every six hours), and skill icons from NCSOFT's own
+game-data site, as RATmeter does. Settings turn either off.
+
+**Can I get banned for using it?**
+It only reads network traffic, as RATmeter does, but NCSOFT's terms forbid unauthorised programs. Use it at your
+own risk (see [Safety and terms](#safety-and-terms)).
+
+**Why does the meter sometimes get taller?**
+Nothing in the meter scrolls. When the world-event alerts and the bars need more room than the size you gave it,
+it grows downwards (upwards at the bottom of the screen) and goes back to your size a moment after. The alerts
+always sit below the last bar, never over it, and the size remembered for next time is always yours. If it is
+already as tall as the screen, the lowest rows fade out and the alerts stay whole.
+
+**How do I hide it quickly?**
+**Ctrl+Shift+D** hides and shows it, even while the game has focus. Change the shortcut in Settings.
+
+**A player shows as `Player_xxxx`.**
+The game sends names only at certain moments (teleporting, entering a dungeon). The meter shows a placeholder until
+then, as RATmeter does.
+
+**It says "Waiting for the game's connection...".**
+Start the game (or change zone) and give it a moment. If it stays, check that Npcap is installed with
+WinPcap API-compatible mode.
+
+**It closes with a message about Npcap.**
+Install Npcap as in step 1 of [Download and run](#download-and-run).
+
+**Are the numbers the same as RATmeter's?**
+They come from the same decoder (included unmodified), so they should match; what differs is the overlay and the
+extras around it.
+
+**Something looks wrong. How do I report it?**
+Open an [issue](https://github.com/harrynguon/Scarlet-Meter/issues) with what you saw and roughly when. The log for
+that day (`data\logs`) helps: look it over before attaching it.
 
 ## Building from source
 

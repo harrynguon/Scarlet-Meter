@@ -1,7 +1,8 @@
 /* World-event notices at the bottom of the overlay (Components/AlertStrip.razor), below the last DPS bar. Uses
    app.css tokens. Nothing in the overlay scrolls: the strip always takes its full height (flex: none), the first two
    notices and "+N more" collapsed, every due notice expanded, and when the window is too short for it and the bars,
-   the window grows (Windows/OverlayFit), so a notice never covers a bar and is never cut. */
+   the window grows (Windows/OverlayFit); once it is as tall as the screen the lowest rows give way instead (app.css,
+   .overlay.cut .rows). So a notice never covers a bar and is never cut, and "Show less" is always there. */
 .alerts {
     display: flex;
     flex-direction: column;

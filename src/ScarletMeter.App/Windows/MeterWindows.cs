@@ -66,6 +66,13 @@ public interface IMeterWindows
     /// show all of it and returns to the player's own size when it fits (<see cref="OverlayFit"/>).
     /// </summary>
     void FitOverlayToContent(double contentHeight);
+
+    /// <summary>
+    /// Whether the overlay window is shorter than content <paramref name="contentHeight"/> tall even after fitting: it
+    /// is as tall as the screen allows, or the player is resizing it. The page's rows then give way (app.css,
+    /// .overlay.cut), never the notices. Cheap to call on every render.
+    /// </summary>
+    bool OverlayCutsContent(double contentHeight);
 }
 
 /// <summary>
@@ -182,6 +189,8 @@ public sealed class MeterWindows : IMeterWindows
     {
         if (!closing) overlay?.FitToContent(contentHeight);
     }
+
+    public bool OverlayCutsContent(double contentHeight) => !closing && overlay?.CutsContent(contentHeight) == true;
 
     public void MinimizeOverlay()
     {
