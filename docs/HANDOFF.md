@@ -35,6 +35,9 @@ Record the tested commit, observation date and Windows configuration. Pending:
 - [ ] The overlay shows over the game (borderless or windowed mode), stays on top, drags by its header and resizes from its edges; the background opacity and a background picture look right over the game.
 - [ ] `Ctrl+Shift+D` (or the chosen shortcut) minimizes and restores the meter while the game has focus, and does not trigger a game action.
 - [ ] Class colours, relative bars, deaths, hidden names and row size behave as in RATmeter.
+- [ ] On a boss, "Kill in" appears after a few seconds and lands within a few seconds of the real kill when the pace is steady; note bosses where it misleads (phases, invulnerable stretches, heals).
+- [ ] Each player's combat power beside their name matches the game (upstream reads it from a heuristic scan; note any wrong or missing value).
+- [ ] With "Bar effects" on, the lightning on your bar, the gloss and the overtake glide do not cost frames in the game (compare FPS with the setting off); the glide looks right when players swap places often.
 - [ ] Settings and window positions survive a restart; fight options (boss-only, combined summons, one-minute dummy) change new hits.
 
 ## Next: world-event notices

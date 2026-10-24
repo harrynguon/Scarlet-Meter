@@ -134,6 +134,16 @@ public sealed record AppearanceSettings
 
     /// <summary>Show skill and buff icons, which load from NC's game-data CDN as in RATmeter.</summary>
     public bool SkillIcons { get; init; } = true;
+
+    /// <summary>
+    /// The meter's effects: a shine on every bar, lightning on the player's own bar, and rows that glide (with a
+    /// flash) when one player overtakes another. Off gives plain bars and instant reordering; the system's
+    /// "reduce motion" setting turns the motion off either way.
+    /// </summary>
+    public bool BarEffects { get; init; } = true;
+
+    /// <summary>Show each player's combat power beside their name, when the game has sent it.</summary>
+    public bool ShowCombatPower { get; init; } = true;
 }
 
 /// <summary>Overlay behaviour.</summary>

@@ -30,6 +30,7 @@ $required = @(
     'wwwroot\css\app.css',
     'wwwroot\css\views.css',
     'wwwroot\css\alerts.css',
+    'wwwroot\js\overlay-fx.js',
     'wwwroot\_framework\blazor.webview.js',
     'GameData\Assets\classes.json',
     'GameData\Assets\skills.json',

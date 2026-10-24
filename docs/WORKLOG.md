@@ -2,6 +2,20 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Target card with "Kill in", bar effects, overtake glide, combat power
+
+**What:** The overlay's header now shows the fight's state ("Boss combat" or "Combat", a live dot, the duration); the duration left the totals line, which keeps party DPS and ping. In a fight a target card shows the name (a skull for a boss), HP and percent, a thicker HP bar and "Kill in", from a new `Combat/KillTimer`: remaining HP over how fast it fell in the last 20 seconds, nothing for the first 5 seconds, while not falling or beyond an hour, starting over on another target or rising HP. Each row shows the player's combat power beside their name ("Show combat power", default on). "Bar effects" (default on) gives every bar a gloss and a bright tip, makes the player's own row glow with animated lightning on its bar (SVG zigzags with running, flickering dashes and a periodic strike), and glides rows to their new places with a flash on the one that moved up when someone overtakes (`wwwroot/js/overlay-fx.js`, FLIP through a `MutationObserver`, loaded by `index.html`; Windows' reduce-motion stops the motion). Settings, Appearance has both toggles. `Test-PublishLayout.ps1` requires the script. ARCHITECTURE ("Windows", tests), HANDOFF in-game items.
+
+**Why:** Harry asked for bars that pop, with the blue bar as a lightning strike, a small move animation when one player overtakes another, "Kill in" and "Berserk in" timers, and combat power on the bars (item level dropped: upstream does not decode it).
+
+**Not done: "Berserk in".** Upstream's `mobs.json` has a boss's name and flags only, nothing in the decoded traffic gives an enrage time, and neither reference repository Harry saved (A2Tools plugins, aion2timeroverlay) holds boss enrage timers; it needs a source first.
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` 382/382: new `KillTimerTests` (8), a settings test for a file from before these options, a markup test for the pages' scripts. Fail-first: dropping the 20-second window, the 5-second minimum and the one-hour cap each failed their test; dropping the rising-HP reset passed every test at first, so `AHealMeasuresOnlyTheFallAfterIt` was added, and it fails without the reset.
+
+**Not checked yet:** the look in the running meter (needs a window; waiting for Harry's go-ahead); in the game (HANDOFF).
+
+**Next:** visual check with Harry's OK, audit, Codex, CI, merge.
+
 ## 2026-10-24 — Expandable "+N more" in the alert strip
 
 **What:** The overlay's alert strip still shows two notices, but "+N more" is now a button: hovering it lists the hidden notices, one per line with their location and local start or close time (clock times, so the tooltip does not go stale while open); clicking it expands the strip to every due notice with its countdown and progress bar, and "Show less" collapses it. Expanded, the strip takes at most 45% of the meter's height and scrolls beyond, so the rows stay visible; it collapses by itself once no notice is hidden, so it starts collapsed the next time more are due. The rules live in a new pure helper, `Alerts/AlertStripLayout` (shown list, hidden count, whether it stays expanded, the tooltip, one notice's description, now also used for each notice's own tooltip); `AlertStrip.razor` keeps only the expanded flag. The button carries `aria-expanded`. ARCHITECTURE ("Overlay notices", tests) and a HANDOFF in-game item.

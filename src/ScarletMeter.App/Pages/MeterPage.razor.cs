@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
 using ScarletMeter.App.Alerts;
+using ScarletMeter.App.Combat;
 using ScarletMeter.App.Formatting;
 using ScarletMeter.App.Settings;
 using ScarletMeter.App.Updates;
@@ -23,6 +24,9 @@ public partial class MeterPage : IAsyncDisposable
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromMilliseconds(100);
 
     private readonly CancellationTokenSource stopping = new();
+    // The target card's "Kill in", fed with every snapshot.
+    private readonly KillTimer killTimer = new();
+    private TimeSpan? killIn;
     private CombatSnapshot snapshot = CombatSnapshot.Empty;
     private AppearanceSettings appearance = new();
     private int? ping;
@@ -118,6 +122,7 @@ public partial class MeterPage : IAsyncDisposable
                 try
                 {
                     snapshot = Engine.GetSnapshot();
+                    killIn = killTimer.Update(snapshot.Target, Clock.GetUtcNow());
                     await RenderAsync();
                     if (refreshFailing) Logger.LogInformation("Refreshing the meter works again.");
                     refreshFailing = false;
@@ -173,6 +178,8 @@ public partial class MeterPage : IAsyncDisposable
     {
         Engine.Reset();
         snapshot = CombatSnapshot.Empty;
+        killTimer.Clear();
+        killIn = null;
     }
 
     public async ValueTask DisposeAsync()
