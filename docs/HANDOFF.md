@@ -31,13 +31,13 @@ Record the tested commit, observation date and Windows configuration. Pending:
 - [ ] Normal launch with Npcap finds the game's connection ("[CAPTURE] !!! LOCKED !!!" in the log) and the header leaves "Waiting for the game's connection...".
 - [ ] Hits on a mob populate rows; party DPS, duration and HP bar move; ping shows.
 - [ ] A boss's HP bar starts full and reaches zero at its kill (upstream v1.11.5.341 fixed the max HP of some bosses); note any boss whose bar does not.
-- [ ] A summon's damage (an Elementalist's spirit, for example) lands on its owner's row, not on an unnamed player: v1.11.5.341 rewrote how a summon's owner is read.
+- [ ] A summon's damage (a Spiritmaster's spirit, for example) lands on its owner's row, not on an unnamed player: v1.11.5.341 rewrote how a summon's owner is read.
 - [ ] After a session, `logs/scarlet-*.log` holds no stream of `PacketParseException` errors from mob packets.
 - [ ] Reset clears the fight; a new pull starts fresh. With a summon out across the reset, its damage still lands on its owner's row, not on an unnamed player.
 - [ ] Without Npcap (or with it uninstalled), a normal launch shows the "Install Npcap" dialog and exits.
 - [ ] Close the window during a fight: no crash, a completed boss fight appears in `combat-history.db`.
 - [ ] CPU and memory are comparable to RATmeter on the same fight.
-- [ ] Player details for a real fight match RATmeter's details window on the same fight: skill names, icons and rates, buffs and uptime, the graph, and an Elementalist's or other summon's damage grouped under its owner skill.
+- [ ] Player details for a real fight match RATmeter's details window on the same fight: skill names, icons and rates, buffs and uptime, the graph, and a Spiritmaster's or other summon's damage grouped under its owner skill.
 - [ ] A boss fight appears in history after upstream's 45-second idle timeout (or on close) and reopens with the details the live view showed; browsing history during a fight does not drop hits.
 - [ ] The overlay shows over the game (borderless or windowed mode), stays on top, drags by its header and resizes from its edges; the background opacity and a background picture look right over the game, and "Picture opacity" tones a busy picture down without fading text or bars. The panel ends under its last row (or the notices): below it the game shows through, a click there reaches the game, the picture does not jump when the notices come and go, and the window still resizes from the edges its panel reaches.
 - [ ] `Ctrl+Shift+D` (or the chosen shortcut) minimizes and restores the meter while the game has focus, and does not trigger a game action.

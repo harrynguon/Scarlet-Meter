@@ -2,6 +2,18 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-25 — Spiritmaster, no white stripe, a margin under the rows
+
+**What:** (1) Class names follow AION 2 Global: `Engine/Upstream/GlobalNames` maps upstream's "Elementalist" (and "Elementalist spirit") to "Spiritmaster" (whole words), applied in `UpstreamMapping.ToPlayerRow` (the overlay, the details, history) and to the combat log's summon names; upstream's `classes.json` stays unedited. The demo's player is "Demo Spiritmaster", and Scarlet's own code, comments, README, ARCHITECTURE, DEVELOPMENT and HANDOFF say Spiritmaster. (2) The player's own bar no longer carries a 2 px white stripe at its left edge (`.fill.me-mark`, now gone with its class): the row is marked by a ring round it instead, gold, or the bar effects' glow in the class's colour as before. (3) The overlay's panel has an 8 px bottom padding, so the last row (or the notices) no longer sits on the panel's edge. ARCHITECTURE (upstream folder, the overlay page, the panel, tests), LESSONS (two entries).
+
+**Why:** Harry, from screenshots: "why is there a little white area to the left of the gladiator damage (and check other classes too)" (it was the "you" stripe, on the player's own bar whatever the class; the other bars had none, by their pixels); "rename Elementalist to Spiritmaster. We are on Aion 2 Global."; and "maybe add some permanent area below the last player's damage bar", since the fitted panel ended right under it.
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` 429/429: `GlobalNamesTests` (8 cases), `TheOwnRowIsMarkedByARingNotOnTheBar`, the class name asserted on the live row and the details (`PlayerDetailsTests`) and on a saved demo fight (`DemoModeTests`), and the panel's bottom padding in `TheOverlayPanelFitsItsContent`. Fail-first, each failing its tests: no bottom padding, the white stripe back, the class name unmapped in `ToPlayerRow` (four tests), and `GlobalNames` renaming nothing (six).
+
+**Not checked:** in a window (Harry may be in game); Global's names for the summons themselves (the combat log shows their entity names, mapped the same way).
+
+**Next:** a visual check with Harry's go-ahead, audit, Codex and CI; merge.
+
 ## 2026-10-25 — The overlay's panel fits its content
 
 **What:** The overlay's panel (`.overlay` in `app.css`) no longer fills the window: it is as tall as its content, up to the window (`max-height: 100%`), and the rows take their own height (`flex: 0 1 auto`), shrinking and scrolling only when the window is too short. What the panel does not cover is see-through to the game. The window keeps the size the player set, which is the most the panel grows to. The background picture is laid out against the window (`background-attachment: fixed`), so it keeps its scale and place as the panel grows and shrinks. `RazorMarkupTests.TheOverlayPanelFitsItsContent` guards the three rules. ARCHITECTURE ("Windows", tests), a HANDOFF item.

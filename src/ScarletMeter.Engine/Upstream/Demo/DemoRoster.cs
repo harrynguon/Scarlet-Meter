@@ -52,7 +52,7 @@ internal static class DemoRoster
     private const int GladiatorId = 41_001;
     private const int ClericId = 41_002;
     private const int RangerId = 41_003;
-    private const int ElementalistId = 41_004;
+    private const int SpiritmasterId = 41_004;
 
     private static readonly DemoHitProfile Melee = new(Critical: 0.45, BackAttack: 0.45, FrontAttack: 0.30, Perfect: 0.06, DoubleDamage: 0.04, Parry: 0.03);
     private static readonly DemoHitProfile Ranged = new(Critical: 0.40, BackAttack: 0.15, FrontAttack: 0.25, Perfect: 0.05, DoubleDamage: 0.05, Parry: 0.02);
@@ -85,7 +85,7 @@ internal static class DemoRoster
             new(14040000, 420_000, 1),   // Spiral Arrow
             new(14050000, 200_000, 1, DotTicks: 5, DotTickDamage: 70_000), // Drill Dart, a hit and then ticks
         ]),
-        new(ElementalistId, "Demo Elementalist", ClassId: 16, CombatPower: 3_010, IsUser: false, OwnerId: null, CastSeconds: 1.1, Caster,
+        new(SpiritmasterId, "Demo Spiritmaster", ClassId: 16, CombatPower: 3_010, IsUser: false, OwnerId: null, CastSeconds: 1.1, Caster,
         [
             new(16010000, 250_000, 3),   // Cold Shock
             new(16040000, 300_000, 2),   // Combustion
@@ -95,12 +95,12 @@ internal static class DemoRoster
     ];
 
     /// <summary>
-    /// The Elementalist's fire spirit. Its hits use the owner's summoning skill (an Elementalist skill code, which
+    /// The Spiritmaster's fire spirit. Its hits use the owner's summoning skill (a Spiritmaster skill code, which
     /// upstream treats as the owner skill of a summon group) and the spirit's basic attack (a spirit-class code),
     /// so upstream folds both under "Summon: Fire Spirit" when summon grouping is on.
     /// </summary>
     public static DemoCombatant Summon { get; } =
-        new(41_101, Name: null, ClassId: 10, CombatPower: 0, IsUser: false, OwnerId: ElementalistId, CastSeconds: 1.4, Caster,
+        new(41_101, Name: null, ClassId: 10, CombatPower: 0, IsUser: false, OwnerId: SpiritmasterId, CastSeconds: 1.4, Caster,
         [
             new(10001, 120_000, 4),      // Fire Spirit: Basic Attack (upstream normalises 10001 to 100011)
             new(16100000, 260_000, 1),   // Summon: Fire Spirit
@@ -115,7 +115,7 @@ internal static class DemoRoster
         new(17430000, ClericId, OnParty: true, PeriodSeconds: 30, DurationSeconds: 20),       // Prayer of Amplification
         new(11250000, GladiatorId, OnParty: false, PeriodSeconds: 25, DurationSeconds: 12),   // Zikel's Blessing
         new(14220000, RangerId, OnParty: false, PeriodSeconds: 40, DurationSeconds: 30),      // Bow of Blessing
-        new(16370000, ElementalistId, OnParty: true, PeriodSeconds: 45, DurationSeconds: 15), // Flame Blessing
+        new(16370000, SpiritmasterId, OnParty: true, PeriodSeconds: 45, DurationSeconds: 15), // Flame Blessing
     ];
 
     /// <summary>Boss mob codes from upstream's mobs.json (Aultross, Fediv Wraith, Transcendent Bakarma), fought in turn.</summary>

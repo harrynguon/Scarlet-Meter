@@ -30,7 +30,7 @@ dotnet run --project "<checkout>\src\ScarletMeter.App\ScarletMeter.App.csproj" -
 Switches:
 
 - `--no-capture` opens the window without Npcap (status reads "Capture is off").
-- `--demo` opens it without Npcap on synthetic fights, for UI work: a party of four ("Demo Gladiator", the user, "Demo Cleric", "Demo Ranger", "Demo Elementalist" with a fire spirit) fights one boss after another, each fight lasting about 60 to 90 seconds with crits, back attacks, DoTs, summon damage, buffs, ping and falling boss HP, then saved to history; the next starts ten seconds later. Capture reads as running on adapter "Demo". Demo fights go to `demo-history.db`, never to the real `combat-history.db`. It cannot be combined with `--no-capture`. It exercises fight tracking, details and history, not packet decoding (docs/ARCHITECTURE.md, "Demo mode").
+- `--demo` opens it without Npcap on synthetic fights, for UI work: a party of four ("Demo Gladiator", the user, "Demo Cleric", "Demo Ranger", "Demo Spiritmaster" with a fire spirit) fights one boss after another, each fight lasting about 60 to 90 seconds with crits, back attacks, DoTs, summon damage, buffs, ping and falling boss HP, then saved to history; the next starts ten seconds later. Capture reads as running on adapter "Demo". Demo fights go to `demo-history.db`, never to the real `combat-history.db`. It cannot be combined with `--no-capture`. It exercises fight tracking, details and history, not packet decoding (docs/ARCHITECTURE.md, "Demo mode").
 - `--data-dir <absolute path>` moves everything the meter writes (history database, logs, WebView2 profile) for a session, for example to keep a test run away from real data.
 
 Anything else is rejected with a dialog.

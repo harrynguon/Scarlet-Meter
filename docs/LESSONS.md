@@ -4,6 +4,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**Class names were upstream's, not AION 2 Global's** (Harry, 2026-10-25).
+- What: the meter showed "Elementalist", the name in RATmeter's game data (`classes.json`), for the class AION 2 Global calls the Spiritmaster, in the overlay, the details, the history and the demo.
+- Why: names were taken from upstream's data as they come, and nobody compared them with the Global client the meter is for.
+- Guard: `Engine/Upstream/GlobalNames`, applied where the engine maps upstream's class and summon names, with `GlobalNamesTests` and checks on the live row, the details and a saved fight; upstream's data stays unedited. When a name reaches the player from upstream's data, check it against Global's.
+
+**Two markers for "you", one of them read as a glitch** (Harry, 2026-10-25).
+- What: the player's own bar carried a 2 px white stripe at its left edge (`.fill.me-mark`, from before the bar effects); when the effects added a glow ring round the player's row (#21), the stripe stayed, and on its own it looked like a rendering fault.
+- Why: the new marker was added without removing or revisiting the old one, and screenshots were checked for the effects, not for leftovers at the bar's edge.
+- Guard: one marker, a ring round the row (gold, or the effects' glow), and `RazorMarkupTests.TheOwnRowIsMarkedByARingNotOnTheBar`. When adding a visual cue, look for the one it replaces.
+
 **Fitting the panel to its content squeezed the expanded strip, and the first fix clipped it** (audit and Codex on #26, fixed before merge).
 - What: changing the rows from `flex: 1` (they gave up their space) to `flex: 0 1 auto` (they keep their own height) made the expanded notice strip, a scroll area that may shrink, give up space in proportion to the rows: with a full party it opened about one notice tall, the same squeeze #20's lesson describes. The first fix, `flex-shrink: 0` on the strip, then let it run past the bottom of a short window's panel, clipping its "Show less" so it could not be collapsed (Codex). The demo check could show neither, since the demo has four players and the default window.
 - Why: each change was judged by the case in front of it (four rows with the notices held; then a full party), not by the page's extremes in both directions (many rows, and a short window), and a flex rule on one child changes how its siblings shrink.

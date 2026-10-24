@@ -218,6 +218,8 @@ public sealed class PlayerDetailsTests : IDisposable
         combat.Hit(lone, mob, T0.AddSeconds(4), 400, loneSkill, characterClass: elementalist);
 
         var details = combat.Engine.GetPlayerDetails(AlphaId)!;
+        Assert.Equal("Spiritmaster", details.Player.ClassName); // Global's name for upstream's "Elementalist"
+        Assert.Equal("Spiritmaster", Assert.Single(combat.Engine.GetSnapshot().Players, p => p.Id == AlphaId).ClassName);
         Assert.Equal(10_400, details.Player.TotalDamage); // upstream credits the summons' damage to their owner
         var single = Assert.Single(details.Skills, s => s.Name == "Summon: Lone Spirit");
         Assert.False(single.IsSummonGroup);

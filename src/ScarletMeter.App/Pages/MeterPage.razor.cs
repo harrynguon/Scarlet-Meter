@@ -131,9 +131,10 @@ public partial class MeterPage : IAsyncDisposable
         return top > 0 ? player.TotalDamage * 100.0 / top : 0;
     }
 
-    // Class gradients (app.css .fill.class-N) when enabled; otherwise the accent, with the user in gold.
+    // Class gradients (app.css .fill.class-N) when enabled; otherwise the accent, with the user in gold. The user's
+    // own row is marked by a ring round it (app.css .row.me), not by anything drawn on the bar.
     private string FillClass(PlayerRow player) => appearance.ClassColors
-        ? $"{ClassColors.CssClass(player.ClassId)}{(player.IsUser ? " me-mark" : "")}"
+        ? ClassColors.CssClass(player.ClassId)
         : player.IsUser ? "self" : string.Empty;
 
     private void OnHeaderMouseDown(MouseEventArgs e)

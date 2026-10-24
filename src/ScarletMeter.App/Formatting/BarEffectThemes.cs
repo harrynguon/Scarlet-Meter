@@ -4,7 +4,7 @@ namespace ScarletMeter.App.Formatting;
 /// The animated effect on a player's bar, chosen by class (Components/BarEffect.razor draws it; app.css,
 /// ".bar-fx.theme-NAME", animates it). Loose, abstract takes on each class: Gladiator cleaving slashes, Templar a
 /// shield's sheen and facets, Assassin poison and daggers, Ranger a volley of arrows, Sorcerer fire and ice,
-/// Elementalist drifting spirits, Cleric holy rays and sparkles, Chanter mantra rings, Brawler impacts at the bar's
+/// Spiritmaster drifting spirits, Cleric holy rays and sparkles, Chanter mantra rings, Brawler impacts at the bar's
 /// tip. An unknown class (or a summon) gets lightning.
 /// </summary>
 public static class BarEffectThemes
@@ -44,7 +44,7 @@ public static class BarEffectThemes
         13 => "venom",    // Assassin
         14 => "volley",   // Ranger
         15 => "fire-ice", // Sorcerer
-        16 => "spirits",  // Elementalist
+        16 => "spirits",  // Spiritmaster
         17 => "radiance", // Cleric
         18 => "mantra",   // Chanter
         19 => "impact",   // Brawler
