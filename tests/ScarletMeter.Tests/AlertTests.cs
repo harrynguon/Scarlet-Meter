@@ -162,9 +162,18 @@ public sealed class AlertTests : IDisposable
         Assert.False(gate.Hold(false, noticesDue: true)); // once
 
         Assert.False(gate.Hold(true, noticesDue: true));
+        Assert.False(gate.Hold(false, noticesDue: true)); // a fight after the restore that waited: not again
+
+        Assert.False(gate.Hold(true, noticesDue: true));
         Assert.False(gate.Approaching());
         Assert.False(gate.Hold(false, noticesDue: false)); // the event passed during the fight: not at all
         Assert.True(gate.Approaching());
+
+        // A fight with nothing waiting brings nothing back, though a notice is due (the player hid the meter again
+        // after its restore).
+        var quiet = new AlertRestoreGate();
+        Assert.False(quiet.Hold(true, noticesDue: true));
+        Assert.False(quiet.Hold(false, noticesDue: true));
     }
 
     [Fact]

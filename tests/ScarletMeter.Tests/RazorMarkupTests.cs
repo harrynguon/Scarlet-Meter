@@ -65,7 +65,8 @@ public sealed partial class RazorMarkupTests
     }
 
     // The overlay holds its notices back by the player's "Hide during boss fights" switch, keeps the strip mounted
-    // while they are held, and tells the window layer, so bringing the meter back for an event waits too.
+    // and silent while they are held, and tells the window layer, whose restore for an event goes through the gate.
+    // Source-text guards: the strip's rendering and the WPF window layer have no test host here.
     [Fact]
     public void TheOverlayHoldsItsNoticesByThePlayersSwitch()
     {
@@ -76,6 +77,17 @@ public sealed partial class RazorMarkupTests
         Assert.Contains("bossFightUnderWay = bossFight.Update(snapshot.Target, now);", code);
         Assert.Contains("Windows.HoldAlerts(NoticesHeld);", code);
         Assert.Matches(@"(?m)^\s*<AlertStrip [^>]*Held=""NoticesHeld"" />", markup);
+
+        // The strip shows nothing and announces nothing while held, before either of its other branches.
+        var strip = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Components", "AlertStrip.razor"));
+        Assert.Contains(@"<span class=""sr-only"" role=""status"">@(Held ? string.Empty : Announcement)</span>", strip);
+        Assert.Matches(@"(?s)@if \(Held\)\s*\{\s*@\*[^*]*\*@\s*\}\s*else if \(View\.Alerts\.Count > 0\)", strip);
+
+        // The window layer asks the gate before every restore for an event, and acts on the one that waited.
+        var windows = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Windows", "MeterWindows.cs"));
+        Assert.Contains("if (restoreGate.Approaching()) RestoreForAlert();", windows);
+        Assert.Contains("if (restoreGate.Hold(held, alertMonitor?.Current.Alerts.Count > 0)) RestoreForAlert();", windows);
+        Assert.Equal(3, Regex.Matches(windows, @"\bRestoreForAlert\(\)").Count); // the two calls and its definition
     }
 
     [GeneratedRegex(@"<span class=""(num[^""]*)""")]

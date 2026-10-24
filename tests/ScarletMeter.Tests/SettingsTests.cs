@@ -108,9 +108,17 @@ public sealed class SettingsTests : IDisposable
         var store = NewStore();
         var settings = new MeterSettings();
         var flipped = new List<(PropertyInfo Section, PropertyInfo Flag, bool Value)>();
-        foreach (var section in typeof(MeterSettings).GetProperties()
-                     .Where(p => p.CanWrite && p.PropertyType.Namespace == typeof(MeterSettings).Namespace && p.PropertyType.IsClass))
+        // Every section is a class this test can make and fill; a new kind of section (a struct, a nested one) must
+        // fail here rather than be skipped. Version and the window placements are not switches.
+        var sections = typeof(MeterSettings).GetProperties()
+            .Where(p => p.Name is not (nameof(MeterSettings.Version) or nameof(MeterSettings.Windows)))
+            .ToList();
+        Assert.Equal(5, sections.Count);
+        foreach (var section in sections)
         {
+            Assert.True(section.CanWrite && section.PropertyType.IsClass && section.PropertyType.Namespace == typeof(MeterSettings).Namespace,
+                $"{section.Name} is not a settings section this test can flip");
+            Assert.DoesNotContain(section.PropertyType.GetProperties(), p => p.PropertyType == typeof(bool?));
             var value = Activator.CreateInstance(section.PropertyType)!;
             foreach (var flag in section.PropertyType.GetProperties().Where(p => p.PropertyType == typeof(bool)))
             {

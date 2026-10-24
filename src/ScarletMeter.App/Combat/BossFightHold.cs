@@ -7,9 +7,10 @@ namespace ScarletMeter.App.Combat;
 /// rather than the current target: upstream's target is whatever the player hit last, so in a fight with adds it
 /// flips between the boss and them, and the notices would jump in and out with it. The hold lasts while the boss's
 /// HP moved within the last <see cref="HoldFor"/>, whichever target is current, and ends when that boss is seen at
-/// 0 HP, when the target goes (a reset, or a kill the engine drops), or when its HP has stood still that long (a
-/// wipe, or a boss left alive: upstream keeps its target until the next hit, so without this the notices would stay
-/// hidden indefinitely). Not thread-safe: the overlay calls it from its refresh loop only.
+/// 0 HP, when the target goes (a reset, or a kill the engine drops), when its HP has stood still that long (a wipe,
+/// or a boss left alive: upstream keeps its target until the next hit, so without this the notices would stay hidden
+/// indefinitely), or when the clock goes back. A boss holds again when its HP moves or it becomes the target again
+/// after another boss or none. Not thread-safe: the overlay calls it from its refresh loop only.
 /// </summary>
 public sealed class BossFightHold
 {
@@ -31,9 +32,13 @@ public sealed class BossFightHold
             bossId = null;
             return false;
         }
-        // Another boss, its HP moving, or a clock that went back: the boss fight is on from now. An add as the
-        // target changes nothing, so the boss it came from keeps holding.
-        if (target.IsBoss && (target.Id != bossId || target.HpCurrent != bossHp || now < movedAt))
+        // A clock that went back cannot say how long the HP has been still, so whatever was held lets go, whichever
+        // target is current; the next hit on a boss holds again. Without this, the time since the last move would be
+        // negative and an add as the target would keep the notices held for as long as the jump.
+        if (now < movedAt) movedAt = now - HoldFor;
+        // Another boss, or its HP moving: the boss fight is on from now. An add as the target changes nothing, so the
+        // boss it came from keeps holding.
+        if (target.IsBoss && (target.Id != bossId || target.HpCurrent != bossHp))
         {
             bossId = target.Id;
             bossHp = target.HpCurrent;

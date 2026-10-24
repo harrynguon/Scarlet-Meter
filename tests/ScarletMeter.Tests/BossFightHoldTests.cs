@@ -5,7 +5,7 @@ namespace ScarletMeter.Tests;
 
 /// <summary>
 /// When a boss fight holds the world-event notices back: from the boss's first hit, across its adds, until it is
-/// down, the target goes, or its HP has stood still for <see cref="BossFightHold.HoldFor"/>.
+/// down, the target goes, its HP has stood still for <see cref="BossFightHold.HoldFor"/>, or the clock goes back.
 /// </summary>
 public sealed class BossFightHoldTests
 {
@@ -62,15 +62,34 @@ public sealed class BossFightHoldTests
     }
 
     [Fact]
-    public void ClearingOrAClockThatGoesBackStartsOver()
+    public void ClearingForgetsTheBoss()
     {
         var hold = new BossFightHold();
         Assert.True(hold.Update(Boss, At(0)));
         hold.Clear();
         Assert.False(hold.Update(Add, At(1)));
-        Assert.True(hold.Update(Boss, At(2)));
-        Assert.True(hold.Update(Boss, At(-100)));      // the clock went back: held from then
-        Assert.True(hold.Update(Boss, At(-100 + 59)));
-        Assert.False(hold.Update(Boss, At(-100 + 60)));
+        Assert.True(hold.Update(Boss, At(2)));         // the boss as the target again
+    }
+
+    // A clock that goes back cannot say how long the HP has been still: whatever was held lets go, the boss or an
+    // add as the target alike, and the next hit on the boss holds again.
+    [Fact]
+    public void AClockThatGoesBackLetsGoUntilTheNextHit()
+    {
+        var hold = new BossFightHold();
+        Assert.True(hold.Update(Boss, At(0)));
+        Assert.False(hold.Update(Boss, At(-3600)));    // an hour back, the boss still the target
+        Assert.False(hold.Update(Boss, At(-3599)));
+        Assert.True(hold.Update(Boss with { HpCurrent = 899_000 }, At(-3598)));
+        Assert.True(hold.Update(Boss with { HpCurrent = 899_000 }, At(-3598 + 59)));
+        Assert.False(hold.Update(Boss with { HpCurrent = 899_000 }, At(-3598 + 60)));
+
+        // A wipe with an add as the last target: the notices came back, and a clock stepped back keeps them back.
+        var afterWipe = new BossFightHold();
+        Assert.True(afterWipe.Update(Boss, At(0)));
+        Assert.True(afterWipe.Update(Add, At(10)));
+        Assert.False(afterWipe.Update(Add, At(70)));
+        Assert.False(afterWipe.Update(Add, At(70 - 3600)));
+        Assert.False(afterWipe.Update(Add, At(80 - 3600)));
     }
 }

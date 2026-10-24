@@ -123,11 +123,11 @@
                     <RangeSetting Label="Warn this long before" Value="@S.Alerts.LeadMinutes" Min="1" Max="60" Step="1"
                                   Format="@(v => $"{v:0} min")"
                                   ValueChanged="@(v => Change(s => s with { Alerts = s.Alerts with { LeadMinutes = (int)Math.Round(v) } }))" />
-                    <ToggleSetting Label="Bring the meter back before an event" Description="If the meter is minimized, show it once when an event's warning appears, without taking focus from the game."
+                    <ToggleSetting Label="Bring the meter back before an event" Description="If the meter is minimized, show it once when an event's warning appears, without taking focus from the game. During a boss fight it waits until the fight is over."
                                    Value="@S.Alerts.RestoreMinimizedMeter" ValueChanged="@(v => Change(s => s with { Alerts = s.Alerts with { RestoreMinimizedMeter = v } }))" />
                     <ToggleSetting Label="Show the next event" Description="When nothing is due, show the next alerted event as one dim line."
                                    Value="@S.Alerts.ShowNextEvent" ValueChanged="@(v => Change(s => s with { Alerts = s.Alerts with { ShowNextEvent = v } }))" />
-                    <ToggleSetting Label="Hide during boss fights" Description="While you fight a boss (a dungeon boss, a field boss), the notices step aside so the meter has room; they come back once it is down. The bell in the meter's header turns them off altogether."
+                    <ToggleSetting Label="Hide during boss fights" Description="While you fight a boss (a dungeon boss, a field boss), the notices step aside so the meter has room, also while you hit its adds; they come back once it is down, or about a minute after a wipe. The bell in the meter's header turns them off altogether."
                                    Value="@S.Alerts.HideDuringBossFights" ValueChanged="@(v => Change(s => s with { Alerts = s.Alerts with { HideDuringBossFights = v } }))" />
                 </section>
                 <section>

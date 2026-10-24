@@ -10,7 +10,7 @@
     changes when a notice appears or changes kind, not every second. It is always rendered (empty when nothing
     is due), because a live region inserted already filled is often not announced. While Held (the notices stand
     aside for a boss fight) it shows nothing and its live region is empty, so what came due meanwhile is announced
-    when the fight ends; the player's expanded choice is kept.
+    when the fight ends; the player's expanded choice is kept while more than two notices are due.
 *@
 <span class="sr-only" role="status">@(Held ? string.Empty : Announcement)</span>
 @if (Held)
