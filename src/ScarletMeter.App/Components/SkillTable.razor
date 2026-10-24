@@ -73,7 +73,7 @@
         <td>@DetailFormat.Full(skill.MinHit)</td>
         <td>@DetailFormat.Full(skill.MaxHit)</td>
         <td class="bar-col">
-            <span class="cell-bar" style="width:@Compact.Percent(skill.DamageShare)"></span>
+            <span class="cell-track"><span class="cell-bar" style="width:@Compact.Percent(skill.DamageShare)"></span></span>
             <span class="cell-bar-text">@Compact.Number(skill.TotalDamage) <small>@Compact.Percent(skill.DamageShare)</small></span>
         </td>
     };

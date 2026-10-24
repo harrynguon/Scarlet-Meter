@@ -2,6 +2,18 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Clearer share and uptime bars
+
+**What:** The bars in the details window (skill damage, buff uptime) and the saved fight's party table use a red gradient like the overlay's instead of a flat 32% red, over a faint full-width track; the saved fight's share bars take the overlay's class gradients when "Class colours" is on (`ClassColors.CssClass`, now shared with the overlay's rows); labels over a bar get a shadow and a lighter secondary colour. A lessons entry.
+
+**Why:** Harry found the share bars in the saved-fight and details views hard to see.
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` 372/372, 5 new (`FormattingTests.ClassIdsMapToTheirGradientOrTheNeutralOne`). `Smoke-Meter.ps1 --demo`: the details Skills tab showed bright gradient bars with readable labels; the saved fight's four share bars carried `fill class-11`, `class-16`, `class-14` and `class-17` with their gradients (computed style read from the page) and drew in blue, teal, green and gold (screenshots, not committed).
+
+**Audit (pr-auditor, standard pass on 42aecf2): approve with nits**, applied: each bar was sized against the whole cell while the new track was 12 px narrower, so a 50% share reached about 54% of the track and anything over about 92% looked full; the bar now sits inside the track (`.cell-track`), and in the running app every bar measured exactly its label's share (58.1% of the track for 58.1%, 31.3% for 31.3%). Overlay rows, `.fill` scoping, specificity, stacking and the settings refresh were checked by reading and found unchanged or correct. 372/372 after the fix.
+
+**Next:** Codex's review and CI on the final head, then merge.
+
 ## 2026-10-24 — One-command update of a portable copy
 
 **What:** `scripts/Update-Meter.ps1` finds RATmeter's latest release on GitHub (or takes `-Tag`), stops when already on it, and otherwise, in a temporary worktree on a local branch `update/upstream-<release>`, moves the pin with `Update-Upstream.ps1` (Debug build and tests), commits it and builds the portable zip with `Publish-Portable.ps1` (Release build and tests) into `<checkout>\portable`. It removes the worktree, and a branch it created without committing to. Settings, About shows the one command for a portable copy; README, DEVELOPMENT, ARCHITECTURE, the scarlet-upstream-update skill and a lessons entry.

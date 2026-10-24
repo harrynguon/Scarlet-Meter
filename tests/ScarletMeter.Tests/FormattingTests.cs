@@ -3,9 +3,18 @@ using ScarletMeter.App.Windows;
 
 namespace ScarletMeter.Tests;
 
-/// <summary>Display helpers: RATmeter-compatible name masking, ping bands and the image URLs the pages may load.</summary>
+/// <summary>Display helpers: RATmeter-compatible name masking, ping bands, class colours and the image URLs the pages may load.</summary>
 public sealed class FormattingTests
 {
+    [Theory]
+    [InlineData(10, "class-10")]
+    [InlineData(19, "class-19")]
+    [InlineData(9, "class-0")]
+    [InlineData(20, "class-0")]
+    [InlineData(0, "class-0")]
+    public void ClassIdsMapToTheirGradientOrTheNeutralOne(int classId, string css) =>
+        Assert.Equal(css, ClassColors.CssClass(classId));
+
     [Theory]
     [InlineData("", "")]
     [InlineData("Ab", "**")]
