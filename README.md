@@ -1,7 +1,8 @@
 # Scarlet Meter
 
 **A DPS meter for AION 2 (Global) that shows who is doing what, live, in a clean overlay over the game.**
-Unzip it, run it, and it finds the game by itself: no installer, no .NET to install, no administrator rights.
+Unzip it, run it, and it finds the game by itself: no installer, no .NET to install, and no administrator rights
+once Npcap is set up.
 It is built on [RATmeter](https://github.com/Kuroukihime/AIon2-Dps-Meter)'s proven packet decoding, with its own
 overlay and extras: a boss card with a "Kill in" estimate, animated bar effects for every class, world-event
 alerts, and a background picture of your choice.
@@ -18,7 +19,8 @@ You need Windows 11, 64-bit (Windows 10 has not been tried; it may need the
 
 1. **Install [Npcap](https://npcap.com/#download)** (the packet-capture driver every network-based meter uses).
    In its installer, tick **"Install Npcap in WinPcap API-compatible Mode"**, and leave **"Restrict Npcap
-   driver's access to Administrators only"** unticked, so the meter never needs administrator rights.
+   driver's access to Administrators only"** unticked, so the meter never needs administrator rights. (Npcap's own
+   installer asks for an administrator once, as any driver does.)
 2. **Download** the latest `ScarletMeter-<version>-win-x64.zip` from
    [Releases](https://github.com/harrynguon/Scarlet-Meter/releases) and **unzip** it anywhere you can write to:
    Documents, Desktop, a games folder (not Program Files).

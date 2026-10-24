@@ -5,7 +5,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows10.0.20348.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <AddRazorSupportForMvc>false</AddRazorSupportForMvc>
     <UseRazorSourceGenerator>true</UseRazorSourceGenerator>

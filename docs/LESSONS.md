@@ -71,6 +71,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**A versioned Windows target bundled a proprietary library nobody used** (re-audit on #23, fixed before any release).
+- What: the app targeted `net10.0-windows10.0.20348.0`, copied from RATmeter's UI project. A versioned Windows target brings in Microsoft's Windows SDK projection, so every build bundled `Microsoft.Windows.SDK.NET.dll` (25 MB) and `WinRT.Runtime.dll`, under a licence known only by a URL, inside a GPLv3 program, though nothing in the meter uses a WinRT API.
+- Why: the target framework was taken as a given from upstream, and the licence review listed what the NuGet restore names, not what the published exe actually bundles; the projection comes from the target framework, not from a package.
+- Guard: plain `net10.0-windows`, and `ThirdPartyNoticesTests.TheProgramBundlesNoWindowsSdkProjection` fails on a versioned Windows target or the SDK pack. For a licence review, list what the build output holds (framework packs, runtime packs, native libraries), not only the package graph.
+
 **The first release named its licences but did not carry them** (deep audit on #23, fixed before any release).
 - What: the planned v0.1.0 zip listed each component's licence by name, but binary copies must carry the texts and notices themselves (WebView2's BSD-style licence says so in as many words; MIT and Apache-2.0 too); .NET's notices were linked on `main`, not the shipped version; and "the source is the tag" left RATmeter's half of the source in someone else's repository, since GitHub's source archives drop submodules. The release job also ran restores, builds and tests with a write token kept in git's config, took the tag name into a script's text, and accepted a tag on any commit.
 - Why: the review asked whether each licence is compatible with the GPL, not what each one requires of a binary copy; and the workflow was written as a build script, without asking what its token could do in a compromised build.

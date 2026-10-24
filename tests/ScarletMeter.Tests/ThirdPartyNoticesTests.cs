@@ -11,8 +11,8 @@ namespace ScarletMeter.Tests;
 /// THIRD-PARTY-NOTICES.md lists exactly the NuGet packages that ship in the program (from the app's restore), with the
 /// licence each declares and the licence and notice files it ships, whose copies in licenses/packages match the
 /// package byte for byte (run scripts/Write-ThirdPartyNotices.ps1 after a package change); every SPDX licence named
-/// has its official text in licenses/; LICENSE is the plain GPLv3 byte for byte; and NOTICE and the notices name what
-/// a GPLv3 release must. Paths come from the test assembly's location, never the working directory.
+/// has its official text in licenses/; LICENSE is the plain GPLv3 byte for byte; the program bundles no proprietary
+/// Windows SDK projection; and NOTICE and the notices name what a GPLv3 release must. Paths come from the test assembly's location, never the working directory.
 /// </summary>
 public sealed partial class ThirdPartyNoticesTests
 {
@@ -23,6 +23,10 @@ public sealed partial class ThirdPartyNoticesTests
     private const string GplSha256 = "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986";
     private const string ApacheSha256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30";
     private const string MplSha256 = "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04";
+    // The MIT text from "Permission is hereby granted" to its end, as .NET's and K4os.Compression.LZ4's copies have
+    // it; and dotnet/wpf's THIRD-PARTY-NOTICES.TXT at v10.0.13 (the Windows Desktop runtime pack ships none).
+    private const string MitPermissionSha256 = "f9c4c77baa3828004ee54b8a4f2db2e88ed44a6237a493965bf551fac0fcb62d";
+    private const string WpfNoticesSha256 = "d23dba2fee20c6b59d8f7088ee9ed372459c952a319b7ca90f3eec370cc76eb9";
 
     [Fact]
     public void ThePackageTableIsExactlyTheShippedPackages()
@@ -80,10 +84,29 @@ public sealed partial class ThirdPartyNoticesTests
         Assert.Equal(ApacheSha256, Sha256WithLf(Path.Combine(licences, "Apache-2.0.txt")));
         Assert.Equal(MplSha256, Sha256WithLf(Path.Combine(licences, "MPL-2.0.txt")));
         // K4os.Compression.LZ4 links its licence rather than naming it: MIT, so its holder is in MIT.txt.
-        var mit = File.ReadAllText(Path.Combine(licences, "MIT.txt"));
+        var mit = File.ReadAllText(Path.Combine(licences, "MIT.txt")).Replace("\r\n", "\n");
         foreach (var holder in new[] { ".NET Foundation and Contributors", "Milosz Krajewski", "Tamir Gal, Chris Morgan and others" })
             Assert.Contains(holder, mit, StringComparison.Ordinal);
-        Assert.Contains("Permission is hereby granted, free of charge", mit, StringComparison.Ordinal);
+        var permission = mit.IndexOf("Permission is hereby granted", StringComparison.Ordinal);
+        Assert.True(permission >= 0, "licenses/MIT.txt has no MIT permission text");
+        Assert.Equal(MitPermissionSha256, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(mit[permission..]))));
+        Assert.Equal(WpfNoticesSha256, Sha256WithLf(Path.Combine(licences, "dotnet-wpf", "THIRD-PARTY-NOTICES.TXT")));
+    }
+
+    // A versioned Windows target framework (net10.0-windows10.0.x) bundles Microsoft's Windows SDK projection, which
+    // the meter does not use and whose proprietary licence is not the GPL's to cover: the app must not bring it in.
+    [Fact]
+    public void TheProgramBundlesNoWindowsSdkProjection()
+    {
+        using var assets = AppAssets();
+        foreach (var framework in assets.RootElement.GetProperty("project").GetProperty("frameworks").EnumerateObject())
+        {
+            Assert.DoesNotContain("windows10", framework.Name, StringComparison.OrdinalIgnoreCase);
+            if (framework.Value.TryGetProperty("frameworkReferences", out var references))
+                Assert.DoesNotContain(references.EnumerateObject(), r => r.Name.StartsWith("Microsoft.Windows.SDK.NET", StringComparison.OrdinalIgnoreCase));
+            if (framework.Value.TryGetProperty("downloadDependencies", out var downloads))
+                Assert.DoesNotContain(downloads.EnumerateArray(), d => d.GetProperty("name").GetString()!.StartsWith("Microsoft.Windows.SDK.NET", StringComparison.OrdinalIgnoreCase));
+        }
     }
 
     [Fact]
@@ -106,9 +129,7 @@ public sealed partial class ThirdPartyNoticesTests
     // The packages of the app restore's first target that ship something, and the NuGet folder they are in.
     private static (List<(string Id, string Version)> Packages, string Cache) ShippedPackages()
     {
-        var assetsPath = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "obj", "project.assets.json");
-        Assert.True(File.Exists(assetsPath), $"No restore of the app at {assetsPath}.");
-        using var assets = JsonDocument.Parse(File.ReadAllText(assetsPath));
+        using var assets = AppAssets();
         var cache = assets.RootElement.GetProperty("project").GetProperty("restore").GetProperty("packagesPath").GetString()!;
         var target = assets.RootElement.GetProperty("targets").EnumerateObject().First();
         var packages = target.Value.EnumerateObject()
@@ -119,6 +140,14 @@ public sealed partial class ThirdPartyNoticesTests
             .ToList();
         Assert.NotEmpty(packages);
         return (packages, cache);
+    }
+
+    // The app's restore (src/ScarletMeter.App/obj/project.assets.json), written by any restore or build.
+    private static JsonDocument AppAssets()
+    {
+        var assetsPath = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "obj", "project.assets.json");
+        Assert.True(File.Exists(assetsPath), $"No restore of the app at {assetsPath}.");
+        return JsonDocument.Parse(File.ReadAllText(assetsPath));
     }
 
     // What Write-ThirdPartyNotices.ps1 writes for a package's licence: the expression, the shipped file, or the URL.

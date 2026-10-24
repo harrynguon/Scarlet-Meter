@@ -14,6 +14,8 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
 - `Apache-2.0.txt` and `MPL-2.0.txt`: the Apache License 2.0 and the Mozilla Public License 2.0.
 - `packages/`: every licence, notice and third-party-notices file the NuGet packages ship, verbatim (the table below
   says which package ships which), among them Microsoft.Web.WebView2's BSD-style licence and its notices.
+- `dotnet-wpf/THIRD-PARTY-NOTICES.TXT`: WPF's third-party notices (dotnet/wpf at v10.0.13), since the Windows
+  Desktop runtime pack ships only its licence.
 - `runtime/` (release zip only): the licence and third-party notices of the .NET runtime packs bundled in
   `ScarletMeter.exe`, copied from the very packs the release was built with.
 
@@ -24,15 +26,15 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
 - **harrynguon/AIon2-Dps-Meter** (the World Companion's schedule engine, `DeferredWindowClose`), a fork of RATmeter,
   https://github.com/harrynguon/AIon2-Dps-Meter, GNU GPL v3.
 - **.NET** (the runtime bundled in the self-contained `ScarletMeter.exe`, with WPF), Copyright (c) .NET Foundation
-  and Contributors, MIT. Its licence and third-party notices are in the release zip's `licenses/runtime/`; for
-  .NET 10 they are also at https://github.com/dotnet/runtime/blob/release/10.0/THIRD-PARTY-NOTICES.TXT and
+  and Contributors, MIT. Its licence and third-party notices are in the release zip's `licenses/runtime/`, and
+  WPF's in `licenses/dotnet-wpf/`; for .NET 10 they are also at
+  https://github.com/dotnet/runtime/blob/release/10.0/THIRD-PARTY-NOTICES.TXT and
   https://github.com/dotnet/wpf/blob/release/10.0/THIRD-PARTY-NOTICES.TXT. The ASP.NET Core Components and
   BlazorWebView packages ship their own notices (`licenses/packages/`; also
   https://github.com/dotnet/aspnetcore/blob/release/10.0/THIRD-PARTY-NOTICES.txt and
-  https://github.com/dotnet/maui/blob/main/THIRD-PARTY-NOTICES.TXT).
-- **Windows SDK projection** (`Microsoft.Windows.SDK.NET` and `WinRT.Runtime`, from the
-  Microsoft.Windows.SDK.NET.Ref pack the Windows target framework brings in), Copyright (c) Microsoft Corporation,
-  under the Windows SDK licence, https://aka.ms/WinSDKLicenseURL; `WinRT.Runtime` is C#/WinRT, MIT.
+  https://github.com/dotnet/maui/blob/main/THIRD-PARTY-NOTICES.TXT). The app targets plain `net10.0-windows`, so
+  the proprietary Windows SDK projection (`Microsoft.Windows.SDK.NET`, which a versioned Windows target would
+  bundle) is not in the program; `ThirdPartyNoticesTests` fails if it comes back.
 
 ## Data
 
@@ -59,7 +61,7 @@ the app's restore; `ThirdPartyNoticesTests` fails when a shipped package is miss
 differs from what its package ships.
 
 <!-- packages:begin -->
-Target `net10.0-windows10.0.20348.0`, 59 packages.
+Target `net10.0-windows`, 59 packages.
 
 | Package | Version | Licence | Its own notices, in `licenses/packages/` | Project |
 | --- | --- | --- | --- | --- |

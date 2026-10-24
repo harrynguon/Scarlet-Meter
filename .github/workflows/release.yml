@@ -23,7 +23,7 @@ jobs:
     steps:
       # Full history, so the check below can see main; the token is not kept for later git commands.
       - name: Checkout with the upstream submodule
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
           fetch-depth: 0
@@ -72,7 +72,7 @@ jobs:
           Write-Host "Pinned upstream release: $tag ($pinned)"
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: 10.0.x
 
@@ -104,7 +104,7 @@ jobs:
           $entries = Get-Entries $zip
           $required = 'ScarletMeter.exe', 'ScarletMeter.portable', 'README.txt', 'LICENSE.txt', 'NOTICE.txt', 'THIRD-PARTY-NOTICES.md', 'wwwroot/index.html',
             'licenses/MIT.txt', 'licenses/Apache-2.0.txt', 'licenses/MPL-2.0.txt', 'licenses/packages/Microsoft.Web.WebView2.LICENSE.txt',
-            'licenses/runtime/Microsoft.NETCore.App.Runtime.win-x64/THIRD-PARTY-NOTICES.TXT'
+            'licenses/dotnet-wpf/THIRD-PARTY-NOTICES.TXT', 'licenses/runtime/Microsoft.NETCore.App.Runtime.win-x64/THIRD-PARTY-NOTICES.TXT'
           foreach ($file in $required) {
             if ($entries -notcontains "ScarletMeter/$file") { throw "The zip lacks ScarletMeter/$file." }
           }
@@ -144,7 +144,7 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release
-          path: release
+          path: ${{ runner.temp }}/release
 
       - name: Draft release
         shell: bash
@@ -155,9 +155,10 @@ jobs:
           set -euo pipefail
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Tag $TAG is not v<major>.<minor>.<patch>." >&2; exit 1; }
           version="${TAG#v}"
-          flags=(--draft --verify-tag --title "Scarlet Meter $TAG" --notes-file release/notes.md)
+          files="$RUNNER_TEMP/release"
+          flags=(--draft --verify-tag --title "Scarlet Meter $TAG" --notes-file "$files/notes.md")
           case "$version" in 0.*) flags+=(--prerelease) ;; esac
           gh release create "$TAG" -R "$GITHUB_REPOSITORY" \
-            "release/ScarletMeter-$version-win-x64.zip" "release/ScarletMeter-$version-win-x64.zip.sha256" \
-            "release/ScarletMeter-$version-source.zip" "release/ScarletMeter-$version-source.zip.sha256" \
+            "$files/ScarletMeter-$version-win-x64.zip" "$files/ScarletMeter-$version-win-x64.zip.sha256" \
+            "$files/ScarletMeter-$version-source.zip" "$files/ScarletMeter-$version-source.zip.sha256" \
             "${flags[@]}"

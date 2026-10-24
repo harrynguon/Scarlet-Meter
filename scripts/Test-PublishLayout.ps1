@@ -51,6 +51,7 @@ $required = @(
     'licenses\Apache-2.0.txt',
     'licenses\MPL-2.0.txt',
     'licenses\packages\Microsoft.Web.WebView2.LICENSE.txt',
+    'licenses\dotnet-wpf\THIRD-PARTY-NOTICES.TXT',
     'licenses\runtime\Microsoft.NETCore.App.Runtime.win-x64\LICENSE.TXT',
     'licenses\runtime\Microsoft.NETCore.App.Runtime.win-x64\THIRD-PARTY-NOTICES.TXT'
 )
