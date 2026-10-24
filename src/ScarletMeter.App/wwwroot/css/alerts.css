@@ -101,10 +101,27 @@
     outline: none;
 }
 
-/* Expanded, the strip may take up to about half the meter and scrolls beyond that, so the rows stay visible. */
+/* Expanded, the strip may take up to about half the meter and scrolls beyond that, so the rows stay visible. The
+   top line separates it from the rows above, which are cut by their own scroll area at the same edge. */
 .alerts.expanded {
     max-height: 45vh;
     overflow-y: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding-top: 3px;
+}
+
+/* "Show less" stays at the bottom of the expanded strip while the notices scroll under it, so collapsing never
+   needs a scroll first. Opaque, so scrolled notices do not show through it. */
+.alerts.expanded > .alert.more {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    background: #15151b;
+}
+
+.alerts.expanded > .alert.more:hover,
+.alerts.expanded > .alert.more:focus-visible {
+    background: #24242d;
 }
 
 .alerts.expanded::-webkit-scrollbar { width: 6px; }
