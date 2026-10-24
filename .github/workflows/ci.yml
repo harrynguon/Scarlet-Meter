@@ -91,8 +91,9 @@ jobs:
       # The portable build under pwsh, twice, into the runner's temp directory. The first run (-Zip) publishes into
       # staging, checks the layout, adds the marker, writes the zip and makes the live copy: the zip must hold the exe
       # and the marker under a top "ScarletMeter" folder and no data or staging marker. A settings file is then planted
-      # in the copy's data folder; the second run (no -Zip) must update the copy in place with that file intact, leave
-      # no .staging or .old, remove the older zip, and leave exactly one ScarletMeter.exe. Nothing launches the meter.
+      # in the copy's data folder and a file of the player's beside it; the second run (no -Zip) must update the copy in
+      # place with both intact, leave no .staging or .old, remove the older zip, and leave exactly one ScarletMeter.exe.
+      # Nothing launches the meter.
       - name: Portable build (publish, layout check, marker, zip, in-place update, twice)
         shell: pwsh
         run: |
@@ -105,7 +106,7 @@ jobs:
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $archive = [IO.Compression.ZipFile]::OpenRead($zip)
           try { $entries = @($archive.Entries | ForEach-Object { $_.FullName -replace '\\', '/' }) } finally { $archive.Dispose() }
-          foreach ($required in 'ScarletMeter/ScarletMeter.exe', 'ScarletMeter/ScarletMeter.portable', 'ScarletMeter/wwwroot/index.html') {
+          foreach ($required in 'ScarletMeter/ScarletMeter.exe', 'ScarletMeter/ScarletMeter.portable', 'ScarletMeter/.scarlet-portable-files', 'ScarletMeter/wwwroot/index.html') {
             if ($entries -notcontains $required) { throw "The zip lacks $required." }
           }
           if ($entries | Where-Object { $_ -notlike 'ScarletMeter/*' -or $_ -like 'ScarletMeter/data/*' -or $_ -like '*/.scarlet-portable-staging' }) { throw 'The zip holds an entry outside ScarletMeter/, a data folder or the staging marker.' }
@@ -117,8 +118,11 @@ jobs:
           $settings = Join-Path $live 'data/settings.json'
           [void][IO.Directory]::CreateDirectory((Split-Path -Parent $settings))
           [IO.File]::WriteAllText($settings, '{ "ci": "kept" }')
+          $notes = Join-Path $live 'notes.txt'
+          [IO.File]::WriteAllText($notes, 'the player''s own file')
           & $publish -OutputRoot $root -SkipTests
           if ([IO.File]::ReadAllText($settings) -ne '{ "ci": "kept" }') { throw 'The in-place update lost the data folder.' }
+          if (-not (Test-Path -LiteralPath $notes -PathType Leaf)) { throw 'The in-place update lost a file the player put beside the exe.' }
           foreach ($leftover in "$live.staging", "$live.old", $zip, "$zip.partial") {
             if (Test-Path -LiteralPath $leftover) { throw "$leftover was left behind." }
           }

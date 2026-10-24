@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The in-place update guarded "data", not the player's files** (deep audit and Codex on #19, fixed before merge).
+- What: the first version of the one-copy update moved only a top-level `data` folder and deleted everything else in the old copy, so a `data - Copy` backup or notes beside the exe would have gone on the next update. When an undo failed it still said "your copy and its data are as they were" while the data sat in `.staging`. Its deletes removed the portable markers in directory order, so a delete stopped by an open file left an unmarked folder every later run refused. A drive root as output root became `C:`, which Windows reads as that drive's current directory. Two runs at once could delete each other's staging folder.
+- Why: "the player's data" was equated with one folder name instead of "everything the build did not put there"; the failure paths were tested for the first failure only, not for an undo failing too; the marker-last delete existed for the installer but was reused without its markers; root paths and concurrency were not considered.
+- Guard: a manifest of the build's files, so everything else is carried over and only listed files are deleted; an undo that fails leaves the copy's name free for the next run to finish and says where everything is; `Remove-OwnedFolder` takes the markers to keep until last; `Resolve-PortableRoot` keeps `C:\`; a named mutex per output root. `Test-PortableFolders.ps1` covers each, with a stand-in for the move that makes chosen moves fail, and each case was shown to fail with its guard removed. When code deletes near the player's files, define what is ours by listing it, and test each undo failing too.
+
 **Share bars were hard to see** (Harry, from the screenshots, 2026-10-24).
 - What: the details and saved-fight bars used a flat 32% red, which on the near-black panel came out as dark maroon.
 - Why: the colour was picked as a token, not looked at on the real background; smoke runs checked the bars existed, not that they could be seen.

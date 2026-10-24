@@ -181,7 +181,7 @@ finally {
 }
 
 Write-Host ''
-Write-Host "Updated to RATmeter $Tag. Start the meter again from $(Join-Path $portable.Live 'ScarletMeter.exe') (your data folder was kept)."
+Write-Host "Updated to RATmeter $Tag. Start the meter again from $(Join-Path $portable.Live 'ScarletMeter.exe')$(if (Test-HoldsData $portable.Live) { ' (your data folder was kept)' })."
 if (Get-GitLine $repoRoot @('rev-parse', '--verify', '--quiet', "refs/heads/$branch")) {
     Write-Host "The pin move is on the local branch $branch; it joins main through a pull request (docs/DEVELOPMENT.md)."
 }

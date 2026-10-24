@@ -171,15 +171,15 @@ function Assert-InstallFoldersOwned($Folders) {
 # Deletes a folder the install made so that a delete stopping part way (a file held open) leaves it still marked:
 # every entry but the markers first, then the markers, then the folder. A plain recursive delete goes in
 # directory order, where ".scarlet-install" sorts first, and would leave an unmarked folder that the next install
-# refuses as someone else's. Callers have checked the folder holds no link (Assert-OwnedFolder).
-function Remove-OwnedFolder([string]$Path) {
-    $markers = @($InstallMarker, $StagingMarker)
+# refuses as someone else's. $Markers are deleted in the order given (the installer's by default; the portable
+# copy passes its own). Callers have checked the folder holds no link (Assert-OwnedFolder).
+function Remove-OwnedFolder([string]$Path, [string[]]$Markers = @($InstallMarker, $StagingMarker)) {
     foreach ($entry in @((New-Object IO.DirectoryInfo $Path).GetFileSystemInfos())) {
-        if ($markers -contains $entry.Name) { continue }
+        if ($Markers -contains $entry.Name) { continue }
         if ($entry -is [IO.DirectoryInfo]) { [IO.Directory]::Delete($entry.FullName, $true) }
         else { [IO.File]::Delete($entry.FullName) }
     }
-    foreach ($marker in $markers) {
+    foreach ($marker in $Markers) {
         $file = Join-Path $Path $marker
         if (Test-Path -LiteralPath $file -PathType Leaf) { [IO.File]::Delete($file) }
     }
