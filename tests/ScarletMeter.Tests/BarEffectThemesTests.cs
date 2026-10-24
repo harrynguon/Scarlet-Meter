@@ -42,12 +42,13 @@ public sealed class BarEffectThemesTests
     public void EveryThemeAndPieceHasStyles()
     {
         var css = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "app.css"));
-        // The whole name, not a prefix of another (".flush" must not pass on ".flushx").
+        // A rule for exactly this selector (or its ::before or ::after), not a longer name (".flushx") nor only a
+        // positional variant (".ring:nth-child(1)") left behind after the base rule went.
         static bool Styled(string css, string selector) =>
-            Regex.IsMatch(css, Regex.Escape(selector) + @"(?![\w-])");
+            Regex.IsMatch(css, Regex.Escape(selector) + @"(?=\s*[{,]|::)");
         foreach (var theme in BarEffectThemes.All)
         {
-            Assert.True(Styled(css, $".theme-{theme}"), theme);
+            Assert.True(Styled(css, $".theme-{theme}"), theme); // its colour rule
             foreach (var piece in BarEffectThemes.Pieces(theme).Distinct())
                 Assert.True(Styled(css, $".theme-{theme} .{piece}"), $"{theme} {piece}");
         }

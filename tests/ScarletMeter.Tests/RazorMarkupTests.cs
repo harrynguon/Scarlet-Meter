@@ -20,13 +20,23 @@ public sealed partial class RazorMarkupTests
         // Every scripts\ path in the markup sits under the <checkout> placeholder (escaped in Razor markup).
         Assert.Empty(Offending(line => RelativeScriptPath().IsMatch(line)));
 
-    // index.html loads only the app's own scripts, each of which exists, and the overlay's effects script reaches
-    // nothing outside the page: no requests, no .NET interop, no eval.
+    // Every <script> in index.html (whatever its attributes' order) loads one of the app's own files, which exists,
+    // and none is inline; the overlay's effects script reaches nothing outside the page: no requests, no .NET
+    // interop, no eval.
     [Fact]
     public void ThePagesLoadOnlyTheAppsOwnScripts()
     {
         var wwwroot = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot");
-        var sources = ScriptSource().Matches(File.ReadAllText(Path.Combine(wwwroot, "index.html"))).Select(m => m.Groups[1].Value).ToList();
+        var tags = ScriptTag().Matches(File.ReadAllText(Path.Combine(wwwroot, "index.html")));
+        Assert.NotEmpty(tags);
+        var sources = new List<string>();
+        foreach (Match tag in tags)
+        {
+            Assert.True(string.IsNullOrWhiteSpace(tag.Groups["body"].Value), $"inline script: {tag.Value}");
+            var src = ScriptSrc().Match(tag.Groups["attributes"].Value);
+            Assert.True(src.Success, $"script without src: {tag.Value}");
+            sources.Add(src.Groups[1].Value);
+        }
         Assert.Contains("js/overlay-fx.js", sources);
         foreach (var source in sources)
         {
@@ -40,8 +50,11 @@ public sealed partial class RazorMarkupTests
             Assert.DoesNotContain(reach, effects);
     }
 
-    [GeneratedRegex(@"<script\s+src=""([^""]+)""")]
-    private static partial Regex ScriptSource();
+    [GeneratedRegex(@"<script\b(?<attributes>[^>]*)>(?<body>.*?)</script>", RegexOptions.Singleline | RegexOptions.IgnoreCase)]
+    private static partial Regex ScriptTag();
+
+    [GeneratedRegex(@"\bsrc\s*=\s*""([^""]*)""", RegexOptions.IgnoreCase)]
+    private static partial Regex ScriptSrc();
 
     [GeneratedRegex(@"[A-Za-z0-9]@[A-Za-z_]")]
     private static partial Regex EmailLikeExpression();

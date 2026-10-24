@@ -35,7 +35,8 @@ Record the tested commit, observation date and Windows configuration. Pending:
 - [ ] The overlay shows over the game (borderless or windowed mode), stays on top, drags by its header and resizes from its edges; the background opacity and a background picture look right over the game.
 - [ ] `Ctrl+Shift+D` (or the chosen shortcut) minimizes and restores the meter while the game has focus, and does not trigger a game action.
 - [ ] Class colours, relative bars, deaths, hidden names and row size behave as in RATmeter.
-- [ ] On a boss, "Kill in" appears after a few seconds and lands within a few seconds of the real kill when the pace is steady; note bosses where it misleads (phases, invulnerable stretches, heals).
+- [ ] On a boss, "Kill in" appears after a few seconds and lands within a few seconds of the real kill when the pace is steady, and keeps its estimate when you hit an add and go back to the boss; note bosses where it misleads (phases, invulnerable stretches, heals).
+- [ ] After a kill: does the boss stay as the target at 0 HP (the header then says "Boss defeated" and the effects stop) or does the meter drop it, as the demo does? Between pulls nothing on the bars should animate.
 - [ ] Each player's combat power beside their name matches the game (upstream reads it from a heuristic scan; note any wrong or missing value).
 - [ ] With "Bar effects" on, the class effects on every bar, the gloss and the overtake glide do not cost frames in the game (compare FPS with the setting off, and with "Effects on every bar" off, in a full party); the glide looks right when players swap places often; each class's effect reads over the game at the chosen opacity.
 - [ ] Settings and window positions survive a restart; fight options (boss-only, combined summons, one-minute dummy) change new hits.

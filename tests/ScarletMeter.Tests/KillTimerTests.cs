@@ -85,6 +85,49 @@ public sealed class KillTimerTests
     }
 
     [Fact]
+    public void SwitchingToAnAddAndBackResumesTheBossEstimate()
+    {
+        // The boss falls 10,000/s for 10 s; the player hits an add for 3 s while the party keeps on the boss; back on
+        // the boss its estimate shows at once, from the whole fall: 870,000 left at 10,000/s is 87 s.
+        var timer = new KillTimer();
+        Run(timer, 1_000_000, 10_000, 10);
+        Run(timer, 50_000, 1_000, 3, startAt: 10.1, id: 99);
+        var back = timer.Update(Boss(870_000), Start.AddSeconds(13.1));
+        Assert.NotNull(back);
+        Assert.InRange(back.Value.TotalSeconds, 86, 88);
+    }
+
+    [Fact]
+    public void ATargetUnseenForAWholeWindowIsForgotten()
+    {
+        var timer = new KillTimer();
+        Run(timer, 1_000_000, 10_000, 10);
+        Run(timer, 50_000, 100, 25, startAt: 10.1, id: 99); // the boss unseen for more than 20 s
+        Assert.Null(timer.Update(Boss(500_000), Start.AddSeconds(35.2)));
+    }
+
+    [Fact]
+    public void OnlyTheLastFewTargetsAreRemembered()
+    {
+        var timer = new KillTimer();
+        Run(timer, 1_000_000, 10_000, 6);
+        for (var add = 0; add < KillTimer.RememberedTargets; add++)
+            timer.Update(Boss(50_000, id: 100 + add), Start.AddSeconds(6.1 + add * 0.1));
+        Assert.Null(timer.Update(Boss(939_000), Start.AddSeconds(6.6))); // pushed out by the adds: starts again
+    }
+
+    [Fact]
+    public void AClockThatGoesBackStartsOver()
+    {
+        var timer = new KillTimer();
+        Run(timer, 1_000_000, 10_000, 10, startAt: 100);
+        Assert.Null(timer.Update(Boss(899_000), Start.AddSeconds(50))); // a minute back
+        var estimate = Run(timer, 899_000, 1_000, 6, startAt: 50.1);
+        Assert.NotNull(estimate);
+        Assert.InRange(estimate.Value.TotalSeconds, 895, 920); // 893,000 left at about 1,000/s, not the old 89 s
+    }
+
+    [Fact]
     public void ASlowFallBeyondAnHourShowsNothing()
     {
         // 1,000,000 HP losing 100 a second would take nearly three hours.

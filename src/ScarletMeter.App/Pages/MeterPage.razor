@@ -5,13 +5,13 @@
     fainter, or only the player's when "Effects on every bar" is off), and js/overlay-fx.js glides rows to their
     new places when the order changes.
 *@
-<div class="overlay @(appearance.BarEffects ? "fx" : "")" data-window="overlay" style="@PanelStyle">
+<div class="overlay @OverlayClass" data-window="overlay" style="@PanelStyle">
     <header class="ov-header" @onmousedown="OnHeaderMouseDown">
         <div class="ov-title">
             @if (snapshot.Target is { } fighting)
             {
-                <span class="state-dot" aria-hidden="true"></span>
-                <span class="state-text">@(fighting.IsBoss ? "Boss combat" : "Combat")</span>
+                <span class="state-dot @StateDotClass" aria-hidden="true"></span>
+                <span class="state-text">@StateText(fighting)</span>
                 <span class="state-time" title="Combat duration">@Compact.Duration(snapshot.Duration)</span>
             }
             else

@@ -15,7 +15,6 @@
     --fair: #dcdcaa;
     --slow: #ce9178;
     --bad: #f44747;
-    --hp: #2a9d8f;
     --radius: 10px;
 }
 
@@ -115,6 +114,19 @@ button {
     border-radius: 50%;
     background: var(--good);
     box-shadow: 0 0 6px var(--good);
+}
+
+/* The target's HP has not moved for a while: the dot dims. */
+.state-dot.quiet {
+    background: var(--fair);
+    box-shadow: none;
+    opacity: 0.7;
+}
+
+/* The target is down. */
+.state-dot.done {
+    background: var(--muted);
+    box-shadow: none;
 }
 
 .state-text {
@@ -291,7 +303,9 @@ button {
 .ping.bad { color: var(--bad); }
 .ping.bad i:nth-child(1) { background: var(--bad); }
 
+/* Positioned, so a row's offsetTop (js/overlay-fx.js) is measured from the list, not the panel above it. */
 .rows {
+    position: relative;
     list-style: none;
     margin: 0;
     padding: 2px 6px 6px;
@@ -482,6 +496,13 @@ button {
 
 .fx .row:not(.me) .bar-fx {
     opacity: 0.6;
+}
+
+/* In a big group only the top eight bars (and the player's own) animate, and nothing does once the fight is quiet
+   or over (MeterPage's "settled"), so a field boss or the time between pulls costs no frames. */
+.fx .rows > .row:nth-child(n+9):not(.me) .bar-fx,
+.fx.settled .bar-fx {
+    display: none;
 }
 
 .theme-lightning { --fx-color: 200, 230, 255; }

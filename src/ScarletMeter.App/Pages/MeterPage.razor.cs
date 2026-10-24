@@ -24,9 +24,12 @@ public partial class MeterPage : IAsyncDisposable
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromMilliseconds(100);
 
     private readonly CancellationTokenSource stopping = new();
-    // The target card's "Kill in", fed with every snapshot.
+    // The target card's "Kill in" and the fight's phase (header, and the effects pausing once it is over), fed
+    // with every snapshot.
     private readonly KillTimer killTimer = new();
+    private readonly FightState fightState = new();
     private TimeSpan? killIn;
+    private FightPhase phase;
     private CombatSnapshot snapshot = CombatSnapshot.Empty;
     private AppearanceSettings appearance = new();
     private int? ping;
@@ -60,6 +63,23 @@ public partial class MeterPage : IAsyncDisposable
     private IEnumerable<PlayerRow> Visible => snapshot.Players
         .Where(p => p.IsIdentified || p.DamageShare > 1)
         .OrderByDescending(p => p.TotalDamage);
+
+    // "fx" with bar effects on; "settled" hides them once the fight is quiet or over (app.css), so nothing animates
+    // between pulls.
+    private string OverlayClass =>
+        (appearance.BarEffects ? "fx" : "") + (phase is FightPhase.Settled or FightPhase.Defeated ? " settled" : "");
+
+    // The header in a fight: what is being fought, or that it is down.
+    private string StateText(TargetInfo target) => phase == FightPhase.Defeated
+        ? target.IsBoss ? "Boss defeated" : "Target defeated"
+        : target.IsBoss ? "Boss combat" : "Combat";
+
+    private string StateDotClass => phase switch
+    {
+        FightPhase.Defeated => "done",
+        FightPhase.Settled => "quiet",
+        _ => string.Empty,
+    };
 
     private string StatusText => Engine.Capture switch
     {
@@ -122,7 +142,9 @@ public partial class MeterPage : IAsyncDisposable
                 try
                 {
                     snapshot = Engine.GetSnapshot();
-                    killIn = killTimer.Update(snapshot.Target, Clock.GetUtcNow());
+                    var now = Clock.GetUtcNow();
+                    killIn = killTimer.Update(snapshot.Target, now);
+                    phase = fightState.Update(snapshot.Target, now);
                     await RenderAsync();
                     if (refreshFailing) Logger.LogInformation("Refreshing the meter works again.");
                     refreshFailing = false;
@@ -180,6 +202,7 @@ public partial class MeterPage : IAsyncDisposable
         snapshot = CombatSnapshot.Empty;
         killTimer.Clear();
         killIn = null;
+        phase = FightPhase.None;
     }
 
     public async ValueTask DisposeAsync()
