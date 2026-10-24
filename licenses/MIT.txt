@@ -4,6 +4,7 @@ This licence covers the following components bundled in Scarlet Meter, each unde
 
 - .NET, its WPF, ASP.NET Core Components, BlazorWebView, Entity Framework Core and Microsoft.Extensions
   libraries: Copyright (c) .NET Foundation and Contributors
+- C#/WinRT (WinRT.Runtime): Copyright (c) Microsoft Corporation
 - K4os.Compression.LZ4: Copyright (c) 2017 Milosz Krajewski
 - SharpPcap: Copyright (c) Tamir Gal, Chris Morgan and others
 - Microsoft.Data.Sqlite: Copyright (c) .NET Foundation and Contributors

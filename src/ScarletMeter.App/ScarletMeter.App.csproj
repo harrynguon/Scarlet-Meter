@@ -5,7 +5,10 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- A Windows 10 SDK version, not plain net10.0-windows: BlazorWebView draws the see-through overlay with
+         WebView2's composition control, which needs the Windows SDK projection (Microsoft.Windows.SDK.NET) at run
+         time; without it the published exe crashed on start (THIRD-PARTY-NOTICES.md, ThirdPartyNoticesTests). -->
+    <TargetFramework>net10.0-windows10.0.20348.0</TargetFramework>
     <UseWPF>true</UseWPF>
     <AddRazorSupportForMvc>false</AddRazorSupportForMvc>
     <UseRazorSourceGenerator>true</UseRazorSourceGenerator>

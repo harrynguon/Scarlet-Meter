@@ -11,8 +11,8 @@ namespace ScarletMeter.Tests;
 /// THIRD-PARTY-NOTICES.md lists exactly the NuGet packages that ship in the program (from the app's restore), with the
 /// licence each declares and the licence and notice files it ships, whose copies in licenses/packages match the
 /// package byte for byte (run scripts/Write-ThirdPartyNotices.ps1 after a package change); every SPDX licence named
-/// has its official text in licenses/; LICENSE is the plain GPLv3 byte for byte; the program bundles no proprietary
-/// Windows SDK projection; and NOTICE and the notices name what a GPLv3 release must. Paths come from the test assembly's location, never the working directory.
+/// has its official text in licenses/; LICENSE is the plain GPLv3 byte for byte; the program keeps the Windows SDK
+/// projection its overlay needs, and names it; and NOTICE and the notices name what a GPLv3 release must. Paths come from the test assembly's location, never the working directory.
 /// </summary>
 public sealed partial class ThirdPartyNoticesTests
 {
@@ -93,20 +93,26 @@ public sealed partial class ThirdPartyNoticesTests
         Assert.Equal(WpfNoticesSha256, Sha256WithLf(Path.Combine(licences, "dotnet-wpf", "THIRD-PARTY-NOTICES.TXT")));
     }
 
-    // A versioned Windows target framework (net10.0-windows10.0.x) bundles Microsoft's Windows SDK projection, which
-    // the meter does not use and whose proprietary licence is not the GPL's to cover: the app must not bring it in.
+    // BlazorWebView draws the see-through overlay with WebView2's composition control, which loads the Windows SDK
+    // projection (Microsoft.Windows.SDK.NET) at run time: a plain net10.0-windows build left it out and the published
+    // exe crashed on start. The app must keep a Windows 10 SDK target, and THIRD-PARTY-NOTICES.md must name the
+    // projection and its licence.
     [Fact]
-    public void TheProgramBundlesNoWindowsSdkProjection()
+    public void TheProgramKeepsTheWindowsSdkProjectionAndNamesIt()
     {
         using var assets = AppAssets();
-        foreach (var framework in assets.RootElement.GetProperty("project").GetProperty("frameworks").EnumerateObject())
+        var frameworks = assets.RootElement.GetProperty("project").GetProperty("frameworks").EnumerateObject().ToList();
+        Assert.NotEmpty(frameworks);
+        foreach (var framework in frameworks)
         {
-            Assert.DoesNotContain("windows10", framework.Name, StringComparison.OrdinalIgnoreCase);
-            if (framework.Value.TryGetProperty("frameworkReferences", out var references))
-                Assert.DoesNotContain(references.EnumerateObject(), r => r.Name.StartsWith("Microsoft.Windows.SDK.NET", StringComparison.OrdinalIgnoreCase));
-            if (framework.Value.TryGetProperty("downloadDependencies", out var downloads))
-                Assert.DoesNotContain(downloads.EnumerateArray(), d => d.GetProperty("name").GetString()!.StartsWith("Microsoft.Windows.SDK.NET", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains("windows10.0.", framework.Name, StringComparison.OrdinalIgnoreCase);
+            Assert.True(framework.Value.TryGetProperty("frameworkReferences", out var references)
+                && references.EnumerateObject().Any(r => r.Name.StartsWith("Microsoft.Windows.SDK.NET.Ref", StringComparison.OrdinalIgnoreCase)),
+                $"{framework.Name} does not bring in the Windows SDK projection WebView2's composition control needs.");
         }
+        var notices = File.ReadAllText(Path.Combine(RepositoryRoot(), "THIRD-PARTY-NOTICES.md"));
+        Assert.Contains("Microsoft.Windows.SDK.NET", notices, StringComparison.Ordinal);
+        Assert.Contains("https://aka.ms/WinSDKLicenseURL", notices, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -32,9 +32,12 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   https://github.com/dotnet/wpf/blob/release/10.0/THIRD-PARTY-NOTICES.TXT. The ASP.NET Core Components and
   BlazorWebView packages ship their own notices (`licenses/packages/`; also
   https://github.com/dotnet/aspnetcore/blob/release/10.0/THIRD-PARTY-NOTICES.txt and
-  https://github.com/dotnet/maui/blob/main/THIRD-PARTY-NOTICES.TXT). The app targets plain `net10.0-windows`, so
-  the proprietary Windows SDK projection (`Microsoft.Windows.SDK.NET`, which a versioned Windows target would
-  bundle) is not in the program; `ThirdPartyNoticesTests` fails if it comes back.
+  https://github.com/dotnet/maui/blob/main/THIRD-PARTY-NOTICES.TXT).
+- **Windows SDK projection** (`Microsoft.Windows.SDK.NET` and `WinRT.Runtime`, bundled in `ScarletMeter.exe` from
+  the Microsoft.Windows.SDK.NET.Ref pack that the Windows 10 SDK target framework brings in, as in RATmeter's own
+  builds). BlazorWebView draws the see-through overlay with WebView2's composition control, which needs it at run
+  time. `Microsoft.Windows.SDK.NET`: Copyright (c) Microsoft Corporation, under the Windows SDK licence terms,
+  https://aka.ms/WinSDKLicenseURL. `WinRT.Runtime` is C#/WinRT, MIT (`licenses/MIT.txt`).
 
 ## Data
 
@@ -61,7 +64,7 @@ the app's restore; `ThirdPartyNoticesTests` fails when a shipped package is miss
 differs from what its package ships.
 
 <!-- packages:begin -->
-Target `net10.0-windows`, 59 packages.
+Target `net10.0-windows10.0.20348.0`, 59 packages.
 
 | Package | Version | Licence | Its own notices, in `licenses/packages/` | Project |
 | --- | --- | --- | --- | --- |

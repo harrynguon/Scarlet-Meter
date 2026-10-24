@@ -33,7 +33,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
-if (-not $Exe) { $Exe = Join-Path $repoRoot 'src\ScarletMeter.App\bin\Debug\net10.0-windows\ScarletMeter.exe' }
+if (-not $Exe) { $Exe = Join-Path $repoRoot 'src\ScarletMeter.App\bin\Debug\net10.0-windows10.0.20348.0\ScarletMeter.exe' }
 if ($Exe -notmatch '^(?:[A-Za-z]:[\\/]|\\\\)') { throw "-Exe must be an absolute path, not `"$Exe`"." }
 if (-not (Test-Path -LiteralPath $Exe)) { throw "No meter at $Exe. Build first (scripts\Build.ps1)." }
 $ownsData = -not $DataDirectory

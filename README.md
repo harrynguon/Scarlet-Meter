@@ -7,7 +7,8 @@ It is built on [RATmeter](https://github.com/Kuroukihime/AIon2-Dps-Meter)'s prov
 overlay and extras: a boss card with a "Kill in" estimate, animated bar effects for every class, world-event
 alerts, and a background picture of your choice.
 
-<p align="center"><img src="docs/images/overlay.png" alt="The Scarlet Meter overlay in a boss fight (demo data)" width="400"/></p>
+<p align="center"><img src="docs/images/demo.gif" alt="Scarlet Meter in a boss fight (demo mode, made-up players): the boss card with its Kill in estimate, each class's animated bar effect, and rows gliding into place as players overtake" width="400"/></p>
+<p align="center"><sub>Demo mode, made-up players: <code>.\ScarletMeter.exe --demo</code></sub></p>
 
 > **Early release.** Its in-game checks are not finished, so numbers may be off. Reports are welcome in
 > [Issues](https://github.com/harrynguon/Scarlet-Meter/issues).
@@ -75,7 +76,7 @@ and adds it up per player and per fight.
 - **Class colours**, **relative bars** (against the top player), row size, and **hidden names** for streams and
   screenshots.
 
-<p align="center"><img src="docs/images/background-picture.png" alt="A background picture at 50% opacity (demo data, test picture)" width="400"/></p>
+<p align="center"><img src="docs/images/background-picture.png" alt="A background picture at 50% picture opacity (demo data, a generated test picture)" width="400"/></p>
 
 **After the fight**
 
