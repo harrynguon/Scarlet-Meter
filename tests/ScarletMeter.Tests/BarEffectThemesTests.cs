@@ -24,7 +24,7 @@ public sealed class BarEffectThemesTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(10)] // an Elementalist's spirit
+    [InlineData(10)] // a Spiritmaster's spirit
     [InlineData(99)]
     [InlineData(-1)]
     public void AnythingElseGetsLightning(int classId) =>

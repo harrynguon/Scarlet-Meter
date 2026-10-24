@@ -121,6 +121,24 @@ public sealed partial class RazorMarkupTests
             ".rows must take its own height and give up its space before the expanded strip (flex: 0 <100 or more> auto)");
         foreach (var strip in new[] { Block(alerts, ".alerts"), Block(alerts, ".alerts.expanded") })
             Assert.DoesNotMatch(@"(?m)^\s*(flex-shrink:\s*0|flex:\s*none)", strip);
+        // A margin under whatever ends the panel (the last row, or the notices), as above the header and card.
+        Assert.Matches(@"(?m)^\s*padding-bottom:\s*[1-9]\d*px;", overlay);
+    }
+
+    // The player's own row is marked by a ring round the row, never by a stripe on the bar (a white inset at the
+    // bar's left edge read as a glitch); bar effects replace the ring with their glow.
+    [Fact]
+    public void TheOwnRowIsMarkedByARingNotOnTheBar()
+    {
+        var css = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "app.css"));
+        var page = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Pages", "MeterPage.razor.cs"));
+        Assert.DoesNotContain("me-mark", css, StringComparison.Ordinal);
+        Assert.DoesNotContain("me-mark", page, StringComparison.Ordinal);
+        Assert.DoesNotMatch(@"\.fill[^{]*\{[^}]*box-shadow:\s*inset", css);
+        // Nothing styles the own row's bar but its gold fill when class colours are off (.fill.self).
+        Assert.DoesNotMatch(@"\.row\.me[^{,]*\.fill", css);
+        Assert.Matches(@"(?m)^\.row\.me \{[^}]*box-shadow:", css);
+        Assert.Matches(@"(?m)^\.fx \.row\.me \{[^}]*box-shadow:", css);
     }
 
     [GeneratedRegex(@"<span class=""(num[^""]*)""")]

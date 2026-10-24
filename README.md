@@ -68,7 +68,7 @@ and adds it up per player and per fight.
 **Looks, your way**
 
 - **Animated bar effects for every class**: Gladiator slashes, Templar shield sheen, Assassin poison and daggers,
-  Ranger arrows, Sorcerer fire and ice, Elementalist spirits, Cleric holy light, Chanter rings, Brawler punches.
+  Ranger arrows, Sorcerer fire and ice, Spiritmaster spirits, Cleric holy light, Chanter rings, Brawler punches.
   Your own bar glows; when someone overtakes, the rows glide into place with a flash. Tone it down to your bar
   only, or turn it off.
 - **Your own background picture** (PNG, JPG, GIF, WebP, BMP), with its **own opacity** so it never distracts,

@@ -13,9 +13,12 @@ namespace ScarletMeter.Engine.Upstream;
 /// </summary>
 internal static class UpstreamMapping
 {
-    /// <summary>Upstream's player totals as a row. Rates and DPS are upstream's own figures.</summary>
+    /// <summary>
+    /// Upstream's player totals as a row. Rates and DPS are upstream's own figures; the class name is Global's
+    /// (<see cref="GlobalNames"/>).
+    /// </summary>
     public static PlayerRow ToPlayerRow(PlayerStats s) => new(
-        s.PlayerId, s.PlayerName ?? string.Empty, s.IsUser, s.IsIdentified, s.ClassId, s.ClassName ?? string.Empty,
+        s.PlayerId, s.PlayerName ?? string.Empty, s.IsUser, s.IsIdentified, s.ClassId, GlobalNames.Of(s.ClassName),
         s.ServerName ?? string.Empty, s.CombatPower, s.TotalDamage, s.DamagePerSecond, s.DamagePercentage,
         s.CriticalRate, s.PlayerDeaths);
 

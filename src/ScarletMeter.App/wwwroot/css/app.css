@@ -72,7 +72,9 @@ button {
    picture both layers are the panel's colour, so nothing changes.
    The panel is only as tall as its content, up to the window (max-height; the rows scroll beyond it): what it does
    not cover is see-through to the game, so the room the notices leave in a boss fight, or below a small party's
-   rows, never shows as an empty panel. The window keeps the size the player gave it. */
+   rows, never shows as an empty panel. The window keeps the size the player gave it. Its bottom padding adds 8 px
+   under whatever ends the panel, on top of the rows' and the notices' own spacing: measured, 18 px from the last
+   row to the panel's edge and 15 px from the last notice. */
 .overlay {
     position: relative;
     isolation: isolate;
@@ -80,6 +82,7 @@ button {
     flex-direction: column;
     max-height: 100%;
     box-sizing: border-box;
+    padding-bottom: 8px;
     border-radius: var(--radius);
     border: 1px solid var(--line);
     overflow: hidden;
@@ -374,8 +377,10 @@ button {
     background: var(--me-soft);
 }
 
-.row .fill.me-mark {
-    box-shadow: inset 2px 0 0 #fff;
+/* The player's own row: a thin ring in the "you" gold. With bar effects on, the effects' glow in the class's colour
+   replaces it (.fx .row.me). Nothing is drawn on the bar itself: a white stripe at its left edge read as a glitch. */
+.row.me {
+    box-shadow: 0 0 0 1px rgba(255, 183, 3, 0.55);
 }
 
 .class-icon {
@@ -778,7 +783,7 @@ button {
 .theme-fire-ice .shard:nth-child(9) { left: 80%; top: 42%; animation-delay: 1s; }
 .theme-fire-ice .shard:nth-child(10) { left: 92%; top: 60%; animation-delay: 1.5s; }
 
-/* Elementalist: spirits drifting across, bobbing, with trails, in turquoise and violet. */
+/* Spiritmaster: spirits drifting across, bobbing, with trails, in turquoise and violet. */
 .theme-spirits .wisp {
     opacity: 0;
     animation: fx-drift 3.2s linear infinite;

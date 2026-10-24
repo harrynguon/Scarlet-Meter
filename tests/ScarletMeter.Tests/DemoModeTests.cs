@@ -24,7 +24,7 @@ public sealed class DemoModeTests
     private const int UserId = 41_001;
     private const int ClericId = 41_002;
     private const int RangerId = 41_003;
-    private const int ElementalistId = 41_004;
+    private const int SpiritmasterId = 41_004;
 
     [Fact]
     public void RosterResolvesInUpstreamsGameDataWithSyntheticNames()
@@ -94,8 +94,10 @@ public sealed class DemoModeTests
 
         var fight = engine.GetHistoryFight(entry.FightId)!;
         Assert.Equal(
-            ["Demo Cleric", "Demo Elementalist", "Demo Gladiator", "Demo Ranger"],
+            ["Demo Cleric", "Demo Gladiator", "Demo Ranger", "Demo Spiritmaster"],
             fight.Players.Select(p => p.Name).Order(StringComparer.Ordinal));
+        // A saved fight shows Global's class name too (upstream's data says "Elementalist").
+        Assert.Equal("Spiritmaster", Assert.Single(fight.Players, p => p.Id == SpiritmasterId).ClassName);
         Assert.All(fight.Details.Values, details =>
         {
             Assert.Contains(details.Buffs, buff => buff.Name == "Prayer of Amplification" && buff.UptimePercent > 0);
@@ -110,10 +112,10 @@ public sealed class DemoModeTests
         Assert.InRange(user.Rates.BackAttack, 1, 99);
         Assert.Contains(user.Skills, skill => skill.SpecializationFlags.SequenceEqual([true, false, true, false, false]));
 
-        var spirit = Assert.Single(fight.Details[ElementalistId].Skills, skill => skill.IsSummonGroup);
+        var spirit = Assert.Single(fight.Details[SpiritmasterId].Skills, skill => skill.IsSummonGroup);
         Assert.Equal("Summon: Fire Spirit", spirit.Name);
         Assert.Equal(["Fire Spirit: Basic Attack", "Summon: Fire Spirit"], spirit.SummonChildren.Select(c => c.Name).Order(StringComparer.Ordinal));
-        Assert.Contains(fight.Details[ElementalistId].CombatLog, hit => hit.SummonName is not null);
+        Assert.Contains(fight.Details[SpiritmasterId].CombatLog, hit => hit.SummonName is not null);
 
         var drillDart = Assert.Single(fight.Details[RangerId].Skills, skill => skill.Name == "Drill Dart");
         Assert.False(drillDart.IsDot); // a hit, then ticks
