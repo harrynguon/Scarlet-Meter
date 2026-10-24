@@ -10,9 +10,11 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Checks (SDK 10.0.402):** `scripts/Build.ps1` 403/403: `TheStripStandsAsideOnlyWhileABossFightIsUnderWay` and `HidingDuringBossFightsIsOnUnlessTurnedOff` new, and `EqualityCoversEveryProperty` caught the new property until its list and comparison were extended (as designed). Fail-first: dropping the boss check, the settled phase or the setting from `HiddenForFight` each failed the new test.
 
-**Not checked yet:** the look in the running meter (Harry is in game; no window was opened); in the game (HANDOFF).
+**Visual check (after Harry closed his meter and said checks could run; `Smoke-Meter.ps1 --demo`, throwaway data directory with every event alerted 60 minutes ahead):** during the demo's boss fight the card was one line and its bar (40 px), reading "Aultross | 136.44M / 148.79M · 91.7% | Kill in 01:10" six seconds in without overflowing, and the strip was hidden; with "Hide during boss fights" turned off in Settings, Alerts, two notices and "+1 more" came back; the bell turned them off (title "Show world-event alerts", `aria-pressed="false"`, struck through and dimmed, and the Settings switch followed) and on again; with the setting back on they stepped aside again, and after the kill ("No active target") they returned. Screenshots looked right; exit code 0; no log warnings.
 
-**Next:** audit, Codex and CI; a visual check once Harry is out of game; merge.
+**Not checked:** in the game (HANDOFF).
+
+**Next:** audit, Codex and CI; merge.
 
 ## 2026-10-24 — Picture opacity
 
