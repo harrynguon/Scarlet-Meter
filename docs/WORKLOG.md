@@ -2,6 +2,29 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Portable build, like RATmeter
+
+**What:**
+
+- `scripts/Publish-Portable.ps1`: builds and tests Release, publishes the self-contained single-file build into a new folder, checks the layout, adds a `ScarletMeter.portable` marker and zips it with `ScarletMeter` at the top. It never deletes or overwrites: a taken name gets a counter.
+- `PortableLayout`: with the marker beside the executable, the data directory is the `data` folder beside it instead of `%LocalAppData%\ScarletMeter`; `--data-dir` still wins. A portable copy that cannot create `data` stops with a message naming it.
+- Settings, About shows the portable update commands (extract the new zip over the folder) when running portable.
+- CI builds the portable zip and checks it holds the exe, the marker and `wwwroot\index.html` under `ScarletMeter/` and no `data` folder; the install smoke now also checks an installed build carries no portable marker. `portable/` is git-ignored.
+- README "Run it" leads with the portable zip; DEVELOPMENT "Portable build", ARCHITECTURE "Storage" and "Updates", SECURITY, HANDOFF and a lessons entry.
+
+**Why:** Harry asked whether it could be portable, like RATmeter, instead of needing an installation.
+
+**Checks (SDK 10.0.402):**
+
+- `scripts/Build.ps1`: 367/367, 5 new (`PortableLayoutTests`).
+- `Publish-Portable.ps1` with the tests, into a scratch folder: a 165 MB folder and a 66 MB zip (RATmeter v1.11.5.341's zip is 114 MB).
+- The zip extracted elsewhere and `ScarletMeter.exe --demo` started from it with `DOTNET_ROOT` and `SCARLET_DOTNET` removed and the working directory set to the Windows folder: the overlay opened ("Scarlet Meter"); `ScarletMeter\data` filled with the logs, the WebView2 profile and the demo history; `%LocalAppData%\ScarletMeter` did not exist before or after; it closed with exit code 0 and no warnings in the log.
+- The zip extracted again over that copy (`Expand-Archive -Force`): the data folder, its history and the settings saved on close were kept.
+
+**Not checked:** the message for a portable folder where `data` cannot be created (it is the start-up error path every other start failure uses); the portable copy in the game; Windows Explorer's own "Extract all" over a copy (it asks before replacing files, and the zip holds no `data`).
+
+**Next:** PR, audit, Codex's review, CI and merge.
+
 ## 2026-10-24 — Requirements and how to run, in the README
 
 **What:** README "Requirements" separates running (Windows, Npcap in WinPcap API-compatible mode with administrator-only access left off, the WebView2 runtime, no .NET install since the installed build is self-contained) from building (.NET 10 SDK, `SCARLET_DOTNET` when it is not on PATH, Git). "Run it" says where the installed exe is (`%LocalAppData%\Programs\ScarletMeter\ScarletMeter.exe`, and the Start menu with `-Shortcut`), the `--demo` command, and what a real start shows. DEVELOPMENT.md's opening matches. A lessons entry records why this was missing.

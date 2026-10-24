@@ -73,6 +73,17 @@ Keep the whole published folder: the game-data JSON files (`GameData\Assets`) an
 
 It fails when a file the meter reads at runtime is missing or the app's assembly was left outside the bundle; it does not launch the meter. `Install-Meter.ps1` (below) runs the same publish and check, and so does CI. No release process exists yet; see docs/SECURITY.md before publishing a binary.
 
+## Portable build
+
+```powershell
+& "<checkout>\scripts\Publish-Portable.ps1"                         # build, test, publish, zip
+& "<checkout>\scripts\Publish-Portable.ps1" -OutputRoot "<absolute folder>"
+```
+
+It runs `Build.ps1 -Configuration Release` (with the tests, unless `-SkipTests`), publishes the self-contained single-file win-x64 build into a new folder `<output root>\ScarletMeter-<commit>-upstream-<release>\ScarletMeter`, checks it with `Test-PublishLayout.ps1`, writes the `ScarletMeter.portable` marker into it and zips it as `<output root>\ScarletMeter-<commit>-upstream-<release>-win-x64.zip`, with `ScarletMeter` as the zip's top folder. The output root defaults to `<checkout>\portable`, which git ignores. It never deletes or overwrites anything: a taken name gets a counter. A checkout with uncommitted changes adds `-dirty` to the name and warns.
+
+The marker makes the meter keep its data in `data` beside the exe (`PortableLayout`); delete it to use `%LocalAppData%\ScarletMeter` instead. `--data-dir` overrides both. A portable folder where the meter cannot create `data` (Program Files, a read-only drive) stops at start with a message saying so. To update a portable copy, close it and extract the newer zip over its folder; the zip holds no `data`. CI builds the zip on every run and checks its contents.
+
 ## Install and update
 
 The meter is built from this checkout: there are no published Scarlet binaries and no self-updater (ARCHITECTURE.md, "Updates"). To install or reinstall:

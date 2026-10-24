@@ -165,13 +165,21 @@
                             <button type="button" class="btn" @onclick="() => Windows.OpenReleasePage(newer.ReleasePage)">Release notes</button>
                         }
                     </div>
-                    @if (Updates.Result is UpstreamReleaseCheckResult.NewerAvailable update)
+                    @if (Updates.Result is UpstreamReleaseCheckResult.NewerAvailable update && Portable)
+                    {
+                        <p class="hint">
+                            To update, run these in PowerShell, with the full path of your Scarlet Meter checkout for &lt;checkout&gt;,
+                            then close the meter, extract the new zip over this folder (its data folder is kept) and start it again:
+                        </p>
+                        <p class="hint mono">&amp; "&lt;checkout&gt;\scripts\Update-Upstream.ps1" -Tag @update.Tag<br />&amp; "&lt;checkout&gt;\scripts\Publish-Portable.ps1"</p>
+                    }
+                    else if (Updates.Result is UpstreamReleaseCheckResult.NewerAvailable installed)
                     {
                         <p class="hint">
                             To update, run these in PowerShell, with the full path of your Scarlet Meter checkout for &lt;checkout&gt;,
                             then start the meter again:
                         </p>
-                        <p class="hint mono">&amp; "&lt;checkout&gt;\scripts\Update-Upstream.ps1" -Tag @update.Tag<br />&amp; "&lt;checkout&gt;\scripts\Install-Meter.ps1"</p>
+                        <p class="hint mono">&amp; "&lt;checkout&gt;\scripts\Update-Upstream.ps1" -Tag @installed.Tag<br />&amp; "&lt;checkout&gt;\scripts\Install-Meter.ps1"</p>
                     }
                 </section>
                 break;

@@ -66,8 +66,19 @@ public partial class App : Application
     private void StartMeter(LaunchOptions launch, string[] args)
     {
         var options = new EngineOptions { Capture = launch.Demo ? CaptureMode.Demo : launch.NoCapture ? CaptureMode.None : CaptureMode.Live };
-        if (launch.DataDirectory is not null) options.DataDirectory = launch.DataDirectory;
-        Directory.CreateDirectory(options.DataDirectory);
+        // --data-dir, else a portable copy's data folder beside the exe, else the per-user data directory.
+        var portable = launch.DataDirectory is null ? PortableLayout.DataDirectory(AppContext.BaseDirectory) : null;
+        if ((launch.DataDirectory ?? portable) is { } chosen) options.DataDirectory = chosen;
+        try
+        {
+            Directory.CreateDirectory(options.DataDirectory);
+        }
+        catch (Exception ex) when (portable is not null && ex is IOException or UnauthorizedAccessException)
+        {
+            throw new IOException(
+                $"This portable copy keeps its data in {portable}, which could not be created ({ex.Message}). Move the " +
+                "Scarlet Meter folder somewhere you can write to (not Program Files), or start it with --data-dir <absolute path>.", ex);
+        }
 
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings
         {

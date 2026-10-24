@@ -44,6 +44,9 @@ public partial class SettingsPage : IDisposable
 
     private string DataDirectory => Options.DataDirectory;
 
+    // A portable copy is updated by extracting a new zip over it, not by Install-Meter.ps1.
+    private static bool Portable => PortableLayout.IsCurrent;
+
     private static string Version =>
         typeof(SettingsPage).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "";
 

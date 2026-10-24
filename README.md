@@ -13,7 +13,7 @@ Status: in development, not yet tried in the game. Capture, decoding, fight trac
 | `src/ScarletMeter.App` | WPF windows hosting Blazor WebViews (overlay, settings, player details, history), the settings store and the upstream release check (`Updates/`); references the engine and the world-events module, never upstream. |
 | `src/ScarletMeter.WorldEvents` | World event schedules (Global preset) and the alert planner for overlay notices; pure .NET, no dependencies; drives the overlay's notices. Times are not verified in the game. |
 | `tests/ScarletMeter.Tests` | Boundary guards, engine mapping, settings, close-ordering, world-event schedule, build-stamp and release-check tests (no Npcap needed). |
-| `scripts/` | `Build.ps1` (restore, build, test), `Install-Meter.ps1` (build and install for the current user) with its folder rules `InstallFolders.ps1` and `Test-InstallMeter.ps1` (its refusal, delete and swap checks), `Update-Upstream.ps1 -Tag vX.Y.Z.N`, `Test-PublishLayout.ps1` and `Smoke-Meter.ps1` (drives the UI for checks). Each derives its paths from its own location. |
+| `scripts/` | `Build.ps1` (restore, build, test), `Publish-Portable.ps1` (build a portable folder and zip), `Install-Meter.ps1` (build and install for the current user) with its folder rules `InstallFolders.ps1` and `Test-InstallMeter.ps1` (its refusal, delete and swap checks), `Update-Upstream.ps1 -Tag vX.Y.Z.N`, `Test-PublishLayout.ps1` and `Smoke-Meter.ps1` (drives the UI for checks). Each derives its paths from its own location. |
 | `docs/` | Maintainer documentation. Start with [docs/README.md](docs/README.md). |
 
 ## Requirements
@@ -23,19 +23,29 @@ To **run** the installed meter:
 - Windows 11, 64-bit. Windows 10 (version 1607 or later, 64-bit) should work but has not been tried.
 - [Npcap](https://npcap.com), for live capture. In its installer, tick "Install Npcap in WinPcap API-compatible Mode": the capture library loads Npcap's `wpcap.dll`, which only that mode installs. Leave "Restrict Npcap driver's access to Administrators only" unticked, or the meter must be started as administrator to capture. Without Npcap, a normal start shows a message saying so and closes; `--demo` and `--no-capture` run without it.
 - The Microsoft Edge WebView2 Runtime, which draws the meter's windows. Windows 11 ships with it; on Windows 10, install the Evergreen Runtime from Microsoft if the meter's windows stay blank.
-- No .NET install: `Install-Meter.ps1` publishes a self-contained build, so the .NET runtime is bundled inside `ScarletMeter.exe`.
+- No .NET install: the portable and installed builds are self-contained, so the .NET runtime is bundled inside `ScarletMeter.exe`.
 
-To **build and install** it (once, and again for each update):
+To **build** it (once, and again for each update):
 
 - The [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). `Build.ps1` and `Install-Meter.ps1` use the `dotnet` on PATH and stop with a message if it is not a .NET 10 SDK; when the SDK is installed elsewhere, set `SCARLET_DOTNET` to its `dotnet.exe` (an absolute path) for the session.
 - Git, to clone the repository with its `upstream/` submodule.
 
 ## Run it
 
-After `Install-Meter.ps1` (below), the meter is `%LocalAppData%\Programs\ScarletMeter\ScarletMeter.exe`; with `-Shortcut` it is also "Scarlet Meter" in the Start menu. To look around without the game first:
+**Portable, like RATmeter** (no installer): build the zip once,
 
 ```powershell
-& (Join-Path $env:LOCALAPPDATA 'Programs\ScarletMeter\ScarletMeter.exe') --demo
+& "<checkout>\scripts\Publish-Portable.ps1"
+```
+
+then unzip `<checkout>\portable\ScarletMeter-<version>-win-x64.zip` anywhere you can write to (not Program Files) and run `ScarletMeter\ScarletMeter.exe`. A portable copy keeps its settings, history and logs in the `data` folder beside the exe, so the whole folder can be moved, copied or deleted as one. To update, close the meter and extract a newer zip over the same folder: the zip holds no `data` folder, so your data stays. The unzipped folder beside the zip, `<checkout>\portable\ScarletMeter-<version>\ScarletMeter`, runs as it is too.
+
+**Installed** instead (below, "Install and update"): the meter is `%LocalAppData%\Programs\ScarletMeter\ScarletMeter.exe`, with "Scarlet Meter" in the Start menu if installed with `-Shortcut`, and its data in `%LocalAppData%\ScarletMeter`.
+
+To look around without the game first, start it with `--demo`, for example:
+
+```powershell
+& "<portable folder>\ScarletMeter.exe" --demo
 ```
 
 `--demo` plays synthetic boss fights (kept in their own history file), `--no-capture` opens the meter with capture off, and `--data-dir <absolute path>` keeps everything it writes somewhere other than `%LocalAppData%\ScarletMeter`. For the real thing, start the game, then the meter; it finds the game's connection on its own ("Waiting for the game's connection..." until it does).
