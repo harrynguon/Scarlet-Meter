@@ -73,16 +73,28 @@
     width: 22%;
 }
 
+/* The whole column as a faint track, so a short bar still reads as a share of the whole. */
+td.bar-col::before {
+    content: "";
+    position: absolute;
+    inset: 4px 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+}
+
+/* A share or uptime bar: the overlay's accent gradient, or a class gradient (.fill.class-N, app.css) when the
+   page adds one. Flat 32% red read as dark maroon on the near-black panel. */
 .cell-bar {
     position: absolute;
     inset: 4px auto 4px 6px;
     max-width: calc(100% - 12px);
-    background: var(--accent-soft);
+    background: linear-gradient(90deg, rgba(230, 57, 70, 0.45) 0%, rgba(230, 57, 70, 0.88) 100%);
     border-radius: 3px;
 }
 
-.cell-bar-text { position: relative; }
-.cell-bar-text small { color: var(--muted); margin-left: 4px; }
+/* Over a bar the label keeps its contrast. */
+.cell-bar-text { position: relative; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85); }
+.cell-bar-text small { color: #c7c4d3; margin-left: 4px; }
 
 .tag {
     display: inline-block;

@@ -27,6 +27,7 @@ public partial class FightHistoryPage : IDisposable
     private bool copied;
     private bool hideNames;
     private bool showDeaths = true;
+    private bool classColors = true;
     private int listRequest;
     private int fightRequest;
 
@@ -54,11 +55,15 @@ public partial class FightHistoryPage : IDisposable
     {
         hideNames = Settings.Current.Appearance.HideNicknames;
         showDeaths = Settings.Current.Appearance.ShowDeaths;
+        classColors = Settings.Current.Appearance.ClassColors;
         Settings.Changed += OnSettingsChanged;
         await SearchAsync(1);
     }
 
     private string Name(PlayerRow player) => hideNames ? NicknameMask.Mask(player.Name) : player.Name;
+
+    // Share bars in the class gradients the overlay uses, when "Class colours" is on; otherwise the accent.
+    private string BarClass(PlayerRow player) => classColors ? "fill " + ClassColors.CssClass(player.ClassId) : string.Empty;
 
     // Only the latest search applies: a slower, older one (Next clicked twice, Search during a slow query) is
     // dropped, as is any result arriving after the window closed. A page past the end, left by retention
@@ -158,6 +163,7 @@ public partial class FightHistoryPage : IDisposable
     {
         hideNames = changed.Appearance.HideNicknames;
         showDeaths = changed.Appearance.ShowDeaths;
+        classColors = changed.Appearance.ClassColors;
         _ = InvokeAsync(StateHasChanged);
     }
 

@@ -100,7 +100,7 @@ public partial class MeterPage : IAsyncDisposable
 
     // Class gradients (app.css .fill.class-N) when enabled; otherwise the accent, with the user in gold.
     private string FillClass(PlayerRow player) => appearance.ClassColors
-        ? $"class-{(player.ClassId is >= 10 and <= 19 ? player.ClassId : 0)}{(player.IsUser ? " me-mark" : "")}"
+        ? $"{ClassColors.CssClass(player.ClassId)}{(player.IsUser ? " me-mark" : "")}"
         : player.IsUser ? "self" : string.Empty;
 
     private void OnHeaderMouseDown(MouseEventArgs e)

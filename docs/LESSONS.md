@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**Share bars were hard to see** (Harry, from the screenshots, 2026-10-24).
+- What: the details and saved-fight bars used a flat 32% red, which on the near-black panel came out as dark maroon.
+- Why: the colour was picked as a token, not looked at on the real background; smoke runs checked the bars existed, not that they could be seen.
+- Guard: bars use the overlay's gradients on a visible track. Look at a screenshot of every new visual element before calling it done.
+
 **Settings backup overwritten when the main file was missing** (Codex on #2, fixed 2026-10-24).
 - What: with `settings.json` missing and `settings.json.bak` damaged, from a newer build or locked, saving stayed on, and the second save's `File.Replace` replaced the only recoverable settings. Now a damaged backup is kept aside, a newer one is used read-only, and a locked or unmovable one switches saving off.
 - Why: the keep-aside and read-only protections were written for a damaged main file only; the missing-file branch was not walked through the same cases.
