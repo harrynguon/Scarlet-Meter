@@ -96,15 +96,25 @@ public sealed partial class RazorMarkupTests
     [Fact]
     public void TheOverlayPanelFitsItsContent()
     {
-        var css = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "app.css"));
-        string Block(string selector) => Regex.Match(css, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
-        var overlay = Block(".overlay");
+        var styles = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css");
+        var css = File.ReadAllText(Path.Combine(styles, "app.css"));
+        var alerts = File.ReadAllText(Path.Combine(styles, "alerts.css"));
+        static string Block(string source, string selector) =>
+            Regex.Match(source, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
+        var overlay = Block(css, ".overlay");
         Assert.Matches(@"(?m)^\s*max-height:\s*100%;", overlay);
         Assert.DoesNotMatch(@"(?m)^\s*height:", overlay);
-        var rows = Block(".rows");
+        // The panel's max-height is a percentage of #app, which must itself be the window's height.
+        Assert.Matches(@"(?m)^\s*height:\s*100%;", Block(css, "#app"));
+        Assert.Matches(@"(?m)^\s*height:\s*100%;", Block(css, "html, body"));
+        // No other rule for the panel itself (.overlay.fx, .overlay[...]; not its descendants) gives it a height.
+        Assert.DoesNotMatch(@"(?m)^\.overlay[.:\[][^\s{,]*\s*\{[^}]*(?<![-\w])height\s*:", css.Replace(".overlay::before {", ".before-layer {"));
+        var rows = Block(css, ".rows");
         Assert.Matches(@"(?m)^\s*flex:\s*0 1 auto;", rows);
         Assert.Matches(@"(?m)^\s*min-height:\s*0;", rows);
-        Assert.Matches(@"var\(--panel-image, none\) center / cover no-repeat fixed;", Block(".overlay::before"));
+        Assert.Matches(@"var\(--panel-image, none\) center / cover no-repeat fixed;", Block(css, ".overlay::before"));
+        // The expanded strip keeps its share however many rows there are (the rows no longer give up their space).
+        Assert.Matches(@"(?m)^\s*flex-shrink:\s*0;", Block(alerts, ".alerts.expanded"));
     }
 
     [GeneratedRegex(@"<span class=""(num[^""]*)""")]

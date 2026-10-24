@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**Fitting the panel to its content squeezed the expanded strip again** (audit on #26, fixed before merge).
+- What: changing the rows from `flex: 1` (they gave up their space) to `flex: 0 1 auto` (they keep their own height) made the expanded notice strip, a scroll area that may shrink, give up space in proportion to the rows: with a full party it opened about one notice tall, the same squeeze #20's lesson describes. The demo check could not show it, since the demo has four players.
+- Why: the change was judged by the case that prompted it (four rows, notices held) and checked in the demo, not at the fullest the page gets (many rows with the strip expanded); a flex rule on one child changes how its siblings shrink.
+- Guard: `.alerts.expanded { flex-shrink: 0 }`, asserted by `RazorMarkupTests.TheOverlayPanelFitsItsContent`, which also pins what the panel's height depends on (`#app` and `html, body` at 100%, no other rule sizing the panel). When a layout rule changes, measure the page at its fullest (the audit did so headlessly with synthetic markup, no window), not only the demo.
+
 **Boss-fight hiding trusted the current target** (audit on #24, fixed before merge).
 - What: the first "Hide during boss fights" hid the notices while a boss was the current target and its fight live or settled. Settled has no end and upstream changes its target only on a hit, so after a wipe the notices would have stayed hidden until the next hit; and the target flips to adds and back, so the strip would have come and gone on every swap. Unmounting the strip also broke its own live-region rule, and "Bring the meter back before an event" could restore a minimized meter mid-fight with its notice hidden.
 - Why: the same assumption #21's lesson names, one steady target, came back in a new feature: the rule was read off `FightState`'s phases without asking how long a phase can last or what the target does between hits; the strip's own comment, which said why it is never unmounted, was not reread.

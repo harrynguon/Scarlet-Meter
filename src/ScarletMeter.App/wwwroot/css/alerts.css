@@ -102,8 +102,11 @@
 }
 
 /* Expanded, the strip may take up to about half the meter and scrolls beyond that, so the rows stay visible. The
-   top line separates it from the rows above, which are cut by their own scroll area at the same edge. */
+   top line separates it from the rows above, which are cut by their own scroll area at the same edge. It never
+   shrinks below that: the rows take their own height (app.css, .rows), and as a scroll area the strip could
+   otherwise be squeezed in proportion to them, down to one notice with a full party. */
 .alerts.expanded {
+    flex-shrink: 0;
     max-height: 45vh;
     overflow-y: auto;
     border-top: 1px solid rgba(255, 255, 255, 0.12);
