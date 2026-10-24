@@ -7,8 +7,11 @@
     padding: 0 6px 6px;
 }
 
+/* flex: none keeps each notice its full height in the strip's column; with overflow: hidden it could otherwise
+   shrink to fit the expanded strip's height cap instead of the strip scrolling. */
 .alert {
     position: relative;
+    flex: none;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -81,7 +84,6 @@
 
 /* "+N more" / "Show less": a button that expands the strip to every due notice and collapses it again. */
 .alert.more {
-    flex: none;
     justify-content: center;
     width: 100%;
     height: 18px;

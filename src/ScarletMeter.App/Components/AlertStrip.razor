@@ -37,7 +37,7 @@
         @if (AlertStripLayout.HiddenCount(View.Alerts) is var hidden && hidden > 0)
         {
             <button type="button" class="alert more" aria-expanded="@(expanded ? "true" : "false")"
-                    title="@(expanded ? "Show only the first two" : AlertStripLayout.HiddenSummary(View.Alerts))"
+                    title="@(expanded ? AlertStripLayout.CollapseHint : AlertStripLayout.HiddenSummary(View.Alerts))"
                     @onclick="() => expanded = !expanded">
                 @(expanded ? "Show less" : $"+{hidden} more")
             </button>

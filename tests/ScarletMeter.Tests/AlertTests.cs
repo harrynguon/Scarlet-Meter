@@ -153,6 +153,7 @@ public sealed class AlertTests : IDisposable
         Assert.Equal(alerts.Take(2), AlertStripLayout.Shown(alerts, expanded: false));
         Assert.Equal(alerts, AlertStripLayout.Shown(alerts, expanded: true));
         Assert.Equal(2, AlertStripLayout.HiddenCount(alerts));
+        Assert.Equal(1, AlertStripLayout.HiddenCount([.. alerts.Take(3)]));
         Assert.Equal(0, AlertStripLayout.HiddenCount([.. alerts.Take(2)]));
         Assert.Equal(0, AlertStripLayout.HiddenCount([]));
     }
@@ -162,8 +163,10 @@ public sealed class AlertTests : IDisposable
     {
         var alerts = FourDue();
         Assert.True(AlertStripLayout.StaysExpanded(true, alerts));
+        Assert.True(AlertStripLayout.StaysExpanded(true, [.. alerts.Take(3)])); // one hidden: still worth expanding
         Assert.False(AlertStripLayout.StaysExpanded(false, alerts));
         Assert.False(AlertStripLayout.StaysExpanded(true, [.. alerts.Take(2)]));
+        Assert.Equal("Show only the first 2", AlertStripLayout.CollapseHint);
     }
 
     [Fact]
@@ -298,18 +301,21 @@ public sealed class AlertTests : IDisposable
 
     public void Dispose() => directory.Dispose();
 
-    // Four due notices, most urgent first: Shugo's entry open, then the rift, Nahma and Kaira about to start.
-    // Built directly, so the strip's rules are tested apart from the schedule.
+    // Four due notices at 01:01, most urgent first: Shugo's entry open (01:00 to 01:03), then the rift, Nahma and
+    // Kaira about to start. Built directly, so the strip's rules are tested apart from the schedule.
     private static IReadOnlyList<EventAlert> FourDue()
     {
         var rules = EventCatalog.Default.ToDictionary(r => r.Id);
-        var start = new DateTimeOffset(2026, 10, 24, 1, 0, 0, TimeSpan.Zero);
+        var hour = new DateTimeOffset(2026, 10, 24, 1, 0, 0, TimeSpan.Zero);
+        var now = hour.AddMinutes(1);
+        EventAlert Soon(string id, int minute) =>
+            new(rules[id], AlertKind.Soon, hour.AddMinutes(minute), hour.AddMinutes(minute), hour.AddMinutes(minute) - now);
         return
         [
-            new EventAlert(rules[EventIds.Shugo], AlertKind.Open, start, start.AddMinutes(3), TimeSpan.FromMinutes(2)),
-            new EventAlert(rules[EventIds.Rift], AlertKind.Soon, start.AddMinutes(4), start.AddMinutes(4), TimeSpan.FromMinutes(4)),
-            new EventAlert(rules[EventIds.Nahma], AlertKind.Soon, start.AddMinutes(20), start.AddMinutes(20), TimeSpan.FromMinutes(20)),
-            new EventAlert(rules[EventIds.Kaira], AlertKind.Soon, start.AddMinutes(35), start.AddMinutes(35), TimeSpan.FromMinutes(35)),
+            new EventAlert(rules[EventIds.Shugo], AlertKind.Open, hour, hour.AddMinutes(3), hour.AddMinutes(3) - now),
+            Soon(EventIds.Rift, 4),
+            Soon(EventIds.Nahma, 20),
+            Soon(EventIds.Kaira, 35),
         ];
     }
 

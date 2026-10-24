@@ -32,6 +32,9 @@ public static class AlertStripLayout
     public static string HiddenSummary(IReadOnlyList<EventAlert> alerts) =>
         string.Join("\n", alerts.Skip(CollapsedCount).Select(Describe));
 
+    /// <summary>The expanded strip's "Show less" tooltip.</summary>
+    public static string CollapseHint => $"Show only the first {CollapsedCount}";
+
     /// <summary>A notice in one line, in local time: "&lt;name&gt; · &lt;location&gt; · starts 21:00" (or "closes" while open).</summary>
     public static string Describe(EventAlert alert) =>
         $"{alert.Rule.Name} · {alert.Rule.Location} · {(alert.Kind == AlertKind.Soon ? "starts" : "closes")} {EventText.LocalTime(alert.Deadline)}";
