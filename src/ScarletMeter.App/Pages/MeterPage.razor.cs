@@ -32,6 +32,8 @@ public partial class MeterPage : IAsyncDisposable
     private FightPhase phase;
     private CombatSnapshot snapshot = CombatSnapshot.Empty;
     private AppearanceSettings appearance = new();
+    // The notices' switches: the header's bell (Enabled) and whether they stand aside for a boss fight.
+    private AlertSettings alertSettings = new();
     private int? ping;
     private Task? refreshLoop;
     private bool refreshFailing;
@@ -102,6 +104,7 @@ public partial class MeterPage : IAsyncDisposable
     protected override void OnInitialized()
     {
         appearance = Settings.Current.Appearance;
+        alertSettings = Settings.Current.Alerts;
         Settings.Changed += OnSettingsChanged;
         Engine.PingUpdated += OnPingUpdated;
         Alerts.Changed += OnAlertsChanged;
@@ -171,6 +174,7 @@ public partial class MeterPage : IAsyncDisposable
     private void OnSettingsChanged(object? sender, MeterSettings changed)
     {
         appearance = changed.Appearance;
+        alertSettings = changed.Alerts;
         _ = RenderAsync();
     }
 
@@ -195,6 +199,9 @@ public partial class MeterPage : IAsyncDisposable
         {
         }
     }
+
+    // The header's bell: world-event notices on or off, saved like the switch in Settings, Alerts.
+    private void ToggleAlerts() => Settings.Update(s => s with { Alerts = s.Alerts with { Enabled = !s.Alerts.Enabled } });
 
     private void Reset()
     {

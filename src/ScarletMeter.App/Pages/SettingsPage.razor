@@ -127,6 +127,8 @@
                                    Value="@S.Alerts.RestoreMinimizedMeter" ValueChanged="@(v => Change(s => s with { Alerts = s.Alerts with { RestoreMinimizedMeter = v } }))" />
                     <ToggleSetting Label="Show the next event" Description="When nothing is due, show the next alerted event as one dim line."
                                    Value="@S.Alerts.ShowNextEvent" ValueChanged="@(v => Change(s => s with { Alerts = s.Alerts with { ShowNextEvent = v } }))" />
+                    <ToggleSetting Label="Hide during boss fights" Description="While you fight a boss (a dungeon boss, a field boss), the notices step aside so the meter has room; they come back once it is down. The bell in the meter's header turns them off altogether."
+                                   Value="@S.Alerts.HideDuringBossFights" ValueChanged="@(v => Change(s => s with { Alerts = s.Alerts with { HideDuringBossFights = v } }))" />
                 </section>
                 <section>
                     <h2>Events</h2>

@@ -72,13 +72,21 @@ public sealed record AlertSettings
     /// </summary>
     public bool RestoreMinimizedMeter { get; init; }
 
+    /// <summary>
+    /// Hide the notices while a boss fight is under way (a boss targeted and its HP moving or only just still), so a
+    /// dungeon boss gets the whole meter; they come back once the boss is down or the target is gone. On by default.
+    /// </summary>
+    public bool HideDuringBossFights { get; init; } = true;
+
     // Value equality including the event list.
     public bool Equals(AlertSettings? other) => other is not null
         && Enabled == other.Enabled && LeadMinutes == other.LeadMinutes && ServerOffsetHours.Equals(other.ServerOffsetHours)
         && ShowNextEvent == other.ShowNextEvent && RestoreMinimizedMeter == other.RestoreMinimizedMeter
+        && HideDuringBossFights == other.HideDuringBossFights
         && Events.SequenceEqual(other.Events, StringComparer.Ordinal);
 
-    public override int GetHashCode() => HashCode.Combine(Enabled, LeadMinutes, ServerOffsetHours, ShowNextEvent, RestoreMinimizedMeter, Events.Count);
+    public override int GetHashCode() =>
+        HashCode.Combine(Enabled, LeadMinutes, ServerOffsetHours, ShowNextEvent, RestoreMinimizedMeter, HideDuringBossFights, Events.Count);
 }
 
 /// <summary>Fight rules upstream applies to every hit; mirrored into the engine's EngineSettings.</summary>

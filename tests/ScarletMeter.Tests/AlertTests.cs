@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using ScarletMeter.App.Alerts;
+using ScarletMeter.App.Combat;
 using ScarletMeter.App.Settings;
 using ScarletMeter.Engine;
 using ScarletMeter.WorldEvents;
@@ -128,6 +129,26 @@ public sealed class AlertTests : IDisposable
         Assert.Equal(new AlertSettings { Events = ["rift"] }, new AlertSettings { Events = ["rift"] });
         Assert.NotEqual(new AlertSettings { Events = ["rift"] }, new AlertSettings { Events = ["shugo"] });
         Assert.Equal(new AlertSettings(), SettingsNormalizer.Normalize(null).Settings.Alerts);
+    }
+
+    [Fact]
+    public void HidingDuringBossFightsIsOnUnlessTurnedOff()
+    {
+        Assert.True(new AlertSettings().HideDuringBossFights);
+        Assert.True(SettingsNormalizer.Normalize(new MeterSettings()).Settings.Alerts.HideDuringBossFights);
+    }
+
+    [Fact]
+    public void TheStripStandsAsideOnlyWhileABossFightIsUnderWay()
+    {
+        var boss = new TargetInfo(1, "Test Boss", 500_000, 1_000_000, IsBoss: true);
+        var mob = boss with { IsBoss = false };
+        Assert.True(AlertStripLayout.HiddenForFight(true, boss, FightPhase.Live));
+        Assert.True(AlertStripLayout.HiddenForFight(true, boss, FightPhase.Settled)); // an invulnerable phase
+        Assert.False(AlertStripLayout.HiddenForFight(true, boss with { HpCurrent = 0 }, FightPhase.Defeated));
+        Assert.False(AlertStripLayout.HiddenForFight(true, null, FightPhase.None));
+        Assert.False(AlertStripLayout.HiddenForFight(true, mob, FightPhase.Live)); // trash keeps the notices
+        Assert.False(AlertStripLayout.HiddenForFight(false, boss, FightPhase.Live)); // the setting off
     }
 
     [Fact]

@@ -2,6 +2,18 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-25 — A calmer overlay: hideable event notices, "Kill in" on the name line
+
+**What:** A bell button in the overlay's header turns the world-event notices off or on in one click (the same `AlertSettings.Enabled` as Settings, Alerts, so it is saved; struck through and dimmed when off). A new "Hide during boss fights" switch (`AlertSettings.HideDuringBossFights`, on by default, in Settings, Alerts) makes the strip step aside while a boss is the target and its fight is live or only briefly still, and come back once the boss is down or the target goes (`AlertStripLayout.HiddenForFight`, from `FightState`'s phase); trash fights keep the notices. The target card is one line and a bar: "Kill in" moved onto the name and HP line, set apart by a hairline, and shows only once there is an estimate (no "--:--"). `AlertSettings`' hand-written equality includes the new switch. ARCHITECTURE ("Windows", "Overlay notices"), a HANDOFF item.
+
+**Why:** Harry found the event notices "too much info" in a dungeon fighting bosses, and the meter "a bit convoluted", asking for "Kill in" on the same row as the boss's name and HP.
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` 403/403: `TheStripStandsAsideOnlyWhileABossFightIsUnderWay` and `HidingDuringBossFightsIsOnUnlessTurnedOff` new, and `EqualityCoversEveryProperty` caught the new property until its list and comparison were extended (as designed). Fail-first: dropping the boss check, the settled phase or the setting from `HiddenForFight` each failed the new test.
+
+**Not checked yet:** the look in the running meter (Harry is in game; no window was opened); in the game (HANDOFF).
+
+**Next:** audit, Codex and CI; a visual check once Harry is out of game; merge.
+
 ## 2026-10-24 — Picture opacity
 
 **What:** A "Picture opacity" slider (5% to 100%, default 100%, the picture as before) under the background picture in Settings, Appearance, shown once a picture is chosen. It fades only the picture; "Background opacity" still fades the whole panel, and text and bars stay solid. In `app.css` a layer of the panel's own colour at 1 minus the picture opacity sits over the picture, under the dark veil: the same result as the picture at that opacity over the panel's colour, with no change when there is no picture. `AppearanceSettings.PictureOpacity`, clamped by the normalizer (non-finite values fall back to 100%). ARCHITECTURE ("Windows"), a HANDOFF item.
