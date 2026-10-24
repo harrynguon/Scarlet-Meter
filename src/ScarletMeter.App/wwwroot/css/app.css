@@ -424,20 +424,85 @@ button {
     pointer-events: none;
 }
 
-/* The player's own row glows, and its bar carries lightning (MeterPage's svg.bolt): two zigzags whose dashes run
-   along it and flicker, and every few seconds a strike that lights the whole bar. */
+/* The player's own row glows in its theme's colour. */
 .fx .row.me {
-    box-shadow: 0 0 0 1px rgba(140, 200, 255, 0.45), 0 0 10px rgba(80, 160, 255, 0.35);
+    --glow: 80, 160, 255;
+    box-shadow: 0 0 0 1px rgba(var(--glow), 0.55), 0 0 10px rgba(var(--glow), 0.4);
 }
 
-.fx .row.me .fill::before {
+.fx .row.me:has(.theme-cleave) { --glow: 255, 150, 80; }
+.fx .row.me:has(.theme-aegis) { --glow: 255, 210, 110; }
+.fx .row.me:has(.theme-venom) { --glow: 110, 255, 90; }
+.fx .row.me:has(.theme-volley) { --glow: 150, 230, 120; }
+.fx .row.me:has(.theme-spirits) { --glow: 90, 220, 230; }
+.fx .row.me:has(.theme-radiance) { --glow: 255, 225, 140; }
+.fx .row.me:has(.theme-mantra) { --glow: 255, 170, 70; }
+.fx .row.me:has(.theme-impact) { --glow: 255, 90, 80; }
+
+/* Fire and ice: warm on the left, cold on the right. */
+.fx .row.me:has(.theme-fire-ice) {
+    box-shadow: 0 0 0 1px rgba(210, 170, 255, 0.55), -5px 0 10px rgba(255, 120, 60, 0.45), 5px 0 10px rgba(80, 200, 255, 0.45);
+}
+
+/* A class's effect inside a bar (Components/BarEffect.razor; Formatting/BarEffectThemes picks the theme and its
+   pieces). It fills the bar and is clipped to it. Its <i> pieces fill it too unless a theme sizes them, so
+   translateX(%) moves a piece across the bar's width; their ::before and ::after draw the visible shapes. Every
+   theme also runs a shimmer in its colour (::after), so each bar is always moving a little. Other players'
+   effects stay behind the player's own. */
+.bar-fx {
+    --fx-color: 255, 255, 255;
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.bar-fx::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 35%;
+    background: linear-gradient(90deg, transparent, rgba(var(--fx-color), 0.34), transparent);
+    animation: fx-shimmer 3.2s ease-in-out infinite;
+}
+
+.bar-fx i {
+    position: absolute;
+    inset: 0;
+    display: block;
+}
+
+.bar-fx i::before,
+.bar-fx i::after {
+    content: "";
+    position: absolute;
+}
+
+.fx .row:not(.me) .bar-fx {
+    opacity: 0.6;
+}
+
+.theme-lightning { --fx-color: 200, 230, 255; }
+.theme-cleave { --fx-color: 255, 215, 175; }
+.theme-aegis { --fx-color: 255, 242, 195; }
+.theme-venom { --fx-color: 190, 255, 140; }
+.theme-volley { --fx-color: 215, 255, 195; }
+.theme-fire-ice { --fx-color: 255, 225, 255; }
+.theme-spirits { --fx-color: 175, 245, 255; }
+.theme-radiance { --fx-color: 255, 246, 205; }
+.theme-mantra { --fx-color: 255, 222, 165; }
+.theme-impact { --fx-color: 255, 175, 155; }
+
+/* Lightning (an unknown class): two zigzags whose dashes run and flicker, and a strike every few seconds. */
+.theme-lightning::before {
     content: "";
     position: absolute;
     inset: 0;
     background: rgba(200, 230, 255, 0.9);
     opacity: 0;
     animation: bolt-strike 3.4s linear infinite;
-    pointer-events: none;
 }
 
 .bolt {
@@ -446,7 +511,6 @@ button {
     width: 100%;
     height: 100%;
     filter: drop-shadow(0 0 2px rgba(150, 210, 255, 0.95)) drop-shadow(0 0 5px rgba(60, 140, 255, 0.8));
-    pointer-events: none;
 }
 
 .bolt polyline {
@@ -469,6 +533,331 @@ button {
     stroke-width: 1;
     stroke-dasharray: 12 16;
     animation: bolt-run 0.6s linear infinite reverse, bolt-flicker 1.7s steps(1, end) infinite reverse;
+}
+
+/* Gladiator: cleaving slashes sweep across, a white-hot edge with an orange glow and a trailing arc. */
+.theme-cleave .slash {
+    opacity: 0;
+    animation: fx-sweep 2.1s cubic-bezier(0.7, 0, 0.3, 1) infinite;
+}
+
+.theme-cleave .slash:nth-child(2) { animation-delay: 0.7s; }
+.theme-cleave .slash:nth-child(3) { animation-delay: 1.4s; }
+
+.theme-cleave .slash::before {
+    left: 0;
+    top: -40%;
+    width: 6px;
+    height: 180%;
+    transform: rotate(30deg);
+    border-radius: 3px;
+    background: linear-gradient(180deg, transparent, #ffffff 30%, #fff1e0 50%, rgba(255, 150, 70, 0.95) 72%, transparent);
+    box-shadow: 0 0 10px 3px rgba(255, 160, 80, 0.9), 0 0 2px 1px rgba(255, 255, 255, 0.8);
+}
+
+.theme-cleave .slash::after {
+    left: -30px;
+    top: -40%;
+    width: 30px;
+    height: 180%;
+    transform: rotate(30deg);
+    background: linear-gradient(90deg, transparent, rgba(255, 180, 110, 0.6));
+}
+
+/* Templar: a shield's golden sheen sweeping over, and facets that gleam in turn. */
+.theme-aegis .sheen {
+    opacity: 0;
+    animation: fx-sweep 3s ease-in-out infinite;
+}
+
+.theme-aegis .sheen::before {
+    left: -12%;
+    top: 0;
+    bottom: 0;
+    width: 32%;
+    background: linear-gradient(100deg, transparent, rgba(255, 246, 210, 0.75), transparent);
+}
+
+.theme-aegis .facet::before {
+    top: 50%;
+    width: 11px;
+    height: 11px;
+    margin: -6px 0 0 -6px;
+    border: 2px solid #ffe9a8;
+    box-shadow: 0 0 8px rgba(255, 210, 110, 0.95), inset 0 0 4px rgba(255, 236, 170, 0.8);
+    opacity: 0;
+    animation: fx-facet 2.4s ease-in-out infinite;
+}
+
+.theme-aegis .facet:nth-child(2)::before { left: 25%; }
+.theme-aegis .facet:nth-child(3)::before { left: 50%; animation-delay: 0.8s; }
+.theme-aegis .facet:nth-child(4)::before { left: 75%; animation-delay: 1.6s; }
+
+/* Assassin: a band of dark poison smoke with an acid core, steel daggers darting across and acid-green bubbles
+   rising. Dark edges, so it reads on the class's own green bar. */
+.theme-venom::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 45%;
+    background: linear-gradient(90deg, transparent, rgba(5, 35, 10, 0.6) 30%, rgba(190, 255, 110, 0.55) 50%, rgba(5, 35, 10, 0.6) 70%, transparent);
+    animation: fx-wash 2.6s ease-in-out infinite;
+}
+
+.theme-venom .dagger {
+    opacity: 0;
+    animation: fx-sweep 1.4s cubic-bezier(0.8, 0, 0.2, 1) infinite;
+}
+
+.theme-venom .dagger:nth-child(2) { animation-delay: 0.7s; }
+
+.theme-venom .dagger::before {
+    left: 0;
+    top: 33%;
+    width: 26px;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #ffffff);
+    box-shadow: 0 0 0 1px rgba(0, 40, 0, 0.45), 0 0 7px 1px rgba(125, 255, 74, 0.95);
+}
+
+.theme-venom .dagger::after {
+    left: 26px;
+    top: calc(33% - 3.5px);
+    border-left: 10px solid #ffffff;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    filter: drop-shadow(0 0 3px rgba(125, 255, 74, 0.95));
+}
+
+.theme-venom .dagger:nth-child(2)::before { top: 64%; }
+.theme-venom .dagger:nth-child(2)::after { top: calc(64% - 3.5px); }
+
+.theme-venom .drip {
+    inset: auto;
+    bottom: 1px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #f8ffe8, #c8ff6a 50%, #3fae12);
+    box-shadow: 0 0 0 1.5px rgba(10, 50, 5, 0.7), 0 0 9px #7dff3a;
+    opacity: 0;
+    animation: fx-rise 2.2s ease-in infinite;
+}
+
+.theme-venom .drip:nth-child(3) { left: 8%; }
+.theme-venom .drip:nth-child(4) { left: 24%; animation-delay: 0.37s; }
+.theme-venom .drip:nth-child(5) { left: 40%; animation-delay: 0.73s; }
+.theme-venom .drip:nth-child(6) { left: 56%; animation-delay: 1.1s; }
+.theme-venom .drip:nth-child(7) { left: 72%; animation-delay: 1.47s; }
+.theme-venom .drip:nth-child(8) { left: 88%; animation-delay: 1.83s; }
+
+/* Ranger: a volley of arrows flying across. */
+.theme-volley .arrow {
+    opacity: 0;
+    animation: fx-fly 1.5s linear infinite;
+}
+
+.theme-volley .arrow:nth-child(1) { --y: 26%; }
+.theme-volley .arrow:nth-child(2) { --y: 48%; animation-delay: 0.38s; }
+.theme-volley .arrow:nth-child(3) { --y: 68%; animation-delay: 0.75s; }
+.theme-volley .arrow:nth-child(4) { --y: 84%; animation-delay: 1.13s; }
+
+.theme-volley .arrow::before {
+    left: 0;
+    top: var(--y, 50%);
+    width: 26px;
+    height: 2px;
+    background: linear-gradient(90deg, rgba(200, 255, 170, 0), #efffe4);
+    box-shadow: 0 0 5px rgba(150, 240, 120, 0.9);
+}
+
+.theme-volley .arrow::after {
+    left: 26px;
+    top: calc(var(--y, 50%) - 3px);
+    border-left: 8px solid #efffe4;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+}
+
+/* Sorcerer: fire and ice, embers rising on the warm left, frost shards glinting on the cold right. */
+.theme-fire-ice::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(255, 110, 40, 0.45), rgba(255, 110, 40, 0) 45%, rgba(90, 200, 255, 0) 55%, rgba(90, 200, 255, 0.45));
+    animation: fx-breathe 2.6s ease-in-out infinite;
+}
+
+.theme-fire-ice .ember {
+    inset: auto;
+    bottom: 1px;
+    width: 5px;
+    height: 7px;
+    border-radius: 50% 50% 40% 40%;
+    background: radial-gradient(circle at 50% 70%, #fffbe0, #ffb04a 55%, #ff4d1a);
+    box-shadow: 0 0 8px #ff7a2a;
+    opacity: 0;
+    animation: fx-ember 1.8s ease-out infinite;
+}
+
+.theme-fire-ice .ember:nth-child(1) { left: 4%; }
+.theme-fire-ice .ember:nth-child(2) { left: 12%; animation-delay: 0.3s; }
+.theme-fire-ice .ember:nth-child(3) { left: 20%; animation-delay: 0.6s; }
+.theme-fire-ice .ember:nth-child(4) { left: 28%; animation-delay: 0.9s; }
+.theme-fire-ice .ember:nth-child(5) { left: 36%; animation-delay: 1.2s; }
+.theme-fire-ice .ember:nth-child(6) { left: 44%; animation-delay: 1.5s; }
+
+.theme-fire-ice .shard {
+    inset: auto;
+    width: 8px;
+    height: 8px;
+    margin-top: -4px;
+    background: linear-gradient(135deg, #ffffff, #a8ecff 55%, #3aa0ff);
+    box-shadow: 0 0 10px #6cd0ff;
+    opacity: 0;
+    animation: fx-glint 2s ease-in-out infinite;
+}
+
+.theme-fire-ice .shard:nth-child(7) { left: 56%; top: 38%; }
+.theme-fire-ice .shard:nth-child(8) { left: 68%; top: 64%; animation-delay: 0.5s; }
+.theme-fire-ice .shard:nth-child(9) { left: 80%; top: 42%; animation-delay: 1s; }
+.theme-fire-ice .shard:nth-child(10) { left: 92%; top: 60%; animation-delay: 1.5s; }
+
+/* Elementalist: spirits drifting across, bobbing, with trails, in turquoise and violet. */
+.theme-spirits .wisp {
+    opacity: 0;
+    animation: fx-drift 3.2s linear infinite;
+}
+
+.theme-spirits .wisp:nth-child(2) { animation-delay: 0.8s; }
+.theme-spirits .wisp:nth-child(3) { animation-delay: 1.6s; }
+.theme-spirits .wisp:nth-child(4) { animation-delay: 2.4s; }
+
+.theme-spirits .wisp::before {
+    left: 0;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    margin-top: -4px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #ffffff, #8ff8ff 45%, rgba(127, 246, 255, 0) 72%);
+    box-shadow: 0 0 10px 3px rgba(110, 230, 255, 0.75);
+    animation: fx-bob 1.1s ease-in-out infinite alternate;
+}
+
+.theme-spirits .wisp::after {
+    left: -22px;
+    top: 50%;
+    width: 22px;
+    height: 2px;
+    margin-top: -1px;
+    background: linear-gradient(90deg, transparent, rgba(160, 240, 255, 0.75));
+    animation: fx-bob 1.1s ease-in-out infinite alternate;
+}
+
+.theme-spirits .wisp:nth-child(even)::before {
+    background: radial-gradient(circle, #ffffff, #d5b3ff 45%, rgba(201, 162, 255, 0) 72%);
+    box-shadow: 0 0 10px 3px rgba(180, 140, 255, 0.75);
+    animation-duration: 0.9s;
+}
+
+.theme-spirits .wisp:nth-child(even)::after {
+    background: linear-gradient(90deg, transparent, rgba(205, 175, 255, 0.75));
+    animation-duration: 0.9s;
+}
+
+/* Cleric: holy light, white rays breathing and sparkles twinkling. */
+.theme-radiance .ray {
+    inset: auto;
+    top: 0;
+    bottom: 0;
+    width: 16%;
+    background: linear-gradient(90deg, transparent, rgba(255, 252, 235, 0.7), transparent);
+    opacity: 0;
+    animation: fx-pulse 2.4s ease-in-out infinite;
+}
+
+.theme-radiance .ray:nth-child(1) { left: 8%; }
+.theme-radiance .ray:nth-child(2) { left: 42%; animation-delay: 0.8s; }
+.theme-radiance .ray:nth-child(3) { left: 74%; animation-delay: 1.6s; }
+
+.theme-radiance .sparkle {
+    inset: auto;
+    width: 10px;
+    height: 10px;
+    opacity: 0;
+    animation: fx-twinkle 2s ease-in-out infinite;
+}
+
+.theme-radiance .sparkle::before,
+.theme-radiance .sparkle::after {
+    background: #ffffff;
+    border-radius: 1px;
+    box-shadow: 0 0 6px #ffe08a, 0 0 2px #fff6cc;
+}
+
+.theme-radiance .sparkle::before { left: 4px; top: 0; width: 2px; height: 10px; }
+.theme-radiance .sparkle::after { left: 0; top: 4px; width: 10px; height: 2px; }
+.theme-radiance .sparkle:nth-child(4) { left: 18%; top: 2px; }
+.theme-radiance .sparkle:nth-child(5) { left: 34%; top: 12px; animation-delay: 0.4s; }
+.theme-radiance .sparkle:nth-child(6) { left: 52%; top: 3px; animation-delay: 0.8s; }
+.theme-radiance .sparkle:nth-child(7) { left: 70%; top: 11px; animation-delay: 1.2s; }
+.theme-radiance .sparkle:nth-child(8) { left: 88%; top: 5px; animation-delay: 1.6s; }
+
+/* Chanter: mantra rings spreading out in turn. */
+.theme-mantra .ring {
+    inset: auto;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    border-radius: 50%;
+    border: 2px solid #fff0d0;
+    box-shadow: 0 0 8px rgba(255, 180, 80, 0.95), inset 0 0 5px rgba(255, 180, 80, 0.7);
+    opacity: 0;
+    animation: fx-ripple 2.4s ease-out infinite;
+}
+
+.theme-mantra .ring:nth-child(1) { left: 15%; }
+.theme-mantra .ring:nth-child(2) { left: 38%; animation-delay: 0.6s; }
+.theme-mantra .ring:nth-child(3) { left: 62%; animation-delay: 1.2s; }
+.theme-mantra .ring:nth-child(4) { left: 85%; animation-delay: 1.8s; }
+
+/* Brawler: punches landing at the bar's tip, a burst and a shockwave, and the bar flushing red with each. */
+/* A one-two: two hits close together, then a pause. Inside the tip, so the whole burst shows. */
+.theme-impact .burst {
+    inset: auto;
+    right: 0;
+    top: 50%;
+    width: 30px;
+    height: 30px;
+    margin-top: -15px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #ffffff, #ffd9c8 20%, rgba(255, 110, 70, 0.9) 42%, rgba(255, 60, 40, 0) 70%);
+    opacity: 0;
+    animation: fx-punch 1.4s ease-out infinite;
+}
+
+.theme-impact .shock {
+    inset: auto;
+    right: 4px;
+    top: 50%;
+    width: 22px;
+    height: 22px;
+    margin-top: -11px;
+    border-radius: 50%;
+    border: 2.5px solid #ffe3d8;
+    box-shadow: 0 0 10px rgba(255, 90, 70, 0.95);
+    opacity: 0;
+    animation: fx-shock 1.4s ease-out infinite;
+}
+
+.theme-impact .flush {
+    background: linear-gradient(90deg, rgba(255, 70, 50, 0), rgba(255, 100, 70, 0.6));
+    opacity: 0;
+    animation: fx-hit 1.4s ease-out infinite;
 }
 
 /* A row that just overtook another flashes once as it glides up (js/overlay-fx.js sets data-overtook). */
@@ -504,15 +893,135 @@ button {
     95% { opacity: 0; }
 }
 
+/* A piece crossing the bar from left to right, then resting until its next turn. */
+@keyframes fx-sweep {
+    0% { transform: translateX(-4%); opacity: 0; }
+    5% { opacity: 1; }
+    30% { transform: translateX(104%); opacity: 0; }
+    100% { transform: translateX(104%); opacity: 0; }
+}
+
+@keyframes fx-fly {
+    0% { transform: translateX(-6%); opacity: 0; }
+    8% { opacity: 1; }
+    85% { opacity: 1; }
+    100% { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes fx-drift {
+    0% { transform: translateX(-3%); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes fx-bob {
+    from { transform: translateY(-6px); }
+    to { transform: translateY(6px); }
+}
+
+/* A 35%-wide shimmer from just off the bar's left edge to just past its right. */
+@keyframes fx-shimmer {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(300%); }
+}
+
+/* The 45%-wide poison sheen, the same way. */
+@keyframes fx-wash {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(230%); }
+}
+
+@keyframes fx-pulse {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
+}
+
+@keyframes fx-breathe {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+}
+
+@keyframes fx-facet {
+    0%, 100% { transform: rotate(45deg) scale(0.5); opacity: 0; }
+    50% { transform: rotate(45deg) scale(1); opacity: 1; }
+}
+
+@keyframes fx-rise {
+    0% { transform: translateY(0) scale(0.5); opacity: 0; }
+    20% { opacity: 1; }
+    100% { transform: translateY(-20px) scale(1.15); opacity: 0; }
+}
+
+@keyframes fx-ember {
+    0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+    15% { opacity: 1; }
+    60% { transform: translate(2px, -11px) scale(1); }
+    100% { transform: translate(-1px, -21px) scale(0.4); opacity: 0; }
+}
+
+@keyframes fx-glint {
+    0%, 100% { transform: rotate(45deg) scale(0); opacity: 0; }
+    40% { transform: rotate(45deg) scale(1.15); opacity: 1; }
+    60% { transform: rotate(45deg) scale(0.85); opacity: 0.85; }
+}
+
+@keyframes fx-twinkle {
+    0%, 100% { transform: scale(0.2) rotate(0deg); opacity: 0; }
+    50% { transform: scale(1) rotate(45deg); opacity: 1; }
+}
+
+@keyframes fx-ripple {
+    0% { transform: scale(0.2); opacity: 0; }
+    15% { opacity: 1; }
+    100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* Brawler's one-two: hits at 0% and 24% of the cycle. */
+@keyframes fx-punch {
+    0% { transform: scale(0.3); opacity: 0; }
+    4% { transform: scale(1.1); opacity: 1; }
+    16% { transform: scale(0.9); opacity: 0; }
+    24% { transform: scale(0.3); opacity: 0; }
+    28% { transform: scale(1.3); opacity: 1; }
+    44% { transform: scale(0.95); opacity: 0; }
+    100% { opacity: 0; }
+}
+
+@keyframes fx-shock {
+    0% { transform: scale(0.4); opacity: 0; }
+    4% { opacity: 1; }
+    20% { transform: scale(2.4); opacity: 0; }
+    24% { transform: scale(0.4); opacity: 0; }
+    28% { opacity: 1; }
+    54% { transform: scale(3.2); opacity: 0; }
+    100% { opacity: 0; }
+}
+
+@keyframes fx-hit {
+    0% { opacity: 0; }
+    4% { opacity: 0.8; }
+    18% { opacity: 0; }
+    28% { opacity: 1; }
+    50% { opacity: 0; }
+    100% { opacity: 0; }
+}
+
 @keyframes overtake-flash {
     from { opacity: 1; }
     to { opacity: 0; }
 }
 
-/* Windows' "reduce motion": the lightning stays, still; no strikes, flicker or flashes (and no glide, in the script). */
+/* Windows' "reduce motion": the effects' moving pieces and shimmers go, the lightning stays still, no flashes
+   (and no glide, in the script). */
 @media (prefers-reduced-motion: reduce) {
+    .bar-fx i,
+    .bar-fx::before,
+    .bar-fx::after {
+        display: none;
+    }
+
     .fx .bolt polyline,
-    .fx .row.me .fill::before,
     .fx .row[data-overtook]::after {
         animation: none;
     }

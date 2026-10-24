@@ -203,9 +203,10 @@ public sealed class SettingsTests : IDisposable
         var loaded = store.Load().Settings;
         Assert.False(loaded.Appearance.ShowDeaths);
         Assert.True(loaded.Appearance.BarEffects);
+        Assert.True(loaded.Appearance.EffectsOnEveryBar);
         Assert.True(loaded.Appearance.ShowCombatPower);
 
-        var plain = loaded with { Appearance = loaded.Appearance with { BarEffects = false, ShowCombatPower = false } };
+        var plain = loaded with { Appearance = loaded.Appearance with { BarEffects = false, EffectsOnEveryBar = false, ShowCombatPower = false } };
         store.Save(plain);
         Assert.Equal(plain, store.Load().Settings);
     }

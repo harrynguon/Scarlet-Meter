@@ -1,0 +1,29 @@
+@*
+    The animated effect inside a player's bar, by class (BarEffectThemes): a box filling the bar, clipped to it,
+    holding the theme's pieces as <i> elements that app.css places, times and animates. The lightning theme draws
+    two zigzags as SVG instead. Purely decorative: hidden from screen readers, never clickable.
+*@
+<span class="bar-fx theme-@Theme" aria-hidden="true">
+    @if (Theme == BarEffectThemes.Default)
+    {
+        @* Two zigzags across the bar, stretched to its width. *@
+        <svg class="bolt" viewBox="0 0 120 24" preserveAspectRatio="none">
+            <polyline class="bolt-a" points="0,13 9,8 16,15 25,6 33,14 41,9 48,17 57,7 66,13 74,5 82,15 91,9 99,16 108,8 120,12" />
+            <polyline class="bolt-b" points="0,10 8,16 17,9 26,17 35,8 44,15 52,6 61,16 70,10 79,18 88,7 97,14 106,9 114,16 120,11" />
+        </svg>
+    }
+    else
+    {
+        @foreach (var piece in BarEffectThemes.Pieces(Theme))
+        {
+            <i class="@piece"></i>
+        }
+    }
+</span>
+
+@code {
+    /// <summary>The player's class id; it picks the theme.</summary>
+    [Parameter] public int ClassId { get; set; }
+
+    private string Theme => BarEffectThemes.For(ClassId);
+}

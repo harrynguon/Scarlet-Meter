@@ -136,11 +136,15 @@ public sealed record AppearanceSettings
     public bool SkillIcons { get; init; } = true;
 
     /// <summary>
-    /// The meter's effects: a shine on every bar, lightning on the player's own bar, and rows that glide (with a
-    /// flash) when one player overtakes another. Off gives plain bars and instant reordering; the system's
-    /// "reduce motion" setting turns the motion off either way.
+    /// The meter's effects: a shine on every bar, each class's animated effect on the bars (BarEffectThemes), and
+    /// rows that glide (with a flash) when one player overtakes another. Off gives plain bars and instant
+    /// reordering; the system's "reduce motion" setting turns the motion off either way.
     /// </summary>
     public bool BarEffects { get; init; } = true;
+
+    /// <summary>With <see cref="BarEffects"/> on: every player's bar carries its class's effect (the others' fainter
+    /// than the player's own), or, off, only the player's own bar does.</summary>
+    public bool EffectsOnEveryBar { get; init; } = true;
 
     /// <summary>Show each player's combat power beside their name, when the game has sent it.</summary>
     public bool ShowCombatPower { get; init; } = true;

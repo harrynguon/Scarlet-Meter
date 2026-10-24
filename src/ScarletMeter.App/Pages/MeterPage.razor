@@ -1,8 +1,9 @@
 @*
     The overlay: a header (fight state and duration, buttons), the target's card (name, HP, its bar and the
     "Kill in" estimate), totals, one row per player and the notices below. With "Bar effects" on (.fx), the bars
-    shine, the player's own bar carries animated lightning, and js/overlay-fx.js glides rows to their new places
-    when the order changes.
+    shine, each bar carries its class's animated effect (BarEffect; the player's own at full strength, the others
+    fainter, or only the player's when "Effects on every bar" is off), and js/overlay-fx.js glides rows to their
+    new places when the order changes.
 *@
 <div class="overlay @(appearance.BarEffects ? "fx" : "")" data-window="overlay" style="@PanelStyle">
     <header class="ov-header" @onmousedown="OnHeaderMouseDown">
@@ -70,13 +71,9 @@
         {
             <li class="row @(player.IsUser ? "me" : "")" @key="player.Id" title="Open this player's breakdown" @onclick="() => Windows.OpenPlayerDetails(player.Id)">
                 <div class="fill @FillClass(player)" style="width:@Compact.Percent(BarPercent(player))">
-                    @if (player.IsUser && appearance.BarEffects)
+                    @if (appearance.BarEffects && (player.IsUser || appearance.EffectsOnEveryBar))
                     {
-                        @* Two zigzags across the bar, stretched to its width; app.css runs them as lightning. *@
-                        <svg class="bolt" viewBox="0 0 120 24" preserveAspectRatio="none" aria-hidden="true">
-                            <polyline class="bolt-a" points="0,13 9,8 16,15 25,6 33,14 41,9 48,17 57,7 66,13 74,5 82,15 91,9 99,16 108,8 120,12" />
-                            <polyline class="bolt-b" points="0,10 8,16 17,9 26,17 35,8 44,15 52,6 61,16 70,10 79,18 88,7 97,14 106,9 114,16 120,11" />
-                        </svg>
+                        <BarEffect ClassId="player.ClassId" />
                     }
                 </div>
                 @if (WebAssetHosts.ClassIconUrl(player.ClassId) is { } icon)
