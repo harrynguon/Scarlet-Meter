@@ -7,6 +7,8 @@ description: Build Scarlet Meter and check its UI without the game - start the r
 
 UI Automation cannot see inside the WebView2 pages, so `scripts/Smoke-Meter.ps1` drives them through the Chrome DevTools Protocol instead. A rendered window never validates combat; say so when reporting.
 
+**Ask the player first.** A smoke run opens the real meter on the player's desktop: the always-on-top overlay, then details, history and settings windows that take focus as they open. Over a running game that is a stream of popups, and it once got the player killed in AION 2. Before any run that opens windows or moves the mouse (this skill, a `--demo` launch, a screenshot tour, opening Explorer), ask in chat whether they are playing, and wait for a go-ahead. Builds and tests that open no window need no ask, but mention that a long build can cause lag in game.
+
 ## 1. Find the SDK and build
 
 The .NET 10 SDK may not be on PATH. Check `dotnet --list-sdks`; if there is no 10.x, find a `dotnet.exe` that lists one (ask the player if none is found) and set, as absolute paths, for the session:

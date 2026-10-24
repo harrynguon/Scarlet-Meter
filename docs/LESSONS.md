@@ -56,6 +56,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**UI checks opened windows over the player's game** (2026-10-24).
+- What: back-to-back smoke runs (a screenshot tour, the share-bar checks) started the meter on Harry's desktop; its always-on-top overlay and the details, history and settings windows popped up and took focus while he was in AION 2, and he died in game.
+- Why: smoke runs were treated as local and harmless, without asking whether the PC was in use.
+- Guard: AGENTS.md "Review and merge" and the scarlet-smoke skill: ask before any check that opens windows or uses the mouse. Builds and tests without windows need no ask.
+
 **A reused branch would have built old code** (Codex and the audit on #16).
 - What: Update-Meter.ps1 reused an existing `update/upstream-<tag>` branch as it was, so a run after new commits on main would have zipped the branch's older source; and it read the current release from `upstream/`'s files, which a `git pull` leaves behind, then claimed a branch it had just deleted.
 - Why: the first run was tested from a fresh state only; reuse and an out-of-date submodule were not.
