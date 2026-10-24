@@ -99,6 +99,37 @@ public sealed class SettingsTests : IDisposable
         Assert.True(result.Settings.Fight.BossOnlyCapture);
     }
 
+    // Every on/off setting in every section survives a save and a load when flipped from its default, so a switch
+    // that is never written ([JsonIgnore], no setter) fails here, not in the player's hands (LESSONS, "Switches that
+    // were never saved").
+    [Fact]
+    public void EveryOnOffSettingSurvivesASave()
+    {
+        var store = NewStore();
+        var settings = new MeterSettings();
+        var flipped = new List<(PropertyInfo Section, PropertyInfo Flag, bool Value)>();
+        foreach (var section in typeof(MeterSettings).GetProperties()
+                     .Where(p => p.CanWrite && p.PropertyType.Namespace == typeof(MeterSettings).Namespace && p.PropertyType.IsClass))
+        {
+            var value = Activator.CreateInstance(section.PropertyType)!;
+            foreach (var flag in section.PropertyType.GetProperties().Where(p => p.PropertyType == typeof(bool)))
+            {
+                Assert.True(flag.CanWrite, $"{section.Name}.{flag.Name} has no setter, so it is never loaded");
+                var on = !(bool)flag.GetValue(value)!;
+                flag.SetValue(value, on);
+                flipped.Add((section, flag, on));
+            }
+            section.SetValue(settings, value);
+        }
+        Assert.Contains(flipped, f => f.Flag.Name == nameof(AlertSettings.HideDuringBossFights));
+        Assert.Contains(flipped, f => f.Flag.Name == nameof(AppearanceSettings.BarEffects));
+
+        store.Save(settings);
+        var loaded = store.Load().Settings;
+        foreach (var (section, flag, value) in flipped)
+            Assert.True(value == (bool)flag.GetValue(section.GetValue(loaded))!, $"{section.Name}.{flag.Name} was not saved");
+    }
+
     // "Hide during boss fights" is on for a file from before it, and turning it off survives a save and a load.
     [Fact]
     public void HidingDuringBossFightsStartsOnAndATurnedOffChoiceIsSaved()
