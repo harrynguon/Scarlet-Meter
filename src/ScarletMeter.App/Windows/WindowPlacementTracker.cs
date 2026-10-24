@@ -8,20 +8,23 @@ namespace ScarletMeter.App.Windows;
 /// Remembers a window's position and size in settings. <see cref="Restore"/> runs before the window is
 /// shown and ignores a saved placement that would land off every monitor (one was unplugged or the layout
 /// changed; see <see cref="ScreenPlacement"/>); moves and resizes are saved shortly after they stop, and once
-/// more when the window closes. Only the normal (not minimized or maximized) state is saved.
+/// more when the window closes. Only the normal (not minimized or maximized) state is saved, and what is saved is
+/// <c>bounds</c>: the window's own placement, or the player's where the window sizes itself (the overlay).
 /// </summary>
 internal sealed class WindowPlacementTracker
 {
     private readonly Window window;
     private readonly string key;
     private readonly SettingsService settings;
+    private readonly Func<Rect> bounds;
     private readonly DispatcherTimer saveTimer;
 
-    public WindowPlacementTracker(Window window, string key, SettingsService settings)
+    public WindowPlacementTracker(Window window, string key, SettingsService settings, Func<Rect> bounds)
     {
         this.window = window;
         this.key = key;
         this.settings = settings;
+        this.bounds = bounds;
         saveTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(400), DispatcherPriority.Background, (_, _) => Save(), window.Dispatcher);
         saveTimer.Stop();
         window.LocationChanged += (_, _) => Schedule();
@@ -52,7 +55,8 @@ internal sealed class WindowPlacementTracker
     {
         saveTimer.Stop();
         if (!window.IsLoaded || window.WindowState != WindowState.Normal) return;
-        var placement = new WindowPlacement(window.Left, window.Top, window.ActualWidth, window.ActualHeight);
+        var b = bounds();
+        var placement = new WindowPlacement(b.X, b.Y, b.Width, b.Height);
         settings.Update(s => s.Windows.TryGetValue(key, out var old) && old == placement
             ? s
             : s with { Windows = new Dictionary<string, WindowPlacement>(s.Windows) { [key] = placement } });

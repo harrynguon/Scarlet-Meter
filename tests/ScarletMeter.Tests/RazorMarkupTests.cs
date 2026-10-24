@@ -21,8 +21,8 @@ public sealed partial class RazorMarkupTests
         Assert.Empty(Offending(line => RelativeScriptPath().IsMatch(line)));
 
     // Every <script> in index.html (whatever its attributes' order) loads one of the app's own files, which exists,
-    // and none is inline; the overlay's effects script reaches nothing outside the page: no requests, no .NET
-    // interop, no eval.
+    // and none is inline; the overlay's effects and size scripts reach nothing outside the page: no requests, no
+    // calls into .NET, no eval.
     [Fact]
     public void ThePagesLoadOnlyTheAppsOwnScripts()
     {
@@ -38,6 +38,7 @@ public sealed partial class RazorMarkupTests
             sources.Add(src.Groups[1].Value);
         }
         Assert.Contains("js/overlay-fx.js", sources);
+        Assert.Contains("js/overlay-size.js", sources);
         foreach (var source in sources)
         {
             Assert.DoesNotContain(":", source);
@@ -45,9 +46,30 @@ public sealed partial class RazorMarkupTests
             if (!source.StartsWith("_framework/", StringComparison.Ordinal))
                 Assert.True(File.Exists(Path.Combine(wwwroot, source.Replace('/', Path.DirectorySeparatorChar))), source);
         }
-        var effects = File.ReadAllText(Path.Combine(wwwroot, "js", "overlay-fx.js"));
-        foreach (var reach in new[] { "fetch(", "XMLHttpRequest", "WebSocket", "sendBeacon", "DotNet.", "eval(", "Function(" })
-            Assert.DoesNotContain(reach, effects);
+        foreach (var script in new[] { "overlay-fx.js", "overlay-size.js" })
+        {
+            var text = File.ReadAllText(Path.Combine(wwwroot, "js", script));
+            foreach (var reach in new[] { "fetch(", "XMLHttpRequest", "WebSocket", "sendBeacon", "DotNet.", "eval(", "Function(" })
+                Assert.DoesNotContain(reach, text);
+        }
+    }
+
+    // Nothing in the overlay scrolls: the page reports its content height after each render and the window grows to
+    // show all of it (Windows/OverlayFit), saving the player's own placement rather than the grown one. Source-text
+    // guards: the WPF window and the WebView have no test host here; OverlayFitTests cover the placement rules.
+    [Fact]
+    public void TheOverlayWindowGrowsToItsContent()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        var page = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
+        Assert.Contains("await JS.InvokeAsync<double>(\"scarletOverlay.contentHeight\"", page);
+        Assert.Contains("Windows.FitOverlayToContent(height);", page);
+        Assert.Contains("contentHeight()", File.ReadAllText(Path.Combine(app, "wwwroot", "js", "overlay-size.js")));
+        var overlay = File.ReadAllText(Path.Combine(app, "Windows", "OverlayWindow.cs"));
+        Assert.Contains("OverlayFit.For(playerTop, playerHeight, contentHeight, ScreenPlacement.WorkAreaOf(this))", overlay);
+        Assert.Matches(@"protected override Rect PlacementBounds =>\s*double\.IsNaN\(playerTop\) \? base\.PlacementBounds : new Rect\(Left, playerTop, ActualWidth, playerHeight\);", overlay);
+        Assert.Contains("var b = bounds();", File.ReadAllText(Path.Combine(app, "Windows", "WindowPlacementTracker.cs")));
+        Assert.Contains("() => PlacementBounds", File.ReadAllText(Path.Combine(app, "Windows", "ScarletWindow.cs")));
     }
 
     // A player's row reads DPS, then total damage, then share (Harry reads the DPS first), each in its own
@@ -90,10 +112,11 @@ public sealed partial class RazorMarkupTests
         Assert.Equal(3, Regex.Matches(windows, @"\bRestoreForAlert\(\)").Count); // the two calls and its definition
     }
 
-    // The overlay's panel is only as tall as its content, up to the window, so the room the notices leave in a boss
-    // fight is see-through rather than empty panel; the rows take only their own height and scroll when the window is
-    // too short, giving up their space before the expanded strip; and the picture is laid out against the window, so
-    // it does not rescale as the panel changes height. Measured in headless Edge with the real styles (WORKLOG).
+    // The overlay's panel is only as tall as its content, so the room the notices leave in a boss fight is see-through
+    // rather than empty panel; nothing in it scrolls (Harry: "i dont like scrolling"): the rows and the notice strip
+    // always take their full height, the expanded strip has no cap, and the window grows instead
+    // (TheOverlayWindowGrowsToItsContent); and the picture is laid out against the window, so it does not rescale as
+    // the panel changes height.
     [Fact]
     public void TheOverlayPanelFitsItsContent()
     {
@@ -110,19 +133,37 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?m)^\s*height:\s*100%;", Block(css, "html, body"));
         // No other rule for the panel itself (.overlay.fx, .overlay[...]; not its descendants) gives it a height.
         Assert.DoesNotMatch(@"(?m)^\.overlay[.:\[][^\s{,]*\s*\{[^}]*(?<![-\w])height\s*:", css.Replace(".overlay::before {", ".before-layer {"));
-        var rows = Block(css, ".rows");
-        Assert.Matches(@"(?m)^\s*min-height:\s*0;", rows);
         Assert.Matches(@"var\(--panel-image, none\) center / cover no-repeat fixed;", Block(css, ".overlay::before"));
-        // In a short window the rows give up their space before the expanded strip (a heavy shrink weight, since
-        // shrinking is weighted by size), and the strip can still shrink to what is left, so "Show less" stays inside
-        // the panel: a strip that cannot shrink ran past the panel's bottom and clipped it (Codex on #26).
-        var weight = Regex.Match(rows, @"(?m)^\s*flex:\s*0 (?<shrink>\d+) auto;");
-        Assert.True(weight.Success && int.Parse(weight.Groups["shrink"].Value) >= 100,
-            ".rows must take its own height and give up its space before the expanded strip (flex: 0 <100 or more> auto)");
-        foreach (var strip in new[] { Block(alerts, ".alerts"), Block(alerts, ".alerts.expanded") })
-            Assert.DoesNotMatch(@"(?m)^\s*(flex-shrink:\s*0|flex:\s*none)", strip);
+        // The rows and the strip never shrink, and no rule in the overlay's styles makes anything scroll: the rows'
+        // overflow is clipped (a gliding row cannot stretch the measured height), the expanded strip has no cap.
+        var rows = Block(css, ".rows");
+        Assert.Matches(@"(?m)^\s*flex:\s*none;", rows);
+        Assert.Matches(@"(?m)^\s*overflow:\s*clip;", rows);
+        Assert.Matches(@"(?m)^\s*flex:\s*none;", Block(alerts, ".alerts"));
+        Assert.DoesNotMatch(@"(?m)^\s*max-height:", Block(alerts, ".alerts.expanded"));
+        Assert.DoesNotMatch(@"overflow(-[xy])?:\s*(auto|scroll)", alerts);
+        Assert.DoesNotMatch(@"position:\s*sticky", alerts);
+        var overlayRules = Regex.Matches(css, @"(?m)^(?<selector>\.(overlay|rows|row|target|ov-)[^{]*)\{(?<body>[^}]*)\}");
+        Assert.NotEmpty(overlayRules);
+        Assert.All(overlayRules, rule => Assert.DoesNotMatch(@"overflow(-[xy])?:\s*(auto|scroll)", rule.Groups["body"].Value));
         // A margin under whatever ends the panel (the last row, or the notices), as above the header and card.
         Assert.Matches(@"(?m)^\s*padding-bottom:\s*[1-9]\d*px;", overlay);
+    }
+
+    // An upcoming event's notice uses its own washed-out gold (--soon), never the bright "you" gold (--me), which
+    // Harry found too loud in the strip; an open entry keeps its teal.
+    [Fact]
+    public void UpcomingNoticesUseTheSoftGold()
+    {
+        var styles = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css");
+        var app = File.ReadAllText(Path.Combine(styles, "app.css"));
+        var alerts = File.ReadAllText(Path.Combine(styles, "alerts.css"));
+        Assert.Matches(@"(?m)^\s*--soon:\s*#dcc68c;", app);
+        Assert.DoesNotContain("var(--me)", alerts, StringComparison.Ordinal);
+        Assert.DoesNotContain("255, 183, 3", alerts, StringComparison.Ordinal);
+        Assert.Matches(@"(?m)^\.alert\.soon \.alert-dot \{[^}]*background:\s*var\(--soon\);", alerts);
+        Assert.Matches(@"(?m)^\.alert-progress \{[^}]*background:\s*var\(--soon\);", alerts);
+        Assert.Matches(@"(?m)^\.alert\.open \.alert-progress \{[^}]*background:\s*var\(--good\);", alerts);
     }
 
     // The player's own row is marked by a ring round the row, never by a stripe on the bar (a white inset at the

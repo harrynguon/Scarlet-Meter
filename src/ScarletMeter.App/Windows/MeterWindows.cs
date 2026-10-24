@@ -60,6 +60,12 @@ public interface IMeterWindows
     /// for an event waits until they do. Cheap to call on every refresh.
     /// </summary>
     void HoldAlerts(bool held);
+
+    /// <summary>
+    /// The overlay page's content height (CSS pixels): nothing in the meter scrolls, so the overlay window grows to
+    /// show all of it and returns to the player's own size when it fits (<see cref="OverlayFit"/>).
+    /// </summary>
+    void FitOverlayToContent(double contentHeight);
 }
 
 /// <summary>
@@ -171,6 +177,11 @@ public sealed class MeterWindows : IMeterWindows
     }
 
     public void BeginOverlayDrag() => overlay?.BeginDrag();
+
+    public void FitOverlayToContent(double contentHeight)
+    {
+        if (!closing) overlay?.FitToContent(contentHeight);
+    }
 
     public void MinimizeOverlay()
     {

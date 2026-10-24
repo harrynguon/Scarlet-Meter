@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 using ScarletMeter.App.Alerts;
 using ScarletMeter.App.Combat;
 using ScarletMeter.App.Formatting;
@@ -40,6 +41,8 @@ public partial class MeterPage : IAsyncDisposable
     private int? ping;
     private Task? refreshLoop;
     private bool refreshFailing;
+    // The content height last sent to the window, which grows to show all of it (nothing in the meter scrolls).
+    private double reportedHeight = double.NaN;
 
     [Inject]
     private ICombatEngine Engine { get; set; } = default!;
@@ -63,6 +66,10 @@ public partial class MeterPage : IAsyncDisposable
     // The "newer RATmeter release" line above the alert strip.
     [Inject]
     private UpdateNotice Updates { get; set; } = default!;
+
+    // Reads the panel's content height after each render (js/overlay-size.js).
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
 
     // Upstream's rule: hide players the game has not named unless they already matter. Highest damage first.
     private IEnumerable<PlayerRow> Visible => snapshot.Players
@@ -116,6 +123,24 @@ public partial class MeterPage : IAsyncDisposable
         Alerts.Changed += OnAlertsChanged;
         Updates.Changed += OnUpdateNoticeChanged;
         refreshLoop = RefreshLoopAsync();
+    }
+
+    // After each render, the panel's content height goes to the window when it changed, so the window grows to show
+    // all of it or returns to the player's size (nothing in the meter scrolls; Windows/OverlayFit). The script may not
+    // be loaded for the first render, and the page may be closing; the next render tries again.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (stopping.IsCancellationRequested) return;
+        try
+        {
+            var height = await JS.InvokeAsync<double>("scarletOverlay.contentHeight", stopping.Token);
+            if (stopping.IsCancellationRequested || Math.Abs(height - reportedHeight) < 0.5) return;
+            reportedHeight = height;
+            Windows.FitOverlayToContent(height);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or OperationCanceledException or ObjectDisposedException)
+        {
+        }
     }
 
     private void OnAlertsChanged(object? sender, EventArgs e) => _ = RenderAsync();

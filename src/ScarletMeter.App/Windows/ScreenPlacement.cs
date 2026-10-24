@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media;
 
 namespace ScarletMeter.App.Windows;
 
@@ -26,6 +28,22 @@ public static class ScreenPlacement
             var overlap = Rect.Intersect(monitor, placement);
             return !overlap.IsEmpty && overlap.Width >= MinVisibleWidth && overlap.Height >= MinVisibleHeight;
         });
+
+    /// <summary>
+    /// The work area (the monitor less the taskbar) of the monitor showing <paramref name="window"/>, in
+    /// device-independent pixels at that window's DPI; the primary monitor's when it cannot be determined.
+    /// </summary>
+    public static Rect WorkAreaOf(Window window)
+    {
+        var handle = new WindowInteropHelper(window).Handle;
+        var monitor = handle == IntPtr.Zero ? IntPtr.Zero : NativeMethods.MonitorFromWindow(handle, NativeMethods.MonitorDefaultToNearest);
+        var info = new NativeMethods.MonitorInfo { Size = Marshal.SizeOf<NativeMethods.MonitorInfo>() };
+        if (monitor == IntPtr.Zero || !NativeMethods.GetMonitorInfo(monitor, ref info)) return SystemParameters.WorkArea;
+        var dpi = VisualTreeHelper.GetDpi(window);
+        var work = info.Work;
+        return new Rect(work.Left / dpi.DpiScaleX, work.Top / dpi.DpiScaleY,
+            (work.Right - work.Left) / dpi.DpiScaleX, (work.Bottom - work.Top) / dpi.DpiScaleY);
+    }
 
     /// <summary>
     /// The monitors' rectangles in device-independent pixels at the system DPI, the units of

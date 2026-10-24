@@ -42,7 +42,7 @@ public abstract class ScarletWindow : Window
         WebView.Services = services;
         Content = WebView;
 
-        placement = new WindowPlacementTracker(this, placementKey, services.GetRequiredService<SettingsService>());
+        placement = new WindowPlacementTracker(this, placementKey, services.GetRequiredService<SettingsService>(), () => PlacementBounds);
         deferredClose = new DeferredWindowClose(
             ReleaseBlazorContentAsync,
             Close,
@@ -70,6 +70,12 @@ public abstract class ScarletWindow : Window
 
     /// <summary>Restores the saved placement; subclasses call it at the end of their constructor, after their defaults.</summary>
     protected bool RestorePlacement() => placement.Restore();
+
+    /// <summary>
+    /// The placement to remember for this window: where it is, unless a subclass sizes the window itself and the
+    /// player's own placement differs (the overlay, which grows to fit its content).
+    /// </summary>
+    protected virtual Rect PlacementBounds => new(Left, Top, ActualWidth, ActualHeight);
 
     /// <summary>Work that must finish before this window's Blazor content is released.</summary>
     protected virtual ValueTask BeforeReleaseAsync() => ValueTask.CompletedTask;

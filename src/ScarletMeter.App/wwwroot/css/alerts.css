@@ -1,14 +1,16 @@
-/* World-event notices at the bottom of the overlay (Components/AlertStrip.razor). Uses app.css tokens. */
-
+/* World-event notices at the bottom of the overlay (Components/AlertStrip.razor), below the last DPS bar. Uses
+   app.css tokens. Nothing in the overlay scrolls: the strip always takes its full height (flex: none), the first two
+   notices and "+N more" collapsed, every due notice expanded, and when the window is too short for it and the bars,
+   the window grows (Windows/OverlayFit), so a notice never covers a bar and is never cut. */
 .alerts {
     display: flex;
     flex-direction: column;
+    flex: none;
     gap: 3px;
     padding: 0 6px 6px;
 }
 
-/* flex: none keeps each notice its full height in the strip's column; with overflow: hidden it could otherwise
-   shrink to fit the expanded strip's height cap instead of the strip scrolling. */
+/* flex: none keeps each notice its full height in the strip's column. */
 .alert {
     position: relative;
     flex: none;
@@ -34,8 +36,10 @@
     background: var(--muted);
 }
 
+/* An upcoming event's dot and progress line in the washed-out gold (--soon, app.css), so the strip stays calm beside
+   the bars; an open entry's are teal. */
 .alert.soon .alert-dot {
-    background: var(--me);
+    background: var(--soon);
     animation: alert-pulse 1.6s ease-in-out infinite;
 }
 
@@ -68,9 +72,13 @@
     left: 0;
     bottom: 0;
     height: 2px;
-    background: var(--me);
+    background: var(--soon);
     opacity: 0.8;
     transition: width 1s linear;
+}
+
+.alert.soon .alert-progress {
+    opacity: 0.65;
 }
 
 .alert.open .alert-progress {
@@ -101,33 +109,12 @@
     outline: none;
 }
 
-/* Expanded, the strip may take up to about half the meter and scrolls beyond that, so the rows stay visible. The
-   top line separates it from the rows above, which are cut by their own scroll area at the same edge. When the
-   window is too short the rows give up their space first (app.css, .rows, a heavy shrink weight), and only then
-   does the strip shrink to what is left, so "Show less" at its bottom always stays inside the panel. */
+/* Expanded, the strip shows every due notice with "Show less" after them, the window growing to fit (.alerts). The
+   top line separates it from the rows above. */
 .alerts.expanded {
-    max-height: 45vh;
-    overflow-y: auto;
     border-top: 1px solid rgba(255, 255, 255, 0.12);
     padding-top: 3px;
 }
-
-/* "Show less" stays at the bottom of the expanded strip while the notices scroll under it, so collapsing never
-   needs a scroll first. Opaque, so scrolled notices do not show through it. */
-.alerts.expanded > .alert.more {
-    position: sticky;
-    bottom: 0;
-    z-index: 1;
-    background: #15151b;
-}
-
-.alerts.expanded > .alert.more:hover,
-.alerts.expanded > .alert.more:focus-visible {
-    background: #24242d;
-}
-
-.alerts.expanded::-webkit-scrollbar { width: 6px; }
-.alerts.expanded::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 3px; }
 
 /* The "newer RATmeter release" line, as quiet as the next-event line. */
 .update-note {

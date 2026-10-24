@@ -47,24 +47,11 @@ public sealed class ToolWindow : ScarletWindow
     private void PlaceBeside(Window owner)
     {
         WindowStartupLocation = WindowStartupLocation.Manual;
-        var area = WorkAreaOf(owner);
+        var area = ScreenPlacement.WorkAreaOf(owner);
         var left = owner.Left + owner.ActualWidth + Gap;
         if (left + Width > area.Right) left = owner.Left - Width - Gap;
         Left = Math.Clamp(left, area.Left, Math.Max(area.Left, area.Right - Width));
         Top = Math.Clamp(owner.Top, area.Top, Math.Max(area.Top, area.Bottom - Height));
-    }
-
-    // The work area of the monitor showing the window, in device-independent pixels at that window's DPI.
-    private static Rect WorkAreaOf(Window window)
-    {
-        var handle = new WindowInteropHelper(window).Handle;
-        var monitor = handle == IntPtr.Zero ? IntPtr.Zero : NativeMethods.MonitorFromWindow(handle, NativeMethods.MonitorDefaultToNearest);
-        var info = new NativeMethods.MonitorInfo { Size = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MonitorInfo>() };
-        if (monitor == IntPtr.Zero || !NativeMethods.GetMonitorInfo(monitor, ref info)) return SystemParameters.WorkArea;
-        var dpi = VisualTreeHelper.GetDpi(window);
-        var work = info.Work;
-        return new Rect(work.Left / dpi.DpiScaleX, work.Top / dpi.DpiScaleY,
-            (work.Right - work.Left) / dpi.DpiScaleX, (work.Bottom - work.Top) / dpi.DpiScaleY);
     }
 
     private void UseDarkTitleBar()
