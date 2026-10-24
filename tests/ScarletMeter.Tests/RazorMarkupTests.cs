@@ -50,6 +50,49 @@ public sealed partial class RazorMarkupTests
             Assert.DoesNotContain(reach, effects);
     }
 
+    // A player's row reads DPS, then total damage, then share (Harry reads the DPS first), each in its own
+    // column; the CSS gives DPS and total fixed widths so the columns line up.
+    [Fact]
+    public void APlayersRowShowsDpsThenTotalDamageThenShare()
+    {
+        var page = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Pages", "MeterPage.razor"));
+        var columns = RowNumberColumn().Matches(page).Select(m => m.Groups[1].Value).ToList();
+        Assert.Equal(["num dps", "num total", "num pct"], columns);
+        Assert.True(page.IndexOf("player.Dps", StringComparison.Ordinal) < page.IndexOf("player.TotalDamage", StringComparison.Ordinal));
+        var css = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "app.css"));
+        foreach (var column in new[] { "dps", "total", "pct" })
+            Assert.Matches($@"\.row \.{column} \{{[^}}]*min-width:", css);
+    }
+
+    // The overlay holds its notices back by the player's "Hide during boss fights" switch, keeps the strip mounted
+    // and silent while they are held, and tells the window layer, whose restore for an event goes through the gate.
+    // Source-text guards: the strip's rendering and the WPF window layer have no test host here.
+    [Fact]
+    public void TheOverlayHoldsItsNoticesByThePlayersSwitch()
+    {
+        var pages = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Pages");
+        var code = File.ReadAllText(Path.Combine(pages, "MeterPage.razor.cs"));
+        var markup = File.ReadAllText(Path.Combine(pages, "MeterPage.razor"));
+        Assert.Contains("AlertStripLayout.HiddenForFight(alertSettings.HideDuringBossFights, bossFightUnderWay)", code);
+        Assert.Contains("bossFightUnderWay = bossFight.Update(snapshot.Target, now);", code);
+        Assert.Contains("Windows.HoldAlerts(NoticesHeld);", code);
+        Assert.Matches(@"(?m)^\s*<AlertStrip [^>]*Held=""NoticesHeld"" />", markup);
+
+        // The strip shows nothing and announces nothing while held, before either of its other branches.
+        var strip = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Components", "AlertStrip.razor"));
+        Assert.Contains(@"<span class=""sr-only"" role=""status"">@(Held ? string.Empty : Announcement)</span>", strip);
+        Assert.Matches(@"(?s)@if \(Held\)\s*\{\s*@\*[^*]*\*@\s*\}\s*else if \(View\.Alerts\.Count > 0\)", strip);
+
+        // The window layer asks the gate before every restore for an event, and acts on the one that waited.
+        var windows = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Windows", "MeterWindows.cs"));
+        Assert.Contains("if (restoreGate.Approaching()) RestoreForAlert();", windows);
+        Assert.Contains("if (restoreGate.Hold(held, alertMonitor?.Current.Alerts.Count > 0)) RestoreForAlert();", windows);
+        Assert.Equal(3, Regex.Matches(windows, @"\bRestoreForAlert\(\)").Count); // the two calls and its definition
+    }
+
+    [GeneratedRegex(@"<span class=""(num[^""]*)""")]
+    private static partial Regex RowNumberColumn();
+
     [GeneratedRegex(@"<script\b(?<attributes>[^>]*)>(?<body>.*?)</script>", RegexOptions.Singleline | RegexOptions.IgnoreCase)]
     private static partial Regex ScriptTag();
 

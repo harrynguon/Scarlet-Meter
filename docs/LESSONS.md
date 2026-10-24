@@ -4,6 +4,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**Boss-fight hiding trusted the current target** (audit on #24, fixed before merge).
+- What: the first "Hide during boss fights" hid the notices while a boss was the current target and its fight live or settled. Settled has no end and upstream changes its target only on a hit, so after a wipe the notices would have stayed hidden until the next hit; and the target flips to adds and back, so the strip would have come and gone on every swap. Unmounting the strip also broke its own live-region rule, and "Bring the meter back before an event" could restore a minimized meter mid-fight with its notice hidden.
+- Why: the same assumption #21's lesson names, one steady target, came back in a new feature: the rule was read off `FightState`'s phases without asking how long a phase can last or what the target does between hits; the strip's own comment, which said why it is never unmounted, was not reread.
+- Guard: `BossFightHold` follows the boss across adds and lets go after 60 seconds of still HP, with `BossFightHoldTests` (each rule shown to fail when removed); the strip is held, not unmounted; `AlertRestoreGate` with its test. For any rule fed by upstream's target, write the test for adds between hits and for a target that never goes.
+
+**Switches that were never saved went unnoticed** (audits on #22 and #24, fixed before merge).
+- What: twice, a `[JsonIgnore]` on a new setting (`PictureOpacity`, then `HideDuringBossFights`) passed every test, so the player's choice would have been lost at the next start without a failing test.
+- Why: each new setting got a default test and an equality entry, but the round trip through the file was tested per setting, by hand, and forgotten for the new one.
+- Guard: `SettingsTests.EveryOnOffSettingSurvivesASave` flips every bool in every section, saves, loads and checks each (shown to fail with a `[JsonIgnore]` on two switches), so a new switch is covered without a new test; numeric settings keep their own round-trip tests.
+
 **"Kill in", the glide and the effects assumed one steady target** (audit on #21, fixed before merge).
 - What: "Kill in" forgot the boss whenever the current target (upstream's: the one last hit) flipped to an add, so its estimate kept restarting; the glide measured row positions from the panel and kept them across a row-size change, so a later reorder glided and flashed rows that had not overtaken anyone; the effects ran on every row and would have run between pulls; two test guards (scripts, styles) matched too loosely to fail when broken.
 - Why: the features were built and checked against the demo, whose single boss is the only target and whose rows go when it dies; the tests were written alongside the code and checked for passing, not each broken on purpose until the audit did it.
@@ -96,7 +106,7 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - Guard: delete a junction itself with `[IO.Directory]::Delete(<path>, $false)`, which never follows it.
 
 **UI checks opened windows over the player's game** (2026-10-24).
-- What: back-to-back smoke runs (a screenshot tour, the share-bar checks) started the meter on Harry's desktop; its always-on-top overlay and the details, history and settings windows popped up and took focus while he was in AION 2, and he died in game.
+- What: back-to-back smoke runs (a screenshot tour, the share-bar checks) started the meter on Harry's desktop; its always-on-top overlay and the details, history and settings windows popped up and took focus while Harry was in AION 2, which got Harry killed in game.
 - Why: smoke runs were treated as local and harmless, without asking whether the PC was in use.
 - Guard: AGENTS.md "Review and merge" and the scarlet-smoke skill: ask before any check that opens windows or uses the mouse. Builds and tests without windows need no ask.
 

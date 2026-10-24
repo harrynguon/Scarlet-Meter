@@ -99,6 +99,64 @@ public sealed class SettingsTests : IDisposable
         Assert.True(result.Settings.Fight.BossOnlyCapture);
     }
 
+    // Every on/off setting in every section survives a save and a load when flipped from its default, so a switch
+    // that is never written ([JsonIgnore], no setter) fails here, not in the player's hands (LESSONS, "Switches that
+    // were never saved").
+    [Fact]
+    public void EveryOnOffSettingSurvivesASave()
+    {
+        var store = NewStore();
+        var settings = new MeterSettings();
+        var flipped = new List<(PropertyInfo Section, PropertyInfo Flag, bool Value)>();
+        // Every section is a class this test can make and fill; a new kind of section (a struct, a nested one) must
+        // fail here rather than be skipped. Version and the window placements are not switches.
+        var sections = typeof(MeterSettings).GetProperties()
+            .Where(p => p.Name is not (nameof(MeterSettings.Version) or nameof(MeterSettings.Windows)))
+            .ToList();
+        Assert.Equal(5, sections.Count);
+        foreach (var section in sections)
+        {
+            Assert.True(section.CanWrite && section.PropertyType.IsClass && section.PropertyType.Namespace == typeof(MeterSettings).Namespace,
+                $"{section.Name} is not a settings section this test can flip");
+            Assert.DoesNotContain(section.PropertyType.GetProperties(), p => p.PropertyType == typeof(bool?));
+            var value = Activator.CreateInstance(section.PropertyType)!;
+            foreach (var flag in section.PropertyType.GetProperties().Where(p => p.PropertyType == typeof(bool)))
+            {
+                Assert.True(flag.CanWrite, $"{section.Name}.{flag.Name} has no setter, so it is never loaded");
+                var on = !(bool)flag.GetValue(value)!;
+                flag.SetValue(value, on);
+                flipped.Add((section, flag, on));
+            }
+            section.SetValue(settings, value);
+        }
+        Assert.Contains(flipped, f => f.Flag.Name == nameof(AlertSettings.HideDuringBossFights));
+        Assert.Contains(flipped, f => f.Flag.Name == nameof(AppearanceSettings.BarEffects));
+
+        store.Save(settings);
+        var loaded = store.Load().Settings;
+        foreach (var (section, flag, value) in flipped)
+            Assert.True(value == (bool)flag.GetValue(section.GetValue(loaded))!, $"{section.Name}.{flag.Name} was not saved");
+    }
+
+    // "Hide during boss fights" is on for a file from before it, and turning it off survives a save and a load.
+    [Fact]
+    public void HidingDuringBossFightsStartsOnAndATurnedOffChoiceIsSaved()
+    {
+        var store = NewStore();
+        Directory.CreateDirectory(directory.FullPath); // TestDataDirectory names the folder; the test makes it
+        File.WriteAllText(store.FilePath, """{ "version": 1, "alerts": { "leadMinutes": 15 } }""");
+
+        var loaded = store.Load().Settings;
+        Assert.True(loaded.Alerts.HideDuringBossFights);
+        Assert.Equal(15, loaded.Alerts.LeadMinutes);
+
+        var off = loaded with { Alerts = loaded.Alerts with { HideDuringBossFights = false } };
+        store.Save(off);
+        var reloaded = store.Load().Settings;
+        Assert.False(reloaded.Alerts.HideDuringBossFights);
+        Assert.Equal(off, reloaded);
+    }
+
     [Fact]
     public void AFileSavedWithAByteOrderMarkLoads()
     {
@@ -148,10 +206,11 @@ public sealed class SettingsTests : IDisposable
         // Every AlertSettings member, since it has a hand-written Equals too.
         var alertProperties = typeof(AlertSettings).GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.Name != "EqualityContract").Select(p => p.Name).Order().ToList();
-        Assert.Equal(new[] { "Enabled", "Events", "LeadMinutes", "RestoreMinimizedMeter", "ServerOffsetHours", "ShowNextEvent" }, alertProperties);
+        Assert.Equal(new[] { "Enabled", "Events", "HideDuringBossFights", "LeadMinutes", "RestoreMinimizedMeter", "ServerOffsetHours", "ShowNextEvent" }, alertProperties);
         var alerts = baseline.Alerts;
         Assert.Equal(alerts, alerts with { Events = alerts.Events.ToList() });
         Assert.NotEqual(alerts, alerts with { Enabled = !alerts.Enabled });
+        Assert.NotEqual(alerts, alerts with { HideDuringBossFights = !alerts.HideDuringBossFights });
         Assert.NotEqual(alerts, alerts with { Events = alerts.Events.Skip(1).ToList() });
         Assert.NotEqual(alerts, alerts with { LeadMinutes = 7 });
         Assert.NotEqual(alerts, alerts with { RestoreMinimizedMeter = !alerts.RestoreMinimizedMeter });
