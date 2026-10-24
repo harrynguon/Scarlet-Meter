@@ -56,6 +56,15 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**Every build was a new copy to unzip** (Harry asked, 2026-10-24).
+- What: `Publish-Portable.ps1` wrote each build to a new stamped folder and zip and never replaced one, so the player had to unzip every update by hand and ended up with several folders, each with its own `ScarletMeter.exe`, not knowing which to click.
+- Why: "never overwrite anything" was chosen as the safe default from the developer's side; the player's question, which exe to run, was not asked. Safety belonged around the player's data, not around program files.
+- Guard: one live copy, `portable\ScarletMeter`, updated in place by renames that keep its `data` folder; earlier builds are removed; CI checks that one `ScarletMeter.exe` is left and a planted settings file survives. When a safety rule makes the player do more work, ask what it protects and protect only that.
+
+**Remove-Item on a junction waits for a confirmation** (Test-PortableFolders.ps1, 2026-10-24).
+- What: in Windows PowerShell 5.1, `Remove-Item -Force` on a junction asks to confirm, and a non-interactive run fails there.
+- Guard: delete a junction itself with `[IO.Directory]::Delete(<path>, $false)`, which never follows it.
+
 **UI checks opened windows over the player's game** (2026-10-24).
 - What: back-to-back smoke runs (a screenshot tour, the share-bar checks) started the meter on Harry's desktop; its always-on-top overlay and the details, history and settings windows popped up and took focus while he was in AION 2, and he died in game.
 - Why: smoke runs were treated as local and harmless, without asking whether the PC was in use.

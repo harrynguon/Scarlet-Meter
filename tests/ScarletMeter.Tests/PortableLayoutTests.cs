@@ -5,7 +5,7 @@ namespace ScarletMeter.Tests;
 
 /// <summary>
 /// The portable layout: a marker beside the executable puts the data folder beside it, its absence leaves the
-/// per-user default, and Publish-Portable.ps1 writes the marker under the name the app looks for.
+/// per-user default, and Publish-Portable.ps1 uses the marker and data folder names the app uses.
 /// </summary>
 public sealed class PortableLayoutTests : IDisposable
 {
@@ -35,11 +35,16 @@ public sealed class PortableLayoutTests : IDisposable
     public void TheTestRunIsNotPortable() =>
         Assert.False(PortableLayout.IsCurrent); // no marker beside the test assembly
 
+    // Publish-Portable.ps1 takes both names from PortableFolders.ps1: the marker it writes, and the data folder it
+    // carries into each new build and never deletes.
     [Fact]
-    public void PublishPortableWritesTheMarkerTheAppLooksFor()
+    public void PublishPortableUsesTheMarkerAndDataFolderTheAppUses()
     {
-        var script = File.ReadAllText(Path.Combine(RepositoryRoot(), "scripts", "Publish-Portable.ps1"));
-        Assert.Contains($"$portableMarker = '{PortableLayout.MarkerFileName}'", script, StringComparison.Ordinal);
+        var folders = File.ReadAllText(Path.Combine(RepositoryRoot(), "scripts", "PortableFolders.ps1"));
+        Assert.Contains($"$PortableMarker = '{PortableLayout.MarkerFileName}'", folders, StringComparison.Ordinal);
+        Assert.Contains($"$PortableDataFolder = '{PortableLayout.DataFolderName}'", folders, StringComparison.Ordinal);
+        var publish = File.ReadAllText(Path.Combine(RepositoryRoot(), "scripts", "Publish-Portable.ps1"));
+        Assert.Contains("PortableFolders.ps1", publish, StringComparison.Ordinal);
     }
 
     public void Dispose() => directory.Dispose();

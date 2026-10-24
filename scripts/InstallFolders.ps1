@@ -188,7 +188,7 @@ function Remove-OwnedFolder([string]$Path) {
 
 # Refuses while a ScarletMeter.exe runs from one of $Folders (final paths). A process whose location cannot be
 # read or resolved (an elevated meter seen from a non-elevated shell) might be running from there, so it refuses too.
-function Assert-MeterNotRunningFrom([string[]]$Folders) {
+function Assert-MeterNotRunningFrom([string[]]$Folders, [string]$Then = 'run the install again') {
     $blocking = @(foreach ($process in @(Get-Process -Name 'ScarletMeter' -ErrorAction SilentlyContinue)) {
         $directory = $null
         try { $directory = Get-FinalPath (Split-Path -Parent $process.Path) } catch { $directory = $null }
@@ -200,7 +200,7 @@ function Assert-MeterNotRunningFrom([string[]]$Folders) {
         }
     })
     if ($blocking.Count) {
-        throw "Scarlet Meter is running ($($blocking -join '; ')). Close it, then run the install again."
+        throw "Scarlet Meter is running ($($blocking -join '; ')). Close it, then $Then."
     }
 }
 

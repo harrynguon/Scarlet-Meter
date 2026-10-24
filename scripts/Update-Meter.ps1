@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-One command to update a portable Scarlet Meter to RATmeter's latest release: finds it, moves the upstream pin,
-builds and tests, and writes a new portable zip.
+One command to update the portable Scarlet Meter to RATmeter's latest release: finds it, moves the upstream pin,
+builds and tests, and updates <checkout>\portable\ScarletMeter in place, keeping its data.
 
 .DESCRIPTION
 1. Asks GitHub for RATmeter's latest published release (or takes -Tag). Releases only, never upstream's dev
@@ -13,16 +13,17 @@ builds and tests, and writes a new portable zip.
    build never misses commits made since; otherwise the script stops and says how to recover.
 3. Runs that worktree's scripts\Update-Upstream.ps1 -Tag <release> (the pin moves, then a Debug build and the
    tests), commits the pin move on the branch, so the build is stamped with a real commit, and runs its
-   scripts\Publish-Portable.ps1 (Release build, tests, publish, layout check, marker, zip) with this checkout's
-   "portable" folder as the output.
+   scripts\Publish-Portable.ps1 (Release build, tests, publish, layout check, marker) with this checkout's
+   "portable" folder as the output: the new build replaces the program files of the one live copy,
+   <checkout>\portable\ScarletMeter, and that copy's data folder is kept.
 4. Removes the temporary worktree, and a branch it created this run without committing to. A branch holding the
    pin move stays: it joins main through a pull request with the docs (docs/DEVELOPMENT.md).
 
-It changes none of this checkout's files, no portable copy and no data; besides the zip, it leaves only the local
-branch (and, on a checkout whose upstream/ was never initialised, git's submodule settings in .git/config). To
-update a copy, close the meter and extract the new zip into the folder that holds its ScarletMeter folder,
-replacing files. When the new release changed something Scarlet's engine uses, the build or the tests fail, no
-zip is written, and the message says so; that needs a code change in src/ScarletMeter.Engine/Upstream.
+Close the meter first: the script refuses while ScarletMeter.exe runs from the portable copy, before building.
+It changes none of this checkout's files and no data; besides the live copy's program files, it leaves only the
+local branch (and, on a checkout whose upstream/ was never initialised, git's submodule settings in .git/config).
+When the new release changed something Scarlet's engine uses, the build or the tests fail, the live copy is left
+as it was, and the message says so; that needs a code change in src/ScarletMeter.Engine/Upstream.
 Uncommitted changes in this checkout are not in the build (a warning says so). Needs git with a user identity
 (for the commit), the network (GitHub) and the .NET 10 SDK (SCARLET_DOTNET when it is not on PATH). Every path
 derives from this script's location or the platform's temp folder. Targets Windows PowerShell 5.1 and pwsh.
@@ -45,6 +46,8 @@ $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $latestReleaseApi = 'https://api.github.com/repos/Kuroukihime/AIon2-Dps-Meter/releases/latest'
 $releaseTag = '\Av[0-9]{1,9}(\.[0-9]{1,9}){3}\z'
 $git = (Get-Command git -ErrorAction Stop).Source
+. (Join-Path $PSScriptRoot 'PortableFolders.ps1')
+$portable = New-PortableFolders (Resolve-FinalPath (Join-Path $repoRoot 'portable'))
 
 # First line git prints for these arguments in $Directory, or $null on any failure. Never throws: stderr is
 # discarded with the preference relaxed, because Windows PowerShell 5.1 turns redirected native stderr into a
@@ -101,7 +104,7 @@ if ($current -and $current -cmatch $releaseTag) {
     $currentVersion = [Version]$current.Substring(1)
     $wantedVersion = [Version]$Tag.Substring(1)
     if ($currentVersion -eq $wantedVersion) {
-        Write-Host "Already on RATmeter $Tag; nothing to update. (Publish-Portable.ps1 rebuilds the zip if you need one.)"
+        Write-Host "Already on RATmeter $Tag; nothing to update. (Publish-Portable.ps1 rebuilds the portable copy if you need it.)"
         return
     }
     if ($currentVersion -gt $wantedVersion) {
@@ -111,6 +114,8 @@ if ($current -and $current -cmatch $releaseTag) {
 elseif ($pinnedCommit) {
     Write-Warning "Could not tell which release HEAD pins (upstream commit $($pinnedCommit.Substring(0, [Math]::Min(7, $pinnedCommit.Length))), not a tag this checkout has); going ahead without the up-to-date or older-release checks."
 }
+# Refused now rather than after minutes of building; Publish-Portable.ps1 checks again before the swap.
+Assert-MeterNotRunningFrom @($portable.Live, $portable.Old, $portable.Staging) 'run Update-Meter.ps1 again'
 Write-Host "Updating from RATmeter $(if ($current) { $current } else { 'an unknown release' }) to $Tag."
 
 if (Get-GitLine $repoRoot @('status', '--porcelain')) {
@@ -146,7 +151,7 @@ try {
         & (Join-Path $work 'scripts\Update-Upstream.ps1') -Tag $Tag
     }
     catch {
-        throw "Moving to RATmeter $Tag, or building and testing against it, failed: $($_.Exception.Message) Nothing was written to portable\ and your meter is unchanged. If the build or the tests failed, the release changed something Scarlet's engine uses, which needs a code change in src\ScarletMeter.Engine\Upstream (the scarlet-upstream-update skill)."
+        throw "Moving to RATmeter $Tag, or building and testing against it, failed: $($_.Exception.Message) Your portable copy is unchanged. If the build or the tests failed, the release changed something Scarlet's engine uses, which needs a code change in src\ScarletMeter.Engine\Upstream (the scarlet-upstream-update skill)."
     }
 
     # Update-Upstream.ps1 staged the pin move; commit it on the branch (nothing to commit when reusing it).
@@ -176,8 +181,7 @@ finally {
 }
 
 Write-Host ''
-Write-Host "Updated to RATmeter $Tag. To update a portable copy: close the meter, then extract the zip above into the folder"
-Write-Host 'that holds your ScarletMeter folder, replacing files (your data folder is kept).'
+Write-Host "Updated to RATmeter $Tag. Start the meter again from $(Join-Path $portable.Live 'ScarletMeter.exe') (your data folder was kept)."
 if (Get-GitLine $repoRoot @('rev-parse', '--verify', '--quiet', "refs/heads/$branch")) {
     Write-Host "The pin move is on the local branch $branch; it joins main through a pull request (docs/DEVELOPMENT.md)."
 }

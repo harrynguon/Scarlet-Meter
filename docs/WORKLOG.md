@@ -2,6 +2,26 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — One portable copy, updated in place; repository renamed Scarlet-Meter
+
+**What:** `scripts/Publish-Portable.ps1` keeps one ready-to-run copy, `<checkout>\portable\ScarletMeter`, instead of a new stamped folder and zip per build. It builds into `ScarletMeter.staging`, checks it, adds the marker, then swaps it in by renames that carry the copy's `data` folder over (live to `.old`, `.old\data` into the new build, new build to the live name, `.old` deleted). A failed rename is undone; a run cut short is finished or undone at the start of the next; nothing holding `data` is deleted; only folders with its markers (or empty ones) are touched, and links are refused. It refuses while the meter runs from the copy, before building and before the swap. `-Zip` writes `ScarletMeter-win-x64.zip` (no data, no staging marker), and without it an older zip is removed; builds earlier versions left under stamped names are removed when they hold no data. The folder rules are a new library, `scripts/PortableFolders.ps1` (on `InstallFolders.ps1`'s path helpers, whose running-meter check now takes the retry wording), checked by the new `scripts/Test-PortableFolders.ps1` on throwaway folders. `Update-Meter.ps1` refuses up front while the meter runs from the copy and updates it in place; Settings, About says to close the meter, run the command, and start it again from the same exe. `PortableLayoutTests` checks the library's marker and data folder names against the app's. CI runs the folder rules and builds the copy twice (the second over a planted settings file). README, DEVELOPMENT, ARCHITECTURE, SECURITY (never hand on the live folder, never `git clean -x`), HANDOFF, the scarlet-upstream-update skill and two lessons entries.
+
+The GitHub repository is renamed from `ScarletMeter` to `Scarlet-Meter` (Harry wants a divider; GitHub names cannot hold spaces). The old URL redirects; the checkout's `origin` now points at the new one, and the docs, the scarlet-ship skill and the scarlet-auditor agent use `harrynguon/Scarlet-Meter`. The local checkout folder keeps its name.
+
+**Why:** Harry asked for the build to be unzipped for him, with no copies kept, only the latest build, so there is one exe to click.
+
+**Checks (SDK 10.0.402, Windows PowerShell 5.1; no window opened):**
+
+- `scripts/Test-PortableFolders.ps1`: 26/26 (first copy; an update keeps `data\settings.json` and leaves no `.old` or `.staging`; a folder without the marker and a copy holding a junction are refused, the junction's target untouched; a cut-short update undone from `.old` and finished from `.staging`; a leftover holding data refused and kept; someone else's folder at the staging name refused; stamped builds without data removed, with data kept, a look-alike without the marker untouched; the zip's entries; a hidden ping.exe renamed `ScarletMeter.exe` running from the copy refused; a swap failing at the last rename, with a file held open, undone with the data back). Fail-first: skipping the data move failed "an update keeps the data folder", and dropping the data check on stamped builds failed "an earlier build holding data is kept"; the library was restored byte for byte.
+- `scripts/Build.ps1`: 372/372.
+- `Publish-Portable.ps1 -SkipTests` twice into a scratch output root outside the checkout: the first (`-Zip`) made the copy (exe and marker, no staging marker) and the zip; with a fake stamped build, its zip and a `data\settings.json` planted, the second replaced the exe, kept the settings, removed the older zip and the stamped build and zip, and left only `ScarletMeter` with one `ScarletMeter.exe`.
+- `Update-Meter.ps1 -Tag v1.11.5.341` said it was already on that release; `-Tag v1.11.4.334` was refused as older. All five scripts parse.
+- Repository rename: `gh repo view harrynguon/Scarlet-Meter` answers, `git ls-remote origin` through the new URL lists `main`.
+
+**Not checked:** the meter started from an updated copy (it needs a window; HANDOFF has the in-game item); a full `Update-Meter.ps1` run to a new release (none is out); pwsh locally (CI runs the scripts under pwsh).
+
+**Next:** audit, Codex and CI, merge; then run `Publish-Portable.ps1` on the main checkout to make `portable\ScarletMeter` and remove the two stamped builds there.
+
 ## 2026-10-24 — Ask before checks that open windows
 
 **What:** AGENTS.md "Review and merge", the scarlet-smoke skill and a lessons entry now say to ask the player before any check that opens windows on their desktop or uses the mouse.

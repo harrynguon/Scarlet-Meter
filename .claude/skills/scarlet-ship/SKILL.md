@@ -31,7 +31,7 @@ Update the docs the change touches (ARCHITECTURE for structure, DEVELOPMENT for 
 
 ## 4. Pull request
 
-Commit (message ends with the Co-Authored-By line the session's attribution asks for), push, and `gh pr create -R harrynguon/ScarletMeter --base main --head <branch>` with a body listing the checks actually run and ending with the session's PR attribution line.
+Commit (message ends with the Co-Authored-By line the session's attribution asks for), push, and `gh pr create -R harrynguon/Scarlet-Meter --base main --head <branch>` with a body listing the checks actually run and ending with the session's PR attribution line.
 
 - Write multi-line messages with `git commit -F -` and a quoted heredoc from Bash. Windows PowerShell 5.1 splits a native argument at embedded double quotes, so `-m` with a here-string that holds `"` commits nothing.
 - A PR that needs another open PR's code is stacked: `--base <that branch>`, so its diff shows only its own change. GitHub retargets it to `main` when the base branch is deleted after its merge; then merge `origin/main` into it, rerun the checks and let CI pass before merging.
@@ -43,9 +43,9 @@ Docs-only changes (Markdown only) need no audit. Otherwise run the `scarlet-audi
 Every PR, docs-only ones included, also gets the Codex bot's review (chatgpt-codex-connector) when it is opened. Before merging:
 
 ```bash
-gh api repos/harrynguon/ScarletMeter/issues/<n>/comments --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .body'   # summary: wait for "Completed"
-gh api repos/harrynguon/ScarletMeter/pulls/<n>/comments --jq '.[] | "\(.path):\(.line // .original_line) \(.body)"'                   # inline findings
-gh api repos/harrynguon/ScarletMeter/pulls/<n>/reviews --jq '.[] | "\(.user.login) \(.state) \(.body)"'
+gh api repos/harrynguon/Scarlet-Meter/issues/<n>/comments --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .body'   # summary: wait for "Completed"
+gh api repos/harrynguon/Scarlet-Meter/pulls/<n>/comments --jq '.[] | "\(.path):\(.line // .original_line) \(.body)"'                   # inline findings
+gh api repos/harrynguon/Scarlet-Meter/pulls/<n>/reviews --jq '.[] | "\(.user.login) \(.state) \(.body)"'
 ```
 
 (Bash, as the session's shell runs it; Windows PowerShell 5.1 mangles the quotes in `--jq` filters.) Check each finding against the current head (a later commit may already fix it), fix the valid ones with a test where it can fail, answer the rest, and list every finding and its outcome in the WORKLOG entry. After pushing fixes, comment `@codex review` and check the new review the same way. A summary stuck at "Running" means no review happened: comment `@codex review` again rather than merging on silence.
@@ -55,8 +55,8 @@ gh api repos/harrynguon/ScarletMeter/pulls/<n>/reviews --jq '.[] | "\(.user.logi
 Only with the player's go-ahead, green CI on the head commit, the audit's findings addressed and every Codex comment checked:
 
 ```powershell
-gh run list -R harrynguon/ScarletMeter --branch <branch> --limit 2
-gh pr merge <number> -R harrynguon/ScarletMeter --squash --match-head-commit <full 40-character sha>
+gh run list -R harrynguon/Scarlet-Meter --branch <branch> --limit 2
+gh pr merge <number> -R harrynguon/Scarlet-Meter --squash --match-head-commit <full 40-character sha>
 ```
 
 Then sync the main checkout (`git switch main`, `git pull --ff-only`), check the merged tree equals the tested commit's tree (`git rev-parse HEAD^{tree}` vs `<sha>^{tree}`), and remove the worktree and branch (deleting the remote branch also needs the player's go-ahead). When later branches were built on this one, merge the new `origin/main` into them (or `git rebase --onto origin/main <old base> <branch>` for unpushed ones) before their own PRs merge.
