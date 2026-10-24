@@ -165,6 +165,8 @@ try {
     Check 'an output root inside a portable copy is refused' ($message -and $message.Contains('inside the portable copy')) "message: $message"
     $message = Get-Throws { Resolve-PortableRoot 'portable' }
     Check 'a relative output root is refused' ($message -and $message.Contains('absolute')) "message: $message"
+    $message = Get-Throws { Resolve-PortableRoot ('\\?\' + $drive) }
+    Check 'a device path output root is refused clearly' ($message -and $message.Contains('device path')) "message: $message"
 
     # Cut short after step 1 (live renamed to old): undone.
     $f = New-Root 'undo'
@@ -186,6 +188,39 @@ try {
     Assert-PortableFoldersOwned $f
     Clear-PortableLeftovers $f
     Check 'and the old program files are cleared' (-not (Test-Path -LiteralPath $f.Old)) '.old left'
+
+    # A restore cut short while the rest follows (a file held open in .old) stops with what to do, the copy keeping
+    # its staging marker, and the next run resumes it.
+    $f = New-Root 'resume'
+    New-FakeBuild $f.Staging 'v2'
+    Write-Text (Join-Path $f.Staging 'notes.txt') 'moved first'
+    New-FakeCopy $f.Old 'v1' '{ "resume": true }'
+    $held = [IO.File]::Open((Join-Path $f.Old 'data\settings.json'), 'Open', 'Read', 'None')
+    try { $message = Get-Throws { Restore-InterruptedPortableUpdate $f } }
+    finally { $held.Dispose() }
+    Check 'a restore stopped part way says not to start the meter' ($message -and $message.Contains('Do not start the meter') -and $message.Contains('still in')) "message: $message"
+    Check 'and the copy keeps its staging marker' (Test-PortableStaging $f.Live) 'marker gone'
+    $said = Restore-InterruptedPortableUpdate $f
+    Assert-PortableFoldersOwned $f
+    Clear-PortableLeftovers $f
+    Check 'the next run resumes it' ($said -and (Read-Text (Join-Path $f.Live 'data\settings.json')) -eq '{ "resume": true }' -and (Read-Text (Join-Path $f.Live 'notes.txt')) -eq 'moved first' -and -not (Test-PortableStaging $f.Live) -and -not (Test-Path -LiteralPath $f.Old)) "said: $said"
+
+    # A restore whose files clash with the copy's stops with what to do and keeps both.
+    $f = New-Root 'restore-clash'
+    New-FakeBuild $f.Staging 'v2'
+    Write-Text (Join-Path $f.Staging 'data\settings.json') 'new'
+    New-FakeCopy $f.Old 'v1' 'old'
+    $message = Get-Throws { Restore-InterruptedPortableUpdate $f }
+    Check 'a restore whose files clash stops with what to do' ($message -and $message.Contains('cannot follow') -and $message.Contains('Do not start the meter')) "message: $message"
+    Check 'and keeps both, the copy still marked' ((Read-Text (Join-Path $f.Live 'data\settings.json')) -eq 'new' -and (Read-Text (Join-Path $f.Old 'data\settings.json')) -eq 'old' -and (Test-PortableStaging $f.Live)) 'changed'
+
+    # A manifest naming the data folder in a form Windows opens as data ("data.") is not trusted.
+    $f = New-Root 'manifest'
+    New-FakeCopy $f.Live 'v1' 'private'
+    [IO.File]::AppendAllText((Join-Path $f.Live $PortableManifest), "data.`r`n")
+    Check 'a manifest listing "data." is not trusted' ($null -eq (Read-PortableManifest $f.Live)) 'accepted'
+    $message = Get-Throws { Write-PortableZip $f.Live $f.Zip }
+    Check 'and no zip is written from it' ($message -and -not (Test-Path -LiteralPath $f.Zip)) "message: $message"
 
     # A leftover holding the player's files is refused, never deleted.
     $f = New-Root 'leftover-data'
@@ -235,12 +270,17 @@ try {
     Write-Text (Join-Path $f.Root 'ScarletMeter-notes-upstream-mine\notes.txt') 'mine'
     Write-PortableZip $f.Live (Join-Path $f.Root 'ScarletMeter-6e67467-upstream-v1.11.5.341-win-x64.zip')
     Write-Text (Join-Path $f.Root 'ScarletMeter-2222222-upstream-v1.11.5.341-win-x64.zip') 'not a zip of ours'
+    $elsewhere = Join-Path $work 'legacy-target'
+    New-LegacyBuild $elsewhere
+    [void][IO.Directory]::CreateDirectory((Join-Path $f.Root 'ScarletMeter-3333333-upstream-v1.11.5.341'))
+    New-Junction (Join-Path $f.Root 'ScarletMeter-3333333-upstream-v1.11.5.341\ScarletMeter') $elsewhere
     $result = Remove-LegacyPortableBuilds $f.Root $build
     Check 'an earlier build holding only a build''s files is removed' (-not (Test-Path -LiteralPath (Join-Path $f.Root 'ScarletMeter-6e67467-upstream-v1.11.5.341'))) 'still there'
     Check 'its stamped zip is removed' (-not (Test-Path -LiteralPath (Join-Path $f.Root 'ScarletMeter-6e67467-upstream-v1.11.5.341-win-x64.zip'))) 'still there'
     Check 'an earlier build holding data is kept' ((Read-Text (Join-Path $f.Root 'ScarletMeter-0d9af74-upstream-v1.11.5.341\ScarletMeter\data\settings.json')) -eq '{ "used": true }' -and ($result.Kept -contains 'ScarletMeter-0d9af74-upstream-v1.11.5.341')) 'removed or not reported'
     Check 'an earlier build holding a file of the player''s is kept' ((Read-Text (Join-Path $f.Root 'ScarletMeter-1111111-upstream-v1.11.5.341\ScarletMeter\my-notes.txt')) -eq 'mine') 'removed'
     Check 'a stamped-looking folder without the marker is untouched' ((Read-Text (Join-Path $f.Root 'ScarletMeter-notes-upstream-mine\notes.txt')) -eq 'mine') 'touched'
+    Check 'an earlier build that is a junction is kept, its target untouched' ((Read-Text (Join-Path $elsewhere 'ScarletMeter.exe')) -eq 'legacy' -and ($result.Kept -contains 'ScarletMeter-3333333-upstream-v1.11.5.341')) 'target reached or not reported'
     Check 'a stamped-looking zip that is not ours is untouched' ((Read-Text (Join-Path $f.Root 'ScarletMeter-2222222-upstream-v1.11.5.341-win-x64.zip')) -eq 'not a zip of ours') 'deleted'
 
     # The zip: only the build's files under ScarletMeter/, forward slashes, never the player's.

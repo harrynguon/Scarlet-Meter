@@ -148,7 +148,10 @@ try {
     }
     $legacy = Remove-LegacyPortableBuilds $OutputRoot $build
     if ($legacy.Removed.Count) { Write-Host "Removed earlier builds: $($legacy.Removed -join ', ')" }
-    if ($legacy.Kept.Count) { Write-Warning "Kept earlier builds that hold more than a build's files (your settings and history may be there): $($legacy.Kept -join ', ')" }
+    if ($legacy.Kept.Count) {
+        Write-Warning ("Kept earlier builds that hold more than a build's files: $($legacy.Kept -join ', '). Your settings and history may be in their ScarletMeter\data folder: " +
+            "before starting the new copy, move that data folder (and any other files of yours) into $($folders.Live), then run this script again to remove the old build.")
+    }
 
     $exe = Join-Path $folders.Live 'ScarletMeter.exe'
     Write-Host "Portable copy: $exe"

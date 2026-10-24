@@ -47,6 +47,7 @@ function New-PortableFolders([string]$Root) {
 # player's files.
 function Resolve-PortableRoot([string]$Path) {
     if ($Path -notmatch '^(?:[A-Za-z]:[\\/]|\\\\)') { throw "OutputRoot must be an absolute path, not `"$Path`"." }
+    if ($Path -match '^[\\/]{2}[?.][\\/]') { throw "OutputRoot must be a plain path such as D:\Games, not the device path `"$Path`"." }
     $full = [IO.Path]::GetFullPath($Path)
     if ($full -notmatch '^[A-Za-z]:\\$') { $full = $full.TrimEnd('\', '/') }
     $final = Resolve-FinalPath $full
@@ -94,8 +95,8 @@ function Write-PortableManifest([string]$Folder) {
 }
 
 # The build's top-level entries as $Folder's manifest lists them, or $null when it has none or it is not one this
-# script wrote (another header, a name with a path character, "." or "..", the data folder, one of the script's
-# own files).
+# script wrote (another header, a name with a path character, a leading space or a trailing dot or space, which
+# covers "." and "..", the data folder, one of the script's own files).
 function Read-PortableManifest([string]$Folder) {
     $file = Join-Path $Folder $PortableManifest
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { return $null }
@@ -106,7 +107,8 @@ function Read-PortableManifest([string]$Folder) {
     $names = @($lines | Select-Object -Skip 1 | Where-Object { $_ })
     if (-not $names.Count) { return $null }
     foreach ($name in $names) {
-        if ($name -match '[\\/:*?"<>|]' -or $name -eq '.' -or $name -eq '..' -or $name -eq $PortableDataFolder -or $PortableOwnFiles -contains $name) {
+        # Windows drops a trailing dot or space when it opens a name ("data." is data), so such names are refused.
+        if ($name -match '[\\/:*?"<>|]' -or $name -match '(^ |[. ]$)' -or $name -eq $PortableDataFolder -or $PortableOwnFiles -contains $name) {
             return $null
         }
     }
@@ -133,14 +135,15 @@ function Move-PortableEntry([string]$From, [string]$To) {
 }
 
 # Deletes a folder this script made: refuses, deleting nothing, when it holds anything of the player's at this
-# moment (judged as Get-PlayerEntries does, with $Fallback) or a link; otherwise deletes the build's files and then
+# moment (judged as Get-PlayerEntries does, with $Fallback), or when it is or holds a link (so a delete never reaches
+# a link's target); otherwise deletes the build's files and then
 # the markers, last, so a delete cut short by an open file leaves a folder the next run recognises and finishes.
 function Remove-PortableFolder([string]$Path, [string[]]$Fallback) {
     $mine = @(Get-PlayerEntries $Path $Fallback)
     if ($mine.Count -or (Test-HoldsData $Path)) {
         throw "$Path holds $(@($mine) -join ', '), which may be yours, so it was not deleted. Move those into $(Split-Path -Parent $Path)\ScarletMeter (or keep them elsewhere), delete $Path, then run again."
     }
-    Assert-NoLinksInside $Path
+    Assert-PlainFolder $Path
     Remove-OwnedFolder $Path $PortableOwnFiles
 }
 
@@ -161,34 +164,40 @@ function Get-Clashes([string]$To, [string[]]$Names) {
 # Finishes or undoes an update that stopped part way, so the live copy and the player's files are where they belong
 # before anything else runs. Returns a sentence describing what it did, or $null.
 #  - no live copy, the staging folder (ours) holds some of the player's files: they had begun moving into the new
-#    build; it becomes the live copy, the rest of the player's files follow from the old folder, and it loses its
-#    staging marker.
+#    build; it becomes the live copy, keeping its staging marker until the rest has followed (below).
 #  - no live copy, the old folder is ours: the live copy had just been renamed aside, or the update was undone all
 #    but the last rename; it becomes the live copy again.
+#  - the live copy carries the staging marker: an update or a restore stopped before the rest of the player's files
+#    followed from the old folder (or before the marker went); they follow now, then the marker goes. A restore cut
+#    short here is therefore resumed by the next run, and one that cannot finish stops with what to do.
 function Restore-InterruptedPortableUpdate($Folders) {
-    if (Test-Path -LiteralPath $Folders.Live) { return $null }
-    if ((Test-PortableStaging $Folders.Staging) -and @(Get-PlayerEntries $Folders.Staging).Count) {
-        Assert-PlainFolder $Folders.Staging
-        Assert-PlainFolder $Folders.Old
-        Move-PortableEntry $Folders.Staging $Folders.Live
-        Remove-Item -LiteralPath (Join-Path $Folders.Live $PortableStagingMarker) -Force
-        $said = "An earlier update had stopped part way; it was finished ($($Folders.Live) holds your files)."
-        if (Test-PortableCopy $Folders.Old) {
-            $rest = @(Get-PlayerEntries $Folders.Old (Read-PortableManifest $Folders.Live))
-            $clashes = Get-Clashes $Folders.Live $rest
-            if ($clashes.Count) {
-                return "$said $($clashes -join ', ') stayed in $($Folders.Old), since the copy already has them; move what you need by hand."
-            }
-            Move-PlayerEntries $Folders.Old $Folders.Live $rest (New-Object 'System.Collections.Generic.List[string]')
+    if (-not (Test-Path -LiteralPath $Folders.Live)) {
+        if ((Test-PortableStaging $Folders.Staging) -and @(Get-PlayerEntries $Folders.Staging).Count) {
+            Assert-PlainFolder $Folders.Staging
+            Move-PortableEntry $Folders.Staging $Folders.Live
         }
-        return $said
+        elseif (Test-PortableCopy $Folders.Old) {
+            Assert-PlainFolder $Folders.Old
+            Move-PortableEntry $Folders.Old $Folders.Live
+            return "An earlier update had stopped part way; it was undone ($($Folders.Live) is back as it was)."
+        }
+        else { return $null }
     }
+    elseif (-not (Test-PortableStaging $Folders.Live)) { return $null }
     if (Test-PortableCopy $Folders.Old) {
         Assert-PlainFolder $Folders.Old
-        Move-PortableEntry $Folders.Old $Folders.Live
-        return "An earlier update had stopped part way; it was undone ($($Folders.Live) is back as it was)."
+        $rest = @(Get-PlayerEntries $Folders.Old (Read-PortableManifest $Folders.Live))
+        $clashes = Get-Clashes $Folders.Live $rest
+        if ($clashes.Count) {
+            throw "An earlier update had stopped part way, and $($clashes -join ', ') in $($Folders.Old) cannot follow into $($Folders.Live), which already has them. Do not start the meter yet: compare the two, keep the one you want in $($Folders.Live), delete $($Folders.Old), then run again."
+        }
+        try { Move-PlayerEntries $Folders.Old $Folders.Live $rest (New-Object 'System.Collections.Generic.List[string]') }
+        catch {
+            throw "An earlier update had stopped part way, and finishing it stopped too ($($_.Exception.Message)): some of your files are still in $($Folders.Old). Do not start the meter now. Close whatever has files open there, then run Publish-Portable.ps1 again, which finishes it."
+        }
     }
-    return $null
+    Remove-Item -LiteralPath (Join-Path $Folders.Live $PortableStagingMarker) -Force
+    return "An earlier update had stopped part way; it was finished ($($Folders.Live) holds your files)."
 }
 
 # The refusals that need no build: each folder at the three names must be plain, and ours or absent (or empty); a
@@ -294,6 +303,9 @@ function Write-PortableZip([string]$Source, [string]$ZipPath) {
         try {
             foreach ($name in @($build) + $PortableManifest + $PortableMarker) {
                 $path = Join-Path $Source $name
+                # The name Windows opens must be the one listed, so a listed name can never reach the player's data.
+                $actual = (Get-Item -LiteralPath $path -Force).Name
+                if ($actual -ne $name -or $actual -eq $PortableDataFolder) { throw "$Source lists $name, which opens as $actual; no zip was written." }
                 $files = if (Test-Path -LiteralPath $path -PathType Container) { @(Get-ChildItem -LiteralPath $path -Recurse -File -Force) } else { @(Get-Item -LiteralPath $path -Force) }
                 foreach ($file in $files) {
                     $relative = $file.FullName.Substring($Source.Length).TrimStart('\')
@@ -341,6 +353,7 @@ function Remove-LegacyPortableBuilds([string]$Root, [string[]]$Build) {
         $ours = ($folder.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and (Test-PortableCopy $inner)
         if (-not $ours) { continue }
         try {
+            # Remove-PortableFolder refuses an inner folder that is itself a link, so its target is never reached.
             Remove-PortableFolder $inner $Build
             if (Test-EmptyFolder $folder.FullName) { [IO.Directory]::Delete($folder.FullName, $false) }
             $removed += $folder.Name
@@ -378,6 +391,8 @@ function Enter-PortableLock([string]$Root) {
     $mutex
 }
 
+# Releases the lock Enter-PortableLock took. A mutex is re-entrant on the thread that holds it, so a nested Enter in
+# the same run would succeed; only Publish-Portable.ps1 takes it (Update-Meter.ps1 calls that script, not the lock).
 function Exit-PortableLock($Mutex) {
-    if ($Mutex) { $Mutex.ReleaseMutex(); $Mutex.Dispose() }
+    if ($Mutex) { try { $Mutex.ReleaseMutex() } finally { $Mutex.Dispose() } }
 }
