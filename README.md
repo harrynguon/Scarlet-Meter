@@ -1,88 +1,168 @@
 # Scarlet Meter
 
-A network-based DPS meter for AION 2 Global with its own UI, built on the packet capture and decoding of [RATmeter](https://github.com/Kuroukihime/AIon2-Dps-Meter) (Kuroukihime/AIon2-Dps-Meter), which is included unmodified as the `upstream/` git submodule and pinned to a release tag.
+**A DPS meter for AION 2 (Global) that shows who is doing what, live, in a clean overlay over the game.**
+Unzip it, run it, and it finds the game by itself: no installer, no .NET to install, and no administrator rights
+once Npcap is set up.
+It is built on [RATmeter](https://github.com/Kuroukihime/AIon2-Dps-Meter)'s proven packet decoding, with its own
+overlay and extras: a boss card with a "Kill in" estimate, animated bar effects for every class, world-event
+alerts, and a background picture of your choice.
 
-Status: in development, not yet tried in the game. Capture, decoding, fight tracking and history come from upstream through `ScarletMeter.Engine`. The overlay is a chromeless, translucent, always-on-top window showing the active target, party DPS, ping and per-player damage, with a settings window for background opacity and picture, class colours, relative bars, deaths, hidden names, row size, fight options (boss-only, combined summons, one-minute dummy, history retention) and a show/hide shortcut (`Ctrl+Shift+D` by default). Window positions are remembered. Clicking a player opens their details (skills, buffs, damage graph, combat log), and a history window browses saved boss fights; `--demo` runs synthetic fights for trying the UI without the game. A slim strip at the bottom of the overlay announces world events (Spacetime Rift, Shugo Festival, Dimensional Invasion, bosses and more) five minutes ahead and while their entry is open; times follow the World Companion's Global preset and are not yet verified in the game. A quiet line says when RATmeter publishes a release newer than the one the meter is built on, and `scripts/Install-Meter.ps1` rebuilds and reinstalls it. See [docs/HANDOFF.md](docs/HANDOFF.md) for what has been checked and what is next.
+<p align="center"><img src="docs/images/demo.gif" alt="Scarlet Meter in a boss fight (demo mode, made-up players): the boss card with its Kill in estimate, each class's animated bar effect, and rows gliding into place as players overtake" width="400"/></p>
+<p align="center"><sub>Demo mode, made-up players: <code>.\ScarletMeter.exe --demo</code></sub></p>
 
-## Layout
+> **Early release.** Its in-game checks are not finished, so numbers may be off. Reports are welcome in
+> [Issues](https://github.com/harrynguon/Scarlet-Meter/issues).
 
-| Path | Purpose |
-| --- | --- |
-| `upstream/` | RATmeter at a release tag (submodule). Never edited here. |
-| `src/ScarletMeter.Engine` | The only project that references upstream. Wraps its pipeline behind Scarlet's own contracts (`ICombatEngine`, `CombatSnapshot`, `PlayerDetails`, the history records). |
-| `src/ScarletMeter.App` | WPF windows hosting Blazor WebViews (overlay, settings, player details, history), the settings store and the upstream release check (`Updates/`); references the engine and the world-events module, never upstream. |
-| `src/ScarletMeter.WorldEvents` | World event schedules (Global preset) and the alert planner for overlay notices; pure .NET, no dependencies; drives the overlay's notices. Times are not verified in the game. |
-| `tests/ScarletMeter.Tests` | Boundary guards, engine mapping, settings, close-ordering, world-event schedule, build-stamp and release-check tests (no Npcap needed). |
-| `scripts/` | `Build.ps1` (restore, build, test), `Publish-Portable.ps1` (build and update the one portable copy, `portable\ScarletMeter`, in place) with its folder rules `PortableFolders.ps1` and `Test-PortableFolders.ps1`, `Update-Meter.ps1` (move to RATmeter's latest release and update the portable copy, in one command), `Install-Meter.ps1` (build and install for the current user) with its folder rules `InstallFolders.ps1` and `Test-InstallMeter.ps1` (its refusal, delete and swap checks), `Update-Upstream.ps1 -Tag vX.Y.Z.N`, `Test-PublishLayout.ps1` and `Smoke-Meter.ps1` (drives the UI for checks). Each derives its paths from its own location. |
-| `docs/` | Maintainer documentation. Start with [docs/README.md](docs/README.md). |
+## Download and run
 
-## Requirements
+You need Windows 11, 64-bit (Windows 10 has not been tried; it may need the
+[WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) first).
 
-To **run** the installed meter:
+1. **Install [Npcap](https://npcap.com/#download)** (the packet-capture driver every network-based meter uses).
+   In its installer, tick **"Install Npcap in WinPcap API-compatible Mode"**, and leave **"Restrict Npcap
+   driver's access to Administrators only"** unticked, so the meter never needs administrator rights. (Npcap's own
+   installer asks for an administrator once, as any driver does.)
+2. **Download** the latest `ScarletMeter-<version>-win-x64.zip` from
+   [Releases](https://github.com/harrynguon/Scarlet-Meter/releases) and **unzip** it anywhere you can write to:
+   Documents, Desktop, a games folder (not Program Files).
+3. **Start the game, then double-click `ScarletMeter\ScarletMeter.exe`.** It shows "Waiting for the game's
+   connection..." until it finds the game, then tracks every fight on its own.
 
-- Windows 11, 64-bit. Windows 10 (version 1607 or later, 64-bit) should work but has not been tried.
-- [Npcap](https://npcap.com), for live capture. In its installer, tick "Install Npcap in WinPcap API-compatible Mode": the capture library loads Npcap's `wpcap.dll`, which only that mode installs. Leave "Restrict Npcap driver's access to Administrators only" unticked, or the meter must be started as administrator to capture. Without Npcap, a normal start shows a message saying so and closes; `--demo` and `--no-capture` run without it.
-- The Microsoft Edge WebView2 Runtime, which draws the meter's windows. Windows 11 ships with it; on Windows 10, install the Evergreen Runtime from Microsoft if the meter's windows stay blank.
-- No .NET install: the portable and installed builds are self-contained, so the .NET runtime is bundled inside `ScarletMeter.exe`.
+That is all. **Ctrl+Shift+D** hides and shows the meter (changeable). Windows may warn that the file comes from an
+unknown publisher, because it is not code-signed: choose "More info", then "Run anyway". Each release comes with
+SHA-256 checksums and its complete source, and is built by GitHub Actions from the tagged source, not on anyone's PC.
 
-To **build** it (once, and again for each update):
+- **Try it without the game:** in the `ScarletMeter` folder, Shift+right-click an empty space, choose "Open in
+  Terminal" and run `.\ScarletMeter.exe --demo` for made-up boss fights.
+- **Update:** close the meter and extract the newer zip into the folder that *holds* your `ScarletMeter` folder
+  (Documents, if the meter is at `Documents\ScarletMeter`), replacing files; in Explorer's "Extract all", change
+  the suggested destination to that folder. Your settings and history are kept.
+- **Uninstall:** delete the folder. Nothing is left in the registry or elsewhere, apart from a few libraries
+  Windows unpacks to `%TEMP%\.net\ScarletMeter` for any single-file app.
 
-- The [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). `Build.ps1` and `Install-Meter.ps1` use the `dotnet` on PATH and stop with a message if it is not a .NET 10 SDK; when the SDK is installed elsewhere, set `SCARLET_DOTNET` to its `dotnet.exe` (an absolute path) for the session.
-- Git, to clone the repository with its `upstream/` submodule.
+## How it works
 
-## Run it
+The game talks to its servers over the network, and that traffic includes every hit, heal and buff. Scarlet Meter
+**listens to that traffic on your own PC** through Npcap, decodes it with RATmeter's decoder (included unmodified),
+and adds it up per player and per fight.
 
-**Portable, like RATmeter** (no installer): build it once,
+- **Read-only.** It never touches the game's process, memory or files, and never sends anything to the game.
+- **Your data stays on your PC.** Settings, saved fights and logs go to a `data` folder beside the exe. The meter
+  makes only two kinds of request, both optional: an anonymous check (at most every six hours) for a newer
+  RATmeter release on GitHub, and skill icons from NCSOFT's own game-data site, as RATmeter does. Settings turn
+  either off.
+- **Damage to whom?** Upstream decides the current target (the one you hit last), the meter shows the party's
+  damage on it, and boss fights are saved to your history.
 
-```powershell
-& "<checkout>\scripts\Publish-Portable.ps1"
-```
+## Features
 
-and run **`<checkout>\portable\ScarletMeter\ScarletMeter.exe`**, already unzipped. That is the only copy and the only exe to click: every rebuild or update replaces the program files in that folder and keeps its `data` folder, where the meter keeps its settings, history and logs, and anything else you put there, such as a backup of `data` (Windows also unpacks a few native libraries to `%TEMP%\.net\ScarletMeter`, as for any single-file app). Earlier builds are not kept (one you ran, which holds a `data` folder, stays until you move that folder into `portable\ScarletMeter`; the script says so); `-Zip` also writes `<checkout>\portable\ScarletMeter-win-x64.zip`, the latest build without your files, for handing on. Close the meter before a rebuild: the script refuses while it runs. Never run `git clean -x` in the checkout, which would delete `portable\` and your data with it. **Updating** (when the meter says a newer RATmeter release is out, usually after a game patch) is one command, with the meter closed:
+**In a fight**
 
-```powershell
-& "<checkout>\scripts\Update-Meter.ps1"
-```
+- A **boss card**: name, HP and HP %, a live HP bar, and **Kill in**, an estimate of the time left at the pace the
+  boss's HP fell over the last 20 seconds (everyone's damage counts; it keeps its estimate when you hit an add and
+  come back).
+- A **row per player**: class icon, name, **combat power**, then DPS, total damage and share, with deaths.
+- **Party DPS**, fight duration, and a colour-coded **ping**.
+- The header says what is going on: **"Boss combat"**, the time, and **"Boss defeated"** when it is down.
 
-It finds RATmeter's latest release, moves the pin to it and builds and tests in a temporary copy, so your checkout's files are untouched (it leaves a local branch holding the pin move), then updates `portable\ScarletMeter` in place, keeping its data. If the new release breaks something Scarlet uses, it stops with a message and the copy stays as it was.
+**Looks, your way**
 
-**Installed** instead (below, "Install and update"): the meter is `%LocalAppData%\Programs\ScarletMeter\ScarletMeter.exe`, with "Scarlet Meter" in the Start menu if installed with `-Shortcut`, and its data in `%LocalAppData%\ScarletMeter`.
+- **Animated bar effects for every class**: Gladiator slashes, Templar shield sheen, Assassin poison and daggers,
+  Ranger arrows, Sorcerer fire and ice, Elementalist spirits, Cleric holy light, Chanter rings, Brawler punches.
+  Your own bar glows; when someone overtakes, the rows glide into place with a flash. Tone it down to your bar
+  only, or turn it off.
+- **Your own background picture** (PNG, JPG, GIF, WebP, BMP), with its **own opacity** so it never distracts,
+  plus the **background opacity** of the whole meter. Text and bars always stay solid.
+- **Class colours**, **relative bars** (against the top player), row size, and **hidden names** for streams and
+  screenshots.
 
-To look around without the game first, start it with `--demo`, for example:
+<p align="center"><img src="docs/images/background-picture.png" alt="A background picture at 50% picture opacity (demo data, a generated test picture)" width="400"/></p>
 
-```powershell
-& "<checkout>\portable\ScarletMeter\ScarletMeter.exe" --demo
-```
+**After the fight**
 
-`--demo` plays synthetic boss fights (kept in their own history file), `--no-capture` opens the meter with capture off, and `--data-dir <absolute path>` keeps everything it writes somewhere other than `%LocalAppData%\ScarletMeter`. For the real thing, start the game, then the meter; it finds the game's connection on its own ("Waiting for the game's connection..." until it does).
+- **Player details**: click anyone for their skill-by-skill damage (with crit, back-attack and other rates), buffs
+  and uptime, a damage graph and the combat log.
+- **History** of saved boss fights, searchable, kept for as long as you choose.
 
-## Build from source
+**World events**
 
-`<checkout>` below is the absolute path of your clone.
+- **Alerts** at the bottom of the meter before world events and field bosses (Spacetime Rift, Shugo Festival,
+  Dimensional Invasion, Watcher Kaira and more) and while their entry is open, with a countdown.
+- **Out of your way**: they step aside during boss fights, a **bell** in the header turns them off in one click,
+  and "+N more" folds extra ones away. Times follow the Global preset and are not yet verified in game.
+
+**Convenient**
+
+- **Portable**: one folder, unzip and run, move or delete it as one. Your data lives inside it.
+- **No installer, no .NET install, no administrator rights** (with Npcap set up as above).
+- A **global hotkey** to hide and show it, an always-on-top chromeless overlay you can drag and resize, and window
+  positions remembered across restarts.
+- **Fight options**: boss fights only, summons folded into their owner, a one-minute cap on training dummies.
+
+<p align="center"><img src="docs/images/settings-alerts.png" alt="Settings, Alerts tab" width="420"/></p>
+
+## Compared with RATmeter
+
+Scarlet Meter is built on RATmeter and shares its decoding, so the numbers come from the same place. Both meters
+read the network only, track DPS, targets, ping, per-player details, combat history and combat power, and offer
+opacity, a background picture, class colours, hidden names and a show/hide hotkey.
+
+| | Scarlet Meter | RATmeter |
+| --- | :---: | :---: |
+| Boss card with a "Kill in" estimate | Yes | No |
+| Animated bar effects per class, overtake glide | Yes | Own-bar colours and gradients |
+| Picture opacity separate from the meter's | Yes | No |
+| World-event and field-boss alerts | Yes | No |
+| Demo mode with made-up fights | Yes | No |
+| Buff and skill-cooldown overlays | No | Yes |
+| Stat Efficiency Calculator | No | Yes |
+| Built-in auto-updater | No (extract a new release) | Yes |
+
+If you want RATmeter's buff tracking or stat calculator, use RATmeter; Scarlet Meter is for a cleaner overlay with
+more at a glance in a fight.
+
+## Safety and terms
+
+The meter only reads network traffic, as RATmeter does. Even so, NCSOFT's terms forbid unauthorised programs and
+using one can lead to an **account ban**: use it at your own risk. AION 2 and its names, artwork and data belong to
+NCSOFT; Scarlet Meter is not affiliated with or endorsed by NCSOFT.
+
+## FAQ
+
+**A player shows as `Player_xxxx`.** The game sends names only at certain moments (teleporting, entering a
+dungeon). The meter shows a placeholder until then, as RATmeter does.
+
+**It says "Waiting for the game's connection...".** Start the game (or change zone) and give it a moment. If it
+stays, check that Npcap is installed with WinPcap API-compatible mode.
+
+**It closes with a message about Npcap.** Install Npcap as in step 1.
+
+**Where is my data?** In the `data` folder beside `ScarletMeter.exe`: settings, saved fights, logs.
+
+## Building from source
+
+Developers: the meter is .NET 10 (WPF windows hosting Blazor pages). `<checkout>` below is the absolute path of
+your clone.
 
 ```powershell
 git clone --recurse-submodules https://github.com/harrynguon/Scarlet-Meter.git "<checkout>"
-& "<checkout>\scripts\Build.ps1"
+& "<checkout>\scripts\Build.ps1"                 # restore, build, test (needs the .NET 10 SDK)
+& "<checkout>\scripts\Publish-Portable.ps1"      # a portable copy in <checkout>\portable\ScarletMeter
 ```
 
-Run `src\ScarletMeter.App` from your IDE, or publish it as described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). `--no-capture` opens the window without Npcap; `--demo` opens it without Npcap on a synthetic party's boss fights (kept in their own history database), for UI work; `--data-dir <absolute path>` moves everything the meter writes (history database, logs, WebView2 profile) away from `%LocalAppData%\ScarletMeter`.
+| Path | Purpose |
+| --- | --- |
+| `upstream/` | RATmeter at a release tag (git submodule), never edited here. |
+| `src/ScarletMeter.Engine` | The only project that references upstream; wraps its pipeline in Scarlet's own contracts. |
+| `src/ScarletMeter.App` | The windows and pages (overlay, settings, details, history), settings and release check. |
+| `src/ScarletMeter.WorldEvents` | World event schedules and the alert planner. |
+| `tests/ScarletMeter.Tests` | Boundary, engine, settings, alert and UI-rule tests (no Npcap needed). |
+| `scripts/` | Build, portable publish and update (`Update-Meter.ps1` moves to RATmeter's latest release), install, smoke tests. |
+| `docs/` | Maintainer documentation: start with [docs/README.md](docs/README.md); releases in [DEVELOPMENT.md](docs/DEVELOPMENT.md). |
 
-## Updating upstream
+## Licence and credits
 
-```powershell
-& "<checkout>\scripts\Update-Upstream.ps1" -Tag v1.11.5.341
-```
-
-Releases only, never upstream's `dev` branch. The script moves the submodule, rebuilds and runs the tests; a compile error in `src/ScarletMeter.Engine/Upstream` is the signal that upstream changed an API the engine maps.
-
-## Install and update
-
-```powershell
-& "<checkout>\scripts\Install-Meter.ps1" -Shortcut
-```
-
-Builds and tests a Release, publishes it and installs it to `%LocalAppData%\Programs\ScarletMeter`, keeping the previous install in `ScarletMeter.previous` for a rollback by hand; close the meter first. It only replaces folders it made itself, and your data in `%LocalAppData%\ScarletMeter` is never touched. There is no self-updater, because the meter is built from source: when upstream publishes a release (the meter will say so, from one anonymous request to GitHub at most every six hours), run `Update-Upstream.ps1` with the new tag, then `Install-Meter.ps1` again. Details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), "Install and update".
-
-## Licence and terms
-
-GPLv3, the same as upstream, because the published program links upstream's code. Decoding the game's traffic is against NC's terms as read in the fork's [SECURITY.md](https://github.com/harrynguon/AIon2-Dps-Meter/blob/master/docs/SECURITY.md); use at your own risk, and see [docs/SECURITY.md](docs/SECURITY.md) before any release.
+GNU GPL v3 ([LICENSE](LICENSE)), the same as RATmeter, whose code the program links. Credits in [NOTICE](NOTICE),
+every bundled component and data source in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), and their licence
+texts and notices in [licenses](licenses). Each release has its complete source, RATmeter's code included, as
+`ScarletMeter-<version>-source.zip`. Thanks to Kuroukihime for RATmeter.

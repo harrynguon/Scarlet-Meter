@@ -155,3 +155,14 @@ Checking what the latest release is: `gh release list -R Kuroukihime/AIon2-Dps-M
 5. `scripts/Install-Meter.ps1 -SkipTests` twice into the runner's temp directory, under pwsh: the self-contained single-file publish, `Test-PublishLayout.ps1` on the published output, the install marker and the folder swap. The second install must accept the first by its marker and keep it as `.previous`; the step checks both carry the marker and that no staging or `.retired` folder is left.
 
 CI does not exercise capture, WebView rendering or the window lifecycle, and does not launch the meter.
+
+## Releases
+
+Releases are built on GitHub's runners, never on a PC, so a zip can hold nothing of a developer's paths, account or data.
+
+1. On a branch: set `<Version>` in `src/Directory.Build.props` (0.x releases are pre-releases), write `docs/release-notes/v<version>.md` (what is new, the Npcap step, the risk note), and, after any package change, run `scripts/Write-ThirdPartyNotices.ps1`, which rewrites the package table and the packages' own licence files in `licenses/packages` (`ThirdPartyNoticesTests` fails until both are current). Merge through a PR as usual.
+2. Tag the merged commit on `main` and push the tag: `git -C "<checkout>" tag v<version> <commit>`, then `git -C "<checkout>" push origin v<version>`.
+3. `.github/workflows/release.yml`, job `build` (read-only token): checks the tag is `v<major>.<minor>.<patch>`, its commit is on `main`, it equals `v` + the version and its notes exist; runs `Build.ps1` (restore, build, tests; not CI's installer, portable-folder or source-archive steps, which ran on the merged commit); runs `Publish-Portable.ps1 -Zip` and `Write-SourceArchive.ps1` into the runner's temp directory; checks the program zip (the program, its marker, `README.txt`, `LICENSE.txt`, `NOTICE.txt`, `THIRD-PARTY-NOTICES.md`, the `licenses` folder with the runtime's notices, no data, no staging marker) and the source zip (the checkout and `upstream/`); writes each zip's SHA-256. Job `draft` (the only one with write access, no project code) creates a **draft** release with `ScarletMeter-<version>-win-x64.zip`, `ScarletMeter-<version>-source.zip` and their `.sha256` files.
+4. Download the draft's zips, check their checksums, unzip them, and search their files for anything that should not be there (an account name, a home path, an e-mail address); then publish the draft (`gh release edit v<version> --draft=false`).
+
+A tag pushed by mistake: delete the draft and the tag (`gh release delete v<version> --cleanup-tag`) before publishing.

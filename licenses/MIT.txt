@@ -1,0 +1,32 @@
+MIT License
+
+This licence covers the following components bundled in Scarlet Meter, each under its own copyright notice:
+
+- .NET, its WPF, ASP.NET Core Components, BlazorWebView, Entity Framework Core and Microsoft.Extensions
+  libraries: Copyright (c) .NET Foundation and Contributors
+- C#/WinRT (WinRT.Runtime): Copyright (c) Microsoft Corporation
+- K4os.Compression.LZ4: Copyright (c) 2017 Milosz Krajewski
+- SharpPcap: Copyright (c) Tamir Gal, Chris Morgan and others
+- Microsoft.Data.Sqlite: Copyright (c) .NET Foundation and Contributors
+- Byanski/aion2timeroverlay (schedule defaults adapted, no code): Copyright (c) Byanski
+
+The runtime's, WPF's and the packages' own licence and third-party notices are in licenses/runtime,
+licenses/dotnet-wpf and licenses/packages beside this file.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

@@ -5,6 +5,9 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+    <!-- A Windows 10 SDK version, not plain net10.0-windows: BlazorWebView draws the see-through overlay with
+         WebView2's composition control, which needs the Windows SDK projection (Microsoft.Windows.SDK.NET) at run
+         time; without it the published exe crashed on start (THIRD-PARTY-NOTICES.md, ThirdPartyNoticesTests). -->
     <TargetFramework>net10.0-windows10.0.20348.0</TargetFramework>
     <UseWPF>true</UseWPF>
     <AddRazorSupportForMvc>false</AddRazorSupportForMvc>
@@ -37,6 +40,33 @@
           CopyToPublishDirectory="PreserveNewest"
           ExcludeFromSingleFile="true" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- What a release must carry beside the executable (GPLv3, credits, how to run it), published loose so a player
+         can read them; scripts/Test-PublishLayout.ps1 checks they are there. -->
+    <None Include="../../LICENSE" Link="LICENSE.txt" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="../../NOTICE" Link="NOTICE.txt" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="../../THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="Release/README.txt" Link="README.txt" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <!-- The licence texts and the packages' own notices (THIRD-PARTY-NOTICES.md, "Licence texts"). -->
+    <None Include="../../licenses/**/*" Link="licenses/%(RecursiveDir)%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
+  <!-- A self-contained publish bundles the .NET runtime packs, so their own licence and third-party notices go beside
+       the executable too, under licenses/runtime/<pack>, copied from the very packs this publish resolved (their
+       package folders, from the SDK's ResolvedRuntimePack items), so they always match the bundled runtime.
+       scripts/Test-PublishLayout.ps1 checks the core runtime's are there. -->
+  <Target Name="PublishRuntimePackNotices" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(SelfContained)' == 'true'">
+    <ItemGroup>
+      <_ScarletRuntimeNotice Include="%(ResolvedRuntimePack.PackageDirectory)/LICENSE*;%(ResolvedRuntimePack.PackageDirectory)/THIRD-PARTY-NOTICES*"
+                             Pack="%(ResolvedRuntimePack.Identity)"
+                             Condition="'%(ResolvedRuntimePack.PackageDirectory)' != ''" />
+      <ResolvedFileToPublish Include="@(_ScarletRuntimeNotice)"
+                             RelativePath="licenses/runtime/%(_ScarletRuntimeNotice.Pack)/%(_ScarletRuntimeNotice.Filename)%(_ScarletRuntimeNotice.Extension)"
+                             CopyToPublishDirectory="PreserveNewest"
+                             ExcludeFromSingleFile="true" />
+    </ItemGroup>
+  </Target>
 
   <!-- Stamps the pinned upstream release and Scarlet's commit into this assembly (read by Updates/BuildInfo.cs). -->
   <Import Project="$(MSBuildThisFileDirectory)Updates\BuildStamp.targets" />
