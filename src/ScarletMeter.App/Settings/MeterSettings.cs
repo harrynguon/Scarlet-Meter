@@ -105,6 +105,8 @@ public sealed record AppearanceSettings
 {
     public const double MinOpacity = 0.1;
     public const double MaxOpacity = 1.0;
+    public const double MinPictureOpacity = 0.05;
+    public const double MaxPictureOpacity = 1.0;
     public const double MinRowScale = 0.75;
     public const double MaxRowScale = 1.5;
 
@@ -116,6 +118,12 @@ public sealed record AppearanceSettings
     /// names <see cref="BackgroundImages"/> writes are accepted, so a settings file cannot point elsewhere.
     /// </summary>
     public string? BackgroundImage { get; init; }
+
+    /// <summary>
+    /// How strongly the background picture shows (0.05 to 1), on top of <see cref="BackgroundOpacity"/>, which
+    /// fades the whole background: lower it when the picture distracts. 1 is the picture as before this setting.
+    /// </summary>
+    public double PictureOpacity { get; init; } = 1.0;
 
     /// <summary>Colour each player's bar by class.</summary>
     public bool ClassColors { get; init; } = true;

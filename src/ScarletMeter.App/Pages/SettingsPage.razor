@@ -28,7 +28,7 @@
                     <div class="setting picture">
                         <span class="text">
                             <span class="label">Background picture</span>
-                            <span class="desc">Shown behind the meter at the opacity above. PNG, JPG, GIF, WebP or BMP up to 8 MB.</span>
+                            <span class="desc">Shown behind the meter, faded with the background and by its own opacity below. PNG, JPG, GIF, WebP or BMP up to 8 MB.</span>
                         </span>
                         <div class="picture-row">
                             @if (WebAssetHosts.BackgroundUrl(S.Appearance.BackgroundImage) is { } url)
@@ -43,6 +43,13 @@
                             <span class="error">@pictureError</span>
                         }
                     </div>
+                    @if (S.Appearance.BackgroundImage is not null)
+                    {
+                        <RangeSetting Label="Picture opacity" Description="How strongly the picture shows. Lower it if it distracts; text and bars stay solid."
+                                      Value="@S.Appearance.PictureOpacity" Min="@AppearanceSettings.MinPictureOpacity" Max="@AppearanceSettings.MaxPictureOpacity" Step="0.05"
+                                      Format="@(v => $"{v * 100:0}%")"
+                                      ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { PictureOpacity = v } }))" />
+                    }
                     <RangeSetting Label="Row size" Value="@S.Appearance.RowScale" Min="@AppearanceSettings.MinRowScale" Max="@AppearanceSettings.MaxRowScale" Step="0.05"
                                   Format="@(v => $"{v:0.00}x")"
                                   ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { RowScale = v } }))" />

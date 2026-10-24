@@ -42,7 +42,7 @@ public sealed class SettingsTests : IDisposable
         var input = new MeterSettings
         {
             Fight = new FightSettings { HistoryRetentionDays = 0 },
-            Appearance = new AppearanceSettings { BackgroundOpacity = double.NaN, RowScale = 9, BackgroundImage = @"..\..\secret.png" },
+            Appearance = new AppearanceSettings { BackgroundOpacity = double.NaN, PictureOpacity = -2, RowScale = 9, BackgroundImage = @"..\..\secret.png" },
             Overlay = new OverlaySettings { ToggleHotkey = "Ctrl+Nope" },
             Windows = new Dictionary<string, WindowPlacement>
             {
@@ -57,11 +57,20 @@ public sealed class SettingsTests : IDisposable
 
         Assert.Equal(1, settings.Fight.HistoryRetentionDays);
         Assert.Equal(0.9, settings.Appearance.BackgroundOpacity);
+        Assert.Equal(AppearanceSettings.MinPictureOpacity, settings.Appearance.PictureOpacity);
         Assert.Equal(AppearanceSettings.MaxRowScale, settings.Appearance.RowScale);
         Assert.Null(settings.Appearance.BackgroundImage);
         Assert.Equal(string.Empty, settings.Overlay.ToggleHotkey);
         Assert.Equal(new[] { WindowKeys.Overlay }, settings.Windows.Keys);
-        Assert.Equal(8, repairs.Count);
+        Assert.Equal(9, repairs.Count);
+
+        // Picture opacity's other edges: too high is clamped to 100%, not finite falls back to 100%, each reported.
+        foreach (var bad in new[] { 5.0, double.PositiveInfinity })
+        {
+            var (repaired, notes) = SettingsNormalizer.Normalize(new MeterSettings { Appearance = new AppearanceSettings { PictureOpacity = bad } });
+            Assert.Equal(1.0, repaired.Appearance.PictureOpacity);
+            Assert.Contains(notes, n => n.StartsWith("Picture opacity", StringComparison.Ordinal));
+        }
     }
 
     [Fact]
@@ -205,8 +214,9 @@ public sealed class SettingsTests : IDisposable
         Assert.True(loaded.Appearance.BarEffects);
         Assert.True(loaded.Appearance.EffectsOnEveryBar);
         Assert.True(loaded.Appearance.ShowCombatPower);
+        Assert.Equal(1.0, loaded.Appearance.PictureOpacity); // the picture as it looked before the setting
 
-        var plain = loaded with { Appearance = loaded.Appearance with { BarEffects = false, EffectsOnEveryBar = false, ShowCombatPower = false } };
+        var plain = loaded with { Appearance = loaded.Appearance with { BarEffects = false, EffectsOnEveryBar = false, ShowCombatPower = false, PictureOpacity = 0.4 } };
         store.Save(plain);
         Assert.Equal(plain, store.Load().Settings);
     }

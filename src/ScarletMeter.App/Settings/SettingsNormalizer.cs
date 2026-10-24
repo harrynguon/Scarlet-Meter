@@ -26,6 +26,7 @@ public static class SettingsNormalizer
 
         var appearance = input.Appearance ?? new AppearanceSettings();
         var opacity = ClampFinite(appearance.BackgroundOpacity, AppearanceSettings.MinOpacity, AppearanceSettings.MaxOpacity, 0.9, "Background opacity", repairs);
+        var pictureOpacity = ClampFinite(appearance.PictureOpacity, AppearanceSettings.MinPictureOpacity, AppearanceSettings.MaxPictureOpacity, 1.0, "Picture opacity", repairs);
         var scale = ClampFinite(appearance.RowScale, AppearanceSettings.MinRowScale, AppearanceSettings.MaxRowScale, 1.0, "Row size", repairs);
         var image = appearance.BackgroundImage;
         if (image is not null && !BackgroundImages.IsStoredName(image))
@@ -57,7 +58,7 @@ public static class SettingsNormalizer
         {
             Version = MeterSettings.CurrentVersion,
             Fight = fight with { HistoryRetentionDays = retention },
-            Appearance = appearance with { BackgroundOpacity = opacity, RowScale = scale, BackgroundImage = image },
+            Appearance = appearance with { BackgroundOpacity = opacity, PictureOpacity = pictureOpacity, RowScale = scale, BackgroundImage = image },
             Overlay = overlay with { ToggleHotkey = hotkey },
             Alerts = NormalizeAlerts(input.Alerts, repairs),
             Updates = NormalizeUpdates(input.Updates, repairs),
