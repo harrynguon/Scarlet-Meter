@@ -168,11 +168,11 @@
                     @if (Updates.Result is UpstreamReleaseCheckResult.NewerAvailable update && Portable)
                     {
                         <p class="hint">
-                            To update, run these in PowerShell, with the full path of your Scarlet Meter checkout for &lt;checkout&gt;,
-                            then close the meter, extract the new zip into the folder that holds this ScarletMeter folder, replacing files
-                            (the data folder is kept), and start it again:
+                            To update, run this in PowerShell, with the full path of your Scarlet Meter checkout for &lt;checkout&gt;. It builds
+                            and tests a new zip in &lt;checkout&gt;\portable without touching this copy. Then close the meter, extract the zip
+                            into the folder that holds this ScarletMeter folder, replacing files (the data folder is kept), and start it again:
                         </p>
-                        <p class="hint mono">&amp; "&lt;checkout&gt;\scripts\Update-Upstream.ps1" -Tag @update.Tag<br />&amp; "&lt;checkout&gt;\scripts\Publish-Portable.ps1"</p>
+                        <p class="hint mono">&amp; "&lt;checkout&gt;\scripts\Update-Meter.ps1" -Tag @update.Tag</p>
                     }
                     else if (Updates.Result is UpstreamReleaseCheckResult.NewerAvailable installed)
                     {

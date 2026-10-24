@@ -111,6 +111,17 @@ When upstream publishes a release (a quiet line in the overlay says so, and Sett
 & "<checkout>\scripts\Install-Meter.ps1"
 ```
 
+## Update a portable copy in one command
+
+```powershell
+& "<checkout>\scripts\Update-Meter.ps1"                    # RATmeter's latest release
+& "<checkout>\scripts\Update-Meter.ps1" -Tag v1.11.6.350   # a particular release
+```
+
+`Update-Meter.ps1` asks GitHub for RATmeter's latest published release (the tag is validated as the app validates it; `-Tag` skips the lookup). The current release is read from the pin HEAD records (`HEAD:upstream`), not from `upstream/`'s files, which a plain `git pull` leaves behind; it stops when that is already the wanted release, refuses an older one, and warns and goes ahead when the pinned commit is not a tag this checkout knows. Otherwise it makes a temporary worktree of `HEAD` under the temp folder on a local branch `update/upstream-<release>`, runs that worktree's `Update-Upstream.ps1 -Tag <release>` (pin, Debug build, tests), commits the pin move on the branch, and runs its `Publish-Portable.ps1` with `<checkout>\portable` as the output (Release build, tests, zip). It then removes the temporary worktree; a branch it created but never committed to (a failed run) is removed too. The checkout's files, any portable copy and its data are not touched (on a checkout whose `upstream/` was never initialised, git writes the submodule's settings to `.git/config`), and uncommitted changes in the checkout are not in the build (it warns). An existing `update/upstream-<release>` branch is reused only when it contains HEAD; otherwise the script stops and says how to recover, so a zip never misses commits made since an earlier run. The commit needs git's `user.name` and `user.email`.
+
+The pin move stays on the local branch until it reaches `main` through a pull request with the docs (ARCHITECTURE's pinned release, a WORKLOG entry, any in-game items), following the scarlet-upstream-update skill. When the build or tests fail against the new release, nothing is written to `portable\`: the release changed something the engine maps, which needs a code change in `src/ScarletMeter.Engine/Upstream`.
+
 ## Updating upstream
 
 ```powershell

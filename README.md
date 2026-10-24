@@ -13,7 +13,7 @@ Status: in development, not yet tried in the game. Capture, decoding, fight trac
 | `src/ScarletMeter.App` | WPF windows hosting Blazor WebViews (overlay, settings, player details, history), the settings store and the upstream release check (`Updates/`); references the engine and the world-events module, never upstream. |
 | `src/ScarletMeter.WorldEvents` | World event schedules (Global preset) and the alert planner for overlay notices; pure .NET, no dependencies; drives the overlay's notices. Times are not verified in the game. |
 | `tests/ScarletMeter.Tests` | Boundary guards, engine mapping, settings, close-ordering, world-event schedule, build-stamp and release-check tests (no Npcap needed). |
-| `scripts/` | `Build.ps1` (restore, build, test), `Publish-Portable.ps1` (build a portable folder and zip), `Install-Meter.ps1` (build and install for the current user) with its folder rules `InstallFolders.ps1` and `Test-InstallMeter.ps1` (its refusal, delete and swap checks), `Update-Upstream.ps1 -Tag vX.Y.Z.N`, `Test-PublishLayout.ps1` and `Smoke-Meter.ps1` (drives the UI for checks). Each derives its paths from its own location. |
+| `scripts/` | `Build.ps1` (restore, build, test), `Publish-Portable.ps1` (build a portable folder and zip), `Update-Meter.ps1` (move to RATmeter's latest release and build a new portable zip, in one command), `Install-Meter.ps1` (build and install for the current user) with its folder rules `InstallFolders.ps1` and `Test-InstallMeter.ps1` (its refusal, delete and swap checks), `Update-Upstream.ps1 -Tag vX.Y.Z.N`, `Test-PublishLayout.ps1` and `Smoke-Meter.ps1` (drives the UI for checks). Each derives its paths from its own location. |
 | `docs/` | Maintainer documentation. Start with [docs/README.md](docs/README.md). |
 
 ## Requirements
@@ -38,7 +38,13 @@ To **build** it (once, and again for each update):
 & "<checkout>\scripts\Publish-Portable.ps1"
 ```
 
-then unzip `<checkout>\portable\ScarletMeter-<version>-win-x64.zip` outside the checkout, anywhere you can write to (not Program Files), and run `ScarletMeter\ScarletMeter.exe`. A portable copy keeps its settings, history and logs in the `data` folder beside the exe, so the whole folder can be moved, copied or deleted as one (Windows also unpacks a few native libraries to `%TEMP%\.net\ScarletMeter`, as for any single-file app). To update, close the meter and extract the newer zip into the folder that holds your `ScarletMeter` folder (not into `ScarletMeter` itself), replacing files: the zip holds no `data` folder, so your data stays.
+then unzip `<checkout>\portable\ScarletMeter-<version>-win-x64.zip` outside the checkout, anywhere you can write to (not Program Files), and run `ScarletMeter\ScarletMeter.exe`. A portable copy keeps its settings, history and logs in the `data` folder beside the exe, so the whole folder can be moved, copied or deleted as one (Windows also unpacks a few native libraries to `%TEMP%\.net\ScarletMeter`, as for any single-file app). **Updating** (when the meter says a newer RATmeter release is out, usually after a game patch) is one command:
+
+```powershell
+& "<checkout>\scripts\Update-Meter.ps1"
+```
+
+It finds RATmeter's latest release, moves the pin to it, builds and tests, and writes a new zip to `<checkout>\portable`, all in a temporary copy, so your checkout's files and your portable copy are untouched (it leaves a local branch holding the pin move). If the new release breaks something Scarlet uses, it stops with a message and writes no zip. Then close the meter and extract the new zip into the folder that holds your `ScarletMeter` folder (not into `ScarletMeter` itself), replacing files: the zip holds no `data` folder, so your data stays.
 
 **Installed** instead (below, "Install and update"): the meter is `%LocalAppData%\Programs\ScarletMeter\ScarletMeter.exe`, with "Scarlet Meter" in the Start menu if installed with `-Shortcut`, and its data in `%LocalAppData%\ScarletMeter`.
 
