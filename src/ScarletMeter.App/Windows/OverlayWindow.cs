@@ -43,7 +43,7 @@ public sealed class OverlayWindow : ScarletWindow
         Width = 400;
         Height = 260;
         MinWidth = 300;
-        MinHeight = 96;
+        MinHeight = WindowPlacement.MinSize;
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;

@@ -191,7 +191,14 @@ public sealed record UpdateSettings
 }
 
 /// <summary>A window's position and size in device-independent pixels.</summary>
-public sealed record WindowPlacement(double Left, double Top, double Width, double Height);
+public sealed record WindowPlacement(double Left, double Top, double Width, double Height)
+{
+    /// <summary>
+    /// The smallest width or height a saved placement may have: the overlay's minimum height, the smallest any window
+    /// allows, so every size a player can give a window is one the settings keep.
+    /// </summary>
+    public const double MinSize = 96;
+}
 
 /// <summary>The windows whose placement is remembered.</summary>
 public static class WindowKeys

@@ -38,10 +38,9 @@
 }
 
 /* An upcoming event's dot and progress line in the washed-out gold (--soon, app.css), so the strip stays calm beside
-   the bars; an open entry's are teal. */
+   the bars; an open entry's are teal. The dot stays still: a pulse beside the bars was distracting in a fight. */
 .alert.soon .alert-dot {
     background: var(--soon);
-    animation: alert-pulse 1.6s ease-in-out infinite;
 }
 
 .alert.open {
@@ -178,9 +177,4 @@
 @keyframes alert-in {
     from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: none; }
-}
-
-@keyframes alert-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.35; }
 }

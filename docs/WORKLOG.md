@@ -18,9 +18,13 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Checks after the re-audit (SDK 10.0.402):** `scripts/Build.ps1` 444/444 (`OverlayFitTests.TheFirstHeightAndRealChangesReachTheWindow`, `OverlayPlacementTests.AWindowThatNoLongerFitsTheScreenShrinksAtOnce` new). Fail-first, 10 mutations, each failing its test by name: the NaN bug put back in the helper and in the page, `OverlayCutsContent` always false, no render on a cut change, the shrink timer left running after close, no refit on a display change or after an outside move, an off-screen window waiting to shrink, `Fitted` never raised, and the page not listening for it.
 
-**Not checked:** the window growing and returning in a real window (waiting for Harry's go-ahead), resizing and dragging a grown window, a restore with a new notice, a display-scale change, a monitor's bottom edge, and anything in game.
+**Window check at fce6bed (Harry's go-ahead, out of game; demo fights, a throwaway data directory, the real mouse):** the player's 260 px window grew to its content (311 px) at once and to 373 px with the strip expanded; after "Show less" it returned to 311 px, never below the player's 260; a drag of the grown window by 60 px kept it grown and saved the player's 260 at the new top; collapsing returned it at that top; with the strip expanded while minimized, a restore without activation (`SW_SHOWNOACTIVATE`) showed every notice inside the window; Ctrl+wheel did not zoom (device pixel ratio stayed 1). The demo's server offset was set to -3 h for the run so that four notices were due ("+2 more"). Two problems: (1) dragging the bottom edge 120 px up left the window at its 96 px minimum, and the save of that height was then dropped as unusable, so the overlay's whole saved placement vanished (`SettingsNormalizer` rejected sizes under 120 px while the window allows 96): fixed, `WindowPlacement.MinSize` is now both the overlay's `MinHeight` and the normalizer's floor, with `SettingsTests.TheSmallestOverlayAPlayerCanMakeIsKept` (LESSONS); (2) why the 120 px pull ended at 96 px, and why a later 150 px pull downwards left the window at 311 px, is not explained yet: the check now traces the window's height at each step of a resize, for the next run.
 
-**Next:** Codex and CI on the fixes; with Harry's go-ahead, a demo check of the window that also records a new README GIF and screenshots; merge; rebuild Harry's copy.
+**Harry, after the run:** the pulsing dot on an upcoming notice was "too distracting": the dot is still now, and `RazorMarkupTests.TheNoticeStripNeverBlinks` keeps the strip free of looping animations (only a notice's one-time entrance moves). `scripts/Build.ps1` 446/446; fail-first: the pulse put back and the 120 px floor put back each fail their test.
+
+**Not checked:** resizing a grown window from its edges (above), a display-scale change, a monitor's bottom edge, and anything in game.
+
+**Next:** with Harry's go-ahead, the traced resize check and the README GIFs and stills re-recorded without the pulse; Codex and CI; merge; rebuild Harry's copy.
 
 ## 2026-10-25 — Spiritmaster, no white stripe, a margin under the rows
 

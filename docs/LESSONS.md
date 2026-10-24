@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**A small overlay lost its saved position** (PR #28's window check, fixed before merge; older than #28).
+- What: the overlay could be resized down to its minimum height of 96 px, but the settings normalizer treats any saved size under 120 px as unusable and drops the whole placement, so the next save of a short overlay erased the player's position and size, and the next start used the default centre.
+- Why: the two limits were set in different files with no test tying them together, and no check had ever resized the overlay below 120 px.
+- Guard: one constant, `WindowPlacement.MinSize`, is both the overlay's `MinHeight` and the normalizer's floor; `SettingsTests.TheSmallestOverlayAPlayerCanMakeIsKept` and a guard on the overlay's `MinHeight`, each shown to fail. When a window limit and a settings limit describe the same thing, share one constant.
+
 **A rewritten comparison against NaN switched the window's growth off** (Codex P1 and the re-audit on #28, fixed before merge).
 - What: while wrapping the page's fit in a guard, `if (Math.Abs(height - reportedHeight) < 0.5) return;` became `if (Math.Abs(height - reportedHeight) >= 0.5) { fit; reportedHeight = height; }`. `reportedHeight` starts as NaN and every comparison with NaN is false, so the first height never reached the window, nothing ever set `reportedHeight`, and the window never grew; the new "cut" rule then faded rows with the whole screen free. The commit's docs, its WORKLOG checks and the message to Harry all said the window grows.
 - Why: the condition lived in the page, guarded by a source-text test that pinned the new text (bug included); the 13 mutations exercised everything around it but not the condition itself; and "inverting a test" was treated as a refactor, when with NaN `!(a < b)` is not `a >= b`. The headless measurement checked the CSS, not the window.

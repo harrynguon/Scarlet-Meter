@@ -113,6 +113,9 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"msg is NativeMethods\.WmDpiChanged or NativeMethods\.WmDisplayChange\s*\|\| \(msg == NativeMethods\.WmSettingChange && wParam == NativeMethods\.SpiSetWorkArea\)\)\s*\{[^}]*RefitSoon\(\);", overlay);
         Assert.Matches(@"overlayPlacement\.MovedTo\(Top\);\s*RefitSoon\(\);", overlay);
         Assert.Matches(@"protected override Rect\? PlacementBounds =>\s*sizingOrMoving \? null\s*: overlayPlacement\.Started \? new Rect\(Left, overlayPlacement\.PlayerTop, ActualWidth, overlayPlacement\.PlayerHeight\)", overlay);
+        // The overlay's minimum height is the settings' floor for a saved size, so a player's smallest overlay is kept
+        // (SettingsTests.TheSmallestOverlayAPlayerCanMakeIsKept).
+        Assert.Contains("MinHeight = WindowPlacement.MinSize;", overlay);
         // The page's CSS pixels are the window's: its WebView does not zoom.
         Assert.Contains("protected override bool WebViewZoomable => false;", overlay);
         var host = File.ReadAllText(Path.Combine(app, "Windows", "ScarletWindow.cs"));
@@ -223,6 +226,18 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?m)^\.alert\.soon \.alert-dot \{[^}]*background:\s*var\(--soon\);", alerts);
         Assert.Matches(@"(?m)^\.alert-progress \{[^}]*background:\s*var\(--soon\);", alerts);
         Assert.Matches(@"(?m)^\.alert\.open \.alert-progress \{[^}]*background:\s*var\(--good\);", alerts);
+    }
+
+    // Nothing in the notice strip blinks or loops (Harry: the pulsing dot was "too distracting"): the only animations
+    // are a notice's one-time entrance and the progress line's width transition.
+    [Fact]
+    public void TheNoticeStripNeverBlinks()
+    {
+        var alerts = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "alerts.css"));
+        Assert.DoesNotContain("infinite", alerts, StringComparison.Ordinal);
+        Assert.DoesNotContain("alternate", alerts, StringComparison.Ordinal);
+        Assert.DoesNotMatch(@"animation-iteration-count", alerts);
+        Assert.Equal(["alert-in"], Regex.Matches(alerts, @"@keyframes\s+([\w-]+)").Select(m => m.Groups[1].Value));
     }
 
     // The player's own row is marked by a ring round the row, never by a stripe on the bar (a white inset at the

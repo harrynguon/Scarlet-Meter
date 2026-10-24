@@ -36,6 +36,24 @@ public sealed class SettingsTests : IDisposable
         Assert.Equal(string.Empty, store.Load().Settings.Overlay.ToggleHotkey);
     }
 
+    // Every size a player can give a window is kept: the overlay may be made as short as its minimum height, and a
+    // save below the normalizer's floor dropped the whole placement (found in PR #28's window check, at 96 px).
+    [Fact]
+    public void TheSmallestOverlayAPlayerCanMakeIsKept()
+    {
+        var input = new MeterSettings
+        {
+            Windows = new Dictionary<string, WindowPlacement> { [WindowKeys.Overlay] = new(160, 200, 400, WindowPlacement.MinSize) },
+        };
+        var (settings, repairs) = SettingsNormalizer.Normalize(input);
+        Assert.Equal(new WindowPlacement(160, 200, 400, WindowPlacement.MinSize), settings.Windows[WindowKeys.Overlay]);
+        Assert.Empty(repairs);
+        Assert.Empty(SettingsNormalizer.Normalize(input with
+        {
+            Windows = new Dictionary<string, WindowPlacement> { [WindowKeys.Overlay] = new(160, 200, 400, WindowPlacement.MinSize - 1) },
+        }).Settings.Windows);
+    }
+
     [Fact]
     public void OutOfRangeValuesAreRepairedAndReported()
     {
