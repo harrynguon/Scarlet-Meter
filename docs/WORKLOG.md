@@ -2,6 +2,16 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Requirements and how to run, in the README
+
+**What:** README "Requirements" separates running (Windows, Npcap in WinPcap API-compatible mode with administrator-only access left off, the WebView2 runtime, no .NET install since the installed build is self-contained) from building (.NET 10 SDK, `SCARLET_DOTNET` when it is not on PATH, Git). "Run it" says where the installed exe is (`%LocalAppData%\Programs\ScarletMeter\ScarletMeter.exe`, and the Start menu with `-Shortcut`), the `--demo` command, and what a real start shows. DEVELOPMENT.md's opening matches. A lessons entry records why this was missing.
+
+**Why:** Harry asked where to run the exe, and for Npcap and any .NET requirement to be written down.
+
+**Checks:** the claims against the code: `Install-Meter.ps1` publishes `--self-contained true` for win-x64 and installs to `%LocalAppData%\Programs\ScarletMeter`, `-Shortcut` creates "Scarlet Meter.lnk" in the user's Start menu Programs folder; the engine's capture-start error asks for WinPcap API-compatible mode because SharpPcap loads `wpcap.dll` (`UpstreamCombatEngine`); `GetDpiForSystem` needs Windows 10 1607 or later. Not checked: Windows 10 itself, and the Npcap administrator-only option (Npcap's own installer documents it).
+
+**Next:** Codex's review and CI, then merge.
+
 ## 2026-10-24 — Codex reviews of PRs #1 to #3, and a lessons log
 
 **What:** Codex's review of #1, #2 and #3 never finished when those PRs were opened, so it was requested again (`@codex review`); it reviewed each PR's merged commit. #3: no findings. Three findings, all still true on `main` (871702e), are fixed here:

@@ -51,6 +51,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**The README did not say what running needs or where the exe is** (Harry asked, 2026-10-24).
+- What: one sentence mixed build and run requirements (it listed the .NET 10 SDK, which only building needs), and nothing said where the installed exe lives or how to start it.
+- Why: the docs were written from the developer's side (build, test, publish) and never read as a player installing it.
+- Guard: README "Requirements" (run versus build) and "Run it". Read user-facing docs as the player before calling a feature done.
+
 **Codex's review comments were not read before merging** (PRs #4 to #10).
 - What: Codex left eight findings; nobody read them, and two were still bugs on `main` after the merges.
 - Why: the merge checklist had CI and the auditor, not the PR's comments.
