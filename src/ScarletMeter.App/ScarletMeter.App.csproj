@@ -45,7 +45,25 @@
     <None Include="../../NOTICE" Link="NOTICE.txt" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <None Include="../../THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <None Include="Release/README.txt" Link="README.txt" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <!-- The licence texts and the packages' own notices (THIRD-PARTY-NOTICES.md, "Licence texts"). -->
+    <None Include="../../licenses/**/*" Link="licenses/%(RecursiveDir)%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
+
+  <!-- A self-contained publish bundles the .NET runtime packs, so their own licence and third-party notices go beside
+       the executable too, under licenses/runtime/<pack>, copied from the very packs this publish resolved (their
+       package folders, from the SDK's ResolvedRuntimePack items), so they always match the bundled runtime.
+       scripts/Test-PublishLayout.ps1 checks the core runtime's are there. -->
+  <Target Name="PublishRuntimePackNotices" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(SelfContained)' == 'true'">
+    <ItemGroup>
+      <_ScarletRuntimeNotice Include="%(ResolvedRuntimePack.PackageDirectory)/LICENSE*;%(ResolvedRuntimePack.PackageDirectory)/THIRD-PARTY-NOTICES*"
+                             Pack="%(ResolvedRuntimePack.Identity)"
+                             Condition="'%(ResolvedRuntimePack.PackageDirectory)' != ''" />
+      <ResolvedFileToPublish Include="@(_ScarletRuntimeNotice)"
+                             RelativePath="licenses/runtime/%(_ScarletRuntimeNotice.Pack)/%(_ScarletRuntimeNotice.Filename)%(_ScarletRuntimeNotice.Extension)"
+                             CopyToPublishDirectory="PreserveNewest"
+                             ExcludeFromSingleFile="true" />
+    </ItemGroup>
+  </Target>
 
   <!-- Stamps the pinned upstream release and Scarlet's commit into this assembly (read by Updates/BuildInfo.cs). -->
   <Import Project="$(MSBuildThisFileDirectory)Updates\BuildStamp.targets" />

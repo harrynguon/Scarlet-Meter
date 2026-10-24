@@ -1,1 +1,3 @@
 * text=auto
+# Licence and notice texts stay byte for byte as their packages ship them (ThirdPartyNoticesTests compares them).
+licenses/** -text

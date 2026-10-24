@@ -21,3 +21,10 @@ TestResults/
 PacketLogs/
 Logs/
 logs/
+
+# A player's settings, packet captures and local agent permissions, wherever they land
+settings.json
+settings.json.bak
+*.pcap
+*.pcapng
+.claude/settings.local.json

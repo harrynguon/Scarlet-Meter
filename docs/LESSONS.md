@@ -71,6 +71,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**The first release named its licences but did not carry them** (deep audit on #23, fixed before any release).
+- What: the planned v0.1.0 zip listed each component's licence by name, but binary copies must carry the texts and notices themselves (WebView2's BSD-style licence says so in as many words; MIT and Apache-2.0 too); .NET's notices were linked on `main`, not the shipped version; and "the source is the tag" left RATmeter's half of the source in someone else's repository, since GitHub's source archives drop submodules. The release job also ran restores, builds and tests with a write token kept in git's config, took the tag name into a script's text, and accepted a tag on any commit.
+- Why: the review asked whether each licence is compatible with the GPL, not what each one requires of a binary copy; and the workflow was written as a build script, without asking what its token could do in a compromised build.
+- Guard: a `licenses` folder in the zip (texts, every package's own files byte for byte, the runtime packs' notices from the packs used), checked by `ThirdPartyNoticesTests`, `Test-PublishLayout.ps1` and the release's zip check; `ScarletMeter-<version>-source.zip` from `Write-SourceArchive.ps1`, run in CI and attached to every release; a read-only build job and a write-only draft job, pinned actions, the tag through the environment and on `main`. For anything distributed, read each licence's conditions for binary copies, and give a workflow's write token to the smallest job that needs it.
+
+**Guards were weaker than the words describing them** (deep audit on #23).
+- What: the WORKLOG said the licence test fails "when `LICENSE` stops being the plain text", but it checked only the first and last lines, so a changed sentence in the middle passed; the package test matched id and version only, so a wrong licence passed; and the docs said the repository "has been public since 2026-10-25" while it was still private.
+- Why: each guard was broken once, in the way it was written for (appended text, a dropped row), and the docs were written for the state the work was heading to.
+- Guard: the GPL's SHA-256, licence cells compared with each package's .nuspec, an exact package set, and each guard broken in several places before it is described (WORKLOG lists them); planned states are written as planned ("to be made public once #23 merges") with a HANDOFF checklist, and updated when they happen.
+
 **Every build was a new copy to unzip** (Harry asked, 2026-10-24).
 - What: `Publish-Portable.ps1` wrote each build to a new stamped folder and zip and never replaced one, so the player had to unzip every update by hand and ended up with several folders, each with its own `ScarletMeter.exe`, not knowing which to click.
 - Why: "never overwrite anything" was chosen as the safe default from the developer's side; the player's question, which exe to run, was not asked. Safety belonged around the player's data, not around program files.

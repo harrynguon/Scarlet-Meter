@@ -11,10 +11,13 @@ jobs:
   build-and-test:
     runs-on: windows-latest
     steps:
+      # Actions are pinned to the commit of a release (named in the comment), so a moved tag cannot change what runs;
+      # nothing here pushes, so the token is not kept in git's config.
       - name: Checkout with the upstream submodule
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: true
+          persist-credentials: false
 
       # checkout runs `git submodule update --init --force --depth=1`: the submodule gets the pinned commit and only
       # the tags that follow upstream's default-branch tip, not the pinned release's, so the build stamp
@@ -47,13 +50,29 @@ jobs:
           Write-Host "Pinned upstream release: $tag ($pinned)"
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           dotnet-version: 10.0.x
 
       - name: Restore, build and test
         shell: pwsh
         run: '& "${{ github.workspace }}/scripts/Build.ps1" -Configuration Release'
+
+      # The release's complete-source zip (scripts/Write-SourceArchive.ps1) for this commit, into the runner's temp
+      # directory: the checkout's files and RATmeter's under upstream/, nothing outside its top folder.
+      - name: Source archive
+        shell: pwsh
+        run: |
+          $zip = Join-Path '${{ runner.temp }}' 'ScarletMeter-0.0.0-source.zip'
+          & (Join-Path '${{ github.workspace }}' 'scripts/Write-SourceArchive.ps1') -Version 0.0.0 -OutputPath $zip
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [IO.Compression.ZipFile]::OpenRead($zip)
+          try { $entries = @($archive.Entries | ForEach-Object { $_.FullName }) } finally { $archive.Dispose() }
+          foreach ($required in 'LICENSE', 'NOTICE', 'ScarletMeter.slnx', 'src/ScarletMeter.App/ScarletMeter.App.csproj', 'upstream/LICENSE', 'upstream/AionDpsMeter.slnx') {
+            if ($entries -notcontains "ScarletMeter-0.0.0-source/$required") { throw "The source archive lacks $required." }
+          }
+          if ($entries | Where-Object { $_ -notlike 'ScarletMeter-0.0.0-source/*' }) { throw 'The source archive holds an entry outside its top folder.' }
+          Write-Host "Source archive checked: $($entries.Count) entries"
 
       # Install-Meter.ps1's refusals (someone's folder, links, overlaps with the data directory or the checkout in
       # any spelling) against throwaway folders, with -CheckOnly: nothing is built or moved.
