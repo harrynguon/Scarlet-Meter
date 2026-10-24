@@ -127,6 +127,7 @@ public partial class MeterPage : IAsyncDisposable
         Engine.PingUpdated += OnPingUpdated;
         Alerts.Changed += OnAlertsChanged;
         Updates.Changed += OnUpdateNoticeChanged;
+        Windows.OverlayFitted += OnOverlayFitted;
         refreshLoop = RefreshLoopAsync();
     }
 
@@ -152,7 +153,7 @@ public partial class MeterPage : IAsyncDisposable
         if (stopping.IsCancellationRequested) return;
         try
         {
-            if (Math.Abs(height - reportedHeight) >= 0.5)
+            if (OverlayFit.IsNewHeight(reportedHeight, height))
             {
                 Windows.FitOverlayToContent(height);
                 reportedHeight = height;
@@ -173,6 +174,11 @@ public partial class MeterPage : IAsyncDisposable
     private void OnAlertsChanged(object? sender, EventArgs e) => _ = RenderAsync();
 
     private void OnUpdateNoticeChanged(object? sender, EventArgs e) => _ = RenderAsync();
+
+    // The window fitted itself outside a render (a restore, the end of a resize, a display change, a delayed shrink):
+    // render now, so the "cut" question is asked again at once rather than at the next refresh, and the rows' fade
+    // never lingers once the window has room.
+    private void OnOverlayFitted(object? sender, EventArgs e) => _ = RenderAsync();
 
     private string DisplayName(PlayerRow player) => appearance.HideNicknames ? NicknameMask.Mask(player.Name) : player.Name;
 
@@ -282,6 +288,7 @@ public partial class MeterPage : IAsyncDisposable
         Engine.PingUpdated -= OnPingUpdated;
         Alerts.Changed -= OnAlertsChanged;
         Updates.Changed -= OnUpdateNoticeChanged;
+        Windows.OverlayFitted -= OnOverlayFitted;
         await stopping.CancelAsync();
         if (refreshLoop is not null) await refreshLoop;
         stopping.Dispose();

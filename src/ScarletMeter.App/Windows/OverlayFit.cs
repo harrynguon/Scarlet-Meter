@@ -26,4 +26,11 @@ public static class OverlayFit
         var top = Math.Max(Math.Min(playerTop, bottom - height), Math.Min(playerTop, workArea.Top));
         return (top, height);
     }
+
+    /// <summary>
+    /// Whether a measured content height is worth passing to the window: the first one (nothing was reported yet,
+    /// <paramref name="reported"/> is NaN), or one that changed by half a pixel or more.
+    /// </summary>
+    public static bool IsNewHeight(double reported, double height) =>
+        double.IsNaN(reported) || Math.Abs(height - reported) >= 0.5;
 }

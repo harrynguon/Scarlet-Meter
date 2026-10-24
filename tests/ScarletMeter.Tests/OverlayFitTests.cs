@@ -44,4 +44,16 @@ public sealed class OverlayFitTests
         // The player made it taller than the work area: that height stands.
         Assert.Equal((0.0, 1200.0), OverlayFit.For(0, 1200, 1300, Work));
     }
+
+    // The page passes its content height to the window only when it is new: always the first (Codex review on
+    // PR #28: a comparison with the initial NaN is false, so the window never grew), then on half a pixel or more.
+    [Fact]
+    public void TheFirstHeightAndRealChangesReachTheWindow()
+    {
+        Assert.True(OverlayFit.IsNewHeight(double.NaN, 300));
+        Assert.False(OverlayFit.IsNewHeight(300, 300.4));
+        Assert.False(OverlayFit.IsNewHeight(300, 299.6));
+        Assert.True(OverlayFit.IsNewHeight(300, 300.5));
+        Assert.True(OverlayFit.IsNewHeight(300, 250));
+    }
 }

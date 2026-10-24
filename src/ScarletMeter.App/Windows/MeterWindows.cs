@@ -73,6 +73,9 @@ public interface IMeterWindows
     /// .overlay.cut), never the notices. Cheap to call on every render.
     /// </summary>
     bool OverlayCutsContent(double contentHeight);
+
+    /// <summary>Raised on the UI thread after the overlay window moved or resized itself to fit its content.</summary>
+    event EventHandler? OverlayFitted;
 }
 
 /// <summary>
@@ -111,10 +114,13 @@ public sealed class MeterWindows : IMeterWindows
 
     public event EventHandler? HotkeyStatusChanged;
 
+    public event EventHandler? OverlayFitted;
+
     /// <summary>Creates and shows the overlay. The app shuts down when it closes.</summary>
     public OverlayWindow ShowOverlay()
     {
         overlay = new OverlayWindow(services, CloseToolWindowsAsync) { CloseBlocked = () => modalOpen };
+        overlay.Fitted += (_, _) => OverlayFitted?.Invoke(this, EventArgs.Empty);
         overlay.SourceInitialized += (_, _) =>
         {
             hotkey = new GlobalHotkey(overlay);

@@ -140,7 +140,7 @@ All in the `data` folder beside `ScarletMeter.exe`, so you can back it up, move 
 
 | What | Where |
 | --- | --- |
-| Logs, one file a day, kept 14 days | `data\logs\scarlet-<date>.log` |
+| Logs, one file a day, the 14 newest kept | `data\logs\scarlet-<date>.log` |
 | Settings, and the previous save | `data\settings.json`, `data\settings.json.bak` |
 | Saved boss fights | `data\combat-history.db` (demo fights: `data\demo-history.db`) |
 | Your background picture | `data\backgrounds\` |
@@ -149,9 +149,9 @@ All in the `data` folder beside `ScarletMeter.exe`, so you can back it up, move 
 A copy built and installed from source keeps the same files in `%LocalAppData%\ScarletMeter` instead.
 
 **Does it send anything anywhere?**
-Your settings, fights and logs never leave your PC. The meter makes only two kinds of request, both optional: an
-anonymous check for a newer RATmeter release on GitHub (at most every six hours), and skill icons from NCSOFT's own
-game-data site, as RATmeter does. Settings turn either off.
+Your settings, fights and logs never leave your PC. The meter itself makes only two kinds of request, both
+optional: an anonymous check for a newer RATmeter release on GitHub (every six hours, or ten minutes after a failed
+try), and skill icons from NCSOFT's own game-data site, as RATmeter does. Settings turn either off.
 
 **Can I get banned for using it?**
 It only reads network traffic, as RATmeter does, but NCSOFT's terms forbid unauthorised programs. Use it at your
@@ -164,7 +164,7 @@ always sit below the last bar, never over it, and the size remembered for next t
 already as tall as the screen, the lowest rows fade out and the alerts stay whole.
 
 **How do I hide it quickly?**
-**Ctrl+Shift+D** hides and shows it, even while the game has focus. Change the shortcut in Settings.
+**Ctrl+Shift+D**, a system-wide shortcut, hides and shows it. Change the shortcut in Settings.
 
 **A player shows as `Player_xxxx`.**
 The game sends names only at certain moments (teleporting, entering a dungeon). The meter shows a placeholder until

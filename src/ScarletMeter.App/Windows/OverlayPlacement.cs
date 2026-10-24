@@ -35,11 +35,14 @@ public sealed class OverlayPlacement
         OverlayFit.For(PlayerTop, PlayerHeight, contentHeight, workArea);
 
     /// <summary>
-    /// Whether <paramref name="target"/> is shorter than what the window shows. The window waits a moment before
-    /// shrinking, so content that comes and goes (a share near the threshold, the target card between pulls) does not
-    /// resize it on every render; it grows at once, so nothing is cut.
+    /// Whether the window waits a moment before going to <paramref name="target"/>: it is shorter than what the window
+    /// shows, so content that comes and goes (a share near the threshold, the target card between pulls) does not
+    /// resize it on every render. Growing never waits, so nothing is cut; nor does a window that no longer fits the
+    /// work area (moved to a shorter monitor, a larger display scale, a taller taskbar), whose bottom is off screen.
     /// </summary>
-    public bool Shrinks((double Top, double Height) target) => target.Height < Shown.Height - 0.5;
+    public bool WaitsToShrink((double Top, double Height) target, Rect workArea) =>
+        target.Height < Shown.Height - 0.5
+        && Shown.Top >= workArea.Top - 0.5 && Shown.Top + Shown.Height <= workArea.Bottom + 0.5;
 
     /// <summary>The window now shows <paramref name="placement"/>.</summary>
     public void Showing((double Top, double Height) placement) => Shown = placement;

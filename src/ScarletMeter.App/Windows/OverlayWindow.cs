@@ -67,7 +67,7 @@ public sealed class OverlayWindow : ScarletWindow
         StateChanged += (_, _) =>
         {
             if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
-            else if (WindowState == WindowState.Normal) Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => Refit()));
+            else if (WindowState == WindowState.Normal) RefitSoon();
         };
         SourceInitialized += (_, _) => HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(OnMessage);
         Loaded += (_, _) =>
@@ -110,24 +110,30 @@ public sealed class OverlayWindow : ScarletWindow
     {
         shrinkLater.Stop();
         if (sizingOrMoving || !IsLoaded || WindowState != WindowState.Normal || !overlayPlacement.Started || double.IsNaN(contentHeight)) return;
-        var target = overlayPlacement.Target(contentHeight, ScreenPlacement.WorkAreaOf(this));
-        if (!shrinkNow && overlayPlacement.Shrinks(target))
+        var workArea = ScreenPlacement.WorkAreaOf(this);
+        var target = overlayPlacement.Target(contentHeight, workArea);
+        if (!shrinkNow && overlayPlacement.WaitsToShrink(target, workArea))
         {
             shrinkLater.Start();
             return;
         }
+        var changed = false;
         applying = true;
         try
         {
-            if (Math.Abs(Top - target.Top) >= 0.5) Top = target.Top;
-            if (Math.Abs(ActualHeight - target.Height) >= 0.5) Height = target.Height;
+            if (Math.Abs(Top - target.Top) >= 0.5) { Top = target.Top; changed = true; }
+            if (Math.Abs(ActualHeight - target.Height) >= 0.5) { Height = target.Height; changed = true; }
         }
         finally
         {
             applying = false;
         }
         overlayPlacement.Showing(target);
+        if (changed) Fitted?.Invoke(this, EventArgs.Empty);
     }
+
+    // A fit after the current message is handled and WPF has laid the window out.
+    private void RefitSoon() => Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => Refit()));
 
     private IntPtr OnMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
@@ -143,16 +149,27 @@ public sealed class OverlayWindow : ScarletWindow
             // Saves were skipped while the drag lasted (PlacementBounds), and the fit may not move the window.
             SavePlacementSoon();
         }
+        else if (msg is NativeMethods.WmDpiChanged or NativeMethods.WmDisplayChange
+                 || (msg == NativeMethods.WmSettingChange && wParam == NativeMethods.SpiSetWorkArea))
+        {
+            // The work area or the display's scale changed: the cap and the room at the bottom may have too.
+            RefitSoon();
+        }
         return IntPtr.Zero;
     }
 
     // A move outside the player's drag and outside Refit (a display change, Windows moving the window): the player's
-    // own top follows it.
+    // own top follows it, and the window fits again where it now is. A minimized window that Windows parked off screen
+    // is minimized by the time that fit runs, so it does nothing.
     private void FollowOutsideMove()
     {
         if (applying || sizingOrMoving || WindowState != WindowState.Normal) return;
         overlayPlacement.MovedTo(Top);
+        RefitSoon();
     }
+
+    /// <summary>Raised after a fit moved or resized the window, so the page can ask again whether it cuts the content.</summary>
+    public event EventHandler? Fitted;
 
     protected override System.Drawing.Color WebViewBackground => System.Drawing.Color.Transparent;
 

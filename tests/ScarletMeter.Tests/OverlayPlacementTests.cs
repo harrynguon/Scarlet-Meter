@@ -100,10 +100,22 @@ public sealed class OverlayPlacementTests
     public void OnlyAShorterTargetWaitsBeforeShrinking()
     {
         var placement = Placement(100, 260);
-        Assert.False(placement.Shrinks(placement.Target(300, Work))); // growing: at once
+        Assert.False(placement.WaitsToShrink(placement.Target(300, Work), Work)); // growing: at once
         placement.Showing(placement.Target(300, Work));
-        Assert.False(placement.Shrinks(placement.Target(300, Work)));
-        Assert.False(placement.Shrinks((100, 299.6))); // within half a pixel: the same
-        Assert.True(placement.Shrinks(placement.Target(250, Work))); // back to the player's height: after a moment
+        Assert.False(placement.WaitsToShrink(placement.Target(300, Work), Work));
+        Assert.False(placement.WaitsToShrink((100, 299.6), Work)); // within half a pixel: the same
+        Assert.True(placement.WaitsToShrink(placement.Target(250, Work), Work)); // back to the player's height: after a moment
+    }
+
+    [Fact]
+    public void AWindowThatNoLongerFitsTheScreenShrinksAtOnce()
+    {
+        // As tall as a 1080p work area, then on a shorter one (a monitor with less room, or a larger display scale).
+        var placement = Placement(0, 260);
+        placement.Showing(placement.Target(2000, Work));
+        Assert.Equal((0.0, 1040.0), placement.Shown);
+        var shorter = new Rect(0, 0, 1280, 688);
+        Assert.Equal((0.0, 688.0), placement.Target(2000, shorter));
+        Assert.False(placement.WaitsToShrink(placement.Target(2000, shorter), shorter));
     }
 }

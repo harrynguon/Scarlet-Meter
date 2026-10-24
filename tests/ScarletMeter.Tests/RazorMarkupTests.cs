@@ -69,10 +69,21 @@ public sealed partial class RazorMarkupTests
         var end = page.IndexOf("private void OnAlertsChanged", StringComparison.Ordinal);
         Assert.True(start >= 0 && end > start);
         var afterRender = page[start..end];
-        Assert.Matches(@"try\s*\{\s*if \(Math\.Abs\(height - reportedHeight\) >= 0\.5\)\s*\{\s*Windows\.FitOverlayToContent\(height\);", afterRender);
-        Assert.Contains("var cut = Windows.OverlayCutsContent(height);", afterRender);
+        // Which heights reach the window is OverlayFit.IsNewHeight's (tested there: the first, NaN before it, included),
+        // never a comparison written out here (Codex review on PR #28).
+        Assert.Matches(@"try\s*\{\s*if \(OverlayFit\.IsNewHeight\(reportedHeight, height\)\)\s*\{\s*Windows\.FitOverlayToContent\(height\);\s*reportedHeight = height;", afterRender);
+        Assert.DoesNotContain("Math.Abs(height - reportedHeight)", page);
+        // The window says whether it cuts the content; a change renders again, and so does a fit the window made on
+        // its own (a restore, a resize's end, a display change), so the rows' fade follows the window at once.
+        Assert.Matches(@"var cut = Windows\.OverlayCutsContent\(height\);[^}]*if \(cut == contentCut\) return;\s*contentCut = cut;\s*StateHasChanged\(\);", afterRender);
         Assert.Matches(@"\}\s*catch \(Exception ex\)\s*\{\s*if \(!fitFailing\)", afterRender);
         Assert.Contains("(contentCut ? \" cut\" : \"\")", page);
+        Assert.Contains("Windows.OverlayFitted += OnOverlayFitted;", page);
+        Assert.Contains("Windows.OverlayFitted -= OnOverlayFitted;", page);
+        Assert.Contains("private void OnOverlayFitted(object? sender, EventArgs e) => _ = RenderAsync();", page);
+        var windows = File.ReadAllText(Path.Combine(app, "Windows", "MeterWindows.cs"));
+        Assert.Contains("public bool OverlayCutsContent(double contentHeight) => !closing && overlay?.CutsContent(contentHeight) == true;", windows);
+        Assert.Contains("overlay.Fitted += (_, _) => OverlayFitted?.Invoke(this, EventArgs.Empty);", windows);
         Assert.Contains("public bool CutsContent(double height) => IsLoaded && ActualHeight < Math.Ceiling(height) - 0.5;",
             File.ReadAllText(Path.Combine(app, "Windows", "OverlayWindow.cs")));
 
@@ -86,15 +97,21 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"finally \{\s*panel\.removeAttribute\('data-measuring'\);", script);
 
         var overlay = File.ReadAllText(Path.Combine(app, "Windows", "OverlayWindow.cs"));
-        Assert.Contains("overlayPlacement.Target(contentHeight, ScreenPlacement.WorkAreaOf(this))", overlay);
+        Assert.Matches(@"var workArea = ScreenPlacement\.WorkAreaOf\(this\);\s*var target = overlayPlacement\.Target\(contentHeight, workArea\);\s*if \(!shrinkNow && overlayPlacement\.WaitsToShrink\(target, workArea\)\)", overlay);
         Assert.Contains("if (sizingOrMoving || !IsLoaded || WindowState != WindowState.Normal", overlay);
         Assert.Contains("applying = true;", overlay);
         Assert.Contains("if (applying || sizingOrMoving", overlay);
         Assert.Contains("overlayPlacement.PlayerPlaced(Top, ActualHeight);", overlay);
         Assert.Contains("overlayPlacement.MovedTo(Top);", overlay);
         Assert.Contains("SavePlacementSoon();", overlay);
-        // A restore fits after WPF's own size handling, not inside StateChanged.
-        Assert.Contains("Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => Refit()))", overlay);
+        Assert.Contains("if (changed) Fitted?.Invoke(this, EventArgs.Empty);", overlay);
+        Assert.Contains("Closed += (_, _) => shrinkLater.Stop();", overlay);
+        // A restore fits after WPF's own size handling, not inside StateChanged; so does a change of the display's
+        // scale or arrangement, of the work area, and an outside move.
+        Assert.Contains("private void RefitSoon() => Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => Refit()));", overlay);
+        Assert.Contains("else if (WindowState == WindowState.Normal) RefitSoon();", overlay);
+        Assert.Matches(@"msg is NativeMethods\.WmDpiChanged or NativeMethods\.WmDisplayChange\s*\|\| \(msg == NativeMethods\.WmSettingChange && wParam == NativeMethods\.SpiSetWorkArea\)\)\s*\{[^}]*RefitSoon\(\);", overlay);
+        Assert.Matches(@"overlayPlacement\.MovedTo\(Top\);\s*RefitSoon\(\);", overlay);
         Assert.Matches(@"protected override Rect\? PlacementBounds =>\s*sizingOrMoving \? null\s*: overlayPlacement\.Started \? new Rect\(Left, overlayPlacement\.PlayerTop, ActualWidth, overlayPlacement\.PlayerHeight\)", overlay);
         // The page's CSS pixels are the window's: its WebView does not zoom.
         Assert.Contains("protected override bool WebViewZoomable => false;", overlay);
