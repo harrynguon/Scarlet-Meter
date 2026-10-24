@@ -102,7 +102,9 @@
 }
 
 /* Expanded, the strip may take up to about half the meter and scrolls beyond that, so the rows stay visible. The
-   top line separates it from the rows above, which are cut by their own scroll area at the same edge. */
+   top line separates it from the rows above, which are cut by their own scroll area at the same edge. When the
+   window is too short the rows give up their space first (app.css, .rows, a heavy shrink weight), and only then
+   does the strip shrink to what is left, so "Show less" at its bottom always stays inside the panel. */
 .alerts.expanded {
     max-height: 45vh;
     overflow-y: auto;

@@ -90,6 +90,39 @@ public sealed partial class RazorMarkupTests
         Assert.Equal(3, Regex.Matches(windows, @"\bRestoreForAlert\(\)").Count); // the two calls and its definition
     }
 
+    // The overlay's panel is only as tall as its content, up to the window, so the room the notices leave in a boss
+    // fight is see-through rather than empty panel; the rows take only their own height and scroll when the window is
+    // too short, giving up their space before the expanded strip; and the picture is laid out against the window, so
+    // it does not rescale as the panel changes height. Measured in headless Edge with the real styles (WORKLOG).
+    [Fact]
+    public void TheOverlayPanelFitsItsContent()
+    {
+        var styles = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css");
+        var css = File.ReadAllText(Path.Combine(styles, "app.css"));
+        var alerts = File.ReadAllText(Path.Combine(styles, "alerts.css"));
+        static string Block(string source, string selector) =>
+            Regex.Match(source, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
+        var overlay = Block(css, ".overlay");
+        Assert.Matches(@"(?m)^\s*max-height:\s*100%;", overlay);
+        Assert.DoesNotMatch(@"(?m)^\s*height:", overlay);
+        // The panel's max-height is a percentage of #app, which must itself be the window's height.
+        Assert.Matches(@"(?m)^\s*height:\s*100%;", Block(css, "#app"));
+        Assert.Matches(@"(?m)^\s*height:\s*100%;", Block(css, "html, body"));
+        // No other rule for the panel itself (.overlay.fx, .overlay[...]; not its descendants) gives it a height.
+        Assert.DoesNotMatch(@"(?m)^\.overlay[.:\[][^\s{,]*\s*\{[^}]*(?<![-\w])height\s*:", css.Replace(".overlay::before {", ".before-layer {"));
+        var rows = Block(css, ".rows");
+        Assert.Matches(@"(?m)^\s*min-height:\s*0;", rows);
+        Assert.Matches(@"var\(--panel-image, none\) center / cover no-repeat fixed;", Block(css, ".overlay::before"));
+        // In a short window the rows give up their space before the expanded strip (a heavy shrink weight, since
+        // shrinking is weighted by size), and the strip can still shrink to what is left, so "Show less" stays inside
+        // the panel: a strip that cannot shrink ran past the panel's bottom and clipped it (Codex on #26).
+        var weight = Regex.Match(rows, @"(?m)^\s*flex:\s*0 (?<shrink>\d+) auto;");
+        Assert.True(weight.Success && int.Parse(weight.Groups["shrink"].Value) >= 100,
+            ".rows must take its own height and give up its space before the expanded strip (flex: 0 <100 or more> auto)");
+        foreach (var strip in new[] { Block(alerts, ".alerts"), Block(alerts, ".alerts.expanded") })
+            Assert.DoesNotMatch(@"(?m)^\s*(flex-shrink:\s*0|flex:\s*none)", strip);
+    }
+
     [GeneratedRegex(@"<span class=""(num[^""]*)""")]
     private static partial Regex RowNumberColumn();
 
