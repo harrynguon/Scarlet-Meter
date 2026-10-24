@@ -2,6 +2,16 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — Ask before checks that open windows
+
+**What:** AGENTS.md "Review and merge", the scarlet-smoke skill and a lessons entry now say to ask the player before any check that opens windows on their desktop or uses the mouse.
+
+**Why:** the smoke runs for the screenshot tour and the share bars opened the meter's windows over Harry's game, took focus, and got him killed in AION 2.
+
+**Checks:** Markdown only: Codex's review and CI.
+
+**Next:** follow it.
+
 ## 2026-10-24 — Clearer share and uptime bars
 
 **What:** The bars in the details window (skill damage, buff uptime) and the saved fight's party table use a red gradient like the overlay's instead of a flat 32% red, over a faint full-width track; the saved fight's share bars take the overlay's class gradients when "Class colours" is on (`ClassColors.CssClass`, now shared with the overlay's rows); labels over a bar get a shadow and a lighter secondary colour. A lessons entry.
