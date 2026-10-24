@@ -147,7 +147,7 @@ button {
 
 .target-name {
     flex: 1;
-    min-width: 0;
+    min-width: 3em;
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
@@ -205,13 +205,26 @@ button {
     color: #fff;
 }
 
+/* A switch that is off (the alerts bell): dimmer, struck through by its icon. */
+.icon-btn.off {
+    color: rgba(141, 138, 157, 0.6);
+}
+
 /* The target's card: name and HP, its bar, and "Kill in". A boss gets a skull and a red tint. */
 .target-card {
+    container-type: inline-size;
     margin: 2px 8px 2px;
     padding: 5px 10px 5px;
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.035);
     border: 1px solid var(--line);
+}
+
+/* On a narrow card the absolute HP gives way, so the name keeps room beside the percent and "Kill in". */
+@container (max-width: 330px) {
+    .target-hp .hp-abs {
+        display: none;
+    }
 }
 
 .target-card.boss {
@@ -238,7 +251,7 @@ button {
 
 .target-bar {
     height: 5px;
-    margin: 5px 0 4px;
+    margin: 5px 0 1px;
     background: rgba(255, 255, 255, 0.08);
     border-radius: 3px;
     overflow: hidden;
@@ -251,21 +264,20 @@ button {
     transition: width 120ms linear;
 }
 
-.target-timers {
-    display: flex;
-    justify-content: space-between;
-    font-size: 11px;
+/* "Kill in" at the end of the name line, set apart by a hairline. */
+.target-kill {
+    flex: none;
+    padding-left: 6px;
+    border-left: 1px solid var(--line);
     color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
 }
 
-.target-timers b {
-    margin-left: 4px;
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-}
-
-.target-timers b.kill {
+.target-kill b {
     color: var(--good);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
 }
 
 .ov-totals {
@@ -409,9 +421,14 @@ button {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
+/* DPS, then total damage, then share; the fixed widths keep each column lined up from row to row. */
 .row .dps {
     min-width: 58px;
     font-weight: 600;
+}
+
+.row .total {
+    min-width: 46px;
 }
 
 .row .pct {

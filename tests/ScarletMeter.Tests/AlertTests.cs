@@ -131,6 +131,52 @@ public sealed class AlertTests : IDisposable
     }
 
     [Fact]
+    public void HidingDuringBossFightsIsOnUnlessTurnedOff()
+    {
+        Assert.True(new AlertSettings().HideDuringBossFights);
+        Assert.True(SettingsNormalizer.Normalize(new MeterSettings()).Settings.Alerts.HideDuringBossFights);
+    }
+
+    // When a boss fight is under way is BossFightHoldTests' subject; here, only that the setting decides.
+    [Fact]
+    public void TheStripStandsAsideOnlyWhileABossFightIsUnderWay()
+    {
+        Assert.True(AlertStripLayout.HiddenForFight(true, bossFightUnderWay: true));
+        Assert.False(AlertStripLayout.HiddenForFight(true, bossFightUnderWay: false));
+        Assert.False(AlertStripLayout.HiddenForFight(false, bossFightUnderWay: true)); // the setting off
+    }
+
+    // "Bring the meter back before an event" waits while the notices stand aside for a boss fight, and then brings
+    // it back once, only if a notice is still due.
+    [Fact]
+    public void BringingTheMeterBackWaitsForTheBossFightToEnd()
+    {
+        var gate = new AlertRestoreGate();
+        Assert.True(gate.Approaching());                  // no fight: at once
+        Assert.False(gate.Hold(false, noticesDue: true)); // nothing waited
+
+        Assert.False(gate.Hold(true, noticesDue: true));
+        Assert.False(gate.Approaching());                 // mid-fight: it waits
+        Assert.False(gate.Hold(true, noticesDue: true));  // still held
+        Assert.True(gate.Hold(false, noticesDue: true));  // the fight ends: now
+        Assert.False(gate.Hold(false, noticesDue: true)); // once
+
+        Assert.False(gate.Hold(true, noticesDue: true));
+        Assert.False(gate.Hold(false, noticesDue: true)); // a fight after the restore that waited: not again
+
+        Assert.False(gate.Hold(true, noticesDue: true));
+        Assert.False(gate.Approaching());
+        Assert.False(gate.Hold(false, noticesDue: false)); // the event passed during the fight: not at all
+        Assert.True(gate.Approaching());
+
+        // A fight with nothing waiting brings nothing back, though a notice is due (the player hid the meter again
+        // after its restore).
+        var quiet = new AlertRestoreGate();
+        Assert.False(quiet.Hold(true, noticesDue: true));
+        Assert.False(quiet.Hold(false, noticesDue: true));
+    }
+
+    [Fact]
     public void WordingForNoticesAndSchedules()
     {
         Assert.Equal("4:59", EventText.Countdown(new TimeSpan(0, 4, 59)));

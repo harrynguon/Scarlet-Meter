@@ -28,10 +28,15 @@ public partial class MeterPage : IAsyncDisposable
     // with every snapshot.
     private readonly KillTimer killTimer = new();
     private readonly FightState fightState = new();
+    // Whether a boss fight is under way, adds included, for the notices that stand aside during one.
+    private readonly BossFightHold bossFight = new();
     private TimeSpan? killIn;
     private FightPhase phase;
+    private bool bossFightUnderWay;
     private CombatSnapshot snapshot = CombatSnapshot.Empty;
     private AppearanceSettings appearance = new();
+    // The notices' switches: the header's bell (Enabled) and whether they stand aside for a boss fight.
+    private AlertSettings alertSettings = new();
     private int? ping;
     private Task? refreshLoop;
     private bool refreshFailing;
@@ -81,6 +86,9 @@ public partial class MeterPage : IAsyncDisposable
         _ => string.Empty,
     };
 
+    // The notices stand aside during a boss fight when "Hide during boss fights" is on.
+    private bool NoticesHeld => AlertStripLayout.HiddenForFight(alertSettings.HideDuringBossFights, bossFightUnderWay);
+
     private string StatusText => Engine.Capture switch
     {
         { IsCapturing: false } => "Capture is off",
@@ -102,6 +110,7 @@ public partial class MeterPage : IAsyncDisposable
     protected override void OnInitialized()
     {
         appearance = Settings.Current.Appearance;
+        alertSettings = Settings.Current.Alerts;
         Settings.Changed += OnSettingsChanged;
         Engine.PingUpdated += OnPingUpdated;
         Alerts.Changed += OnAlertsChanged;
@@ -145,6 +154,8 @@ public partial class MeterPage : IAsyncDisposable
                     var now = Clock.GetUtcNow();
                     killIn = killTimer.Update(snapshot.Target, now);
                     phase = fightState.Update(snapshot.Target, now);
+                    bossFightUnderWay = bossFight.Update(snapshot.Target, now);
+                    Windows.HoldAlerts(NoticesHeld);
                     await RenderAsync();
                     if (refreshFailing) Logger.LogInformation("Refreshing the meter works again.");
                     refreshFailing = false;
@@ -171,6 +182,7 @@ public partial class MeterPage : IAsyncDisposable
     private void OnSettingsChanged(object? sender, MeterSettings changed)
     {
         appearance = changed.Appearance;
+        alertSettings = changed.Alerts;
         _ = RenderAsync();
     }
 
@@ -196,6 +208,9 @@ public partial class MeterPage : IAsyncDisposable
         }
     }
 
+    // The header's bell: world-event notices on or off, saved like the switch in Settings, Alerts.
+    private void ToggleAlerts() => Settings.Update(s => s with { Alerts = s.Alerts with { Enabled = !s.Alerts.Enabled } });
+
     private void Reset()
     {
         Engine.Reset();
@@ -203,6 +218,9 @@ public partial class MeterPage : IAsyncDisposable
         killTimer.Clear();
         killIn = null;
         phase = FightPhase.None;
+        bossFight.Clear();
+        bossFightUnderWay = false;
+        Windows.HoldAlerts(NoticesHeld);
     }
 
     public async ValueTask DisposeAsync()

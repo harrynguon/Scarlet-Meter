@@ -1,16 +1,25 @@
+using ScarletMeter.App.Combat;
 using ScarletMeter.WorldEvents;
 
 namespace ScarletMeter.App.Alerts;
 
 /// <summary>
 /// What the overlay's alert strip (Components/AlertStrip.razor) shows: the first <see cref="CollapsedCount"/>
-/// notices, or every due one once the player expands it, and the hover text listing the ones it hides. Pure, so
-/// the component stays a view and the rules are tested without rendering.
+/// notices, or every due one once the player expands it, the hover text listing the ones it hides, and whether it
+/// stands aside for a boss fight. Pure, so the component stays a view and the rules are tested without rendering.
 /// </summary>
 public static class AlertStripLayout
 {
     /// <summary>Notices the strip shows before it is expanded.</summary>
     public const int CollapsedCount = 2;
+
+    /// <summary>
+    /// Whether the strip stands aside for the fight under way: with "Hide during boss fights" on, while
+    /// <see cref="BossFightHold"/> says a boss fight is under way (adds included, not once the boss is down, gone or
+    /// long still).
+    /// </summary>
+    public static bool HiddenForFight(bool hideDuringBossFights, bool bossFightUnderWay) =>
+        hideDuringBossFights && bossFightUnderWay;
 
     /// <summary>The notices to draw, most urgent first: all of them when expanded, else the first few.</summary>
     public static IEnumerable<EventAlert> Shown(IReadOnlyList<EventAlert> alerts, bool expanded) =>
