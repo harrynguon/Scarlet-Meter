@@ -2,6 +2,22 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-24 — One-command update of a portable copy
+
+**What:** `scripts/Update-Meter.ps1` finds RATmeter's latest release on GitHub (or takes `-Tag`), stops when already on it, and otherwise, in a temporary worktree on a local branch `update/upstream-<release>`, moves the pin with `Update-Upstream.ps1` (Debug build and tests), commits it and builds the portable zip with `Publish-Portable.ps1` (Release build and tests) into `<checkout>\portable`. It removes the worktree, and a branch it created without committing to. Settings, About shows the one command for a portable copy; README, DEVELOPMENT, ARCHITECTURE, the scarlet-upstream-update skill and a lessons entry.
+
+**Why:** Harry asked for one command that moves the upstream pin to the latest release, runs the tests and builds the new portable zip.
+
+**Checks (SDK 10.0.402, Windows PowerShell 5.1):**
+
+- On a checkout pinned to v1.11.5.341: "Already on RATmeter v1.11.5.341; nothing to update." (one request to GitHub's latest-release API).
+- On a throwaway clone with the pin moved back to v1.11.4.334: it found v1.11.5.341, moved the pin in a worktree under the temp folder, built and passed 367/367 in Debug and again in Release, and wrote `ScarletMeter-3d14bcf-upstream-v1.11.5.341-win-x64.zip` (65 MB) to the clone's `portable`. The clone's own pin stayed v1.11.4.334 with a clean status; the branch held the pin move (aa3ffc6); no worktree or temp folder was left. That run was the second: the first was cut short by the test command (LESSONS.md), and the second reused the branch the first had committed.
+- Refusals: `-Tag v9.9.9.9` (not a release) stopped before building, said so, and left no branch, worktree or temp folder; `-Tag v1.11.4.334` on the newer checkout was refused; a malformed tag failed parameter validation.
+
+**Not checked:** a release that really breaks the engine's build (the failure path is the same `catch` the missing-tag case went through); pwsh locally (CI does not run this script, since it needs GitHub and minutes of builds).
+
+**Next:** PR, audit, Codex's review, CI and merge.
+
 ## 2026-10-24 — Portable build, like RATmeter
 
 **What:**

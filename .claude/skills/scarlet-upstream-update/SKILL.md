@@ -26,6 +26,8 @@ Work in a worktree (see the scarlet-ship skill), then:
 
 It refuses non-release tags, moves and stages the submodule, and runs the build and tests.
 
+The player may already have run `scripts/Update-Meter.ps1`, which leaves the pin move committed on a local branch `update/upstream-<tag>` (and a portable zip). Start the PR from that branch rather than moving the pin again: add the docs below, then ship it.
+
 ## 3. When something breaks
 
 `docs/ARCHITECTURE.md`, "What breaks on an upstream update, and where", maps each kind of failure to the one place to fix it:

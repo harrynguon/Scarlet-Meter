@@ -105,6 +105,7 @@ if (Get-GitLine $repoRoot @('status', '--porcelain')) {
 $branch = "update/upstream-$Tag"
 $work = Join-Path ([IO.Path]::GetTempPath()) ('scarlet-update-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
 $branchExists = [bool](Get-GitLine $repoRoot @('rev-parse', '--verify', '--quiet', "refs/heads/$branch"))
+$startCommit = Get-GitLine $repoRoot @('rev-parse', 'HEAD')
 if ($branchExists) {
     Write-Host "Reusing the local branch $branch from an earlier run."
     Invoke-Git @('-C', $repoRoot, 'worktree', 'add', '--quiet', $work, $branch) 'Could not create the temporary worktree.'
@@ -119,7 +120,7 @@ try {
         & (Join-Path $work 'scripts\Update-Upstream.ps1') -Tag $Tag
     }
     catch {
-        throw "Scarlet Meter does not build or pass its tests against RATmeter $Tag ($($_.Exception.Message)). Nothing was written to portable\ and your meter is unchanged. The release changed something the engine uses: it needs a code change in src\ScarletMeter.Engine\Upstream (the scarlet-upstream-update skill)."
+        throw "Moving to RATmeter $Tag, or building and testing against it, failed: $($_.Exception.Message) Nothing was written to portable\ and your meter is unchanged. If the build or the tests failed, the release changed something Scarlet's engine uses, which needs a code change in src\ScarletMeter.Engine\Upstream (the scarlet-upstream-update skill)."
     }
 
     # Update-Upstream.ps1 staged the pin move; commit it on the branch (nothing to commit when reusing it).
@@ -139,6 +140,12 @@ finally {
     finally { $ErrorActionPreference = $preference }
     if (Test-Path -LiteralPath $work) {
         Write-Warning "Could not remove the temporary worktree $work; delete it by hand, then run: git -C `"$repoRoot`" worktree prune"
+    }
+    # A branch this run created but never committed to (the run failed first) holds nothing: drop it.
+    elseif (-not $branchExists -and $startCommit -and (Get-GitLine $repoRoot @('rev-parse', "refs/heads/$branch")) -eq $startCommit) {
+        $ErrorActionPreference = 'Continue'
+        try { & $git -C $repoRoot branch --quiet -D $branch 2>$null | Out-Null } catch { }
+        finally { $ErrorActionPreference = $preference }
     }
 }
 
