@@ -63,7 +63,14 @@ public sealed class SettingsTests : IDisposable
         Assert.Equal(string.Empty, settings.Overlay.ToggleHotkey);
         Assert.Equal(new[] { WindowKeys.Overlay }, settings.Windows.Keys);
         Assert.Equal(9, repairs.Count);
-        Assert.Equal(1.0, SettingsNormalizer.Normalize(new MeterSettings { Appearance = new AppearanceSettings { PictureOpacity = double.PositiveInfinity } }).Settings.Appearance.PictureOpacity);
+
+        // Picture opacity's other edges: too high is clamped to 100%, not finite falls back to 100%, each reported.
+        foreach (var bad in new[] { 5.0, double.PositiveInfinity })
+        {
+            var (repaired, notes) = SettingsNormalizer.Normalize(new MeterSettings { Appearance = new AppearanceSettings { PictureOpacity = bad } });
+            Assert.Equal(1.0, repaired.Appearance.PictureOpacity);
+            Assert.Contains(notes, n => n.StartsWith("Picture opacity", StringComparison.Ordinal));
+        }
     }
 
     [Fact]
@@ -209,7 +216,7 @@ public sealed class SettingsTests : IDisposable
         Assert.True(loaded.Appearance.ShowCombatPower);
         Assert.Equal(1.0, loaded.Appearance.PictureOpacity); // the picture as it looked before the setting
 
-        var plain = loaded with { Appearance = loaded.Appearance with { BarEffects = false, EffectsOnEveryBar = false, ShowCombatPower = false } };
+        var plain = loaded with { Appearance = loaded.Appearance with { BarEffects = false, EffectsOnEveryBar = false, ShowCombatPower = false, PictureOpacity = 0.4 } };
         store.Save(plain);
         Assert.Equal(plain, store.Load().Settings);
     }

@@ -10,7 +10,9 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Checks (SDK 10.0.402):** `scripts/Build.ps1` 401/401, with the normalizer test extended (an out-of-range value clamped and reported, infinity back to 100%) and the earlier-build settings test checking the default. Fail-first: dropping the clamp failed `OutOfRangeValuesAreRepairedAndReported`.
 
-**Next:** visual check with Harry's OK (the game was running), audit, Codex, CI, merge, rebuild his copy.
+**Audit (pr-auditor, deep pass at high effort on 3b7677f): approve with nits**, applied: the value was never saved and read back in a test (`[JsonIgnore]` on it passed), and the upper bound was untested (a maximum of 100 passed), so the earlier-build test now saves and reloads 0.4 and the normalizer test checks 5 and infinity coming back as 100% with a repair (with those, `[JsonIgnore]` fails the earlier-build test and a maximum of 100 fails the normalizer test; 401/401 otherwise); the panel's colour moved to its own `background-color` declaration, so a bad value in the image layers (a comma decimal, say) drops only them instead of blanking the panel, and `--bg` notes its two hard-coded copies; ARCHITECTURE's settings sections line was stale. The auditor checked the compositing in headless Edge 155 against stacked reference elements (100%, 5%, 35% at 60% background, a half-transparent picture, no picture: equal within 8-bit rounding) and that `calc()` with `var()` works inside `rgba()` alpha in the installed WebView2 runtime. Kept: the picture's opacity survives removing the picture (the slider shows again under the next one); the repair message's wording and culture, which predate this. Codex: no findings; CI green on 3b7677f.
+
+**Next:** visual check with Harry's OK (the game was running), merge, rebuild his copy.
 
 ## 2026-10-24 — Target card with "Kill in", class bar effects, overtake glide, combat power
 
