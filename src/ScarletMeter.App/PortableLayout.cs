@@ -11,10 +11,11 @@ namespace ScarletMeter.App;
 /// </summary>
 public static class PortableLayout
 {
-    /// <summary>The marker's file name. Publish-Portable.ps1 writes the same name (a test keeps the two in step).</summary>
+    /// <summary>The marker's file name. scripts\PortableFolders.ps1 names the same file (a test keeps the two in step).</summary>
     public const string MarkerFileName = "ScarletMeter.portable";
 
-    /// <summary>The data folder's name, beside the executable.</summary>
+    /// <summary>The data folder's name, beside the executable. scripts\PortableFolders.ps1 carries a folder of this
+    /// name into each new build and never deletes one (a test keeps the names in step).</summary>
     public const string DataFolderName = "data";
 
     /// <summary>

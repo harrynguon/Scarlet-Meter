@@ -81,21 +81,51 @@ jobs:
             if (Test-Path -LiteralPath $folder) { throw "$folder was left behind." }
           }
 
-      # The portable build under pwsh, into the runner's temp directory: publish, layout check, the portable marker
-      # and the zip. The zip must hold the exe and the marker under a top "ScarletMeter" folder, and no data folder
-      # (extracting an update over a copy must not touch its data). Nothing here launches the meter.
-      - name: Portable build (publish, layout check, marker, zip)
+      # The live portable copy's folder rules (scripts/PortableFolders.ps1) against throwaway folders: the first copy,
+      # an update that keeps the data folder, refusals, cut-short updates, earlier builds, the zip, a running meter.
+      # Nothing is built and the meter is not launched (a hidden, renamed ping.exe stands in for it).
+      - name: Portable folder rules
+        shell: pwsh
+        run: '& "${{ github.workspace }}/scripts/Test-PortableFolders.ps1"'
+
+      # The portable build under pwsh, twice, into the runner's temp directory. The first run (-Zip) publishes into
+      # staging, checks the layout, adds the marker, writes the zip and makes the live copy: the zip must hold the exe
+      # and the marker under a top "ScarletMeter" folder and no data or staging marker. A settings file is then planted
+      # in the copy's data folder and a file of the player's beside it; the second run (no -Zip) must update the copy in
+      # place with both intact, leave no .staging or .old, remove the older zip, and leave exactly one ScarletMeter.exe.
+      # Nothing launches the meter.
+      - name: Portable build (publish, layout check, marker, zip, in-place update, twice)
         shell: pwsh
         run: |
+          $publish = Join-Path '${{ github.workspace }}' 'scripts/Publish-Portable.ps1'
           $root = Join-Path '${{ runner.temp }}' 'portable'
-          & (Join-Path '${{ github.workspace }}' 'scripts/Publish-Portable.ps1') -OutputRoot $root -SkipTests
-          $zips = @(Get-ChildItem -LiteralPath $root -Filter '*-win-x64.zip')
-          if ($zips.Count -ne 1) { throw "Expected one zip in $root, found $($zips.Count)." }
+          $live = Join-Path $root 'ScarletMeter'
+          $zip = Join-Path $root 'ScarletMeter-win-x64.zip'
+          & $publish -OutputRoot $root -SkipTests -Zip
+          if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) { throw "No zip at $zip." }
           Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $archive = [IO.Compression.ZipFile]::OpenRead($zips[0].FullName)
+          $archive = [IO.Compression.ZipFile]::OpenRead($zip)
           try { $entries = @($archive.Entries | ForEach-Object { $_.FullName -replace '\\', '/' }) } finally { $archive.Dispose() }
-          foreach ($required in 'ScarletMeter/ScarletMeter.exe', 'ScarletMeter/ScarletMeter.portable', 'ScarletMeter/wwwroot/index.html') {
+          foreach ($required in 'ScarletMeter/ScarletMeter.exe', 'ScarletMeter/ScarletMeter.portable', 'ScarletMeter/.scarlet-portable-files', 'ScarletMeter/wwwroot/index.html') {
             if ($entries -notcontains $required) { throw "The zip lacks $required." }
           }
-          if ($entries | Where-Object { $_ -notlike 'ScarletMeter/*' -or $_ -like 'ScarletMeter/data/*' }) { throw 'The zip holds an entry outside ScarletMeter/ or a data folder.' }
-          Write-Host "Portable zip checked: $($zips[0].Name), $([math]::Round($zips[0].Length / 1MB)) MB, $($entries.Count) entries"
+          if ($entries | Where-Object { $_ -notlike 'ScarletMeter/*' -or $_ -like 'ScarletMeter/data/*' -or $_ -like '*/.scarlet-portable-staging' }) { throw 'The zip holds an entry outside ScarletMeter/, a data folder or the staging marker.' }
+          Write-Host "Portable zip checked: $([math]::Round((Get-Item -LiteralPath $zip).Length / 1MB)) MB, $($entries.Count) entries"
+          foreach ($required in 'ScarletMeter.exe', 'ScarletMeter.portable', 'wwwroot/index.html') {
+            if (-not (Test-Path -LiteralPath (Join-Path $live $required) -PathType Leaf)) { throw "The live copy $live lacks $required." }
+          }
+          if (Test-Path -LiteralPath (Join-Path $live '.scarlet-portable-staging')) { throw 'The live copy kept the staging marker.' }
+          $settings = Join-Path $live 'data/settings.json'
+          [void][IO.Directory]::CreateDirectory((Split-Path -Parent $settings))
+          [IO.File]::WriteAllText($settings, '{ "ci": "kept" }')
+          $notes = Join-Path $live 'notes.txt'
+          [IO.File]::WriteAllText($notes, 'the player''s own file')
+          & $publish -OutputRoot $root -SkipTests
+          if ([IO.File]::ReadAllText($settings) -ne '{ "ci": "kept" }') { throw 'The in-place update lost the data folder.' }
+          if (-not (Test-Path -LiteralPath $notes -PathType Leaf)) { throw 'The in-place update lost a file the player put beside the exe.' }
+          foreach ($leftover in "$live.staging", "$live.old", $zip, "$zip.partial") {
+            if (Test-Path -LiteralPath $leftover) { throw "$leftover was left behind." }
+          }
+          $exes = @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter 'ScarletMeter.exe')
+          if ($exes.Count -ne 1) { throw "Expected one ScarletMeter.exe under $root, found $($exes.Count)." }
+          Write-Host "Portable copy updated in place with its data kept: $($exes[0].FullName)"

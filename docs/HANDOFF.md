@@ -1,6 +1,6 @@
 # Handoff — 2026-10-24
 
-Repository: https://github.com/harrynguon/ScarletMeter (private, default branch `main`). Sibling fork of upstream with the World Companion feature: https://github.com/harrynguon/AIon2-Dps-Meter.
+Repository: https://github.com/harrynguon/Scarlet-Meter (private, default branch `main`). Sibling fork of upstream with the World Companion feature: https://github.com/harrynguon/AIon2-Dps-Meter.
 
 ## State
 
@@ -14,7 +14,7 @@ Updates (2026-10-24, ARCHITECTURE.md "Updates"): builds stamp the pinned upstrea
 
 - [x] Wire the checker into the UI (`UpdateNotice`, WORKLOG.md 2026-10-24 "Update notice in the overlay").
 - [ ] With the meter installed and a newer RATmeter release out, the overlay's line appears about 30 seconds after start, "Release notes" opens the release in the browser, the cross hides it until the next release, and the switch in Settings, About stops the check.
-- [ ] Unzip a portable build (`Publish-Portable.ps1`) somewhere other than the checkout and run it in the game: data appears in its `data` folder, nothing in `%LocalAppData%\ScarletMeter`; extracting a newer zip over it keeps the settings and history.
+- [ ] Run the portable copy `<checkout>\portable\ScarletMeter\ScarletMeter.exe` (made by `Publish-Portable.ps1`) in the game: data appears in its `data` folder, nothing in `%LocalAppData%\ScarletMeter`; after closing it, a second `Publish-Portable.ps1` (or `Update-Meter.ps1`) run updates it in place and the settings and history are still there. (CI and `Test-PortableFolders.ps1` check the folder moves with fake data; the meter itself has not been run from an updated copy.)
 - [ ] Install once to the default location with `Install-Meter.ps1 -Shortcut`, which also brings in v1.11.5.341 (every install so far went to a temporary directory).
 
 ## Next: in-game acceptance

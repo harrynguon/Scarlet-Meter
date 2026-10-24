@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The in-place update guarded "data", not the player's files** (deep audit and Codex on #19, fixed before merge).
+- What: the first version of the one-copy update moved only a top-level `data` folder and deleted everything else in the old copy, so a `data - Copy` backup or notes beside the exe would have gone on the next update. When an undo failed it still said "your copy and its data are as they were" while the data sat in `.staging`. Its deletes removed the portable markers in directory order, so a delete stopped by an open file left an unmarked folder every later run refused. A drive root as output root became `C:`, which Windows reads as that drive's current directory. Two runs at once could delete each other's staging folder. After those fixes, Codex and a second audit found the recovery itself was not resumable: it dropped the staging marker before the rest of the player's files had followed from `.old`, so a recovery stopped there left a runnable copy without its data that every later run refused; and the earlier-build clean-up deleted through an inner folder that was a junction.
+- Why: "the player's data" was equated with one folder name instead of "everything the build did not put there"; the failure paths were tested for the first failure only, not for an undo or a recovery failing too; the marker-last delete existed for the installer but was reused without its markers; root paths, links one level down and concurrency were not considered.
+- Guard: a manifest of the build's files, so everything else is carried over and only listed files are deleted; an undo that fails leaves the copy's name free for the next run to finish and says where everything is; the copy keeps its staging marker until a recovery has finished, so the next run resumes it; `Remove-OwnedFolder` takes the markers to keep until last; `Remove-PortableFolder` refuses a folder that is a link; `Resolve-PortableRoot` keeps `C:\`; a named mutex per output root. `Test-PortableFolders.ps1` covers each, with a stand-in for the move that makes chosen moves fail and real held-open files, and each case was shown to fail with its guard removed. When code deletes near the player's files, define what is ours by listing it, and test each recovery step failing as well as the first.
+
 **Share bars were hard to see** (Harry, from the screenshots, 2026-10-24).
 - What: the details and saved-fight bars used a flat 32% red, which on the near-black panel came out as dark maroon.
 - Why: the colour was picked as a token, not looked at on the real background; smoke runs checked the bars existed, not that they could be seen.
@@ -55,6 +60,15 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - Guard: `SettingsTests.AFileSavedWithAByteOrderMarkLoads`. Seed test files the way people actually write them.
 
 ## In the process
+
+**Every build was a new copy to unzip** (Harry asked, 2026-10-24).
+- What: `Publish-Portable.ps1` wrote each build to a new stamped folder and zip and never replaced one, so the player had to unzip every update by hand and ended up with several folders, each with its own `ScarletMeter.exe`, not knowing which to click.
+- Why: "never overwrite anything" was chosen as the safe default from the developer's side; the player's question, which exe to run, was not asked. Safety belonged around the player's data, not around program files.
+- Guard: one live copy, `portable\ScarletMeter`, updated in place by renames that keep its `data` folder; earlier builds are removed; CI checks that one `ScarletMeter.exe` is left and a planted settings file survives. When a safety rule makes the player do more work, ask what it protects and protect only that.
+
+**Remove-Item on a junction waits for a confirmation** (Test-PortableFolders.ps1, 2026-10-24).
+- What: in Windows PowerShell 5.1, `Remove-Item -Force` on a junction asks to confirm, and a non-interactive run fails there.
+- Guard: delete a junction itself with `[IO.Directory]::Delete(<path>, $false)`, which never follows it.
 
 **UI checks opened windows over the player's game** (2026-10-24).
 - What: back-to-back smoke runs (a screenshot tour, the share-bar checks) started the meter on Harry's desktop; its always-on-top overlay and the details, history and settings windows popped up and took focus while he was in AION 2, and he died in game.

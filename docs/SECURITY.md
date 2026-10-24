@@ -35,7 +35,9 @@ World events (`src/ScarletMeter.WorldEvents`, `tests/ScarletMeter.Tests/WorldEve
 
 Confirm the schedule data's redistribution terms before any public binary release.
 
-A portable zip from `Publish-Portable.ps1` carries no debug symbols or documentation files, so it does not name the builder's folders or Windows account. It has not been reviewed for public release (licence notices, schedule data terms; see Provenance): hand it only to people you would give the source to.
+A portable build from `Publish-Portable.ps1` (the live copy and its `-Zip` zip) carries no debug symbols or documentation files, so it does not name the builder's folders or Windows account. The zip holds only what the build's manifest lists, never the live copy's `data` folder (settings, history, logs) or anything else the player put there; hand on the zip, never the `portable\ScarletMeter` folder itself, which holds that data. It has not been reviewed for public release (licence notices, schedule data terms; see Provenance): hand it only to people you would give the source to.
+
+The live copy's data sits inside the checkout, in `portable\ScarletMeter\data`, which `.gitignore` excludes (`portable/`); `Publish-Portable.ps1` refuses any other output root inside the checkout. Never `git add -f` anything under `portable\`, and never run `git clean -x` or `-X`, which deletes ignored files and so the player's history and settings.
 
 ## Game terms
 
