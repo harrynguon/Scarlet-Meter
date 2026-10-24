@@ -1,6 +1,6 @@
 # Handoff — 2026-10-24
 
-Repository: https://github.com/harrynguon/Scarlet-Meter (private, default branch `main`). Sibling fork of upstream with the World Companion feature: https://github.com/harrynguon/AIon2-Dps-Meter.
+Repository: https://github.com/harrynguon/Scarlet-Meter (public since 2026-10-25, default branch `main`; releases at https://github.com/harrynguon/Scarlet-Meter/releases, built by the Release workflow from a tag). Sibling fork of upstream with the World Companion feature: https://github.com/harrynguon/AIon2-Dps-Meter.
 
 ## State
 

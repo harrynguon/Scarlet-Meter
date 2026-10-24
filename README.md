@@ -2,7 +2,15 @@
 
 A network-based DPS meter for AION 2 Global with its own UI, built on the packet capture and decoding of [RATmeter](https://github.com/Kuroukihime/AIon2-Dps-Meter) (Kuroukihime/AIon2-Dps-Meter), which is included unmodified as the `upstream/` git submodule and pinned to a release tag.
 
-Status: in development, not yet tried in the game. Capture, decoding, fight tracking and history come from upstream through `ScarletMeter.Engine`. The overlay is a chromeless, translucent, always-on-top window showing the active target, party DPS, ping and per-player damage, with a settings window for background opacity and picture, class colours, relative bars, deaths, hidden names, row size, fight options (boss-only, combined summons, one-minute dummy, history retention) and a show/hide shortcut (`Ctrl+Shift+D` by default). Window positions are remembered. Clicking a player opens their details (skills, buffs, damage graph, combat log), and a history window browses saved boss fights; `--demo` runs synthetic fights for trying the UI without the game. A slim strip at the bottom of the overlay announces world events (Spacetime Rift, Shugo Festival, Dimensional Invasion, bosses and more) five minutes ahead and while their entry is open; times follow the World Companion's Global preset and are not yet verified in the game. A quiet line says when RATmeter publishes a release newer than the one the meter is built on, and `scripts/Install-Meter.ps1` rebuilds and reinstalls it. See [docs/HANDOFF.md](docs/HANDOFF.md) for what has been checked and what is next.
+## Download
+
+Get the latest `ScarletMeter-<version>-win-x64.zip` from [Releases](https://github.com/harrynguon/Scarlet-Meter/releases), install [Npcap](https://npcap.com) (tick "Install Npcap in WinPcap API-compatible Mode"), unzip the meter anywhere you can write to and run `ScarletMeter\ScarletMeter.exe`; nothing else to install. The zip's `README.txt` has the details. Releases are built by GitHub Actions from a tagged commit, not on anyone's PC; each comes with a SHA-256 checksum.
+
+**At your own risk:** the meter only reads network traffic and never touches the game, but NCSOFT's terms forbid unauthorised programs and can lead to an account ban. AION 2 and its names, artwork and data belong to NCSOFT; Scarlet Meter is not affiliated with or endorsed by NCSOFT.
+
+## Status
+
+In development, not yet tried in the game by its author, so the first releases are pre-releases. Capture, decoding, fight tracking and history come from upstream through `ScarletMeter.Engine`. The overlay is a chromeless, translucent, always-on-top window showing the active target, party DPS, ping and per-player damage, with a settings window for background opacity and picture, class colours, relative bars, deaths, hidden names, row size, fight options (boss-only, combined summons, one-minute dummy, history retention) and a show/hide shortcut (`Ctrl+Shift+D` by default). Window positions are remembered. Clicking a player opens their details (skills, buffs, damage graph, combat log), and a history window browses saved boss fights; `--demo` runs synthetic fights for trying the UI without the game. A slim strip at the bottom of the overlay announces world events (Spacetime Rift, Shugo Festival, Dimensional Invasion, bosses and more) five minutes ahead and while their entry is open; times follow the World Companion's Global preset and are not yet verified in the game. A quiet line says when RATmeter publishes a release newer than the one the meter is built on, and `scripts/Install-Meter.ps1` rebuilds and reinstalls it. See [docs/HANDOFF.md](docs/HANDOFF.md) for what has been checked and what is next.
 
 ## Layout
 
@@ -31,6 +39,8 @@ To **build** it (once, and again for each update):
 - Git, to clone the repository with its `upstream/` submodule.
 
 ## Run it
+
+From a release, see "Download" above. From your own build:
 
 **Portable, like RATmeter** (no installer): build it once,
 
@@ -85,4 +95,4 @@ Builds and tests a Release, publishes it and installs it to `%LocalAppData%\Prog
 
 ## Licence and terms
 
-GPLv3, the same as upstream, because the published program links upstream's code. Decoding the game's traffic is against NC's terms as read in the fork's [SECURITY.md](https://github.com/harrynguon/AIon2-Dps-Meter/blob/master/docs/SECURITY.md); use at your own risk, and see [docs/SECURITY.md](docs/SECURITY.md) before any release.
+GPLv3 ([LICENSE](LICENSE)), the same as upstream, because the published program links upstream's code; credits in [NOTICE](NOTICE) and every bundled component and data source in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). The source of a release is its tagged commit. Decoding the game's traffic is against NC's terms as read in the fork's [SECURITY.md](https://github.com/harrynguon/AIon2-Dps-Meter/blob/master/docs/SECURITY.md); use at your own risk, and see [docs/SECURITY.md](docs/SECURITY.md) before any release.

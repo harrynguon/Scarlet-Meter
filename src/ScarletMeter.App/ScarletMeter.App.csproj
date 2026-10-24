@@ -38,6 +38,15 @@
           ExcludeFromSingleFile="true" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- What a release must carry beside the executable (GPLv3, credits, how to run it), published loose so a player
+         can read them; scripts/Test-PublishLayout.ps1 checks they are there. -->
+    <None Include="../../LICENSE" Link="LICENSE.txt" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="../../NOTICE" Link="NOTICE.txt" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="../../THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="Release/README.txt" Link="README.txt" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
   <!-- Stamps the pinned upstream release and Scarlet's commit into this assembly (read by Updates/BuildInfo.cs). -->
   <Import Project="$(MSBuildThisFileDirectory)Updates\BuildStamp.targets" />
 

@@ -672,14 +672,3 @@ may consider it more useful to permit linking proprietary applications with
 the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
-
----
-
-Scarlet Meter
-Copyright (C) 2026 harrynguon
-
-Scarlet Meter is free software: you can redistribute it and/or modify it under the terms of the GNU
-General Public License, version 3, as published by the Free Software Foundation.
-
-It includes and links RATmeter (https://github.com/Kuroukihime/AIon2-Dps-Meter), Copyright (c) 2026
-Kuroukihime, in the upstream/ directory under the same licence; see upstream/LICENSE.

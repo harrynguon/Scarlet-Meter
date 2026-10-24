@@ -1,0 +1,104 @@
+name: Release
+
+# Builds a release from a version tag (v0.1.0) on GitHub's runners, so the zip holds nothing from a developer's
+# machine: the same restore, build, tests and portable publish as CI, a check of the zip's contents, then a DRAFT
+# release with the zip and its SHA-256 for a maintainer to download, check and publish (docs/DEVELOPMENT.md,
+# "Releases"). Only maintainers can push tags. Nothing here launches the meter.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write # to create the draft release, nothing else
+    steps:
+      - name: Checkout with the upstream submodule
+        uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      # As in ci.yml: the build stamp needs the release tag that names the pinned upstream commit.
+      - name: Fetch the pinned upstream release tag
+        shell: pwsh
+        run: |
+          function Invoke-GitWithRetry([string[]]$Arguments) {
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              $output = @(git @Arguments)
+              if ($LASTEXITCODE -eq 0) { return ,$output }
+              if ($attempt -lt 3) { Start-Sleep -Seconds (10 * $attempt) }
+            }
+            throw "git $($Arguments -join ' ') failed three times."
+          }
+          $upstream = Join-Path '${{ github.workspace }}' 'upstream'
+          $pinned = (git -C $upstream rev-parse HEAD).Trim()
+          $listing = Invoke-GitWithRetry @('-C', $upstream, 'ls-remote', '--tags', 'origin', 'refs/tags/v*')
+          $tags = @($listing | ForEach-Object {
+            if ($_ -match "^$pinned\trefs/tags/(v[0-9]+(\.[0-9]+){3})(\^\{\})?$") { $Matches[1] }
+          } | Select-Object -Unique | Sort-Object { [version]$_.Substring(1) } -Descending)
+          if (-not $tags) { throw "Upstream commit $pinned is not a release tag." }
+          $tag = $tags[0]
+          Invoke-GitWithRetry @('-C', $upstream, 'fetch', '--quiet', '--no-tags', '--depth=1', 'origin', "+refs/tags/${tag}:refs/tags/${tag}") | Out-Null
+          "SCARLET_EXPECTED_UPSTREAM_RELEASE=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Pinned upstream release: $tag ($pinned)"
+
+      # The tag must be "v" and the app's version (src/Directory.Build.props), and its notes must exist.
+      - name: The tag matches the app's version
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          [xml]$props = Get-Content -LiteralPath (Join-Path '${{ github.workspace }}' 'src/Directory.Build.props') -Raw
+          $version = @($props.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ })[0]
+          if (-not $version -or $tag -cne "v$version") { throw "Tag $tag does not match the app's version $version (src/Directory.Build.props)." }
+          $notes = Join-Path '${{ github.workspace }}' "docs/release-notes/$tag.md"
+          if (-not (Test-Path -LiteralPath $notes -PathType Leaf)) { throw "No release notes at docs/release-notes/$tag.md." }
+          "SCARLET_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "SCARLET_NOTES=$notes" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore, build and test
+        shell: pwsh
+        run: '& "${{ github.workspace }}/scripts/Build.ps1" -Configuration Release'
+
+      # The portable build into the runner's temp directory, then its zip checked: the program, its marker and
+      # the player's files under a top "ScarletMeter" folder, and no data folder or staging marker.
+      - name: Portable build and zip
+        shell: pwsh
+        run: |
+          $root = Join-Path '${{ runner.temp }}' 'release'
+          & (Join-Path '${{ github.workspace }}' 'scripts/Publish-Portable.ps1') -OutputRoot $root -SkipTests -Zip
+          $zip = Join-Path $root "ScarletMeter-$env:SCARLET_VERSION-win-x64.zip"
+          Move-Item -LiteralPath (Join-Path $root 'ScarletMeter-win-x64.zip') -Destination $zip
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [IO.Compression.ZipFile]::OpenRead($zip)
+          try { $entries = @($archive.Entries | ForEach-Object { $_.FullName -replace '\\', '/' }) } finally { $archive.Dispose() }
+          foreach ($required in 'ScarletMeter.exe', 'ScarletMeter.portable', 'README.txt', 'LICENSE.txt', 'NOTICE.txt', 'THIRD-PARTY-NOTICES.md', 'wwwroot/index.html') {
+            if ($entries -notcontains "ScarletMeter/$required") { throw "The zip lacks ScarletMeter/$required." }
+          }
+          if ($entries | Where-Object { $_ -notlike 'ScarletMeter/*' -or $_ -like 'ScarletMeter/data/*' -or $_ -like '*/.scarlet-portable-staging' }) { throw 'The zip holds an entry outside ScarletMeter/, a data folder or the staging marker.' }
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          [IO.File]::WriteAllText("$zip.sha256", "$hash  $(Split-Path -Leaf $zip)`n")
+          "SCARLET_ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Release zip: $(Split-Path -Leaf $zip), $([math]::Round((Get-Item -LiteralPath $zip).Length / 1MB)) MB, $($entries.Count) entries, SHA-256 $hash"
+
+      # A draft, so nothing is public until a maintainer has read it; versions below 1.0 are pre-releases.
+      - name: Draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $flags = @('--draft', '--verify-tag', '--title', "Scarlet Meter $tag", '--notes-file', $env:SCARLET_NOTES)
+          if ($env:SCARLET_VERSION.StartsWith('0.')) { $flags += '--prerelease' }
+          gh release create $tag $env:SCARLET_ZIP "$env:SCARLET_ZIP.sha256" @flags
+          if ($LASTEXITCODE) { throw 'Creating the draft release failed.' }

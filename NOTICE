@@ -1,0 +1,17 @@
+Scarlet Meter
+Copyright (C) 2026 harrynguon
+https://github.com/harrynguon/Scarlet-Meter
+
+Scarlet Meter is free software: you can redistribute it and/or modify it under the terms of the GNU General
+Public License, version 3, as published by the Free Software Foundation (LICENSE). It is distributed in the hope
+that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.
+
+It includes and links RATmeter (https://github.com/Kuroukihime/AIon2-Dps-Meter), Copyright (c) 2026 Kuroukihime,
+GPLv3, in the upstream/ directory of the source; see upstream/LICENSE. The complete corresponding source of every
+release is the tagged commit in the repository above, with the upstream/ submodule at the commit it records.
+
+Other components, data sources and their licences are listed in THIRD-PARTY-NOTICES.md.
+
+AION 2 and its names, artwork and game data belong to NCSOFT. Scarlet Meter is not affiliated with or endorsed
+by NCSOFT. Reading the game's network traffic may break the game's terms of service; using it is at your own risk.
