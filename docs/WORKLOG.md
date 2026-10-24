@@ -8,7 +8,7 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Why:** Harry, in game with the v0.1.0 build: the notices stepping aside in a boss fight is "great", but "there is a lot of empty space ... the area where the timers ends up being blank space". Of three ways offered (the panel fits its content, the window shrinks to fit, the rows grow to fill), Harry chose the panel fitting its content.
 
-**Checks (SDK 10.0.402):** `TheOverlayPanelFitsItsContent` new; fail-first, each failing it: `height: 100%` back on the panel, `flex: 1` back on the rows, and the picture without `fixed`.
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` 420/420 after merging main; `TheOverlayPanelFitsItsContent` new; fail-first, each failing it: `height: 100%` back on the panel, `flex: 1` back on the rows, and the picture without `fixed`.
 
 **Not checked:** in the game, whether clicks on the see-through part reach the game (a fully transparent pixel of a layered window normally passes them on) and resizing from the edges (the bottom edge is see-through while the panel is short, so it resizes from the top and sides then; Harry was told before choosing).
 
