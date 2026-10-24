@@ -1,6 +1,6 @@
 # Development
 
-Requires Windows, the .NET 10 SDK, the WebView2 runtime (ships with Windows 11), Git, and for live capture [Npcap](https://npcap.com) installed with "Install Npcap in WinPcap API-compatible Mode". Tests, `--no-capture` and `--demo` do not need Npcap.
+Building needs Windows, the .NET 10 SDK and Git. Running needs the WebView2 runtime (ships with Windows 11) and, for live capture, [Npcap](https://npcap.com) installed with "Install Npcap in WinPcap API-compatible Mode" (and its "Restrict ... to Administrators only" option unticked, unless the meter runs as administrator). Tests, `--no-capture` and `--demo` do not need Npcap. A Debug build or `dotnet run` needs the .NET 10 runtime (the SDK has it); the installed build is self-contained and needs no .NET install. README.md ("Requirements", "Run it") is the player's version.
 
 ## Clone and build
 
