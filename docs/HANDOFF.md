@@ -7,7 +7,7 @@ Repository: https://github.com/harrynguon/Scarlet-Meter (public since 2026-10-25
 - [x] Publish with Microsoft's Windows SDK projection bundled: Harry's decision on 2026-10-25, as RATmeter does (WebView2's composition control needs it for the see-through overlay; RATmeter's builds bundle it too; its licence is Microsoft's, and whether the GPL's system-library exception covers it is not settled: docs/SECURITY.md, "Public release").
 - [x] Merge #23, tag `v0.1.0` on `main`, and check the draft (done 2026-10-25, WORKLOG): both zips' SHA-256, the program zip's `licenses` folder and files, the source zip's `upstream/`, and no account name, home path or e-mail in any file (docs/DEVELOPMENT.md, "Releases").
 - [x] Make the repository public, then publish the draft (2026-10-25: https://github.com/harrynguon/Scarlet-Meter/releases/tag/v0.1.0); docs/SECURITY.md ("Game terms") and this line updated.
-- [ ] Once public, with the player's go-ahead (repository settings): protect `main`, add a tag ruleset for `v*`, and require approval before outside contributors' pull requests run workflows (docs/SECURITY.md, "Public release").
+- [x] Once public, with the player's go-ahead (repository settings): protect `main`, add a tag ruleset for `v*`, and require approval before outside contributors' pull requests run workflows (done 2026-10-25, Harry's go-ahead: rulesets "Protect main" and "Release tags", and "all external contributors") (docs/SECURITY.md, "Public release").
 
 ## State
 
@@ -43,7 +43,7 @@ Record the tested commit, observation date and Windows configuration. Pending:
 - [ ] `Ctrl+Shift+D` (or the chosen shortcut) minimizes and restores the meter while the game has focus, and does not trigger a game action.
 - [ ] Class colours, relative bars, deaths, hidden names and row size behave as in RATmeter.
 - [ ] On a boss, "Kill in" appears after a few seconds and lands within a few seconds of the real kill when the pace is steady, and keeps its estimate when you hit an add and go back to the boss; note bosses where it misleads (phases, invulnerable stretches, heals).
-- [ ] After a kill: does the boss stay as the target at 0 HP (the header then says "Boss defeated" and the effects stop) or does the meter drop it, as the demo does? Between pulls nothing on the bars should animate.
+- [x] After a kill: does the boss stay as the target at 0 HP (the header then says "Boss defeated" and the effects stop) or does the meter drop it, as the demo does? It stays: Harry's screenshot of a dungeon boss, 2026-10-25, portable copy built from 333d168, showed "Boss defeated", the card at 0 HP and 0.0%, and the notices back (that also confirms `BossFightHold` letting go at 0 HP). Between pulls nothing on the bars should animate.
 - [ ] Each player's combat power beside their name matches the game (upstream reads it from a heuristic scan; note any wrong or missing value).
 - [ ] With "Bar effects" on, the class effects on every bar, the gloss and the overtake glide do not cost frames in the game (compare FPS with the setting off, and with "Effects on every bar" off, in a full party); the glide looks right when players swap places often; each class's effect reads over the game at the chosen opacity.
 - [ ] Settings and window positions survive a restart; fight options (boss-only, combined summons, one-minute dummy) change new hits.
