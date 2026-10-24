@@ -4,9 +4,11 @@ namespace ScarletMeter.Engine.Upstream;
 
 /// <summary>
 /// AION 2 Global's names where upstream's game data names something differently: RATmeter's classes.json calls the
-/// class Global calls the Spiritmaster "Elementalist" (and its summons "Elementalist spirit"). Applied where the
-/// engine maps upstream's class and summon names (<see cref="UpstreamMapping"/>), so the overlay, details, history
-/// and saved fights all show Global's names while upstream's data stays unedited. Whole words only, case as written.
+/// class Global calls the Spiritmaster "Elementalist" (and its summons' class "Elementalist spirit"). Applied where
+/// the engine maps a player's class name (<see cref="UpstreamMapping.ToPlayerRow"/>), so the overlay, details,
+/// history and saved fights all show Global's names while upstream's data stays unedited. Not applied to names of
+/// players or summons, which are entities' own names (a summon's is "Player_{id}" or its owner-given name), so a
+/// nickname containing the word stays as it is. Whole words only, case as written.
 /// </summary>
 internal static partial class GlobalNames
 {

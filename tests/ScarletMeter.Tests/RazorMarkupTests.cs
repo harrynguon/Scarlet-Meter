@@ -135,6 +135,8 @@ public sealed partial class RazorMarkupTests
         Assert.DoesNotContain("me-mark", css, StringComparison.Ordinal);
         Assert.DoesNotContain("me-mark", page, StringComparison.Ordinal);
         Assert.DoesNotMatch(@"\.fill[^{]*\{[^}]*box-shadow:\s*inset", css);
+        // Nothing styles the own row's bar but its gold fill when class colours are off (.fill.self).
+        Assert.DoesNotMatch(@"\.row\.me[^{,]*\.fill", css);
         Assert.Matches(@"(?m)^\.row\.me \{[^}]*box-shadow:", css);
         Assert.Matches(@"(?m)^\.fx \.row\.me \{[^}]*box-shadow:", css);
     }

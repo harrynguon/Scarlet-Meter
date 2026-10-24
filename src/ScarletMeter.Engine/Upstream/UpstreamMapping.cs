@@ -117,7 +117,7 @@ internal static class UpstreamMapping
                 hit.Damage,
                 FlagsOf(hit),
                 hit.IsDot,
-                hit.SourceSummon?.Name is { } summon ? GlobalNames.Of(summon) : null))
+                hit.SourceSummon?.Name))
             .ToList();
 
     /// <summary>A history list item as an entry. Party DPS is total damage over the fight's duration.</summary>

@@ -72,8 +72,9 @@ button {
    picture both layers are the panel's colour, so nothing changes.
    The panel is only as tall as its content, up to the window (max-height; the rows scroll beyond it): what it does
    not cover is see-through to the game, so the room the notices leave in a boss fight, or below a small party's
-   rows, never shows as an empty panel. The window keeps the size the player gave it. Its bottom padding keeps the
-   same margin under the last row, or the notices, as the header and card have above, whichever ends the panel. */
+   rows, never shows as an empty panel. The window keeps the size the player gave it. Its bottom padding adds 8 px
+   under whatever ends the panel, on top of the rows' and the notices' own spacing: measured, 18 px from the last
+   row to the panel's edge and 15 px from the last notice. */
 .overlay {
     position: relative;
     isolation: isolate;

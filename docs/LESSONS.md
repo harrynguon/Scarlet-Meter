@@ -7,7 +7,7 @@ Mistakes found in this repository's work, why they got through, and what now cat
 **Class names were upstream's, not AION 2 Global's** (Harry, 2026-10-25).
 - What: the meter showed "Elementalist", the name in RATmeter's game data (`classes.json`), for the class AION 2 Global calls the Spiritmaster, in the overlay, the details, the history and the demo.
 - Why: names were taken from upstream's data as they come, and nobody compared them with the Global client the meter is for.
-- Guard: `Engine/Upstream/GlobalNames`, applied where the engine maps upstream's class and summon names, with `GlobalNamesTests` and checks on the live row, the details and a saved fight; upstream's data stays unedited. When a name reaches the player from upstream's data, check it against Global's.
+- Guard: `Engine/Upstream/GlobalNames`, applied where the engine maps players' class names, with `GlobalNamesTests` and checks on the live row, the details and a saved fight; upstream's data stays unedited. When a name reaches the player from upstream's data, check it against Global's.
 
 **Two markers for "you", one of them read as a glitch** (Harry, 2026-10-25).
 - What: the player's own bar carried a 2 px white stripe at its left edge (`.fill.me-mark`, from before the bar effects); when the effects added a glow ring round the player's row (#21), the stripe stayed, and on its own it looked like a rendering fault.
