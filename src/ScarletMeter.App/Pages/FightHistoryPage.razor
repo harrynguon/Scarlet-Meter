@@ -86,7 +86,7 @@
                             <td>@DetailFormat.Full(player.TotalDamage)</td>
                             <td class="accent">@Compact.Number(player.Dps)/s</td>
                             <td>@DetailFormat.Rate(player.CriticalRate)</td>
-                            <td class="bar-col"><span class="cell-bar @BarClass(player)" style="width:@Compact.Percent(player.DamageShare)"></span><span class="cell-bar-text">@Compact.Percent(player.DamageShare)</span></td>
+                            <td class="bar-col"><span class="cell-track"><span class="cell-bar @BarClass(player)" style="width:@Compact.Percent(player.DamageShare)"></span></span><span class="cell-bar-text">@Compact.Percent(player.DamageShare)</span></td>
                         </tr>
                     }
                 </tbody>

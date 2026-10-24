@@ -10,7 +10,9 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Checks (SDK 10.0.402):** `scripts/Build.ps1` 372/372, 5 new (`FormattingTests.ClassIdsMapToTheirGradientOrTheNeutralOne`). `Smoke-Meter.ps1 --demo`: the details Skills tab showed bright gradient bars with readable labels; the saved fight's four share bars carried `fill class-11`, `class-16`, `class-14` and `class-17` with their gradients (computed style read from the page) and drew in blue, teal, green and gold (screenshots, not committed).
 
-**Next:** PR, audit, Codex's review, CI and merge.
+**Audit (pr-auditor, standard pass on 42aecf2): approve with nits**, applied: each bar was sized against the whole cell while the new track was 12 px narrower, so a 50% share reached about 54% of the track and anything over about 92% looked full; the bar now sits inside the track (`.cell-track`), and in the running app every bar measured exactly its label's share (58.1% of the track for 58.1%, 31.3% for 31.3%). Overlay rows, `.fill` scoping, specificity, stacking and the settings refresh were checked by reading and found unchanged or correct. 372/372 after the fix.
+
+**Next:** Codex's review and CI on the final head, then merge.
 
 ## 2026-10-24 — One-command update of a portable copy
 

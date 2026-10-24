@@ -73,21 +73,22 @@
     width: 22%;
 }
 
-/* The whole column as a faint track, so a short bar still reads as a share of the whole. */
-td.bar-col::before {
-    content: "";
+/* The faint track a bar sits in, so a short bar still reads as a share of the whole. The bar is inside it, so its
+   width:N% is exactly N% of the track. */
+.cell-track {
     position: absolute;
     inset: 4px 6px;
     background: rgba(255, 255, 255, 0.05);
     border-radius: 3px;
+    overflow: hidden;
 }
 
 /* A share or uptime bar: the overlay's accent gradient, or a class gradient (.fill.class-N, app.css) when the
    page adds one. Flat 32% red read as dark maroon on the near-black panel. */
 .cell-bar {
     position: absolute;
-    inset: 4px auto 4px 6px;
-    max-width: calc(100% - 12px);
+    inset: 0 auto 0 0;
+    max-width: 100%;
     background: linear-gradient(90deg, rgba(230, 57, 70, 0.45) 0%, rgba(230, 57, 70, 0.88) 100%);
     border-radius: 3px;
 }
