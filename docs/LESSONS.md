@@ -51,6 +51,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**A reused branch would have built old code** (Codex and the audit on #16).
+- What: Update-Meter.ps1 reused an existing `update/upstream-<tag>` branch as it was, so a run after new commits on main would have zipped the branch's older source; and it read the current release from `upstream/`'s files, which a `git pull` leaves behind, then claimed a branch it had just deleted.
+- Why: the first run was tested from a fresh state only; reuse and an out-of-date submodule were not.
+- Guard: a reused branch must contain HEAD (`merge-base --is-ancestor`), the current release comes from `HEAD:upstream`, and the branch line is printed only when the branch exists. Test a script's second run and a `git pull`-ed checkout, not just the first run.
+
 **A test harness cut a script short** (testing Update-Meter.ps1, 2026-10-24).
 - What: piping the script's output through `Select-Object -First 20` stopped the pipeline after 20 matching lines, which stopped the script itself partway through the build, so the run looked like a script failure.
 - Guard: never truncate a long-running command's pipeline; write its output to a log file (`*>&1 | Out-File`) and filter the log afterwards.

@@ -5,23 +5,27 @@ builds and tests, and writes a new portable zip.
 
 .DESCRIPTION
 1. Asks GitHub for RATmeter's latest published release (or takes -Tag). Releases only, never upstream's dev
-   branch. If this checkout is already pinned to it, says so and stops.
-2. Makes a temporary git worktree of this checkout's HEAD under the temp folder, on a local branch
-   "update/upstream-<release>", and runs its scripts\Update-Upstream.ps1 -Tag <release>: the pin moves, then a
-   Debug build and the tests run against the new release.
-3. Commits the pin move on that branch, so the build is stamped with a real commit, then runs its
+   branch. The release this checkout is on is read from the pin its HEAD commit records (not from upstream/'s
+   files, which a plain git pull leaves behind); if it is already the wanted one, says so and stops, and an older
+   one is refused.
+2. Makes a temporary git worktree under the temp folder on a local branch "update/upstream-<release>", started
+   from HEAD. An existing branch of that name from an earlier run is reused only when it contains HEAD, so the
+   build never misses commits made since; otherwise the script stops and says how to recover.
+3. Runs that worktree's scripts\Update-Upstream.ps1 -Tag <release> (the pin moves, then a Debug build and the
+   tests), commits the pin move on the branch, so the build is stamped with a real commit, and runs its
    scripts\Publish-Portable.ps1 (Release build, tests, publish, layout check, marker, zip) with this checkout's
    "portable" folder as the output.
-4. Removes the temporary worktree. The branch stays: it holds the pin move, which becomes part of main through a
-   pull request with the docs updated (docs/DEVELOPMENT.md, "Updating upstream").
+4. Removes the temporary worktree, and a branch it created this run without committing to. A branch holding the
+   pin move stays: it joins main through a pull request with the docs (docs/DEVELOPMENT.md).
 
-It changes nothing in this checkout's files, in a portable copy or in its data: to update a copy, close the meter
-and extract the new zip into the folder that holds its ScarletMeter folder, replacing files. When the new release
-changed something Scarlet's engine uses, the build or the tests fail, no zip is written, and the message says so;
-that needs a code change in src/ScarletMeter.Engine/Upstream. Uncommitted changes in this checkout are not in the
-build (a warning says so). Needs git, the network (GitHub) and the .NET 10 SDK (SCARLET_DOTNET when it is not on
-PATH). Every path derives from this script's location or the platform's temp folder. Targets Windows PowerShell 5.1
-and pwsh.
+It changes none of this checkout's files, no portable copy and no data; besides the zip, it leaves only the local
+branch (and, on a checkout whose upstream/ was never initialised, git's submodule settings in .git/config). To
+update a copy, close the meter and extract the new zip into the folder that holds its ScarletMeter folder,
+replacing files. When the new release changed something Scarlet's engine uses, the build or the tests fail, no
+zip is written, and the message says so; that needs a code change in src/ScarletMeter.Engine/Upstream.
+Uncommitted changes in this checkout are not in the build (a warning says so). Needs git with a user identity
+(for the commit), the network (GitHub) and the .NET 10 SDK (SCARLET_DOTNET when it is not on PATH). Every path
+derives from this script's location or the platform's temp folder. Targets Windows PowerShell 5.1 and pwsh.
 
 .PARAMETER Tag
 A RATmeter release tag such as v1.11.5.341, instead of asking GitHub for the latest.
@@ -31,14 +35,15 @@ A RATmeter release tag such as v1.11.5.341, instead of asking GitHub for the lat
 #>
 [CmdletBinding()]
 param(
-    [ValidatePattern('^v\d{1,9}\.\d{1,9}\.\d{1,9}\.\d{1,9}$')]
+    # Case-sensitive, ASCII digits only, nothing after: the same rule as the app's release check.
+    [ValidateScript({ $_ -cmatch '\Av[0-9]{1,9}(\.[0-9]{1,9}){3}\z' })]
     [string]$Tag
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $latestReleaseApi = 'https://api.github.com/repos/Kuroukihime/AIon2-Dps-Meter/releases/latest'
-$releaseTag = '^v\d{1,9}\.\d{1,9}\.\d{1,9}\.\d{1,9}$'
+$releaseTag = '\Av[0-9]{1,9}(\.[0-9]{1,9}){3}\z'
 $git = (Get-Command git -ErrorAction Stop).Source
 
 # First line git prints for these arguments in $Directory, or $null on any failure. Never throws: stderr is
@@ -57,10 +62,17 @@ function Get-GitLine([string]$Directory, [string[]]$Arguments) {
     finally { $ErrorActionPreference = $preference }
 }
 
-# Runs git and throws with $Failure when it fails; --quiet arguments keep its success chatter off stderr.
+# Runs git and throws $Failure, with git's last lines, when it fails. The preference is relaxed while it runs, so
+# git's stderr becomes part of the message instead of a raw NativeCommandError under Windows PowerShell 5.1.
 function Invoke-Git([string[]]$Arguments, [string]$Failure) {
-    & $git @Arguments
-    if ($LASTEXITCODE) { throw $Failure }
+    $preference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { $output = @(& $git @Arguments 2>&1) }
+    finally { $ErrorActionPreference = $preference }
+    if ($LASTEXITCODE) {
+        $detail = (@($output | ForEach-Object { "$_".Trim() } | Where-Object { $_ }) | Select-Object -Last 3) -join ' '
+        throw "$Failure $detail"
+    }
 }
 
 # --- Which release ---
@@ -79,11 +91,13 @@ if (-not $Tag) {
     }
     # The answer is untrusted: only a release tag of the expected form is used.
     $Tag = [string]$release.tag_name
-    if ($Tag -notmatch $releaseTag) { throw 'GitHub answered with something that is not a RATmeter release tag; nothing was changed.' }
+    if ($Tag -cnotmatch $releaseTag) { throw 'GitHub answered with something that is not a RATmeter release tag; nothing was changed.' }
 }
 
-$current = Get-GitLine (Join-Path $repoRoot 'upstream') @('describe', '--tags', '--exact-match', 'HEAD')
-if ($current -and $current -match $releaseTag) {
+# The release HEAD pins: the submodule commit HEAD records, named by its tag when upstream/ has it.
+$pinnedCommit = Get-GitLine $repoRoot @('rev-parse', 'HEAD:upstream')
+$current = if ($pinnedCommit) { Get-GitLine (Join-Path $repoRoot 'upstream') @('describe', '--tags', '--exact-match', $pinnedCommit) }
+if ($current -and $current -cmatch $releaseTag) {
     $currentVersion = [Version]$current.Substring(1)
     $wantedVersion = [Version]$Tag.Substring(1)
     if ($currentVersion -eq $wantedVersion) {
@@ -94,24 +108,36 @@ if ($current -and $current -match $releaseTag) {
         throw "This checkout is on $current, newer than $Tag; nothing was changed."
     }
 }
+elseif ($pinnedCommit) {
+    Write-Warning "Could not tell which release HEAD pins (upstream commit $($pinnedCommit.Substring(0, [Math]::Min(7, $pinnedCommit.Length))), not a tag this checkout has); going ahead without the up-to-date or older-release checks."
+}
 Write-Host "Updating from RATmeter $(if ($current) { $current } else { 'an unknown release' }) to $Tag."
 
 if (Get-GitLine $repoRoot @('status', '--porcelain')) {
     Write-Warning 'This checkout has uncommitted changes; they are not in the new build, which starts from the last commit.'
 }
 
-# --- A throwaway worktree, so this checkout is never touched ---
+# --- A throwaway worktree, so this checkout's files are never touched ---
 
 $branch = "update/upstream-$Tag"
 $work = Join-Path ([IO.Path]::GetTempPath()) ('scarlet-update-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
-$branchExists = [bool](Get-GitLine $repoRoot @('rev-parse', '--verify', '--quiet', "refs/heads/$branch"))
 $startCommit = Get-GitLine $repoRoot @('rev-parse', 'HEAD')
+if (-not $startCommit) { throw 'This checkout has no commit to build from.' }
+$branchExists = [bool](Get-GitLine $repoRoot @('rev-parse', '--verify', '--quiet', "refs/heads/$branch"))
 if ($branchExists) {
-    Write-Host "Reusing the local branch $branch from an earlier run."
+    # Reused only when it holds everything HEAD does, so the zip never misses commits made since an earlier run.
+    $preference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & $git -C $repoRoot merge-base --is-ancestor $startCommit "refs/heads/$branch" 2>$null; $containsHead = ($LASTEXITCODE -eq 0) }
+    finally { $ErrorActionPreference = $preference }
+    if (-not $containsHead) {
+        throw "The local branch $branch, from an earlier run, does not contain this checkout's current commit, so building it would miss newer changes. Nothing was changed. If it holds only the pin move, delete it (git -C `"$repoRoot`" branch -D $branch) and run again; otherwise merge HEAD into it first."
+    }
+    Write-Host "Reusing the local branch $branch from an earlier run (it contains the current commit)."
     Invoke-Git @('-C', $repoRoot, 'worktree', 'add', '--quiet', $work, $branch) 'Could not create the temporary worktree.'
 }
 else {
-    Invoke-Git @('-C', $repoRoot, 'worktree', 'add', '--quiet', '-b', $branch, $work, 'HEAD') 'Could not create the temporary worktree.'
+    Invoke-Git @('-C', $repoRoot, 'worktree', 'add', '--quiet', '-b', $branch, $work, $startCommit) 'Could not create the temporary worktree.'
 }
 try {
     Invoke-Git @('-C', $work, 'submodule', 'update', '--init', '--quiet', 'upstream') 'Could not fetch the upstream submodule into the temporary worktree.'
@@ -126,7 +152,7 @@ try {
     # Update-Upstream.ps1 staged the pin move; commit it on the branch (nothing to commit when reusing it).
     & $git -C $work diff --cached --quiet
     if ($LASTEXITCODE) {
-        Invoke-Git @('-C', $work, 'commit', '--quiet', '-m', "Move upstream to release $Tag (Update-Meter.ps1)") 'Committing the pin move failed.'
+        Invoke-Git @('-C', $work, 'commit', '--quiet', '-m', "Move upstream to release $Tag (Update-Meter.ps1)") 'Committing the pin move failed (is git''s user.name and user.email set?).'
     }
 
     & (Join-Path $work 'scripts\Publish-Portable.ps1') -OutputRoot (Join-Path $repoRoot 'portable')
@@ -141,8 +167,8 @@ finally {
     if (Test-Path -LiteralPath $work) {
         Write-Warning "Could not remove the temporary worktree $work; delete it by hand, then run: git -C `"$repoRoot`" worktree prune"
     }
-    # A branch this run created but never committed to (the run failed first) holds nothing: drop it.
-    elseif (-not $branchExists -and $startCommit -and (Get-GitLine $repoRoot @('rev-parse', "refs/heads/$branch")) -eq $startCommit) {
+    # A branch this run created but never committed to holds nothing of its own: drop it.
+    elseif (-not $branchExists -and (Get-GitLine $repoRoot @('rev-parse', "refs/heads/$branch")) -eq $startCommit) {
         $ErrorActionPreference = 'Continue'
         try { & $git -C $repoRoot branch --quiet -D $branch 2>$null | Out-Null } catch { }
         finally { $ErrorActionPreference = $preference }
@@ -152,4 +178,6 @@ finally {
 Write-Host ''
 Write-Host "Updated to RATmeter $Tag. To update a portable copy: close the meter, then extract the zip above into the folder"
 Write-Host 'that holds your ScarletMeter folder, replacing files (your data folder is kept).'
-Write-Host "The pin move is on the local branch $branch; it joins main through a pull request (docs/DEVELOPMENT.md)."
+if (Get-GitLine $repoRoot @('rev-parse', '--verify', '--quiet', "refs/heads/$branch")) {
+    Write-Host "The pin move is on the local branch $branch; it joins main through a pull request (docs/DEVELOPMENT.md)."
+}

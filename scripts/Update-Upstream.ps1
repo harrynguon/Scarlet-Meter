@@ -13,7 +13,8 @@ script's location, so it runs from any working directory.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidatePattern('^v\d+\.\d+\.\d+\.\d+$')]
+    # Case-sensitive, ASCII digits only, nothing after: the same rule as the app's release check.
+    [ValidateScript({ $_ -cmatch '\Av[0-9]{1,9}(\.[0-9]{1,9}){3}\z' })]
     [string]$Tag
 )
 

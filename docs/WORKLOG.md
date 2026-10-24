@@ -16,7 +16,9 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Not checked:** a release that really breaks the engine's build (the failure path is the same `catch` the missing-tag case went through); pwsh locally (CI does not run this script, since it needs GitHub and minutes of builds).
 
-**Next:** PR, audit, Codex's review, CI and merge.
+**Review of #16:** Codex (one P2) and pr-auditor (deep pass: request changes) both found that a reused branch was built as it was, so it could miss commits made since; the audit also found the current release was read from `upstream/`'s working tree (stale after a plain `git pull`, in which case the closing message named a branch the run had just deleted), git's raw stderr replacing the script's message under Windows PowerShell 5.1 with output redirected, docs saying "the checkout is untouched" though a branch is added, a tag pattern looser than the app's (case, Unicode digits, a trailing newline), and the skill not saying to check the branch holds only the pin move. All fixed: a reused branch must contain HEAD; the release comes from `HEAD:upstream` (unknown releases warn and go ahead); git failures carry git's last lines in the script's message; the branch line prints only when the branch exists; both scripts validate tags with `-cmatch '\Av[0-9]{1,9}(\.[0-9]{1,9}){3}\z'`; docs, skill and a lessons entry corrected.
+
+**Next:** CI, Codex's review of the fixes, and merge.
 
 ## 2026-10-24 — Portable build, like RATmeter
 

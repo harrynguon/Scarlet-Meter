@@ -44,7 +44,7 @@ then unzip `<checkout>\portable\ScarletMeter-<version>-win-x64.zip` outside the 
 & "<checkout>\scripts\Update-Meter.ps1"
 ```
 
-It finds RATmeter's latest release, moves the pin to it, builds and tests, and writes a new zip to `<checkout>\portable`, all in a temporary copy, so your checkout and your portable copy are untouched. If the new release breaks something Scarlet uses, it stops with a message and writes no zip. Then close the meter and extract the new zip into the folder that holds your `ScarletMeter` folder (not into `ScarletMeter` itself), replacing files: the zip holds no `data` folder, so your data stays.
+It finds RATmeter's latest release, moves the pin to it, builds and tests, and writes a new zip to `<checkout>\portable`, all in a temporary copy, so your checkout's files and your portable copy are untouched (it leaves a local branch holding the pin move). If the new release breaks something Scarlet uses, it stops with a message and writes no zip. Then close the meter and extract the new zip into the folder that holds your `ScarletMeter` folder (not into `ScarletMeter` itself), replacing files: the zip holds no `data` folder, so your data stays.
 
 **Installed** instead (below, "Install and update"): the meter is `%LocalAppData%\Programs\ScarletMeter\ScarletMeter.exe`, with "Scarlet Meter" in the Start menu if installed with `-Shortcut`, and its data in `%LocalAppData%\ScarletMeter`.
 
