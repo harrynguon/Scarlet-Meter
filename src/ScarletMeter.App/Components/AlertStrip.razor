@@ -8,10 +8,16 @@
     collapses by itself once the extra events have passed; AlertStripLayout). Countdowns use the time the parent
     passes in, so they tick with the overlay's own refresh. Screen readers hear only the hidden summary, which
     changes when a notice appears or changes kind, not every second. It is always rendered (empty when nothing
-    is due), because a live region inserted already filled is often not announced.
+    is due), because a live region inserted already filled is often not announced. While Held (the notices stand
+    aside for a boss fight) it shows nothing and its live region is empty, so what came due meanwhile is announced
+    when the fight ends; the player's expanded choice is kept.
 *@
-<span class="sr-only" role="status">@Announcement</span>
-@if (View.Alerts.Count > 0)
+<span class="sr-only" role="status">@(Held ? string.Empty : Announcement)</span>
+@if (Held)
+{
+    @* Standing aside for a boss fight. *@
+}
+else if (View.Alerts.Count > 0)
 {
     <div class="alerts @(expanded ? "expanded" : "")" aria-label="World event alerts">
         @foreach (var alert in AlertStripLayout.Shown(View.Alerts, expanded))
@@ -62,6 +68,9 @@ else if (View.Next is { } next)
     [Parameter, EditorRequired] public AlertView View { get; set; } = AlertView.None;
 
     [Parameter] public DateTimeOffset Now { get; set; }
+
+    // The notices stand aside for a boss fight: nothing shows, and nothing is announced until they come back.
+    [Parameter] public bool Held { get; set; }
 
     protected override void OnParametersSet() => expanded = AlertStripLayout.StaysExpanded(expanded, View.Alerts);
 

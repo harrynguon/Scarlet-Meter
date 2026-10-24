@@ -54,6 +54,12 @@ public interface IMeterWindows
 
     /// <summary>Raised when <see cref="HotkeyError"/> changes.</summary>
     event EventHandler? HotkeyStatusChanged;
+
+    /// <summary>
+    /// The overlay's world-event notices stand aside for a boss fight, or come back; bringing a minimized meter back
+    /// for an event waits until they do. Cheap to call on every refresh.
+    /// </summary>
+    void HoldAlerts(bool held);
 }
 
 /// <summary>
@@ -77,6 +83,9 @@ public sealed class MeterWindows : IMeterWindows
     private bool hotkeySuspended;
     private bool modalOpen;
     private bool closing;
+    // "Bring the meter back before an event": the notices it follows, and whether a boss fight holds it back.
+    private readonly AlertRestoreGate restoreGate = new();
+    private AlertMonitor? alertMonitor;
 
     public MeterWindows(IServiceProvider services, SettingsService settings, ILogger<MeterWindows> logger)
     {
@@ -190,18 +199,31 @@ public sealed class MeterWindows : IMeterWindows
     /// <summary>
     /// Brings a minimized meter back once per event occurrence, when its Soon notice appears (if the player
     /// wants that), without activating it, so the game keeps keyboard focus. Owned tool windows reappear with
-    /// the overlay.
+    /// the overlay. While the notices stand aside for a boss fight it waits until they come back
+    /// (<see cref="AlertRestoreGate"/>).
     /// </summary>
     public void FollowAlerts(AlertMonitor alerts)
     {
+        alertMonitor = alerts;
         alerts.EventApproaching += (_, _) => Application.Current?.Dispatcher.InvokeAsync(() =>
         {
-            if (overlay is null || closing || modalOpen || overlay.WindowState != WindowState.Minimized) return;
-            if (!settings.Current.Alerts.RestoreMinimizedMeter) return;
-            var handle = new System.Windows.Interop.WindowInteropHelper(overlay).Handle;
-            if (handle != IntPtr.Zero) NativeMethods.ShowWindow(handle, NativeMethods.SwShowNoActivate);
+            if (restoreGate.Approaching()) RestoreForAlert();
         });
         alerts.Start();
+    }
+
+    public void HoldAlerts(bool held)
+    {
+        if (restoreGate.Hold(held, alertMonitor?.Current.Alerts.Count > 0)) RestoreForAlert();
+    }
+
+    // Shows the minimized overlay without activating it, if the player wants that and nothing forbids it now.
+    private void RestoreForAlert()
+    {
+        if (overlay is null || closing || modalOpen || overlay.WindowState != WindowState.Minimized) return;
+        if (!settings.Current.Alerts.RestoreMinimizedMeter) return;
+        var handle = new System.Windows.Interop.WindowInteropHelper(overlay).Handle;
+        if (handle != IntPtr.Zero) NativeMethods.ShowWindow(handle, NativeMethods.SwShowNoActivate);
     }
 
     public void SuspendHotkey(bool suspended)

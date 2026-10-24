@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using ScarletMeter.App.Alerts;
-using ScarletMeter.App.Combat;
 using ScarletMeter.App.Settings;
 using ScarletMeter.Engine;
 using ScarletMeter.WorldEvents;
@@ -138,17 +137,34 @@ public sealed class AlertTests : IDisposable
         Assert.True(SettingsNormalizer.Normalize(new MeterSettings()).Settings.Alerts.HideDuringBossFights);
     }
 
+    // When a boss fight is under way is BossFightHoldTests' subject; here, only that the setting decides.
     [Fact]
     public void TheStripStandsAsideOnlyWhileABossFightIsUnderWay()
     {
-        var boss = new TargetInfo(1, "Test Boss", 500_000, 1_000_000, IsBoss: true);
-        var mob = boss with { IsBoss = false };
-        Assert.True(AlertStripLayout.HiddenForFight(true, boss, FightPhase.Live));
-        Assert.True(AlertStripLayout.HiddenForFight(true, boss, FightPhase.Settled)); // an invulnerable phase
-        Assert.False(AlertStripLayout.HiddenForFight(true, boss with { HpCurrent = 0 }, FightPhase.Defeated));
-        Assert.False(AlertStripLayout.HiddenForFight(true, null, FightPhase.None));
-        Assert.False(AlertStripLayout.HiddenForFight(true, mob, FightPhase.Live)); // trash keeps the notices
-        Assert.False(AlertStripLayout.HiddenForFight(false, boss, FightPhase.Live)); // the setting off
+        Assert.True(AlertStripLayout.HiddenForFight(true, bossFightUnderWay: true));
+        Assert.False(AlertStripLayout.HiddenForFight(true, bossFightUnderWay: false));
+        Assert.False(AlertStripLayout.HiddenForFight(false, bossFightUnderWay: true)); // the setting off
+    }
+
+    // "Bring the meter back before an event" waits while the notices stand aside for a boss fight, and then brings
+    // it back once, only if a notice is still due.
+    [Fact]
+    public void BringingTheMeterBackWaitsForTheBossFightToEnd()
+    {
+        var gate = new AlertRestoreGate();
+        Assert.True(gate.Approaching());                  // no fight: at once
+        Assert.False(gate.Hold(false, noticesDue: true)); // nothing waited
+
+        Assert.False(gate.Hold(true, noticesDue: true));
+        Assert.False(gate.Approaching());                 // mid-fight: it waits
+        Assert.False(gate.Hold(true, noticesDue: true));  // still held
+        Assert.True(gate.Hold(false, noticesDue: true));  // the fight ends: now
+        Assert.False(gate.Hold(false, noticesDue: true)); // once
+
+        Assert.False(gate.Hold(true, noticesDue: true));
+        Assert.False(gate.Approaching());
+        Assert.False(gate.Hold(false, noticesDue: false)); // the event passed during the fight: not at all
+        Assert.True(gate.Approaching());
     }
 
     [Fact]

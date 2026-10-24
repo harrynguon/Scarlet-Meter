@@ -50,6 +50,37 @@ public sealed partial class RazorMarkupTests
             Assert.DoesNotContain(reach, effects);
     }
 
+    // A player's row reads DPS, then total damage, then share (Harry reads the DPS first), each in its own
+    // column; the CSS gives DPS and total fixed widths so the columns line up.
+    [Fact]
+    public void APlayersRowShowsDpsThenTotalDamageThenShare()
+    {
+        var page = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Pages", "MeterPage.razor"));
+        var columns = RowNumberColumn().Matches(page).Select(m => m.Groups[1].Value).ToList();
+        Assert.Equal(["num dps", "num total", "num pct"], columns);
+        Assert.True(page.IndexOf("player.Dps", StringComparison.Ordinal) < page.IndexOf("player.TotalDamage", StringComparison.Ordinal));
+        var css = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "app.css"));
+        foreach (var column in new[] { "dps", "total", "pct" })
+            Assert.Matches($@"\.row \.{column} \{{[^}}]*min-width:", css);
+    }
+
+    // The overlay holds its notices back by the player's "Hide during boss fights" switch, keeps the strip mounted
+    // while they are held, and tells the window layer, so bringing the meter back for an event waits too.
+    [Fact]
+    public void TheOverlayHoldsItsNoticesByThePlayersSwitch()
+    {
+        var pages = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Pages");
+        var code = File.ReadAllText(Path.Combine(pages, "MeterPage.razor.cs"));
+        var markup = File.ReadAllText(Path.Combine(pages, "MeterPage.razor"));
+        Assert.Contains("AlertStripLayout.HiddenForFight(alertSettings.HideDuringBossFights, bossFightUnderWay)", code);
+        Assert.Contains("bossFightUnderWay = bossFight.Update(snapshot.Target, now);", code);
+        Assert.Contains("Windows.HoldAlerts(NoticesHeld);", code);
+        Assert.Matches(@"(?m)^\s*<AlertStrip [^>]*Held=""NoticesHeld"" />", markup);
+    }
+
+    [GeneratedRegex(@"<span class=""(num[^""]*)""")]
+    private static partial Regex RowNumberColumn();
+
     [GeneratedRegex(@"<script\b(?<attributes>[^>]*)>(?<body>.*?)</script>", RegexOptions.Singleline | RegexOptions.IgnoreCase)]
     private static partial Regex ScriptTag();
 

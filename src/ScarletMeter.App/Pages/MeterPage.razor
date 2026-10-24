@@ -24,7 +24,7 @@
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8a4.5 4.5 0 1 0 1.3-3.2" /><path d="M3.2 2.6v2.6h2.6" /></svg>
             </button>
             @* World-event notices on or off in one click (the same switch as Settings, Alerts); struck through when off. *@
-            <button type="button" class="icon-btn @(alertSettings.Enabled ? "" : "off")" aria-pressed="@(alertSettings.Enabled ? "true" : "false")"
+            <button type="button" class="icon-btn @(alertSettings.Enabled ? "" : "off")" aria-label="World-event alerts" aria-pressed="@(alertSettings.Enabled ? "true" : "false")"
                     title="@(alertSettings.Enabled ? "Hide world-event alerts" : "Show world-event alerts")" @onclick="ToggleAlerts">
                 <svg viewBox="0 0 16 16" aria-hidden="true">
                     <path d="M4.3 11.2V7.3a3.7 3.7 0 0 1 7.4 0v3.9l1.2 1.2H3.1z" /><path d="M6.6 13.7a1.5 1.5 0 0 0 2.8 0" />
@@ -58,7 +58,8 @@
                     <svg class="target-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8c-3.3 0-5.6 2.3-5.6 5.3 0 1.9 1 3.3 2.4 4v2.1c0 .6.4.9.9.9h4.6c.5 0 .9-.3.9-.9v-2.1c1.4-.7 2.4-2.1 2.4-4 0-3-2.3-5.3-5.6-5.3Z" /><circle cx="5.8" cy="7.4" r="1.2" /><circle cx="10.2" cy="7.4" r="1.2" /><path d="M6.6 12.4v1.3M9.4 12.4v1.3" /></svg>
                 }
                 <span class="target-name" title="@target.Name">@target.Name</span>
-                <span class="target-hp">@Compact.Number(target.HpCurrent) / @Compact.Number(target.HpTotal) · <b>@Compact.Percent(target.HpPercent)</b></span>
+                @* The absolute HP gives way to the name on a narrow card (app.css, .target-card's container query). *@
+                <span class="target-hp"><span class="hp-abs">@Compact.Number(target.HpCurrent) / @Compact.Number(target.HpTotal) · </span><b>@Compact.Percent(target.HpPercent)</b></span>
                 @* On the same line, and only once there is an estimate, so the card stays one line and a bar. *@
                 @if (killIn is { } left)
                 {
@@ -104,8 +105,8 @@
                 {
                     <span class="deaths" title="Deaths">&#x1F480; @player.Deaths</span>
                 }
-                <span class="num">@Compact.Number(player.TotalDamage)</span>
                 <span class="num dps">@Compact.Number(player.Dps)/s</span>
+                <span class="num total" title="Total damage">@Compact.Number(player.TotalDamage)</span>
                 <span class="num pct">@Compact.Percent(player.DamageShare)</span>
             </li>
         }
@@ -122,9 +123,7 @@
             </button>
         </div>
     }
-    @* The notices stand aside during a boss fight when "Hide during boss fights" is on (AlertStripLayout). *@
-    @if (!AlertStripLayout.HiddenForFight(alertSettings.HideDuringBossFights, snapshot.Target, phase))
-    {
-        <AlertStrip View="Alerts.Current" Now="Clock.GetUtcNow()" />
-    }
+    @* Always rendered, held empty while the notices stand aside for a boss fight (NoticesHeld), so its live region
+       and the player's "+N more" choice survive the fight. *@
+    <AlertStrip View="Alerts.Current" Now="Clock.GetUtcNow()" Held="NoticesHeld" />
 </div>

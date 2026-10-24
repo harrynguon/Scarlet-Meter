@@ -1,5 +1,4 @@
 using ScarletMeter.App.Combat;
-using ScarletMeter.Engine;
 using ScarletMeter.WorldEvents;
 
 namespace ScarletMeter.App.Alerts;
@@ -15,11 +14,12 @@ public static class AlertStripLayout
     public const int CollapsedCount = 2;
 
     /// <summary>
-    /// Whether the strip stands aside for the fight under way: with "Hide during boss fights" on, while a boss is the
-    /// target and its fight is live or only briefly still (an invulnerable phase), not once it is down or gone.
+    /// Whether the strip stands aside for the fight under way: with "Hide during boss fights" on, while
+    /// <see cref="BossFightHold"/> says a boss fight is under way (adds included, not once the boss is down, gone or
+    /// long still).
     /// </summary>
-    public static bool HiddenForFight(bool hideDuringBossFights, TargetInfo? target, FightPhase phase) =>
-        hideDuringBossFights && target is { IsBoss: true } && phase is FightPhase.Live or FightPhase.Settled;
+    public static bool HiddenForFight(bool hideDuringBossFights, bool bossFightUnderWay) =>
+        hideDuringBossFights && bossFightUnderWay;
 
     /// <summary>The notices to draw, most urgent first: all of them when expanded, else the first few.</summary>
     public static IEnumerable<EventAlert> Shown(IReadOnlyList<EventAlert> alerts, bool expanded) =>

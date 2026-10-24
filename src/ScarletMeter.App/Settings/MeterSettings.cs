@@ -73,8 +73,9 @@ public sealed record AlertSettings
     public bool RestoreMinimizedMeter { get; init; }
 
     /// <summary>
-    /// Hide the notices while a boss fight is under way (a boss targeted and its HP moving or only just still), so a
-    /// dungeon boss gets the whole meter; they come back once the boss is down or the target is gone. On by default.
+    /// Hide the notices while a boss fight is under way (Combat/BossFightHold: from the boss's first hit, adds
+    /// included, while its HP moved within the last minute), so a dungeon boss gets the whole meter; they come back
+    /// once the boss is down, the target is gone or the boss has been still for a minute. On by default.
     /// </summary>
     public bool HideDuringBossFights { get; init; } = true;
 

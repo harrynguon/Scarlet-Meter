@@ -99,6 +99,25 @@ public sealed class SettingsTests : IDisposable
         Assert.True(result.Settings.Fight.BossOnlyCapture);
     }
 
+    // "Hide during boss fights" is on for a file from before it, and turning it off survives a save and a load.
+    [Fact]
+    public void HidingDuringBossFightsStartsOnAndATurnedOffChoiceIsSaved()
+    {
+        var store = NewStore();
+        Directory.CreateDirectory(directory.FullPath); // TestDataDirectory names the folder; the test makes it
+        File.WriteAllText(store.FilePath, """{ "version": 1, "alerts": { "leadMinutes": 15 } }""");
+
+        var loaded = store.Load().Settings;
+        Assert.True(loaded.Alerts.HideDuringBossFights);
+        Assert.Equal(15, loaded.Alerts.LeadMinutes);
+
+        var off = loaded with { Alerts = loaded.Alerts with { HideDuringBossFights = false } };
+        store.Save(off);
+        var reloaded = store.Load().Settings;
+        Assert.False(reloaded.Alerts.HideDuringBossFights);
+        Assert.Equal(off, reloaded);
+    }
+
     [Fact]
     public void AFileSavedWithAByteOrderMarkLoads()
     {
