@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The first boss-timers window trusted WebView2's words more than its docs** (deep audit on #29, fixed before merge).
+- What: the window treated "user-initiated" as "the player clicked this link", but WebView2 counts any script running from a click, so an advert could turn one click into a burst of browser tabs, local addresses included; and a toolbar click after the page's browser process crashed would have thrown out of the handler and ended the meter, since the control's `CoreWebView2` getter throws then. Screen capture, Save as, dropped files and the context menu were also still open.
+- Why: the lock was designed from the event names and the obvious cases (a link, a download, a permission), not from the SDK's own documentation of each property and of the control's failure modes; the tests covered the pure rule, and its callers only as source text.
+- Guard: the window's decisions are pure and tested (`DecideNavigation`, `DecideNewWindow`, `IsWebPage` refusing local hosts, `BrowserLaunchGate`), every button acts through a guard, the start catches everything, the remaining capabilities are refused, and each is in the source guard; 11 mutations, each failing its test. Before hosting third-party content, read the SDK's documentation of every event and property relied on, and list what a hostile page could still do.
+
 **A small overlay lost its saved position** (PR #28's window check, fixed before merge; older than #28).
 - What: the overlay could be resized down to its minimum height of 96 px, but the settings normalizer treats any saved size under 120 px as unusable and drops the whole placement, so the next save of a short overlay erased the player's position and size, and the next start used the default centre.
 - Why: the two limits were set in different files with no test tying them together, and no check had ever resized the overlay below 120 px.

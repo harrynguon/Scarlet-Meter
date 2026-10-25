@@ -325,14 +325,7 @@ public sealed class MeterWindows : IMeterWindows
             logger.LogWarning("Refused to open a page that is not a RATmeter release page."); // the address is untrusted: not logged
             return;
         }
-        try
-        {
-            using var _ = Process.Start(new ProcessStartInfo { FileName = page.AbsoluteUri, UseShellExecute = true });
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
-            logger.LogWarning(ex, "Opening the release page failed.");
-        }
+        DefaultBrowser.Open(page, logger);
     }
 
     /// <summary>

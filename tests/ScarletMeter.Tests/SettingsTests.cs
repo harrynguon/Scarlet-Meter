@@ -95,10 +95,11 @@ public sealed class SettingsTests : IDisposable
     public void NullSectionsFromAFileTakeDefaults()
     {
         File.WriteAllText(Path.Combine(directory.FullPath, "settings.json"),
-            """{ "version": 1, "fight": null, "appearance": { "classColors": false }, "windows": null }""");
+            """{ "version": 1, "fight": null, "appearance": { "classColors": false }, "bossTimers": null, "windows": null }""");
         var result = NewStore().Load();
         Assert.Equal(SettingsLoadStatus.Loaded, result.Status);
         Assert.Equal(new FightSettings(), result.Settings.Fight);
+        Assert.Equal(new BossTimersSettings(), result.Settings.BossTimers);
         Assert.False(result.Settings.Appearance.ClassColors);
         Assert.Equal(0.9, result.Settings.Appearance.BackgroundOpacity); // missing field keeps its default
         Assert.Empty(result.Settings.Windows);

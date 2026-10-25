@@ -94,7 +94,8 @@ and adds it up per player and per fight.
   fit instead. Times follow the Global preset and are not yet verified in game.
 - **Boss timers**: the hourglass in the header opens [aion2timers.com](https://www.aion2timers.com/world-boss-timer/)'s
   world-boss timers in a small window of their own, in or out of game. The site remembers your server and faction
-  there; links to other sites open in your browser. It sits behind the game unless you pin it on top.
+  there; links to other sites open in your browser (one every few seconds at most; a site link that redirects
+  elsewhere stays put). It sits behind the game unless you pin it on top.
 
 <p align="center"><img src="docs/images/alerts.gif" alt="World-event alerts below the bars (demo mode): two shown with +2 more; clicking it shows all four with Show less, the meter growing to fit, and folds them away again" width="456"/></p>
 
@@ -160,7 +161,8 @@ Your settings, fights and logs never leave your PC. The meter itself makes only 
 optional: an anonymous check for a newer RATmeter release on GitHub (every six hours, or ten minutes after a failed
 try), and skill icons from NCSOFT's own game-data site, as RATmeter does. Settings turn either off. The boss-timers
 window loads aion2timers.com only when you open it, like a browser tab kept apart from the meter: the site sees a
-normal visit, and the meter never reads the page.
+normal visit, Microsoft's SmartScreen checks the addresses it opens (as Edge does), and the meter never reads the
+page.
 
 **Can I get banned for using it?**
 It only reads network traffic, as RATmeter does, but NCSOFT's terms forbid unauthorised programs. Use it at your
