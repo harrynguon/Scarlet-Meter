@@ -2,6 +2,14 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-25 — v0.2.0 prepared
+
+**What:** `<Version>` is 0.2.0 (`src/Directory.Build.props`) and `docs/release-notes/v0.2.0.md` says what is new since 0.1.0 (#26 to #33: the icon and the header's face with its HP ring, readable rows, the one-bar world-event strip, the boss-timers window, the meter growing instead of scrolling, and the fixes), how to update from 0.1.0 (move the `data` folder), the Npcap step and the risk note, as DEVELOPMENT.md "Releases" asks. No package changed, so `Write-ThirdPartyNotices.ps1` has nothing to rewrite. Added to PR 32 rather than a PR of its own, so the release takes one round of review.
+
+**Why:** Harry: "run the audit. fix what it finds. then merge and release."
+
+**Next:** merge PR 32 once Codex and CI are clean on its head; tag `v0.2.0` on the merged commit; check the draft's zips (checksums, no account name, home path or e-mail address in their files); publish the draft as a pre-release.
+
 ## 2026-10-25 — Scarlet's face in the header, ringed by the boss's HP; larger class icons on the bars
 
 **What:** (1) The overlay's header starts with Scarlet's face (`wwwroot/images/avatar.png`, 64 px, shown 20 px and round), always, between fights too, in place of the state dot. Its ring takes the current target's HP (`MeterPage.AvatarClass`, `Formatting/HpBand`): green (`#5ed36a`) from 66%, yellow (`#f2c94c`) from 33%, red (`#f04c56`) above 0; glowing while the HP moves, without the glow and a touch dimmer once it has been still for 10 seconds; grey at 0 HP; a faint edge between fights. The overlay's `.state-dot` rules are gone. (2) The class icon on the overlay's bars is 19.5 px instead of 18 (`.rows .class-icon`, about 8% larger), still with 3 px or more above and below it in the 26 px row; the history and details windows keep 18 px. (3) `Test-PublishLayout.ps1` requires the image in a publish; THIRD-PARTY-NOTICES "Artwork" names it.
