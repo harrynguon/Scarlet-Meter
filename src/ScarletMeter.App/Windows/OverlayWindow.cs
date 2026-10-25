@@ -12,8 +12,8 @@ namespace ScarletMeter.App.Windows;
 /// <summary>
 /// The meter overlay: chromeless, transparent and always on top. The page paints its own translucent panel
 /// (background opacity is a setting), is dragged by its header (<see cref="BeginDrag"/>) and resized from
-/// the window edges through WindowChrome. Nothing in it scrolls: when the page's content is taller than the player's
-/// height, the window grows to fit at once and returns to the player's own placement a moment after it fits again
+/// the window edges through WindowChrome. Only its player list scrolls, past "Rows before scrolling": when the
+/// page's content is taller than the player's height, the window grows to fit at once and returns to the player's own placement a moment after it fits again
 /// (<see cref="FitToContent"/>, <see cref="OverlayPlacement"/>, <see cref="OverlayFit"/>); the player's placement,
 /// not the grown one, is what is saved. Its WebView does not zoom, so the page's CSS pixels are the window's.
 /// Closing it closes the tool windows first, then the app.

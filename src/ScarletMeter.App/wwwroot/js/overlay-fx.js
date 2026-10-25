@@ -93,6 +93,10 @@
         rowsObserver.observe(list, { childList: true });
         overlayObserver = new MutationObserver(remember);
         overlayObserver.observe(list.closest('.overlay'), { attributes: true, attributeFilter: ['style', 'class'] });
+        // In a list past "Rows before scrolling" the player's own row is pinned (app.css, .rows.capped > .row.me), and
+        // its offsetTop follows the scroll; measure again so a later reorder starts from where it is drawn. A list
+        // that is replaced takes its listener with it.
+        list.addEventListener('scroll', remember, { passive: true });
     }
 
     new MutationObserver(attach).observe(document.body, { childList: true, subtree: true });

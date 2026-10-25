@@ -136,6 +136,8 @@ public sealed record AppearanceSettings
     public const double MaxPictureOpacity = 1.0;
     public const double MinRowScale = 0.75;
     public const double MaxRowScale = 1.5;
+    public const int MinVisibleRows = 3;
+    public const int MaxVisibleRows = 40;
 
     /// <summary>Opacity of the overlay's background (0.1 to 1); text and bars stay opaque.</summary>
     public double BackgroundOpacity { get; init; } = 0.9;
@@ -166,6 +168,12 @@ public sealed record AppearanceSettings
 
     /// <summary>Size of the meter's rows and text (0.75 to 1.5).</summary>
     public double RowScale { get; init; } = 1.0;
+
+    /// <summary>
+    /// The most player rows the overlay shows at once (3 to 40): with more players the list scrolls, the player's own
+    /// row staying in view, so the meter stops growing in a big raid. The notices below never scroll.
+    /// </summary>
+    public int VisibleRows { get; init; } = 10;
 
     /// <summary>Show skill and buff icons, which load from NC's game-data CDN as in RATmeter.</summary>
     public bool SkillIcons { get; init; } = true;

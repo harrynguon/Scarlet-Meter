@@ -95,7 +95,8 @@
         </span>
     </div>
 
-    <ul class="rows">
+    @* Past "Rows before scrolling" the list scrolls, the player's own row pinned in view (RowsClass, app.css .rows.capped). *@
+    <ul class="rows @RowsClass">
         @foreach (var player in Visible)
         {
             <li class="row @(player.IsUser ? "me" : "")" @key="player.Id" title="Open this player's breakdown" @onclick="() => Windows.OpenPlayerDetails(player.Id)">

@@ -44,7 +44,8 @@ public partial class MeterPage : IAsyncDisposable
     private OdyleEnergy? odyle;
     private Task? refreshLoop;
     private bool refreshFailing;
-    // The content height last sent to the window, which grows to show all of it (nothing in the meter scrolls).
+    // The content height last sent to the window, which grows to show all of it (only the player list scrolls, past
+    // "Rows before scrolling").
     private double reportedHeight = double.NaN;
     private bool fitFailing;
     // Whether the window, after the last fit, still cannot show all of the content (OverlayClass, "cut").
@@ -82,6 +83,11 @@ public partial class MeterPage : IAsyncDisposable
         .Where(p => p.IsIdentified || p.DamageShare > 1)
         .OrderByDescending(p => p.TotalDamage);
 
+    // "capped" once there are more rows than "Rows before scrolling": the list stops at that many and scrolls
+    // (app.css, .rows.capped; --visible-rows in PanelStyle). Up to it the list is clipped, as before, so a gliding row
+    // never shows a scrollbar for a moment.
+    private string RowsClass => Visible.Count() > appearance.VisibleRows ? "capped" : string.Empty;
+
     // "fx" with bar effects on; "settled" hides them once the fight is quiet or over (app.css), so nothing animates
     // between pulls. "cut" while the window cannot show all of the content (IMeterWindows.OverlayCutsContent): the
     // rows give way then, faded, and the notices stay whole.
@@ -107,13 +113,14 @@ public partial class MeterPage : IAsyncDisposable
         _ => "No active target",
     };
 
-    // Background opacity, picture and its opacity, and row size as CSS variables on the panel (see app.css, .overlay).
+    // Background opacity, picture and its opacity, row size and rows before scrolling as CSS variables on the panel
+    // (see app.css, .overlay and .rows.capped).
     private string PanelStyle
     {
         get
         {
             var style = string.Create(CultureInfo.InvariantCulture,
-                $"--panel-alpha:{appearance.BackgroundOpacity:0.###};--image-alpha:{appearance.PictureOpacity:0.###};--row-scale:{appearance.RowScale:0.###};");
+                $"--panel-alpha:{appearance.BackgroundOpacity:0.###};--image-alpha:{appearance.PictureOpacity:0.###};--row-scale:{appearance.RowScale:0.###};--visible-rows:{appearance.VisibleRows};");
             return WebAssetHosts.BackgroundUrl(appearance.BackgroundImage) is { } url ? style + $"--panel-image:url('{url}');" : style;
         }
     }
@@ -132,7 +139,7 @@ public partial class MeterPage : IAsyncDisposable
     }
 
     // After each render, the panel's content height goes to the window when it changed, so the window grows to show
-    // all of it or returns to the player's size (nothing in the meter scrolls; Windows/OverlayFit), and the page asks
+    // all of it or returns to the player's size (only the capped player list scrolls; Windows/OverlayFit), and the page asks
     // whether the window still cuts the content (as tall as the screen allows, or being resized), when the rows give
     // way; a change renders once more. The script may not be loaded for the first render, and the page may be
     // closing; the next render tries again. A fit that fails is logged once and retried on the next render: a

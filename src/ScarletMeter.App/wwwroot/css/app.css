@@ -73,8 +73,9 @@ button {
    the picture at that opacity over the colour would look; the dark veil above it keeps text readable. Without a
    picture both layers are the panel's colour, so nothing changes.
    The panel is only as tall as its content: what it does not cover is see-through to the game, so the room the
-   notices leave in a boss fight, or below a small party's rows, never shows as an empty panel. Nothing in it
-   scrolls: when the content is taller than the window, the window grows to fit (js/overlay-size.js reports the
+   notices leave in a boss fight, or below a small party's rows, never shows as an empty panel. Only the player
+   list scrolls, past "Rows before scrolling" (.rows.capped); the notices never do. Otherwise, when the content is
+   taller than the window, the window grows to fit (js/overlay-size.js reports the
    height, Windows/OverlayFit places the window) and returns to the player's size once it fits again. max-height
    keeps the panel inside the window for the moment until then, and for good once the window is as tall as the
    screen, when the rows give way (.overlay.cut .rows), never the notices. Its bottom padding adds 8 px
@@ -387,9 +388,10 @@ button {
 .ping.bad { color: var(--bad); }
 .ping.bad i:nth-child(1) { background: var(--bad); }
 
-/* Positioned, so a row's offsetTop (js/overlay-fx.js) is measured from the list, not the panel above it. Nothing in
-   the overlay scrolls: the rows take their full height (flex: none) and the window grows to the content (.overlay).
-   Its overflow is clipped, not scrollable, so a row gliding into place (a transform) cannot stretch the measured
+/* Positioned, so a row's offsetTop (js/overlay-fx.js) is measured from the list, not the panel above it. Up to
+   "Rows before scrolling" the rows take their full height (flex: none) and the window grows to the content
+   (.overlay); past it the list scrolls (.rows.capped). Up to it, its overflow is clipped, not scrollable, so a row
+   gliding into place (a transform) cannot stretch the measured
    height for a moment and make the window jump. --row-edge is the crisp dark edge every bit of a row's text sits
    on, a tight outline shadow, so white text stays readable over the brightest class bars (gold, green) as well as
    the dark track; a soft shadow alone washed out there. */
@@ -416,6 +418,50 @@ button {
 
 .overlay[data-measuring] .rows {
     flex: none;
+}
+
+/* More players than "Rows before scrolling" (Settings, Appearance; Pages/MeterPage.razor.cs, RowsClass; Harry: in
+   big raids the meter was "just too long vertically"): the list stops at that many rows and scrolls, so the window
+   stops growing there; the notices below never scroll. Each row takes 29 px (26 px and its 3 px gap), so the
+   content box holds that many rows and the padding shows the top 6 px of the next one, faded out at the bottom
+   edge as a sign that more follow; scrolled to the end, only the last row's gap is in the fade. The list's zoom
+   (Row size) scales the cap with the rows. The page measures it at this height (js/overlay-size.js), so the
+   window fits the capped list. */
+.rows.capped {
+    max-height: calc(var(--visible-rows, 10) * 29px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 9px), transparent);
+}
+
+.rows.capped::-webkit-scrollbar { width: 6px; }
+.rows.capped::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 3px; }
+
+/* In a scrolling list the player's own row never scrolls out of sight: it stops at the top edge, or at the bottom
+   in the last whole row's place (3 px above the padding, which is the fade), over whichever row is there. Only
+   while it is stuck (a scroll-state query on the row itself) does a solid backdrop in the panel's colour cover the
+   row beneath; unstuck it looks like every other row, over the picture. Its offsetTop is where it is drawn, so
+   js/overlay-fx.js measures it again on scroll. */
+.rows.capped > .row.me {
+    position: sticky;
+    top: 0;
+    bottom: 3px;
+    z-index: 1;
+    container-type: scroll-state;
+}
+
+.rows.capped > .row.me::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+}
+
+@container scroll-state((stuck: top) or (stuck: bottom)) {
+    .rows.capped > .row.me::before {
+        background: linear-gradient(var(--row), var(--row)), rgb(15, 15, 20);
+    }
 }
 
 .row {
