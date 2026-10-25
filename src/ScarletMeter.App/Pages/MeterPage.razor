@@ -1,5 +1,5 @@
 @*
-    The overlay: a header (fight state and duration, buttons), the target's card (name, HP, its bar and the
+    The overlay: a header (Scarlet's face ringed by the fight's state, the state and duration, buttons), the target's card (name, HP, its bar and the
     "Kill in" estimate), totals, one row per player and the notices below. With "Bar effects" on (.fx), the bars
     shine, each bar carries its class's animated effect (BarEffect; the player's own at full strength, the others
     fainter, or only the player's when "Effects on every bar" is off), and js/overlay-fx.js glides rows to their
@@ -8,9 +8,10 @@
 <div class="overlay @OverlayClass" data-window="overlay" style="@PanelStyle">
     <header class="ov-header" @onmousedown="OnHeaderMouseDown">
         <div class="ov-title">
+            @* Scarlet's face, always there; its ring takes the fight's state (AvatarClass, app.css .ov-avatar). *@
+            <span class="ov-avatar @AvatarClass" aria-hidden="true"></span>
             @if (snapshot.Target is { } fighting)
             {
-                <span class="state-dot @StateDotClass" aria-hidden="true"></span>
                 <span class="state-text">@StateText(fighting)</span>
                 <span class="state-time" title="Combat duration">@Compact.Duration(snapshot.Duration)</span>
             }

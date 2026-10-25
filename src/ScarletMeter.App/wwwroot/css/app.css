@@ -128,27 +128,39 @@ button {
     gap: 8px;
 }
 
-/* In a fight: a live dot, "Boss combat" or "Combat", and the duration. */
-.state-dot {
+/* Scarlet's face at the header's left, always there (images/avatar.png, from the app icon's portrait; its source is in
+   THIRD-PARTY-NOTICES.md, "Artwork"), then in a fight "Boss combat" or "Combat" and the duration. Its ring takes the
+   target's HP (Formatting/HpBand): green from 66%, yellow from 33%, red below, glowing while the HP moves and without
+   the glow, a touch dimmer, once it has been still a while (.still); grey when the target is down; between fights
+   only a faint edge. A truer green than the theme's teal (--good), which looked off beside the portrait's reds. */
+.ov-avatar {
     flex: none;
-    width: 8px;
-    height: 8px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
-    background: var(--good);
-    box-shadow: 0 0 6px var(--good);
+    background: url("../images/avatar.png") center / cover no-repeat;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 
-/* The target's HP has not moved for a while: the dot dims. */
-.state-dot.quiet {
-    background: var(--fair);
-    box-shadow: none;
-    opacity: 0.7;
+.ov-avatar.hp-high { --ring: #5ed36a; }
+.ov-avatar.hp-mid { --ring: #f2c94c; }
+.ov-avatar.hp-low { --ring: #f04c56; }
+
+.ov-avatar.hp-high,
+.ov-avatar.hp-mid,
+.ov-avatar.hp-low {
+    box-shadow: 0 0 0 1.5px var(--ring), 0 0 7px var(--ring);
 }
 
-/* The target is down. */
-.state-dot.done {
-    background: var(--muted);
-    box-shadow: none;
+.ov-avatar.hp-high.still,
+.ov-avatar.hp-mid.still,
+.ov-avatar.hp-low.still {
+    box-shadow: 0 0 0 1.5px var(--ring);
+    opacity: 0.85;
+}
+
+.ov-avatar.done {
+    box-shadow: 0 0 0 1.5px var(--muted);
 }
 
 .state-text {
@@ -411,6 +423,13 @@ button {
     border-radius: 4px;
     background-size: cover;
     background-position: center;
+}
+
+/* On the overlay's bars the class icon is a little larger (Harry: hard to see at 18 px): 19.5 px, about 8% more,
+   still well inside the 26 px row; it scales with the row size like the rest of the row (.rows' zoom). */
+.rows .class-icon {
+    width: 19.5px;
+    height: 19.5px;
 }
 
 /* The name and, after it, the combat power; the name gives way first when the row is narrow. */

@@ -38,6 +38,20 @@ public sealed class FormattingTests
     [InlineData(450, "bad")]
     public void PingBands(int? ping, string level) => Assert.Equal(level, PingLevel.Of(ping));
 
+    // The header ring's colour by the target's HP (Harry: "green = 66->100% hp, yellow = 33-66% hp, red = 0.1-33% hp"):
+    // each boundary belongs to the band above it; 0 (down) and an unknown HP have no band.
+    [Theory]
+    [InlineData(100, "hp-high")]
+    [InlineData(66, "hp-high")]
+    [InlineData(65.99, "hp-mid")]
+    [InlineData(33, "hp-mid")]
+    [InlineData(32.99, "hp-low")]
+    [InlineData(0.1, "hp-low")]
+    [InlineData(0.001, "hp-low")]
+    [InlineData(0, "")]
+    [InlineData(double.NaN, "")]
+    public void HpBands(double hpPercent, string band) => Assert.Equal(band, HpBand.Of(hpPercent));
+
     [Fact]
     public void PagesOnlyGetUrlsOnTheLocalHosts()
     {

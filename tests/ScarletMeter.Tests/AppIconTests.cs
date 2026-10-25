@@ -89,6 +89,7 @@ public sealed partial class AppIconTests
         var notices = File.ReadAllText(Path.Combine(RepositoryRoot(), "THIRD-PARTY-NOTICES.md"));
         Assert.Contains("## Artwork", notices);
         Assert.Contains("src/ScarletMeter.App/Assets/ScarletMeter.ico", notices);
+        Assert.Contains("src/ScarletMeter.App/wwwroot/images/avatar.png", notices); // the header's face, from the same portrait
         Assert.Contains("AI-generated", notices);
         Assert.Contains("GPT 6.1 Astra", notices);
     }

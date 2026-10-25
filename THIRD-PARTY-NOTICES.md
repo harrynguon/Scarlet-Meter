@@ -58,6 +58,9 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   pixel-art portrait, made for this project by its owner (harrynguon) with GPT 6.1 Astra on 2026-10-25, then resized
   into the icon's sizes, lightly sharpened at the small sizes and given rounded corners. It is not affiliated with or
   endorsed by any game, anime or studio. Scarlet Meter is a free, non-commercial project.
+- **Header face** (`src/ScarletMeter.App/wwwroot/images/avatar.png`, at the left of the meter's header): the same
+  portrait without the meter badge, also made by the project's owner with GPT 6.1 Astra on 2026-10-25, cropped to the
+  face and resized to 64 px.
 
 ## NuGet packages
 
