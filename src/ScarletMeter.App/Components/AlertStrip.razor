@@ -1,16 +1,16 @@
 @using ScarletMeter.App.Alerts
 @using ScarletMeter.WorldEvents
 @*
-    The overlay's world-event notices: a slim strip at the bottom of the meter. "Soon" counts down to the
-    start with a bar that fills over the lead time; "Open" counts down to the end of the entry or portal
-    window. Two notices show; the rest are summarised as "+N more", which lists them on hover and expands the
-    strip to show all of them with their countdowns when clicked ("Show less" collapses it again, and it
-    collapses by itself once the extra events have passed; AlertStripLayout). Countdowns use the time the parent
-    passes in, so they tick with the overlay's own refresh. Screen readers hear only the hidden summary, which
-    changes when a notice appears or changes kind, not every second. It is always rendered (empty when nothing
-    is due), because a live region inserted already filled is often not announced. While Held (the notices stand
-    aside for a boss fight) it shows nothing and its live region is empty, so what came due meanwhile is announced
-    when the fight ends; the player's expanded choice is kept while more than two notices are due.
+    The overlay's world-event notices: one slim bar at the bottom of the meter that opens and closes. Closed (the
+    default), it shows the most urgent notice in one line, with its progress line, how many more are due ("+2") and a
+    chevron; hovering lists every due notice. Open, it becomes a "World events" header over every notice with its countdown: "Soon"
+    counts down to the start with a line that fills over the lead time, "Open" to the end of the entry or portal
+    window. The player's choice is kept in settings (AlertSettings.NoticesExpanded), so it stays as they left it.
+    Countdowns use the time the parent passes in, so they tick with the overlay's own refresh. Screen readers hear
+    only the hidden summary, which changes when a notice appears or changes kind, not every second. It is always
+    rendered (empty when nothing is due), because a live region inserted already filled is often not announced.
+    While Held (the notices stand aside for a boss fight) it shows nothing and its live region is empty, so what came
+    due meanwhile is announced when the fight ends.
 *@
 <span class="sr-only" role="status">@(Held ? string.Empty : Announcement)</span>
 @if (Held)
@@ -19,34 +19,42 @@
 }
 else if (View.Alerts.Count > 0)
 {
-    <div class="alerts @(expanded ? "expanded" : "")" aria-label="World event alerts">
-        @foreach (var alert in AlertStripLayout.Shown(View.Alerts, expanded))
+    var first = View.Alerts[0];
+    <div class="alerts @(Expanded ? "expanded" : "")" aria-label="World event alerts">
+        <button type="button" class="alert-bar @Kind(first)" aria-expanded="@(Expanded ? "true" : "false")"
+                title="@(Expanded ? AlertStripLayout.CollapseHint : AlertStripLayout.List(View.Alerts))"
+                @onclick="Toggle">
+            <span class="alert-dot"></span>
+            @if (Expanded)
+            {
+                <span class="alert-name">World events</span>
+                <span class="alert-count">@View.Alerts.Count</span>
+            }
+            else
+            {
+                <span class="alert-name">@first.Rule.Name</span>
+                <span class="alert-when">@When(first)</span>
+                @if (AlertStripLayout.MoreCount(View.Alerts) is var more && more > 0)
+                {
+                    <span class="alert-count">+@more</span>
+                }
+                @* Keyed to the notice, so when another becomes the most urgent its line starts afresh rather than gliding
+                   from the last one's fill. *@
+                <span class="alert-progress" @key="@($"{first.Rule.Id}-{first.Kind}-{first.Start.UtcTicks}")"
+                      style="width:@Compact.Percent(Progress(first, first.Deadline - Now))"></span>
+            }
+            <span class="alert-chevron" aria-hidden="true"></span>
+        </button>
+        @foreach (var alert in AlertStripLayout.Shown(View.Alerts, Expanded))
         {
             var remaining = alert.Deadline - Now;
             <div class="alert @Kind(alert)" @key="@($"{alert.Rule.Id}-{alert.Kind}-{alert.Start.UtcTicks}")"
                  title="@AlertStripLayout.Describe(alert)">
                 <span class="alert-dot"></span>
                 <span class="alert-name">@alert.Rule.Name</span>
-                <span class="alert-when">
-                    @if (alert.Kind == AlertKind.Soon)
-                    {
-                        <text>in @EventText.Countdown(remaining)</text>
-                    }
-                    else
-                    {
-                        <text>@EventText.OpenLabel(alert.Rule) · @EventText.Countdown(remaining) left</text>
-                    }
-                </span>
+                <span class="alert-when">@When(alert)</span>
                 <span class="alert-progress" style="width:@Compact.Percent(Progress(alert, remaining))"></span>
             </div>
-        }
-        @if (AlertStripLayout.HiddenCount(View.Alerts) is var hidden && hidden > 0)
-        {
-            <button type="button" class="alert more" aria-expanded="@(expanded ? "true" : "false")"
-                    title="@(expanded ? AlertStripLayout.CollapseHint : AlertStripLayout.HiddenSummary(View.Alerts))"
-                    @onclick="() => expanded = !expanded">
-                @(expanded ? "Show less" : $"+{hidden} more")
-            </button>
         }
     </div>
 }
@@ -62,21 +70,33 @@ else if (View.Next is { } next)
 }
 
 @code {
-    // The player's choice, kept across the overlay's refreshes while extra notices are due.
-    private bool expanded;
-
     [Parameter, EditorRequired] public AlertView View { get; set; } = AlertView.None;
 
     [Parameter] public DateTimeOffset Now { get; set; }
 
+    // Open: every notice under a header. Closed: the most urgent one in the bar. The parent keeps it in settings.
+    [Parameter] public bool Expanded { get; set; }
+
+    [Parameter] public EventCallback<bool> ExpandedChanged { get; set; }
+
     // The notices stand aside for a boss fight: nothing shows, and nothing is announced until they come back.
     [Parameter] public bool Held { get; set; }
 
-    protected override void OnParametersSet() => expanded = AlertStripLayout.StaysExpanded(expanded, View.Alerts);
+    // The bar's click: asks the parent to open or close the strip; the parent saves the choice and passes it back.
+    private Task Toggle() => ExpandedChanged.InvokeAsync(!Expanded);
 
-    private string Announcement => string.Join("; ", View.Alerts.Take(AlertStripLayout.CollapsedCount).Select(a => a.Kind == AlertKind.Soon
+    private string Announcement => string.Join("; ", View.Alerts.Take(AlertStripLayout.AnnouncedCount).Select(a => a.Kind == AlertKind.Soon
         ? $"{a.Rule.Name} starts at {EventText.LocalTime(a.Start)}"
         : $"{a.Rule.Name}: {EventText.OpenLabel(a.Rule)} until {EventText.LocalTime(a.Deadline)}"));
+
+    // "in 6:13" before a start; "Portal open · 7:12 left" while entry is possible.
+    private string When(EventAlert alert)
+    {
+        var remaining = alert.Deadline - Now;
+        return alert.Kind == AlertKind.Soon
+            ? $"in {EventText.Countdown(remaining)}"
+            : $"{EventText.OpenLabel(alert.Rule)} · {EventText.Countdown(remaining)} left";
+    }
 
     private static string Kind(EventAlert alert) =>
         (alert.Kind == AlertKind.Open ? "open" : "soon") + " kind-" + alert.Rule.Kind.ToString().ToLowerInvariant();

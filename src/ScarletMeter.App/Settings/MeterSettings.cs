@@ -91,15 +91,21 @@ public sealed record AlertSettings
     /// </summary>
     public bool HideDuringBossFights { get; init; } = true;
 
+    /// <summary>
+    /// The overlay's notice strip open, every due notice listed under its bar; closed (the default), the bar shows the
+    /// most urgent one in a single line. The player's last choice, from the bar itself.
+    /// </summary>
+    public bool NoticesExpanded { get; init; }
+
     // Value equality including the event list.
     public bool Equals(AlertSettings? other) => other is not null
         && Enabled == other.Enabled && LeadMinutes == other.LeadMinutes && ServerOffsetHours.Equals(other.ServerOffsetHours)
         && ShowNextEvent == other.ShowNextEvent && RestoreMinimizedMeter == other.RestoreMinimizedMeter
-        && HideDuringBossFights == other.HideDuringBossFights
+        && HideDuringBossFights == other.HideDuringBossFights && NoticesExpanded == other.NoticesExpanded
         && Events.SequenceEqual(other.Events, StringComparer.Ordinal);
 
     public override int GetHashCode() =>
-        HashCode.Combine(Enabled, LeadMinutes, ServerOffsetHours, ShowNextEvent, RestoreMinimizedMeter, HideDuringBossFights, Events.Count);
+        HashCode.Combine(Enabled, LeadMinutes, ServerOffsetHours, ShowNextEvent, RestoreMinimizedMeter, HideDuringBossFights, NoticesExpanded, Events.Count);
 }
 
 /// <summary>Fight rules upstream applies to every hit; mirrored into the engine's EngineSettings.</summary>

@@ -337,7 +337,9 @@ button {
 /* Positioned, so a row's offsetTop (js/overlay-fx.js) is measured from the list, not the panel above it. Nothing in
    the overlay scrolls: the rows take their full height (flex: none) and the window grows to the content (.overlay).
    Its overflow is clipped, not scrollable, so a row gliding into place (a transform) cannot stretch the measured
-   height for a moment and make the window jump. */
+   height for a moment and make the window jump. --row-edge is the crisp dark edge every bit of a row's text sits
+   on, a tight outline shadow, so white text stays readable over the brightest class bars (gold, green) as well as
+   the dark track; a soft shadow alone washed out there. */
 .rows {
     position: relative;
     list-style: none;
@@ -346,6 +348,7 @@ button {
     overflow: clip;
     flex: none;
     zoom: var(--row-scale, 1);
+    --row-edge: 0 0 1px rgba(0, 0, 0, 0.95), 0 1px 1px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 0.6);
 }
 
 /* Only where the window cannot grow to the content (it is as tall as the screen, or the player is resizing it:
@@ -418,11 +421,11 @@ button {
 
 .row .name {
     min-width: 0;
-    font-weight: 600;
+    font-weight: 700;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    text-shadow: var(--row-edge);
 }
 
 .row.me .name {
@@ -431,23 +434,25 @@ button {
 
 .row .cp {
     flex: none;
-    color: rgba(235, 233, 242, 0.62);
+    color: rgba(235, 233, 242, 0.8);
     font-size: 11px;
     font-variant-numeric: tabular-nums;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    text-shadow: var(--row-edge);
 }
 
+/* The death count in the meter's white-ish text, like the combat power, not an alarm red. */
 .row .deaths {
-    color: #e0787a;
+    color: rgba(235, 233, 242, 0.85);
     font-size: 11px;
     white-space: nowrap;
+    text-shadow: var(--row-edge);
 }
 
 .row .num {
     font-variant-numeric: tabular-nums;
     text-align: right;
     white-space: nowrap;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    text-shadow: var(--row-edge);
 }
 
 /* DPS, then the share over the total damage, in one slim line: DPS and the share read first (bold, white), and the
