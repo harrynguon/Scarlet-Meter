@@ -1,5 +1,8 @@
 namespace ScarletMeter.Engine.Odyle;
 
+/// <summary>The energy read from a record and its entry's key, which a list defines for the updates after it.</summary>
+internal readonly record struct OdyleEnergyReading(OdyleEnergy Energy, uint Key);
+
 /// <summary>
 /// Reads Odyle energy from the game's records, as worked out by A2Tools (taengu/A2Tools-DPS-Meter#63 and its fixes
 /// 2723bff and 29e7193, GPL-3.0; see THIRD-PARTY-NOTICES.md): it is the first entry of the game's list of entry
@@ -40,9 +43,18 @@ internal static class OdyleEnergyRecords
 
     /// <summary>
     /// The Odyle energy in one record (its length varint, two opcode bytes, then its body), or null when the record
-    /// is neither kind or does not carry it.
+    /// is neither kind or does not carry it; no energy key known (see <see cref="ReadEntry"/>).
     /// </summary>
-    public static OdyleEnergy? Read(ReadOnlySpan<byte> record)
+    public static OdyleEnergy? Read(ReadOnlySpan<byte> record) => ReadEntry(record, energyKey: null)?.Energy;
+
+    /// <summary>
+    /// The Odyle energy in one record and its entry's key, or null. The list defines the key (its energy entry is
+    /// found by shape). An update can carry another key's slot-1 entry (A2Tools' list holds one, <c>04 01 b4 c4 04
+    /// 03</c>, so its update would read as the energy), so with <paramref name="energyKey"/> known, from an earlier list,
+    /// an update's entry counts only under that key; without it (a meter started mid-session) the first slot-1 entry
+    /// is taken, as A2Tools does. Audit on PR #36.
+    /// </summary>
+    public static OdyleEnergyReading? ReadEntry(ReadOnlySpan<byte> record, uint? energyKey)
     {
         if (!TryReadVarInt(record, 0, out _, out var at)) return null;
         if (record.Length < at + 2) return null;
@@ -51,7 +63,7 @@ internal static class OdyleEnergyRecords
         return opcode switch
         {
             ListOpcode => InList(body),
-            UpdateOpcode => InUpdate(body),
+            UpdateOpcode => InUpdate(body, energyKey),
             _ => null,
         };
     }
@@ -65,7 +77,7 @@ internal static class OdyleEnergyRecords
     // ("0c 01 00 00 00" opens A2Tools' sample), which EnergyOf turns away by its zeros. Reading only the two-value
     // kind passed over the energy of a player with either value at 0, and the search went on to whatever looked like
     // it next.
-    private static OdyleEnergy? InList(ReadOnlySpan<byte> body)
+    private static OdyleEnergyReading? InList(ReadOnlySpan<byte> body)
     {
         for (var i = 0; i + 1 < body.Length; i++)
         {
@@ -73,14 +85,16 @@ internal static class OdyleEnergyRecords
             if (!TryReadEntry(body, i, out var entry, out var next)) continue;
             if (!TryReadEntry(body, next, out var following, out _)) continue;
             if (following.Slot != 2 || following.Key != entry.Key) continue;
-            if (EnergyOf(entry) is { } energy) return energy;
+            if (EnergyOf(entry) is { } energy) return new OdyleEnergyReading(energy, entry.Key);
         }
         return null;
     }
 
-    // An update: a byte, then the entries; the energy is among them or not there. The byte is not a count to trust:
-    // updates with 00 there carry an entry too (A2Tools, 29e7193), so at least one entry is read.
-    private static OdyleEnergy? InUpdate(ReadOnlySpan<byte> body)
+    // An update: a byte, then the entries; the energy is among them or not there. The byte is not a count to trust
+    // when it is 00: updates with 00 there carry an entry too (A2Tools, 29e7193), so at least one entry is read. A
+    // larger count is kept, so bytes after the entries are never read as more of them. With the energy's key known,
+    // another key's slot-1 entry is passed over (ReadEntry).
+    private static OdyleEnergyReading? InUpdate(ReadOnlySpan<byte> body, uint? energyKey)
     {
         if (body.IsEmpty) return null;
         var count = Math.Max((int)body[0], 1);
@@ -88,7 +102,8 @@ internal static class OdyleEnergyRecords
         for (var n = 0; n < count; n++)
         {
             if (!TryReadEntry(body, at, out var entry, out at)) return null;
-            if (EnergyOf(entry) is { } energy) return energy;
+            if (energyKey is { } key && entry.Key != key) continue;
+            if (EnergyOf(entry) is { } energy) return new OdyleEnergyReading(energy, entry.Key);
         }
         return null;
     }
@@ -109,9 +124,13 @@ internal static class OdyleEnergyRecords
 
     private static bool IsKind(byte kind) => kind is FirstValueKind or SecondValueKind or BothValuesKind;
 
-    // A value an entry carries: never 0, since the game leaves a zero out (that is what the kind says), so a 0 means
-    // bytes that only look like an entry, such as the list's header (Scarlet's tightening of A2Tools' bound, which
-    // every documented entry keeps to); and within the generous MaxValue, which turns away other look-alikes.
+    // A value the energy entry carries: never 0, since the game leaves a zero out (that is what the kind says), so a 0
+    // means bytes that only look like the entry (Scarlet's tightening of A2Tools' bound, which every documented slot-1
+    // entry keeps to); and within the generous MaxValue, which turns away other look-alikes. Two such look-alikes: the
+    // list's header ("0c 01 00 00 00"), and an update of the table it opens, whose entries appear to carry a 4-byte id
+    // ("04 0c 00 00 00 ..." in A2Tools' update without the energy), so id 1's would read as "0c 01 00 00 00 ...": kind
+    // 0c, slot 1, key 0, values 0 and 0, which is "0 (+0)" with nothing to back it (audit on PR #36; an inference from
+    // A2Tools' samples). Since an update's first entry is now always read, this is what turns it away there.
     private static bool IsPlausible(uint value) => value is > 0 and <= MaxValue;
 
     // An entry as read: its kind, slot and key, and its one value (First) or two (First, Second).

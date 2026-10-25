@@ -219,19 +219,20 @@ internal sealed class DemoCombatFeed
         }
     }
 
-    // A fight starts: it spends Odyle energy, sent as the game's update record. Once both parts are 0 nothing is sent
-    // (the game's form for that is not documented: OdyleEnergyRecordWriter), so the display keeps the last value.
+    // A fight starts: it spends Odyle energy, sent as the game's update record.
     private void SpendOdyle()
     {
         odyle = AfterFight(odyle);
-        if (odyle.Basic == 0 && odyle.Charged == 0) return;
         odyleTap?.Observe(OdyleEnergyRecordWriter.Update(odyle, OdyleEntryKey));
     }
 
     /// <summary>
     /// The demo's Odyle energy after a fight: a raid costs <see cref="OdylePerFight"/> basic, and once basic runs below
     /// that a recharge moves up to <see cref="OdyleRecharge"/> from charged to basic, so the numbers keep moving; basic
-    /// never goes below 0.
+    /// never goes below 0. Once both would be 0 (after about 160 fights) it starts again from
+    /// <see cref="StartingOdyle"/>, so it is never 0 and 0, which <see cref="OdyleEnergyRecordWriter"/> cannot write
+    /// (the game's form for it is not documented) and which would freeze the display and make a later Begin throw
+    /// (audit on PR #36).
     /// </summary>
     internal static OdyleEnergy AfterFight(OdyleEnergy energy)
     {
@@ -243,7 +244,8 @@ internal sealed class DemoCombatFeed
             basic += recharge;
             charged -= recharge;
         }
-        return new OdyleEnergy(Math.Max(0, basic), charged);
+        basic = Math.Max(0, basic);
+        return basic == 0 && charged == 0 ? StartingOdyle : new OdyleEnergy(basic, charged);
     }
 
     private void StartFight(DateTime at)

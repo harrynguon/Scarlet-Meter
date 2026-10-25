@@ -22,7 +22,8 @@ internal static class OdyleEnergyRecordWriter
     /// </summary>
     public static byte[] List(OdyleEnergy energy, uint key)
     {
-        var body = new List<byte> { 0x49, 0x00, 0x00, 0x00, 0x0A, 0x01, 0x01, 0x03 };
+        // Made-up data before the list, its length as in the game's (not its bytes).
+        var body = new List<byte> { 0x2A, 0x00, 0x00, 0x00, 0x05, 0x01, 0x01, 0x02 };
         AddEnergyEntry(body, energy, key);
         body.AddRange([0x04, 0x02]);
         AddVarInt(body, key);
