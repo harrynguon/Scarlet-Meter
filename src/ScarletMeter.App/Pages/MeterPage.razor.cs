@@ -92,12 +92,8 @@ public partial class MeterPage : IAsyncDisposable
         ? target.IsBoss ? "Boss defeated" : "Target defeated"
         : target.IsBoss ? "Boss combat" : "Combat";
 
-    private string StateDotClass => phase switch
-    {
-        FightPhase.Defeated => "done",
-        FightPhase.Settled => "quiet",
-        _ => string.Empty,
-    };
+    // The ring round the header's face (HpBand.RingClass): the target's HP band, without its glow once still.
+    private string AvatarClass => HpBand.RingClass(phase, snapshot.Target);
 
     // The notices stand aside during a boss fight when "Hide during boss fights" is on.
     private bool NoticesHeld => AlertStripLayout.HiddenForFight(alertSettings.HideDuringBossFights, bossFightUnderWay);

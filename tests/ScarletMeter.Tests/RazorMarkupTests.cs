@@ -420,6 +420,71 @@ public sealed partial class RazorMarkupTests
         Assert.DoesNotMatch(@"(?m)^[^{}]*\.row\b[^{}]*\{[^}]*text-shadow:(?!\s*var\(--row-edge\);)", rules);
     }
 
+    // Scarlet's face sits at the header's left in place of the old state dot (Harry: "in permanent place of the grey
+    // dot"), always, between fights too: it comes before the fight branch, not inside it. Its ring takes the target's HP
+    // band (HpBand.RingClass, whose behaviour FormattingTests pins), glowing while the HP moves and without the glow,
+    // a touch dimmer, once it has been still; white-ish while the target's total HP is unknown; grey when the target
+    // is down; none between fights. The green is not the theme's teal, which Harry found "a bit weird" there. The
+    // history list keeps a dot of its own, styled in views.css alone. The image ships with the meter (the publish
+    // layout check requires it) and is a 64 px PNG, enough for 20 px at 300%.
+    [Fact]
+    public void TheHeaderShowsScarletsFaceRingedByTheFightsState()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        var markup = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
+        Assert.Matches(@"(?s)<div class=""ov-title"">\s*(?:@\*.*?\*@\s*)?<span class=""ov-avatar @AvatarClass"" aria-hidden=""true""></span>\s*@if \(snapshot\.Target is \{ \} fighting\)", markup);
+        Assert.DoesNotContain("state-dot", markup);
+        Assert.Contains("private string AvatarClass => HpBand.RingClass(phase, snapshot.Target);",
+            File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs")));
+
+        var css = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "app.css"));
+        static string Block(string source, string selector) =>
+            Regex.Match(source, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
+        var avatar = Block(css, ".ov-avatar");
+        Assert.Matches(@"(?m)^\s*width:\s*20px;", avatar);
+        Assert.Matches(@"(?m)^\s*height:\s*20px;", avatar);
+        Assert.Matches(@"border-radius:\s*50%;", avatar);
+        Assert.Matches(@"background:\s*url\(""\.\./images/avatar\.png""\) center / cover no-repeat;", avatar);
+        Assert.Matches(@"--ring:\s*#5ed36a;", Block(css, ".ov-avatar.hp-high"));
+        Assert.Matches(@"--ring:\s*#f2c94c;", Block(css, ".ov-avatar.hp-mid"));
+        Assert.Matches(@"--ring:\s*#f04c56;", Block(css, ".ov-avatar.hp-low"));
+        Assert.Matches(@"--ring:\s*rgba\(235, 233, 242, 0\.75\);", Block(css, ".ov-avatar.hp-unknown"));
+        var glowing = Regex.Match(css, @"(?m)^\.ov-avatar\.hp-high,\s*\.ov-avatar\.hp-mid,\s*\.ov-avatar\.hp-low,\s*\.ov-avatar\.hp-unknown \{(?<body>[^}]*)\}").Groups["body"].Value;
+        Assert.Matches(@"box-shadow:\s*0 0 0 1\.5px var\(--ring\), 0 0 7px var\(--ring\);", glowing);
+        var still = Regex.Match(css, @"(?m)^\.ov-avatar\.hp-high\.still,\s*\.ov-avatar\.hp-mid\.still,\s*\.ov-avatar\.hp-low\.still,\s*\.ov-avatar\.hp-unknown\.still \{(?<body>[^}]*)\}").Groups["body"].Value;
+        Assert.Matches(@"box-shadow:\s*0 0 0 1\.5px var\(--ring\);", still); // the same colour, its glow gone
+        Assert.Matches(@"opacity:\s*0\.85;", still); // and a touch dimmer
+        Assert.Matches(@"box-shadow:\s*0 0 0 1\.5px var\(--muted\);", Block(css, ".ov-avatar.done"));
+        Assert.DoesNotMatch(@"\.ov-avatar[^{]*\{[^}]*var\(--good\)", css); // not the theme's teal
+        Assert.DoesNotMatch(@"(?m)^\.state-dot", css);
+        Assert.Matches(@"(?m)^\.state-dot \{", File.ReadAllText(Path.Combine(app, "wwwroot", "css", "views.css"))); // the history list's own
+
+        var png = File.ReadAllBytes(Path.Combine(app, "wwwroot", "images", "avatar.png"));
+        Assert.Equal(new byte[] { 0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A }, png[..8]);
+        static int BigEndian(byte[] b, int at) => (b[at] << 24) | (b[at + 1] << 16) | (b[at + 2] << 8) | b[at + 3];
+        Assert.Equal(64, BigEndian(png, 16));
+        Assert.Equal(64, BigEndian(png, 20));
+        Assert.Contains(@"'wwwroot\images\avatar.png',", File.ReadAllText(Path.Combine(RepositoryRoot(), "scripts", "Test-PublishLayout.ps1")));
+    }
+
+    // The class icon on the overlay's bars is 5 to 10% larger than elsewhere (Harry: hard to see), square, and leaves
+    // at least 3 px above and below it in the 26 px row.
+    [Fact]
+    public void TheBarsClassIconsAreALittleLarger()
+    {
+        var css = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "app.css"));
+        static string Block(string source, string selector) =>
+            Regex.Match(source, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
+        static double Px(string body, string property) => double.Parse(
+            Regex.Match(body, @"(?m)^\s*" + property + @":\s*([\d.]+)px;").Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        var base_ = Block(css, ".class-icon");
+        var bars = Block(css, ".rows .class-icon");
+        var size = Px(bars, "width");
+        Assert.Equal(size, Px(bars, "height"));
+        Assert.InRange(size / Px(base_, "width"), 1.05, 1.10);
+        Assert.True(Px(Block(css, ".row"), "height") - size >= 6, "the icon leaves room above and below it in the row");
+    }
+
     // The player's own row is marked by a ring round the row, never by a stripe on the bar (a white inset at the
     // bar's left edge read as a glitch); bar effects replace the ring with their glow.
     [Fact]

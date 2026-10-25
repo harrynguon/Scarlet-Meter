@@ -15,6 +15,9 @@
     <AssemblyName>ScarletMeter</AssemblyName>
     <RootNamespace>ScarletMeter.App</RootNamespace>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- The exe's icon (Explorer, shortcuts), which every window also shows: WPF gives a window that sets no Icon
+         the exe's own. Its source is in THIRD-PARTY-NOTICES.md, "Artwork". -->
+    <ApplicationIcon>Assets\ScarletMeter.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
