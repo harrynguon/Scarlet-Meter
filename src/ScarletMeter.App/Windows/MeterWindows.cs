@@ -65,20 +65,26 @@ public interface IMeterWindows
     void HoldAlerts(bool held);
 
     /// <summary>
-    /// The overlay page's content height (CSS pixels), the player list at its capped height: only that list scrolls,
-    /// so the overlay window grows to show all of it and returns to the player's own size when it fits
-    /// (<see cref="OverlayFit"/>).
+    /// The overlay page's heights (CSS pixels): <paramref name="contentHeight"/>, which the window is as tall as;
+    /// <paramref name="emptyHeight"/>, its content with no rows; and <paramref name="rowStep"/>, a row with its gap,
+    /// by which a resize of the bar area counts rows (<see cref="OverlayFit"/>).
     /// </summary>
-    void FitOverlayToContent(double contentHeight);
+    void FitOverlayToContent(double contentHeight, double emptyHeight, double rowStep);
 
     /// <summary>
-    /// Whether the overlay window is shorter than content <paramref name="contentHeight"/> tall even after fitting: it
-    /// is as tall as the screen allows, or the player is resizing it. The page's rows then give way (app.css,
-    /// .overlay.cut), never the notices. Cheap to call on every render.
+    /// Whether the overlay window is shorter than content <paramref name="contentHeight"/> tall: it is as tall as the
+    /// screen allows. The page's rows then give way and scroll (app.css, .rows.scrolls), never the notices. Cheap to
+    /// call on every render.
     /// </summary>
     bool OverlayCutsContent(double contentHeight);
 
-    /// <summary>Raised on the UI thread after the overlay window moved or resized itself to fit its content.</summary>
+    /// <summary>Whether the player is dragging an edge of the overlay: the page lets its bars fill the window meanwhile.</summary>
+    bool OverlayResizing { get; }
+
+    /// <summary>
+    /// Raised on the UI thread after the overlay window moved or resized itself to fit its content, or a resize of an
+    /// edge started or ended.
+    /// </summary>
     event EventHandler? OverlayFitted;
 }
 
@@ -212,12 +218,14 @@ public sealed class MeterWindows : IMeterWindows
 
     public void BeginOverlayDrag() => overlay?.BeginDrag();
 
-    public void FitOverlayToContent(double contentHeight)
+    public void FitOverlayToContent(double contentHeight, double emptyHeight, double rowStep)
     {
-        if (!closing) overlay?.FitToContent(contentHeight);
+        if (!closing) overlay?.FitToContent(contentHeight, emptyHeight, rowStep);
     }
 
     public bool OverlayCutsContent(double contentHeight) => !closing && overlay?.CutsContent(contentHeight) == true;
+
+    public bool OverlayResizing => !closing && overlay?.Resizing == true;
 
     public void MinimizeOverlay()
     {

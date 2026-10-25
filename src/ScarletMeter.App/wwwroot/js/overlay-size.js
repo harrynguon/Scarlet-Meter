@@ -1,17 +1,19 @@
-// The overlay's content height, which Pages/MeterPage.razor.cs asks for after each render: only the player list
-// scrolls, past "Rows before scrolling" (app.css, .rows.capped, measured at that capped height), so when the panel's
-// content (rows and notices) is taller than the window, the window grows to show all of it (Windows/OverlayFit).
-// The panel's max-height keeps it inside the window, so its scroll height is its content's
-// height; its borders are added. Where the window cannot grow further the rows give way (app.css, .overlay.cut), so
-// for the moment of the measurement data-measuring gives them their full height again; it is removed before anything
-// is drawn. Only reads the page: no requests, no calls into .NET.
+// The overlay's heights, which Pages/MeterPage.razor.cs asks for after each render: the panel with the bar area at its
+// rows (the window is as tall as that; Windows/OverlayFit) and with no rows (from which a resize of the bar area counts
+// rows). For the moment of each measurement data-measuring makes the panel as tall as its content, whatever the window
+// (a resize under way, or the screen too short), with the bar area at its rows ("content") or at none ("empty"; the
+// list's padding stays, as in the empty meter); it is removed before anything is drawn. Heights are the panel's border
+// box, in CSS pixels. Only reads the page: no requests, no calls into .NET.
 window.scarletOverlay = {
-    contentHeight() {
+    heights() {
         const panel = document.querySelector('[data-window=overlay]');
-        if (!panel) return 0;
-        panel.setAttribute('data-measuring', '');
+        if (!panel) return null;
         try {
-            return panel.scrollHeight + (panel.offsetHeight - panel.clientHeight);
+            panel.setAttribute('data-measuring', 'content');
+            const content = panel.getBoundingClientRect().height;
+            panel.setAttribute('data-measuring', 'empty');
+            const empty = panel.getBoundingClientRect().height;
+            return { content, empty };
         } finally {
             panel.removeAttribute('data-measuring');
         }

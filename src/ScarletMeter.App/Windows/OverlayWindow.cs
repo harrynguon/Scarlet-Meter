@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -12,11 +14,14 @@ namespace ScarletMeter.App.Windows;
 /// <summary>
 /// The meter overlay: chromeless, transparent and always on top. The page paints its own translucent panel
 /// (background opacity is a setting), is dragged by its header (<see cref="BeginDrag"/>) and resized from
-/// the window edges through WindowChrome. Only its player list scrolls, past "Rows before scrolling": when the
-/// page's content is taller than the player's height, the window grows to fit at once and returns to the player's own placement a moment after it fits again
-/// (<see cref="FitToContent"/>, <see cref="OverlayPlacement"/>, <see cref="OverlayFit"/>); the player's placement,
-/// not the grown one, is what is saved. Its WebView does not zoom, so the page's CSS pixels are the window's.
-/// Closing it closes the tool windows first, then the app.
+/// the window edges through WindowChrome. It is as tall as the page's content (<see cref="FitToContent"/>,
+/// <see cref="OverlayPlacement"/>, <see cref="OverlayFit"/>): growing at once when the content grows, shrinking a
+/// moment after it shrinks, its top the player's own. Dragging its bottom edge sizes only the bar area: while the
+/// resize lasts the page lets the bars fill the window (<see cref="Resizing"/>) and the window is held between no
+/// rows and <see cref="OverlayFit.MostRows"/>, and where it ends becomes the bar area's whole rows
+/// (<see cref="AppearanceSettings.BarRows"/>), saved; the notices and the rest keep their own heights. The player's
+/// top is what is saved. Its WebView does not zoom, so the page's CSS pixels are the window's. Closing it closes the
+/// tool windows first, then the app.
 /// </summary>
 public sealed class OverlayWindow : ScarletWindow
 {
@@ -24,14 +29,21 @@ public sealed class OverlayWindow : ScarletWindow
     private static readonly TimeSpan ShrinkDelay = TimeSpan.FromSeconds(2);
 
     private readonly Func<ValueTask> closeToolWindows;
+    // Where the bar area's rows are kept (AppearanceSettings.BarRows).
+    private readonly SettingsService settings;
 
     // The player's own placement and the one shown; the width is always the player's.
     private readonly OverlayPlacement overlayPlacement = new();
     private readonly DispatcherTimer shrinkLater;
-    // The content height the page last reported; NaN before the first.
+    // The heights the page last reported (FitToContent): its content, its content with no rows, and a row with its
+    // gap; NaN before the first.
     private double contentHeight = double.NaN;
+    private double emptyHeight = double.NaN;
+    private double rowStep = double.NaN;
     // Inside the system's move or resize loop (the player dragging the header or an edge): no fitting meanwhile.
     private bool sizingOrMoving;
+    // Within that loop, an edge is being dragged (WM_SIZING came), not the header.
+    private bool resizing;
     // Set while Refit moves the window, so LocationChanged does not take the move for someone else's.
     private bool applying;
 
@@ -39,6 +51,7 @@ public sealed class OverlayWindow : ScarletWindow
         : base(services, typeof(MeterPage), WindowKeys.Overlay)
     {
         this.closeToolWindows = closeToolWindows;
+        settings = services.GetRequiredService<SettingsService>();
         Title = "Scarlet Meter";
         Width = 400;
         Height = 260;
@@ -81,14 +94,27 @@ public sealed class OverlayWindow : ScarletWindow
     }
 
     /// <summary>
-    /// The page's content height in device-independent pixels (CSS pixels at the WebView's zoom of 1): the window
-    /// grows to show all of it, or returns to the player's own placement when it fits. Call on the UI thread.
+    /// The page's heights in device-independent pixels (CSS pixels at the WebView's zoom of 1): its content, which the
+    /// window is as tall as, its content with no rows, and a row with its gap
+    /// (<see cref="IMeterWindows.FitOverlayToContent"/>). The first report after an earlier build, which saved the
+    /// window's height rather than the bar area's rows, turns that height into rows (kept, so the player's size stays)
+    /// and waits for the page to report again with them. Call on the UI thread.
     /// </summary>
-    public void FitToContent(double height)
+    public void FitToContent(double content, double empty, double step)
     {
-        contentHeight = height;
+        contentHeight = content;
+        emptyHeight = empty;
+        rowStep = step;
+        if (IsLoaded && settings.Current.Appearance.BarRows is null && OverlayFit.RowsFor(ActualHeight, empty, step) is { } rows)
+        {
+            SetBarRows(rows);
+            return;
+        }
         Refit();
     }
+
+    /// <summary>Whether an edge is being dragged: the page then lets the bars fill the window. Call on the UI thread.</summary>
+    public bool Resizing => resizing;
 
     /// <summary>
     /// Whether the window, as laid out now, is shorter than content <paramref name="height"/> tall: true once it is as
@@ -97,21 +123,23 @@ public sealed class OverlayWindow : ScarletWindow
     /// </summary>
     public bool CutsContent(double height) => IsLoaded && ActualHeight < Math.Ceiling(height) - 0.5;
 
-    // The player's own placement, once known; nothing while they are dragging or resizing, whose end saves it.
+    // The player's own placement, once known; nothing while they are dragging or resizing, whose end saves it. Its
+    // height is the window's as shown then, which the content's replaces once the page has reported.
     protected override Rect? PlacementBounds =>
         sizingOrMoving ? null
-        : overlayPlacement.Started ? new Rect(Left, overlayPlacement.PlayerTop, ActualWidth, overlayPlacement.PlayerHeight)
+        : overlayPlacement.Started ? new Rect(Left, overlayPlacement.PlayerTop, ActualWidth, overlayPlacement.Shown.Height)
         : base.PlacementBounds;
 
-    // Takes the window to OverlayFit's placement for the last content height: at once when that grows it (so nothing
-    // is cut), after ShrinkDelay when it shrinks it, unless the content grows back meanwhile. Nothing while the player
-    // is dragging or resizing (that ends in WmExitSizeMove, which fits again) or the window is minimized.
+    // Takes the window to OverlayFit's placement for the content's height (as both the least and the most, so the
+    // window is exactly as tall): at once when that grows it (so nothing is cut), after ShrinkDelay when it shrinks it,
+    // unless the content grows back meanwhile. Nothing while the player is dragging or resizing (that ends in
+    // WmExitSizeMove, which fits again) or the window is minimized.
     private void Refit(bool shrinkNow = false)
     {
         shrinkLater.Stop();
         if (sizingOrMoving || !IsLoaded || WindowState != WindowState.Normal || !overlayPlacement.Started || double.IsNaN(contentHeight)) return;
         var workArea = ScreenPlacement.WorkAreaOf(this);
-        var target = overlayPlacement.Target(contentHeight, workArea);
+        var target = overlayPlacement.Target(contentHeight, workArea, contentHeight);
         if (!shrinkNow && overlayPlacement.WaitsToShrink(target, workArea))
         {
             shrinkLater.Start();
@@ -135,17 +163,83 @@ public sealed class OverlayWindow : ScarletWindow
     // A fit after the current message is handled and WPF has laid the window out.
     private void RefitSoon() => Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => Refit()));
 
+    // For the length of a drag or resize, the window's height is held between the content with no rows and with
+    // OverlayFit.MostRows rows, from the page's last heights, so a resize stops there rather than springing back when
+    // it ends; WmExitSizeMove lets go again, so a fit's growth for the notices or a display change is never held back.
+    // Only within the work area's height, as a fit would be. Nothing until the page has reported.
+    private void HoldHeightWhileResizing()
+    {
+        if (!double.IsFinite(emptyHeight) || !double.IsFinite(rowStep)) return;
+        var least = Math.Max(WindowPlacement.MinSize, Math.Min(Math.Ceiling(emptyHeight), ScreenPlacement.WorkAreaOf(this).Height));
+        MinHeight = least;
+        MaxHeight = Math.Max(least, Math.Ceiling(emptyHeight + OverlayFit.MostRows * rowStep));
+    }
+
+    // Holds the rectangle being dragged (WM_SIZING's, device pixels) within the height held for the resize
+    // (HoldHeightWhileResizing) by stopping the edge being dragged (OverlayFit.HoldDraggedEdge), before Windows moves
+    // the window: WPF's own MinHeight and MaxHeight would keep the top, so the top edge dragged past the most carried
+    // the whole window up with the cursor.
+    private void HoldDraggedEdge(IntPtr edge, IntPtr rectPointer)
+    {
+        if (rectPointer == IntPtr.Zero) return;
+        var rect = Marshal.PtrToStructure<NativeMethods.RectInt>(rectPointer);
+        var scale = VisualTreeHelper.GetDpi(this).DpiScaleY;
+        var (top, bottom) = OverlayFit.HoldDraggedEdge(rect.Top, rect.Bottom, edge.ToInt32(), MinHeight * scale, MaxHeight * scale);
+        if (top == rect.Top && bottom == rect.Bottom) return;
+        rect.Top = top;
+        rect.Bottom = bottom;
+        Marshal.StructureToPtr(rect, rectPointer, fDeleteOld: false);
+    }
+
+    // Keeps the bar area's rows, which the page shows once Settings.Changed reaches it.
+    private void SetBarRows(int rows)
+    {
+        if (settings.Current.Appearance.BarRows != rows)
+            settings.Update(s => s with { Appearance = s.Appearance with { BarRows = rows } });
+    }
+
     private IntPtr OnMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == NativeMethods.WmEnterSizeMove)
         {
             sizingOrMoving = true;
+            HoldHeightWhileResizing();
+        }
+        else if (msg == NativeMethods.WmSizing && sizingOrMoving)
+        {
+            if (!resizing)
+            {
+                // An edge is being dragged: the page lets the bars follow it.
+                resizing = true;
+                Fitted?.Invoke(this, EventArgs.Empty);
+            }
+            HoldDraggedEdge(wParam, lParam);
+            handled = true;
+            return 1;
         }
         else if (msg == NativeMethods.WmExitSizeMove)
         {
             sizingOrMoving = false;
+            MinHeight = WindowPlacement.MinSize;
+            MaxHeight = double.PositiveInfinity;
             overlayPlacement.PlayerPlaced(Top, ActualHeight);
-            Refit();
+            if (resizing)
+            {
+                // Where the edge was let go becomes the bar area's whole rows; the window takes that height at once,
+                // before the page reports it, so it settles there rather than waiting to shrink.
+                resizing = false;
+                if (OverlayFit.RowsFor(ActualHeight, emptyHeight, rowStep) is { } rows)
+                {
+                    contentHeight = emptyHeight + rows * rowStep;
+                    SetBarRows(rows);
+                }
+                Refit(shrinkNow: true);
+                Fitted?.Invoke(this, EventArgs.Empty);
+            }
+            else
+            {
+                Refit();
+            }
             // Saves were skipped while the drag lasted (PlacementBounds), and the fit may not move the window.
             SavePlacementSoon();
         }
@@ -168,7 +262,10 @@ public sealed class OverlayWindow : ScarletWindow
         RefitSoon();
     }
 
-    /// <summary>Raised after a fit moved or resized the window, so the page can ask again whether it cuts the content.</summary>
+    /// <summary>
+    /// Raised after a fit moved or resized the window, or a resize of an edge started or ended, so the page can ask
+    /// again whether it cuts the content and whether it is being resized.
+    /// </summary>
     public event EventHandler? Fitted;
 
     protected override System.Drawing.Color WebViewBackground => System.Drawing.Color.Transparent;

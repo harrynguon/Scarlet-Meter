@@ -1,9 +1,9 @@
 /* World-event notices at the bottom of the overlay (Components/AlertStrip.razor), below the last DPS bar. Uses
    app.css tokens. One bar that opens and closes: closed, the most urgent notice in one line; open, a "World events"
-   header over every due notice. Nothing in the overlay scrolls: the strip always takes its full height (flex: none),
-   and when the window is too short for it and the bars, the window grows (Windows/OverlayFit); once it is as tall as
-   the screen the lowest rows give way instead (app.css, .overlay.cut .rows). So a notice never covers a bar and is
-   never cut, and the bar is always there to fold the list away. */
+   header over every due notice. The strip never scrolls and keeps its own height (flex: none): resizing the meter
+   sizes only the bar area above it, and the window grows when the strip opens (Windows/OverlayFit); once it is as tall
+   as the screen the bar area gives way and scrolls instead (app.css, .rows.scrolls). So a notice never covers a bar and
+   is never cut, and the bar is always there to fold the list away. */
 .alerts {
     display: flex;
     flex-direction: column;

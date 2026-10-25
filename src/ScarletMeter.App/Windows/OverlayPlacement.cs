@@ -30,9 +30,12 @@ public sealed class OverlayPlacement
         Shown = (top, height);
     }
 
-    /// <summary>Where the window goes for content <paramref name="contentHeight"/> tall on this work area.</summary>
-    public (double Top, double Height) Target(double contentHeight, Rect workArea) =>
-        OverlayFit.For(PlayerTop, PlayerHeight, contentHeight, workArea);
+    /// <summary>
+    /// Where the window goes when its content needs at least <paramref name="leastHeight"/> and the meter may be at
+    /// most <paramref name="mostHeight"/> tall, on this work area (<see cref="OverlayFit.For"/>).
+    /// </summary>
+    public (double Top, double Height) Target(double leastHeight, Rect workArea, double mostHeight = double.PositiveInfinity) =>
+        OverlayFit.For(PlayerTop, PlayerHeight, leastHeight, workArea, mostHeight);
 
     /// <summary>
     /// Whether the window waits a moment before going to <paramref name="target"/>: it is shorter than what the window

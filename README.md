@@ -77,8 +77,10 @@ and adds it up per player and per fight.
   plus the **background opacity** of the whole meter. Text and bars always stay solid.
 - **Class colours**, **relative bars** (against the top player), row size, and **hidden names** for streams and
   screenshots.
-- **Stays compact in big raids**: past 10 players (**Rows before scrolling**, 3 to 40) the bars scroll instead of
-  the meter growing, and your own bar stays in view, pinned to the top or bottom edge when it would scroll away.
+- **A bar area you size**: drag the meter's bottom edge to make the bars' area anything from none to ten bars tall;
+  it snaps to whole bars and keeps that size, with empty rows when fewer are playing. The event timers below keep
+  their own size. With more players than fit, the bars scroll and your own bar stays in view, pinned to the top or
+  bottom edge when it would scroll away.
 
 <p align="center"><img src="docs/images/background-picture.png" alt="A background picture at 50% picture opacity (demo data, a generated test picture)" width="456"/></p>
 
@@ -174,11 +176,10 @@ It only reads network traffic, as RATmeter does, but NCSOFT's terms forbid unaut
 own risk (see [Safety and terms](#safety-and-terms)).
 
 **Why does the meter sometimes get taller?**
-Only the bars scroll, and only once there are more players than **Rows before scrolling** (10 unless you change
-it in Settings, Appearance). When the world-event alerts and the bars need more room than the size you gave it,
-it grows downwards (upwards at the bottom of the screen) and goes back to your size a moment after. The alerts
-always sit below the last bar, never over it, and the size remembered for next time is always yours. If it is
-already as tall as the screen, the lowest rows fade out and the alerts stay whole.
+The bars' area stays the size you dragged it to; the bars scroll inside it. The rest of the meter keeps its own
+size: when the world-event alerts open or a boss card appears, the meter grows downwards by that much (upwards at the
+bottom of the screen), and goes back a moment after they go. The alerts always sit below the bars, never over them,
+and the place remembered for next time is always yours.
 
 **How do I hide it quickly?**
 **Ctrl+Shift+D**, a system-wide shortcut, hides and shows it. Change the shortcut in Settings.
