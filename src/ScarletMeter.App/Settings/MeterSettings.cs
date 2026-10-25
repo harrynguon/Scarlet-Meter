@@ -136,8 +136,8 @@ public sealed record AppearanceSettings
     public const double MaxPictureOpacity = 1.0;
     public const double MinRowScale = 0.75;
     public const double MaxRowScale = 1.5;
-    public const int MinVisibleRows = 3;
-    public const int MaxVisibleRows = 40;
+    public const int MaxBarRows = 10;
+    public const int DefaultBarRows = 8;
 
     /// <summary>Opacity of the overlay's background (0.1 to 1); text and bars stay opaque.</summary>
     public double BackgroundOpacity { get; init; } = 0.9;
@@ -170,10 +170,13 @@ public sealed record AppearanceSettings
     public double RowScale { get; init; } = 1.0;
 
     /// <summary>
-    /// The most player rows the overlay shows at once (3 to 40): with more players the list scrolls, the player's own
-    /// row staying in view, so the meter stops growing in a big raid. The notices below never scroll.
+    /// How many rows tall the overlay's bar area is (0 to 10), set by dragging the meter's bottom edge (Harry: "make
+    /// sure the resizing only changes the size of the dps bar area"): more players scroll inside it, fewer leave the
+    /// rest of it empty, and the notices below keep their own height. Null until the meter first fits, which takes
+    /// it from the window's height an earlier build saved (Windows/OverlayWindow), so a player's size is kept; the
+    /// page shows <see cref="DefaultBarRows"/> until then.
     /// </summary>
-    public int VisibleRows { get; init; } = 10;
+    public int? BarRows { get; init; }
 
     /// <summary>Show skill and buff icons, which load from NC's game-data CDN as in RATmeter.</summary>
     public bool SkillIcons { get; init; } = true;
@@ -227,9 +230,11 @@ public sealed record WindowPlacement(double Left, double Top, double Width, doub
 {
     /// <summary>
     /// The smallest width or height a saved placement may have: the overlay's minimum height, the smallest any window
-    /// allows, so every size a player can give a window is one the settings keep.
+    /// allows, so every size a player can give a window is one the settings keep. Below the overlay's empty meter (77 px
+    /// with no notice due, 75 px at row size 0.75, measured), whose height the overlay is when its bar area has no rows:
+    /// at 96 px a saved overlay that short was dropped as unusable, its place lost (audit on PR #37).
     /// </summary>
-    public const double MinSize = 96;
+    public const double MinSize = 48;
 }
 
 /// <summary>The windows whose placement is remembered.</summary>

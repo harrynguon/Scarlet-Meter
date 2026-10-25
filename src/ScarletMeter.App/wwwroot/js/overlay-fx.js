@@ -2,8 +2,8 @@
 // flags a row that passed another so app.css flashes it once. FLIP: each row's last position and rank are
 // remembered; when Blazor moves rows (they are keyed by player, so the elements themselves move), each moved row
 // starts from where it was drawn (its old place, plus any glide still under way) and transitions to the new one.
-// Positions are measured in the row list's view (app.css makes it positioned; past "Rows before scrolling" it
-// scrolls, and a scroll position the browser moves by itself as rows come and go, at the end of the list, must not
+// Positions are measured in the row list's view (app.css makes it positioned; when the bar area cannot show every row
+// it scrolls, and a scroll position the browser moves by itself as rows come and go, at the end of the list, must not
 // move rows that stayed put) and measured again when the overlay's style or class changes (row size, effects on or
 // off), when the list scrolls and when it changes size, so a later reorder never starts from stale places. Runs
 // only while the overlay has the "fx" class (Settings, Appearance, "Bar effects") and Windows does not ask for
@@ -27,7 +27,7 @@
     }
 
     // Where a row's layout place is in the list's view: its offset in the list's content less the list's scroll.
-    // In content coordinates alone, a scroll position the browser moved during a reorder (the end of a capped list
+    // In content coordinates alone, a scroll position the browser moved during a reorder (the end of a scrolling list
     // clamping when a row above the view goes) would glide every visible row by a row and back: audit on PR #35.
     function drawnTop(row) {
         return row.offsetTop - list.scrollTop;
@@ -105,8 +105,8 @@
         rowsObserver.observe(list, { childList: true });
         overlayObserver = new MutationObserver(remember);
         overlayObserver.observe(list.closest('.overlay'), { attributes: true, attributeFilter: ['style', 'class'] });
-        // In a list past "Rows before scrolling" the player's own row is pinned (app.css, .rows.capped > .row.me), and
-        // its offsetTop follows the scroll and the list's height (a capped list giving way while the window is cut);
+        // In a scrolling list the player's own row is pinned (app.css, .rows.scrolls > .row.me), and its offsetTop
+        // follows the scroll and the list's height (the bar area resized, or giving way to a short screen);
         // measure again on either, so a later reorder starts from where it is drawn. A list that is replaced takes
         // its listener with it; the size observer is disconnected above.
         list.addEventListener('scroll', remember, { passive: true });

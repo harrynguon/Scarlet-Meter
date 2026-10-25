@@ -91,19 +91,43 @@ public sealed class SettingsTests : IDisposable
         }
     }
 
-    // "Rows before scrolling" keeps to its range, each repair reported; a value inside it, its edges included, stays.
+    // The bar area's rows keep to 0..10, each repair reported; unset (null, until the window takes them from an
+    // earlier build's height) stays unset, as does a value inside the range, its edges included.
     [Theory]
-    [InlineData(0, AppearanceSettings.MinVisibleRows, true)]
-    [InlineData(-5, AppearanceSettings.MinVisibleRows, true)]
-    [InlineData(int.MaxValue, AppearanceSettings.MaxVisibleRows, true)]
-    [InlineData(AppearanceSettings.MinVisibleRows, AppearanceSettings.MinVisibleRows, false)]
-    [InlineData(AppearanceSettings.MaxVisibleRows, AppearanceSettings.MaxVisibleRows, false)]
-    [InlineData(8, 8, false)]
-    public void RowsBeforeScrollingKeepToTheirRange(int saved, int kept, bool repaired)
+    [InlineData(-3, 0, true)]
+    [InlineData(25, AppearanceSettings.MaxBarRows, true)]
+    [InlineData(0, 0, false)]
+    [InlineData(AppearanceSettings.MaxBarRows, AppearanceSettings.MaxBarRows, false)]
+    [InlineData(4, 4, false)]
+    public void TheBarAreaKeepsToItsRows(int saved, int kept, bool repaired)
     {
-        var (settings, repairs) = SettingsNormalizer.Normalize(new MeterSettings { Appearance = new AppearanceSettings { VisibleRows = saved } });
-        Assert.Equal(kept, settings.Appearance.VisibleRows);
-        Assert.Equal(repaired, repairs.Any(r => r.StartsWith("Rows before scrolling", StringComparison.Ordinal)));
+        var (settings, repairs) = SettingsNormalizer.Normalize(new MeterSettings { Appearance = new AppearanceSettings { BarRows = saved } });
+        Assert.Equal(kept, settings.Appearance.BarRows);
+        Assert.Equal(repaired, repairs.Any(r => r.StartsWith("The bar area", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void TheBarAreaIsUnsetUntilTheWindowSetsIt()
+    {
+        Assert.Null(new AppearanceSettings().BarRows);
+        var (settings, repairs) = SettingsNormalizer.Normalize(new MeterSettings());
+        Assert.Null(settings.Appearance.BarRows);
+        Assert.Empty(repairs);
+        Assert.InRange(AppearanceSettings.DefaultBarRows, 0, AppearanceSettings.MaxBarRows);
+    }
+
+    // A file from the build that had "Rows before scrolling" (#35; dragging the bar area took its place) still loads
+    // as it is, the old value passed over, nothing reported, and the rest of its appearance kept.
+    [Fact]
+    public void AFileWithTheOldRowsBeforeScrollingLoads()
+    {
+        var store = NewStore();
+        Directory.CreateDirectory(directory.FullPath); // TestDataDirectory names the folder; the test makes it
+        File.WriteAllText(store.FilePath, "{ \"version\": 1, \"appearance\": { \"visibleRows\": 6, \"rowScale\": 1.25 } }");
+        var result = store.Load();
+        Assert.Equal(SettingsLoadStatus.Loaded, result.Status);
+        Assert.Null(result.Notice);
+        Assert.Equal(1.25, result.Settings.Appearance.RowScale);
     }
 
     [Fact]
@@ -334,9 +358,8 @@ public sealed class SettingsTests : IDisposable
         Assert.True(loaded.Appearance.ShowCombatPower);
         Assert.True(loaded.Appearance.ShowOdyleEnergy);
         Assert.Equal(1.0, loaded.Appearance.PictureOpacity); // the picture as it looked before the setting
-        Assert.Equal(10, loaded.Appearance.VisibleRows); // Harry: "cap the dps bars to like 8-10 players"
 
-        var plain = loaded with { Appearance = loaded.Appearance with { BarEffects = false, EffectsOnEveryBar = false, ShowCombatPower = false, PictureOpacity = 0.4, VisibleRows = 6 } };
+        var plain = loaded with { Appearance = loaded.Appearance with { BarEffects = false, EffectsOnEveryBar = false, ShowCombatPower = false, PictureOpacity = 0.4 } };
         store.Save(plain);
         Assert.Equal(plain, store.Load().Settings);
     }

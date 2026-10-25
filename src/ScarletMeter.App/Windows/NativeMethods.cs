@@ -10,6 +10,8 @@ internal static class NativeMethods
     // The player starts and ends dragging or resizing a window (the system's move/size loop).
     public const int WmEnterSizeMove = 0x0231;
     public const int WmExitSizeMove = 0x0232;
+    // The loop is a resize, not a move: sent while an edge is being dragged.
+    public const int WmSizing = 0x0214;
     // The display's scale, resolution or arrangement changed, or the work area did (a taskbar resized or set to hide).
     public const int WmDpiChanged = 0x02E0;
     public const int WmDisplayChange = 0x007E;

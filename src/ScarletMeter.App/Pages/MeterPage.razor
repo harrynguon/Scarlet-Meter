@@ -95,9 +95,9 @@
         </span>
     </div>
 
-    @* Past "Rows before scrolling" the list scrolls, the player's own row pinned in view (RowsClass, app.css .rows.capped). *@
+    @* The bar area: as many rows tall as the player dragged it (BarRows); with more players it scrolls, the player's own row pinned in view (RowsClass, app.css .rows.scrolls). *@
     <ul class="rows @RowsClass">
-        @foreach (var player in Visible)
+        @foreach (var player in Shown)
         {
             <li class="row @(player.IsUser ? "me" : "")" @key="player.Id" title="Open this player's breakdown" @onclick="() => Windows.OpenPlayerDetails(player.Id)">
                 <div class="fill @FillClass(player)" style="width:@Compact.Percent(BarPercent(player))">
