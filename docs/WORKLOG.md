@@ -2,6 +2,28 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-25 — Odyle energy beside the ping
+
+**What:** the overlay's totals line shows the player's Odyle energy left of the ping, basic then charged in brackets ("420 (+1,200)", `Formatting/OdyleText`), with a crystal of Scarlet's own drawing, once the game has sent it and while "Show Odyle energy" (`AppearanceSettings.ShowOdyleEnergy`, on by default; Settings, Appearance) is on. The engine reads it beside upstream's pipeline: `Upstream/OdyleEnergyTap` subscribes to upstream's `TcpStreamBuffer.PacketExtracted`, opens LZ4 bundles with upstream's internal `PacketProcessor.ProcessPacket` (bound once by reflection), and `Odyle/OdyleEnergyRecords` reads records `0b 61` (the whole list of entry counts) and `0c 61` (changes), as A2Tools documented them; `ICombatEngine` gains `OdyleEnergy` and `OdyleEnergyUpdated`. The demo hands the tap synthetic records (a login list, an update per fight). ARCHITECTURE "Odyle energy" has the detail; THIRD-PARTY-NOTICES credits A2Tools (GPL v3).
+
+**Why:** Harry: "work on a new feature - odyle energy displayer. place it to the left of the ping display", with an earlier analysis of how Abyss Logs and A2Tools (taengu/A2Tools-DPS-Meter#63) read it from the game's traffic. Upstream's opcode table takes only processors marked with its internal attribute, so a Scarlet processor cannot join it without editing `upstream/`; the stream buffer's public event is the seam.
+
+**Found on the way:** upstream's `PacketAccumulator` searches for its keep-alive from the end of the bytes it holds (`IndexOfArray(pattern, length)` passes the length as the start), so a new stream synchronises only on a keep-alive left from an earlier chunk. Live traffic gets there; a one-off injection does not, so the demo hands its records to the tap directly and the tests synchronise with a padded keep-alive and then another. A candidate fix to offer upstream (it also delays live capture's start).
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` 551/551 (`OdyleEnergyTests` new, 20 cases; `FormattingTests.OdyleEnergyReadsAsTheGameWritesIt`, `RazorMarkupTests.OdyleEnergySitsLeftOfThePing`, the setting's default in `SettingsTests`). Fail-first, twelve mutations, each failing its test by name: the list without the slot-2 check, any value plausible, a varint wrapping past 32 bits, an update reading only its first entry, bundles not opened, an unchanged value raised again, exceptions escaping into the stream, the demo without its login list or its spending, the page never reading the value, a ping before the energy, the energy not pushed right; a comment in the reader passes. Every byte in the tests is synthetic.
+
+**Not checked:** real traffic (HANDOFF): that the records and the shape heuristic hold on the live game, the value against the game's tooltip, a recharge item and a raid; the display over the game. Nothing was run with a window open.
+
+**Next:** push, PR, a deep audit (capture and the engine's upstream mapping), Codex and CI; Harry's in-game check; merge with Harry's go-ahead.
+
+## 2026-10-25 — v0.2.0 released
+
+**What:** PR 32 merged as e5cbdcd (Codex found nothing on its head 99f2ff4; CI passed). `v0.2.0` tagged on it; the release workflow (run 40189037349) built the draft: `ScarletMeter-0.2.0-win-x64.zip`, `ScarletMeter-0.2.0-source.zip` and their `.sha256`. Checked as DEVELOPMENT.md "Releases" asks: both checksums match; the 518 files of both zips hold no home path, machine or account name and no e-mail address of the player (the addresses in them are third-party licence authors, upstream's README contact and the tests' made-up ones). Published as a pre-release: https://github.com/harrynguon/Scarlet-Meter/releases/tag/v0.2.0.
+
+**Why:** Harry: "run the audit. fix what it finds. then merge and release."
+
+**Next:** the in-game checks in HANDOFF; the next release when there is something to ship.
+
 ## 2026-10-25 — v0.2.0 prepared
 
 **What:** `<Version>` is 0.2.0 (`src/Directory.Build.props`) and `docs/release-notes/v0.2.0.md` says what is new since 0.1.0 (#26 to #33: the icon and the header's face with its HP ring, readable rows, the one-bar world-event strip, the boss-timers window, the meter growing instead of scrolling, and the fixes), how to update from 0.1.0 (move the `data` folder), the Npcap step and the risk note, as DEVELOPMENT.md "Releases" asks. No package changed, so `Write-ThirdPartyNotices.ps1` has nothing to rewrite. Added to PR 32 rather than a PR of its own, so the release takes one round of review.

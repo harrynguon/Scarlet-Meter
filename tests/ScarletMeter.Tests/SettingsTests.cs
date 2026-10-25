@@ -317,6 +317,7 @@ public sealed class SettingsTests : IDisposable
         Assert.True(loaded.Appearance.BarEffects);
         Assert.True(loaded.Appearance.EffectsOnEveryBar);
         Assert.True(loaded.Appearance.ShowCombatPower);
+        Assert.True(loaded.Appearance.ShowOdyleEnergy);
         Assert.Equal(1.0, loaded.Appearance.PictureOpacity); // the picture as it looked before the setting
 
         var plain = loaded with { Appearance = loaded.Appearance with { BarEffects = false, EffectsOnEveryBar = false, ShowCombatPower = false, PictureOpacity = 0.4 } };

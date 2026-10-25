@@ -69,4 +69,14 @@ public interface ICombatEngine : IDisposable
 
     /// <summary>Latest ping in milliseconds. Raised on a capture (or demo feed) thread, never on the UI thread.</summary>
     event EventHandler<int>? PingUpdated;
+
+    /// <summary>
+    /// The player's Odyle energy as the game last sent it, or null until it sends one: it does at login, after a
+    /// server transfer and when the value changes (a raid, a recharge item), not on a teleport, so a meter started
+    /// mid-session has none until then. Kept across Stop and Reset.
+    /// </summary>
+    OdyleEnergy? OdyleEnergy { get; }
+
+    /// <summary>The Odyle energy changed. Raised on a capture (or demo feed) thread, never on the UI thread.</summary>
+    event EventHandler<OdyleEnergy>? OdyleEnergyUpdated;
 }

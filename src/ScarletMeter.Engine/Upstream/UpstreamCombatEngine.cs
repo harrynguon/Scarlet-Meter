@@ -25,6 +25,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     private readonly CombatSessionManager sessions;
     private readonly ICombatHistoryStore history;
     private readonly SavedHistoryReader savedHistory;
+    private readonly OdyleEnergyTap odyle;
     private readonly ILogger<UpstreamCombatEngine> logger;
     private volatile bool savedHistoryDamaged; // set while upstream's store cannot read the saved list
     private bool disposed;
@@ -35,6 +36,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         CombatSessionManager sessions,
         ICombatHistoryStore history,
         IDbContextFactory<CombatHistoryDbContext> historyDatabase,
+        OdyleEnergyTap odyle,
         ILogger<UpstreamCombatEngine> logger)
     {
         this.pipeline = pipeline;
@@ -42,6 +44,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         this.sessions = sessions;
         this.history = history;
         savedHistory = new SavedHistoryReader(historyDatabase);
+        this.odyle = odyle;
         this.logger = logger;
     }
 
@@ -52,6 +55,14 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     {
         add => sessions.PingUpdated += value;
         remove => sessions.PingUpdated -= value;
+    }
+
+    public OdyleEnergy? OdyleEnergy => odyle.Current;
+
+    public event EventHandler<OdyleEnergy>? OdyleEnergyUpdated
+    {
+        add => odyle.Updated += value;
+        remove => odyle.Updated -= value;
     }
 
     public CaptureState Capture => new(capture.IsCapturing, capture.DeviceName);
@@ -256,5 +267,6 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
             logger.LogError(ex, "Error while shutting down the combat engine.");
         }
         (pipeline as IDisposable)?.Dispose();
+        odyle.Dispose();
     }
 }

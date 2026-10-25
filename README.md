@@ -63,7 +63,8 @@ and adds it up per player and per fight.
   come back).
 - A **row per player**: class icon, name, **combat power**, deaths, then DPS and share, with the total damage small
   under the share.
-- **Party DPS**, fight duration, and a colour-coded **ping**.
+- **Party DPS**, fight duration, your **Odyle energy** (basic, then charged in brackets, once the game sends it: at
+  login, after a server transfer and when it changes) and a colour-coded **ping**.
 - The header says what is going on: **"Boss combat"**, the time, and **"Boss defeated"** when it is down.
 
 **Looks, your way**
@@ -122,6 +123,7 @@ opacity, a background picture, class colours, hidden names and a show/hide hotke
 | Animated bar effects per class, overtake glide | Yes | Own-bar colours and gradients |
 | Picture opacity separate from the meter's | Yes | No |
 | World-event and field-boss alerts | Yes | No |
+| Odyle energy beside the ping | Yes | No |
 | Demo mode with made-up fights | Yes | No |
 | Buff and skill-cooldown overlays | No | Yes |
 | Stat Efficiency Calculator | No | Yes |

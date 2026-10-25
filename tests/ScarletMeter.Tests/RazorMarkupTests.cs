@@ -485,6 +485,33 @@ public sealed partial class RazorMarkupTests
         Assert.True(Px(Block(css, ".row"), "height") - size >= 6, "the icon leaves room above and below it in the row");
     }
 
+    // Odyle energy sits left of the ping (Harry: "place it to the left of the ping display") once the game has sent it
+    // and while "Show Odyle energy" is on, as basic then charged; the two sit together at the line's end. The page
+    // reads the value on its refresh loop, on the renderer's dispatcher, not from the capture thread's event.
+    [Fact]
+    public void OdyleEnergySitsLeftOfThePing()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        var markup = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
+        var totals = Regex.Match(markup, @"(?s)<div class=""ov-totals"">(?<body>.*?)\n    </div>").Groups["body"].Value;
+        Assert.Matches(@"(?s)class=""accent"">.*@if \(appearance\.ShowOdyleEnergy && odyle is \{ \} energy\).*<span class=""odyle"".*"
+            + @"@OdyleText\.Basic\(energy\).*@OdyleText\.Charged\(energy\).*<span class=""ping ", totals);
+        Assert.True(totals.IndexOf(@"<span class=""odyle""", StringComparison.Ordinal) < totals.IndexOf(@"<span class=""ping", StringComparison.Ordinal),
+            "the energy comes before the ping");
+        Assert.DoesNotContain("<img", totals); // the crystal is Scarlet's own drawing, not the game's art
+
+        var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
+        Assert.Matches(@"snapshot = Engine\.GetSnapshot\(\);\s*(?://[^\n]*\n\s*)*odyle = Engine\.OdyleEnergy;", code);
+        Assert.DoesNotContain("OdyleEnergyUpdated", code);
+
+        var css = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "app.css"));
+        static string Block(string source, string selector) =>
+            Regex.Match(source, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
+        Assert.Matches(@"margin-left:\s*auto;", Block(css, ".odyle"));
+        Assert.Matches(@"margin-left:\s*0;", Block(css, ".odyle + .ping"));
+        Assert.Matches(@"margin-left:\s*auto;", Block(css, ".ping")); // without the energy, the ping still ends the line
+    }
+
     // The player's own row is marked by a ring round the row, never by a stripe on the bar (a white inset at the
     // bar's left edge read as a glitch); bar effects replace the ring with their glow.
     [Fact]

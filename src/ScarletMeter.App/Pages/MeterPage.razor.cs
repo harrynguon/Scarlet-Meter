@@ -40,6 +40,8 @@ public partial class MeterPage : IAsyncDisposable
     // strip is open (NoticesExpanded).
     private AlertSettings alertSettings = new();
     private int? ping;
+    // The latest Odyle energy, read with each refresh; null until the game sends it.
+    private OdyleEnergy? odyle;
     private Task? refreshLoop;
     private bool refreshFailing;
     // The content height last sent to the window, which grows to show all of it (nothing in the meter scrolls).
@@ -120,6 +122,7 @@ public partial class MeterPage : IAsyncDisposable
     {
         appearance = Settings.Current.Appearance;
         alertSettings = Settings.Current.Alerts;
+        odyle = Engine.OdyleEnergy;
         Settings.Changed += OnSettingsChanged;
         Engine.PingUpdated += OnPingUpdated;
         Alerts.Changed += OnAlertsChanged;
@@ -207,6 +210,9 @@ public partial class MeterPage : IAsyncDisposable
                 try
                 {
                     snapshot = Engine.GetSnapshot();
+                    // Read on this loop, which runs on the renderer's dispatcher, rather than set from the capture
+                    // thread's event: the two numbers are read together under the engine's lock, never torn.
+                    odyle = Engine.OdyleEnergy;
                     var now = Clock.GetUtcNow();
                     killIn = killTimer.Update(snapshot.Target, now);
                     phase = fightState.Update(snapshot.Target, now);
