@@ -11,8 +11,8 @@ namespace ScarletMeter.App.Windows;
 /// a resize ends at into rows. Everything else keeps its own height, so the window grows when the notices open or the
 /// target card comes, and shrinks a moment after they go. It grows downwards; near the bottom of the screen it moves
 /// up just enough to stay inside the monitor's work area, never above the work area's top (or the player's own top,
-/// if that is higher), and it is never made taller than the work area. Pure, so the rules are tested without a
-/// window; all values are device-independent pixels.
+/// if that is higher), and it is never made taller than the work area unless the player's own height already is.
+/// Pure, so the rules are tested without a window; all values are device-independent pixels unless named otherwise.
 /// </summary>
 public static class OverlayFit
 {
@@ -26,7 +26,48 @@ public static class OverlayFit
     public static double RowStep(double rowScale) => RowPixels * rowScale;
 
     /// <summary>The tallest a resize may make the meter: its content with no rows, <paramref name="emptyHeight"/>, and <see cref="MostRows"/> rows.</summary>
-    public static double MostHeight(double emptyHeight, double rowScale) => emptyHeight + MostRows * RowStep(rowScale);
+    public static double MostHeight(double emptyHeight, double rowStep) => emptyHeight + MostRows * rowStep;
+
+    /// <summary>
+    /// The heights a resize is held between: the content with no rows (never below the overlay's floor,
+    /// <see cref="WindowPlacement.MinSize"/>, nor above the work area) and that with <see cref="MostRows"/> rows, whole
+    /// pixels.
+    /// </summary>
+    public static (double Least, double Most) DragLimits(double emptyHeight, double rowStep, double workAreaHeight)
+    {
+        var least = Math.Max(WindowPlacement.MinSize, Math.Min(Math.Ceiling(emptyHeight), workAreaHeight));
+        return (least, Math.Max(least, Math.Ceiling(MostHeight(emptyHeight, rowStep))));
+    }
+
+    /// <summary>Whether a resize by <paramref name="edge"/> (WM_SIZING's WMSZ_ value) can change the height: the top or bottom edge, or a corner.</summary>
+    public static bool IsHeightEdge(int edge) => edge is >= 3 and <= 8;
+
+    /// <summary>
+    /// The bar area's rows after a resize by <paramref name="edge"/> from <paramref name="startHeight"/> to
+    /// <paramref name="endHeight"/>, or null when it was no change of height: the left or right edge only (a meter cut
+    /// by a short screen would otherwise save the rows it fits; Codex review on PR #37), or a drag that ended where it
+    /// started (cancelled with Escape, which puts the window back).
+    /// </summary>
+    public static int? ResizedRows(int edge, double startHeight, double endHeight, double emptyHeight, double rowStep) =>
+        IsHeightEdge(edge) && Math.Abs(endHeight - startHeight) >= 0.5 ? RowsFor(endHeight, emptyHeight, rowStep) : null;
+
+    /// <summary>
+    /// The window's top once a resize by <paramref name="edge"/> that left it <paramref name="height"/> tall settles at
+    /// <paramref name="settledHeight"/> (whole rows): dragged by the top, the bottom stays where it was and the top
+    /// moves; dragged by the bottom, the top stays.
+    /// </summary>
+    public static double TopAfterResize(int edge, double top, double height, double settledHeight) =>
+        edge is 3 or 4 or 5 ? top + height - settledHeight : top;
+
+    /// <summary>
+    /// The bar area's rows to start from when none are saved (<paramref name="barRows"/> null), or null when they are:
+    /// an earlier build saved the window's height instead, so a restored placement turns that height into rows (the
+    /// player's size kept); without one (a first start) the default.
+    /// </summary>
+    public static int? CarriedRows(int? barRows, bool placementRestored, double height, double emptyHeight, double rowStep) =>
+        barRows is not null ? null
+        : placementRestored ? RowsFor(height, emptyHeight, rowStep) ?? AppearanceSettings.DefaultBarRows
+        : AppearanceSettings.DefaultBarRows;
 
     /// <summary>
     /// The window's top and height when its content needs at least <paramref name="leastHeight"/> and may be at most

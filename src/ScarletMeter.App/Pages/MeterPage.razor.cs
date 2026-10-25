@@ -44,9 +44,10 @@ public partial class MeterPage : IAsyncDisposable
     private OdyleEnergy? odyle;
     private Task? refreshLoop;
     private bool refreshFailing;
-    // The heights last sent to the window (OnAfterRenderAsync): the content, and the content with no rows.
+    // The heights last sent to the window (OnAfterRenderAsync): the content, the content with no rows, and a row's step.
     private double reportedContent = double.NaN;
     private double reportedEmpty = double.NaN;
+    private double reportedStep = double.NaN;
     private bool fitFailing;
     // Whether the window, after the last fit, is shorter than the content (RowsClass, "scrolls"), and whether the player
     // is dragging its edge (OverlayClass, "sizing").
@@ -96,11 +97,16 @@ public partial class MeterPage : IAsyncDisposable
         (appearance.BarEffects ? "fx" : "") + (phase is FightPhase.Settled or FightPhase.Defeated ? " settled" : "")
         + (resizing ? " sizing" : "");
 
-    // "scrolls" once the bar area cannot show every row: more players than its rows, the window as tall as the screen
-    // allows (IMeterWindows.OverlayCutsContent), or a resize under way. The list scrolls then, the player's own row
-    // pinned in view (app.css, .rows.scrolls). Otherwise it is clipped, so a gliding row never shows a scrollbar for
-    // a moment.
-    private string RowsClass => Visible.Count() > BarRows || contentCut || resizing ? "scrolls" : string.Empty;
+    // The rows the bar area holds: none when it has no rows (the empty meter), unless its edge is being dragged, when
+    // the bars follow the edge. A bar area of no rows still holding them showed a sliver of the pinned own row over a
+    // scrollbar (audit on PR #37).
+    private IEnumerable<PlayerRow> Shown => BarRows == 0 && !resizing ? [] : Visible;
+
+    // "scrolls" once the bar area cannot show every row: more players than its rows (some), the window as tall as the
+    // screen allows (IMeterWindows.OverlayCutsContent), or a resize under way. The list scrolls then, the player's own
+    // row pinned in view (app.css, .rows.scrolls). Otherwise it is clipped, so a gliding row never shows a scrollbar
+    // for a moment.
+    private string RowsClass => (BarRows > 0 && Visible.Count() > BarRows) || contentCut || resizing ? "scrolls" : string.Empty;
 
     // The header in a fight: what is being fought, or that it is down.
     private string StateText(TargetInfo target) => phase == FightPhase.Defeated
@@ -168,11 +174,15 @@ public partial class MeterPage : IAsyncDisposable
         if (stopping.IsCancellationRequested || heights is null) return;
         try
         {
-            if (OverlayFit.IsNewHeight(reportedContent, heights.Content) || OverlayFit.IsNewHeight(reportedEmpty, heights.Empty))
+            // The step too: at no rows a row-size notch moves the heights by less than half a pixel (audit on PR #37).
+            var step = OverlayFit.RowStep(appearance.RowScale);
+            if (OverlayFit.IsNewHeight(reportedContent, heights.Content) || OverlayFit.IsNewHeight(reportedEmpty, heights.Empty)
+                || OverlayFit.IsNewHeight(reportedStep, step))
             {
-                Windows.FitOverlayToContent(heights.Content, heights.Empty, OverlayFit.RowStep(appearance.RowScale));
+                Windows.FitOverlayToContent(heights.Content, heights.Empty, step);
                 reportedContent = heights.Content;
                 reportedEmpty = heights.Empty;
+                reportedStep = step;
             }
             var cut = Windows.OverlayCutsContent(heights.Content);
             var sizing = Windows.OverlayResizing;

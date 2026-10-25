@@ -401,7 +401,7 @@ button {
    It is as many rows tall as the player dragged it (--bar-rows, 0 to Windows/OverlayFit.MostRows; each row 29 px, its
    26 px and 3 px gap, in the list's zoomed pixels, so it follows the row size), its padding around them: fewer players
    leave the rest of it empty, and the notices below stay where they are. It gives way (shrinks, down to its padding)
-   only when the screen is too short for the panel. Its overflow is clipped unless it scrolls (.rows.scrolls), so a
+   when the panel is taller than the window: the screen too short for it, or for the moment before the window grows. Its overflow is clipped unless it scrolls (.rows.scrolls), so a
    row gliding into place (a transform) cannot show a scrollbar for a moment. --row-edge is the crisp dark edge every
    bit of a row's text sits on, a tight outline shadow, so white text stays readable over the brightest class bars
    (gold, green) as well as the dark track; a soft shadow alone washed out there. */

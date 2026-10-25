@@ -42,8 +42,13 @@ public sealed class OverlayWindow : ScarletWindow
     private double rowStep = double.NaN;
     // Inside the system's move or resize loop (the player dragging the header or an edge): no fitting meanwhile.
     private bool sizingOrMoving;
-    // Within that loop, an edge is being dragged (WM_SIZING came), not the header.
+    // Within that loop, the top or bottom edge (or a corner) is being dragged, not the header or a side; the edge
+    // (WM_SIZING's WMSZ_ value, 0 before one) and the window's height when the loop began.
     private bool resizing;
+    private int dragEdge;
+    private double heightAtStart;
+    // Whether a saved placement was restored, so an earlier build's height can be carried over as rows.
+    private readonly bool placementRestored;
     // Set while Refit moves the window, so LocationChanged does not take the move for someone else's.
     private bool applying;
 
@@ -90,30 +95,33 @@ public sealed class OverlayWindow : ScarletWindow
         };
         LocationChanged += (_, _) => FollowOutsideMove();
         Closed += (_, _) => shrinkLater.Stop();
-        RestorePlacement();
+        placementRestored = RestorePlacement();
     }
 
     /// <summary>
     /// The page's heights in device-independent pixels (CSS pixels at the WebView's zoom of 1): its content, which the
     /// window is as tall as, its content with no rows, and a row with its gap
-    /// (<see cref="IMeterWindows.FitOverlayToContent"/>). The first report after an earlier build, which saved the
-    /// window's height rather than the bar area's rows, turns that height into rows (kept, so the player's size stays)
-    /// and waits for the page to report again with them. Call on the UI thread.
+    /// (<see cref="IMeterWindows.FitOverlayToContent"/>). With no rows saved, the first report starts them
+    /// (<see cref="OverlayFit.CarriedRows"/>: an earlier build's restored height turned into rows, so the player's size
+    /// stays, or the default) and the window takes that height at once, before the page reports it again. Call on the
+    /// UI thread.
     /// </summary>
     public void FitToContent(double content, double empty, double step)
     {
         contentHeight = content;
         emptyHeight = empty;
         rowStep = step;
-        if (IsLoaded && settings.Current.Appearance.BarRows is null && OverlayFit.RowsFor(ActualHeight, empty, step) is { } rows)
+        if (IsLoaded && OverlayFit.CarriedRows(settings.Current.Appearance.BarRows, placementRestored, ActualHeight, empty, step) is { } rows)
         {
+            contentHeight = empty + rows * step;
             SetBarRows(rows);
+            Refit(shrinkNow: true);
             return;
         }
         Refit();
     }
 
-    /// <summary>Whether an edge is being dragged: the page then lets the bars fill the window. Call on the UI thread.</summary>
+    /// <summary>Whether the top or bottom edge is being dragged: the page then lets the bars fill the window. Call on the UI thread.</summary>
     public bool Resizing => resizing;
 
     /// <summary>
@@ -124,10 +132,11 @@ public sealed class OverlayWindow : ScarletWindow
     public bool CutsContent(double height) => IsLoaded && ActualHeight < Math.Ceiling(height) - 0.5;
 
     // The player's own placement, once known; nothing while they are dragging or resizing, whose end saves it. Its
-    // height is the window's as shown then, which the content's replaces once the page has reported.
+    // height is the window's as shown then (the content's, once the page has reported), and never below the floor the
+    // settings keep a saved size to, which would drop the whole placement (audit on PR #37).
     protected override Rect? PlacementBounds =>
         sizingOrMoving ? null
-        : overlayPlacement.Started ? new Rect(Left, overlayPlacement.PlayerTop, ActualWidth, overlayPlacement.Shown.Height)
+        : overlayPlacement.Started ? new Rect(Left, overlayPlacement.PlayerTop, ActualWidth, Math.Max(overlayPlacement.Shown.Height, WindowPlacement.MinSize))
         : base.PlacementBounds;
 
     // Takes the window to OverlayFit's placement for the content's height (as both the least and the most, so the
@@ -163,28 +172,20 @@ public sealed class OverlayWindow : ScarletWindow
     // A fit after the current message is handled and WPF has laid the window out.
     private void RefitSoon() => Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => Refit()));
 
-    // For the length of a drag or resize, the window's height is held between the content with no rows and with
-    // OverlayFit.MostRows rows, from the page's last heights, so a resize stops there rather than springing back when
-    // it ends; WmExitSizeMove lets go again, so a fit's growth for the notices or a display change is never held back.
-    // Only within the work area's height, as a fit would be. Nothing until the page has reported.
-    private void HoldHeightWhileResizing()
+    // Holds the rectangle being dragged (WM_SIZING's, device pixels) between the content with no rows and with
+    // OverlayFit.MostRows rows (OverlayFit.DragLimits, from the page's last heights) by stopping the edge being dragged
+    // (OverlayFit.HoldDraggedEdge), before Windows moves the window, so a resize stops there rather than springing back
+    // when it ends. Not with WPF's MinHeight and MaxHeight: WPF holds those by keeping the top and moving the bottom,
+    // so the top edge dragged past the most carried the whole window up with the cursor (Harry), and set for the whole
+    // loop they also shrank a window waiting to shrink when a move of the header began (audit on PR #37). Nothing
+    // until the page has reported.
+    private void HoldDraggedEdge(int edge, IntPtr rectPointer)
     {
-        if (!double.IsFinite(emptyHeight) || !double.IsFinite(rowStep)) return;
-        var least = Math.Max(WindowPlacement.MinSize, Math.Min(Math.Ceiling(emptyHeight), ScreenPlacement.WorkAreaOf(this).Height));
-        MinHeight = least;
-        MaxHeight = Math.Max(least, Math.Ceiling(emptyHeight + OverlayFit.MostRows * rowStep));
-    }
-
-    // Holds the rectangle being dragged (WM_SIZING's, device pixels) within the height held for the resize
-    // (HoldHeightWhileResizing) by stopping the edge being dragged (OverlayFit.HoldDraggedEdge), before Windows moves
-    // the window: WPF's own MinHeight and MaxHeight would keep the top, so the top edge dragged past the most carried
-    // the whole window up with the cursor.
-    private void HoldDraggedEdge(IntPtr edge, IntPtr rectPointer)
-    {
-        if (rectPointer == IntPtr.Zero) return;
+        if (rectPointer == IntPtr.Zero || !double.IsFinite(emptyHeight) || !double.IsFinite(rowStep)) return;
         var rect = Marshal.PtrToStructure<NativeMethods.RectInt>(rectPointer);
         var scale = VisualTreeHelper.GetDpi(this).DpiScaleY;
-        var (top, bottom) = OverlayFit.HoldDraggedEdge(rect.Top, rect.Bottom, edge.ToInt32(), MinHeight * scale, MaxHeight * scale);
+        var (least, most) = OverlayFit.DragLimits(emptyHeight, rowStep, ScreenPlacement.WorkAreaOf(this).Height);
+        var (top, bottom) = OverlayFit.HoldDraggedEdge(rect.Top, rect.Bottom, edge, least * scale, most * scale);
         if (top == rect.Top && bottom == rect.Bottom) return;
         rect.Top = top;
         rect.Bottom = bottom;
@@ -203,43 +204,45 @@ public sealed class OverlayWindow : ScarletWindow
         if (msg == NativeMethods.WmEnterSizeMove)
         {
             sizingOrMoving = true;
-            HoldHeightWhileResizing();
+            dragEdge = 0;
+            heightAtStart = ActualHeight;
         }
         else if (msg == NativeMethods.WmSizing && sizingOrMoving)
         {
-            if (!resizing)
+            dragEdge = wParam.ToInt32();
+            if (!resizing && OverlayFit.IsHeightEdge(dragEdge))
             {
-                // An edge is being dragged: the page lets the bars follow it.
+                // The top or bottom edge is being dragged: the page lets the bars follow it.
                 resizing = true;
                 Fitted?.Invoke(this, EventArgs.Empty);
             }
-            HoldDraggedEdge(wParam, lParam);
+            HoldDraggedEdge(dragEdge, lParam);
             handled = true;
             return 1;
         }
         else if (msg == NativeMethods.WmExitSizeMove)
         {
             sizingOrMoving = false;
-            MinHeight = WindowPlacement.MinSize;
-            MaxHeight = double.PositiveInfinity;
-            overlayPlacement.PlayerPlaced(Top, ActualHeight);
-            if (resizing)
+            var wasResizing = resizing;
+            resizing = false;
+            if (wasResizing && OverlayFit.ResizedRows(dragEdge, heightAtStart, ActualHeight, emptyHeight, rowStep) is { } rows)
             {
                 // Where the edge was let go becomes the bar area's whole rows; the window takes that height at once,
-                // before the page reports it, so it settles there rather than waiting to shrink.
-                resizing = false;
-                if (OverlayFit.RowsFor(ActualHeight, emptyHeight, rowStep) is { } rows)
-                {
-                    contentHeight = emptyHeight + rows * rowStep;
-                    SetBarRows(rows);
-                }
-                Refit(shrinkNow: true);
-                Fitted?.Invoke(this, EventArgs.Empty);
+                // before the page reports it, so it settles there rather than waiting to shrink, and dragged by the top
+                // it keeps its bottom where it was.
+                contentHeight = emptyHeight + rows * rowStep;
+                var settled = Math.Ceiling(contentHeight);
+                overlayPlacement.PlayerPlaced(OverlayFit.TopAfterResize(dragEdge, Top, ActualHeight, settled), settled);
+                SetBarRows(rows);
             }
             else
             {
-                Refit();
+                // A move, a drag of a side only, or a resize cancelled where it began: the rows stay.
+                overlayPlacement.PlayerPlaced(Top, ActualHeight);
             }
+            Refit(shrinkNow: wasResizing);
+            if (wasResizing) Fitted?.Invoke(this, EventArgs.Empty);
+            dragEdge = 0;
             // Saves were skipped while the drag lasted (PlacementBounds), and the fit may not move the window.
             SavePlacementSoon();
         }

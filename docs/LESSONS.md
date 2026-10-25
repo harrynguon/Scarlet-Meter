@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The overlay's saved place was dropped again, at no rows** (deep audit on #37, fixed before merge).
+- What: with the window hugging its content, it saved its shown height, which at no rows and no notice due is 77 px, below the 96 px floor `SettingsNormalizer` keeps a saved size to, so the whole placement was dropped and the meter came back centred: the same failure as "A small overlay lost its saved position" below.
+- Why: the floor was set for a window the player sized; when the window became as short as its content, nothing re-checked the smallest content against it, and the earlier guard tested only the player's smallest size.
+- Guard: the floor is 48 px, `OverlayFitTests.TheEmptyMeterIsAboveTheOverlaysFloor` pins it below the measured empty meter, and the window saves no height below it. When what a window's size follows changes, re-check every bound its saved size meets.
+
 **A drag of the meter's top edge past its most moved the whole window up** (found by Harry with the portable copy, 2026-10-26; fixed before the PR).
 - What: during a resize the overlay held its height with WPF's `MinHeight` and `MaxHeight`, which WPF enforces by keeping the top and moving the bottom. Dragged by the bottom edge that stops the edge; dragged by the top past ten rows, the top went on following the cursor and the bottom moved up with it.
 - Why: every check dragged the bottom edge only (a `SetWindowPos` that kept the top), the case where WPF's limits look right; the other edges were never tried.
@@ -155,6 +160,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - Guard: `SettingsTests.AFileSavedWithAByteOrderMarkLoads`. Seed test files the way people actually write them.
 
 ## In the process
+
+**A helper that rewrote test lines dropped five new assertions** (2026-10-26, caught by a fail-first run before commit).
+- What: replacing a test's lines by number with a PowerShell function, the multi-line replacements were written as `` Line 85 'a' + "`r`n" + 'b' ``, which PowerShell parses as separate arguments: only the first piece was written, and the rest (the no-rows guard among them) silently went missing. The build and every test passed.
+- Why: nothing checked the edit's result; the passing build read as success.
+- Guard: the fail-first run, which showed a mutation of the no-rows rule passing; after a scripted edit of a test, grep for each new assertion (done since), and keep running a mutation per new rule before trusting the tests.
 
 **A check launched the debug build and Windows popped a ".NET is missing" dialog on the player's screen** (2026-10-26, while Harry was in game; closed at once).
 - What: to check the resizable meter in a real window, the debug `ScarletMeter.exe` was started with `--demo`. It is framework-dependent, and the .NET 10 runtime here is the private SDK's, not installed for Windows, so the app host showed its download dialog over the game instead of the meter.

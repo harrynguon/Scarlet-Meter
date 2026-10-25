@@ -230,9 +230,11 @@ public sealed record WindowPlacement(double Left, double Top, double Width, doub
 {
     /// <summary>
     /// The smallest width or height a saved placement may have: the overlay's minimum height, the smallest any window
-    /// allows, so every size a player can give a window is one the settings keep.
+    /// allows, so every size a player can give a window is one the settings keep. Below the overlay's empty meter (77 px
+    /// with no notice due, 75 px at row size 0.75, measured), whose height the overlay is when its bar area has no rows:
+    /// at 96 px a saved overlay that short was dropped as unusable, its place lost (audit on PR #37).
     /// </summary>
-    public const double MinSize = 96;
+    public const double MinSize = 48;
 }
 
 /// <summary>The windows whose placement is remembered.</summary>

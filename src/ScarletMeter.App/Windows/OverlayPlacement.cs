@@ -3,9 +3,9 @@ using System.Windows;
 namespace ScarletMeter.App.Windows;
 
 /// <summary>
-/// The overlay's two placements: the player's own top and height (what is saved, and what the window returns to)
-/// and the one the window shows now (the player's, or a grown one from <see cref="OverlayFit"/>), with how the
-/// player's drags and resizes and the system's moves change them. Pure, so the rules are tested without a window;
+/// The overlay's two placements: the player's own top and height (the top is what is saved and what the window returns
+/// to; the overlay passes its content's height as the height to show, OverlayWindow) and the one the window shows now,
+/// with how the player's drags and resizes and the system's moves change them. Pure, so the rules are tested without a window;
 /// <see cref="OverlayWindow"/> applies them. All values are device-independent pixels.
 /// </summary>
 public sealed class OverlayPlacement

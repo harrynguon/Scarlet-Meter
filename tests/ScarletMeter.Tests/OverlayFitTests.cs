@@ -69,8 +69,69 @@ public sealed class OverlayFitTests
         Assert.Equal(ScarletMeter.App.Settings.AppearanceSettings.MaxBarRows, OverlayFit.MostRows);
         Assert.Equal(29, OverlayFit.RowStep(1));
         Assert.Equal(36.25, OverlayFit.RowStep(1.25));
-        Assert.Equal(490, OverlayFit.MostHeight(200, 1));
-        Assert.Equal(562.5, OverlayFit.MostHeight(200, 1.25));
+        Assert.Equal(490, OverlayFit.MostHeight(200, OverlayFit.RowStep(1)));
+        Assert.Equal(562.5, OverlayFit.MostHeight(200, OverlayFit.RowStep(1.25)));
+    }
+
+    // A resize is held between the content with no rows, whole pixels, never below the overlay's floor nor above the
+    // work area, and that with ten rows.
+    [Fact]
+    public void AResizeIsHeldBetweenNoRowsAndTen()
+    {
+        Assert.Equal((78.0, 368.0), OverlayFit.DragLimits(77.2, 29, 1040));
+        Assert.Equal((ScarletMeter.App.Settings.WindowPlacement.MinSize, 310.0), OverlayFit.DragLimits(20, 29, 1040)); // the floor; ten rows above the content
+        Assert.Equal((500.0, 990.0), OverlayFit.DragLimits(700, 29, 500)); // the content taller than the work area
+    }
+
+    // The overlay's floor, which a saved size is kept to, is below the smallest empty meter (77 px with no notice due,
+    // 75 px at row size 0.75; measured in headless Edge): at 96 px a saved overlay at no rows was dropped as unusable
+    // and its place lost (audit on PR #37). The window saves no height below the floor.
+    [Fact]
+    public void TheEmptyMeterIsAboveTheOverlaysFloor() =>
+        Assert.True(ScarletMeter.App.Settings.WindowPlacement.MinSize <= 72, "the floor must stay below the smallest empty meter");
+
+    // Only a drag of the top or bottom edge, or a corner, that changed the height sets the rows: a side only (a meter cut
+    // by a short screen would save the rows it fits; Codex review on PR #37) or a drag cancelled where it began does not.
+    [Theory]
+    [InlineData(6, 300, 400, 200, 29, 7)]
+    [InlineData(3, 300, 400, 200, 29, 7)]
+    [InlineData(8, 300, 400, 200, 29, 7)]
+    [InlineData(1, 300, 400, 200, 29, -1)]   // the left side
+    [InlineData(2, 300, 300, 200, 29, -1)]   // the right side
+    [InlineData(6, 300, 300.3, 200, 29, -1)] // let go where it began
+    [InlineData(0, 300, 400, 200, 29, -1)]   // no edge reported
+    public void OnlyAChangeOfHeightSetsTheRows(int edge, double start, double end, double empty, double step, int rows) =>
+        Assert.Equal(rows < 0 ? (int?)null : rows, OverlayFit.ResizedRows(edge, start, end, empty, step));
+
+    [Theory]
+    [InlineData(3), InlineData(4), InlineData(5), InlineData(6), InlineData(7), InlineData(8)]
+    public void TheTopAndBottomEdgesChangeTheHeight(int edge) => Assert.True(OverlayFit.IsHeightEdge(edge));
+
+    [Theory]
+    [InlineData(0), InlineData(1), InlineData(2), InlineData(9)]
+    public void TheSidesDoNot(int edge) => Assert.False(OverlayFit.IsHeightEdge(edge));
+
+    // A resize settles on whole rows: dragged by the top, the bottom stays where it was let go and the top moves (audit
+    // on PR #37: the bottom and the notices moved by up to half a row); dragged by the bottom, the top stays.
+    [Theory]
+    [InlineData(3, 100, 400, 388, 112)]
+    [InlineData(4, 100, 400, 412, 88)]
+    [InlineData(5, 100, 400, 400, 100)]
+    [InlineData(6, 100, 400, 388, 100)]
+    [InlineData(8, 100, 400, 412, 100)]
+    public void ASettledResizeKeepsTheEdgeNotDragged(int edge, double top, double height, double settled, double settledTop) =>
+        Assert.Equal(settledTop, OverlayFit.TopAfterResize(edge, top, height, settled));
+
+    // With no rows saved: an earlier build's restored window height becomes rows (the player's size kept, even when
+    // that is the default's 8), a first start takes the default; saved rows are left alone.
+    [Fact]
+    public void RowsAreCarriedOverOnce()
+    {
+        Assert.Equal(2, OverlayFit.CarriedRows(null, true, 300, 240, 29));
+        Assert.Equal(8, OverlayFit.CarriedRows(null, true, 472, 240, 29));
+        Assert.Equal(ScarletMeter.App.Settings.AppearanceSettings.DefaultBarRows, OverlayFit.CarriedRows(null, false, 260, 77, 29));
+        Assert.Null(OverlayFit.CarriedRows(5, true, 300, 240, 29));
+        Assert.Null(OverlayFit.CarriedRows(0, false, 300, 240, 29));
     }
 
     // Where a resize ends becomes the bar area's rows: the nearest whole number above the content with no rows (its
