@@ -367,7 +367,7 @@ button {
     display: flex;
     align-items: center;
     gap: 10px;
-    height: 24px;
+    height: 26px;
     padding: 0 8px 0 6px;
     margin-bottom: 3px;
     background: var(--row);
@@ -450,19 +450,33 @@ button {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
-/* DPS, then total damage, then share; the fixed widths keep each column lined up from row to row. */
+/* DPS, then the share over the total damage, in one slim line: DPS and the share read first (bold, white), and the
+   total sits under the share, smaller and dimmer, the one to look at less. The fixed widths keep each column lined
+   up from row to row. */
 .row .dps {
     min-width: 58px;
     font-weight: 600;
 }
 
-.row .total {
-    min-width: 46px;
+.row .share {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 1px;
+    min-width: 42px;
+    line-height: 1;
 }
 
 .row .pct {
-    min-width: 42px;
-    color: rgba(235, 233, 242, 0.75);
+    font-weight: 600;
+    color: var(--text);
+    font-size: 12.5px;
+}
+
+.row .total {
+    font-size: 10px;
+    color: rgba(235, 233, 242, 0.55);
 }
 
 /* Class gradients, as RATmeter's (upstream AionDpsMeter.UI/wwwroot/css/app.css), keyed by class id. */

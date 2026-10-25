@@ -61,7 +61,8 @@ and adds it up per player and per fight.
 - A **boss card**: name, HP and HP %, a live HP bar, and **Kill in**, an estimate of the time left at the pace the
   boss's HP fell over the last 20 seconds (everyone's damage counts; it keeps its estimate when you hit an add and
   come back).
-- A **row per player**: class icon, name, **combat power**, then DPS, total damage and share, with deaths.
+- A **row per player**: class icon, name, **combat power**, deaths, then DPS and share, with the total damage small
+  under the share.
 - **Party DPS**, fight duration, and a colour-coded **ping**.
 - The header says what is going on: **"Boss combat"**, the time, and **"Boss defeated"** when it is down.
 

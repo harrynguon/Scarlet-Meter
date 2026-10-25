@@ -124,18 +124,33 @@ public sealed partial class RazorMarkupTests
         Assert.Contains("bounds() is not { } b) return;", File.ReadAllText(Path.Combine(app, "Windows", "WindowPlacementTracker.cs")));
     }
 
-    // A player's row reads DPS, then total damage, then share (Harry reads the DPS first), each in its own
-    // column; the CSS gives DPS and total fixed widths so the columns line up.
+    // A player's row reads DPS, then the share with the total damage under it (Harry: three numbers in a line were too
+    // many; the share in bold white, the total "more of a 'i should look here less'"). DPS and the share column keep
+    // fixed widths so the columns line up; the total is smaller and dimmer than the share.
     [Fact]
-    public void APlayersRowShowsDpsThenTotalDamageThenShare()
+    public void APlayersRowShowsDpsThenTheShareOverTheTotal()
     {
         var page = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Pages", "MeterPage.razor"));
         var columns = RowNumberColumn().Matches(page).Select(m => m.Groups[1].Value).ToList();
-        Assert.Equal(["num dps", "num total", "num pct"], columns);
-        Assert.True(page.IndexOf("player.Dps", StringComparison.Ordinal) < page.IndexOf("player.TotalDamage", StringComparison.Ordinal));
+        Assert.Equal(["num dps", "num pct", "num total"], columns);
+        Assert.Matches(@"<span class=""share"">\s*<span class=""num pct""[^>]*>@Compact\.Percent\(player\.DamageShare\)</span>\s*<span class=""num total""[^>]*>@Compact\.Number\(player\.TotalDamage\)</span>\s*</span>", page);
+        Assert.True(page.IndexOf("player.Dps", StringComparison.Ordinal) < page.IndexOf("player.DamageShare", StringComparison.Ordinal));
+
         var css = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "app.css"));
-        foreach (var column in new[] { "dps", "total", "pct" })
-            Assert.Matches($@"\.row \.{column} \{{[^}}]*min-width:", css);
+        static string Block(string source, string selector) =>
+            Regex.Match(source, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
+        Assert.Matches(@"min-width:", Block(css, ".row .dps"));
+        var share = Block(css, ".row .share");
+        Assert.Matches(@"flex-direction:\s*column;", share);
+        Assert.Matches(@"min-width:", share);
+        var pct = Block(css, ".row .pct");
+        Assert.Matches(@"font-weight:\s*600;", pct);
+        Assert.Matches(@"color:\s*var\(--text\);", pct);
+        static double Size(string body) => double.Parse(Regex.Match(body, @"font-size:\s*([\d.]+)px").Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        var total = Block(css, ".row .total");
+        Assert.True(Size(total) < Size(pct), "the total is smaller than the share");
+        Assert.True(Size(total) >= 10, "but not too small to read over the game");
+        Assert.DoesNotMatch(@"font-weight", total);
     }
 
     // The overlay holds its notices back by the player's "Hide during boss fights" switch, keeps the strip mounted

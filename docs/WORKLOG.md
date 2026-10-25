@@ -22,9 +22,11 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Harry, after the run:** the pulsing dot on an upcoming notice was "too distracting": the dot is still now, and `RazorMarkupTests.TheNoticeStripNeverBlinks` keeps the strip free of looping animations (only a notice's one-time entrance moves). `scripts/Build.ps1` 446/446; fail-first: the pulse put back and the 120 px floor put back each fail their test.
 
+**Harry, on the rows and the boss card:** "maybe three numbers on a row is too much". Four layouts were rendered headlessly with the real styles and made-up players (one line as now; two lines; DPS stacked over the total; DPS and share only), and Harry chose the stacked one with the total under the share instead, the share in bold white "so that the total damage number is more of a 'i should look here less' view". Each row now reads DPS, then the share (12.5 px, bold, `--text`) over the total damage (10 px, 55% white), in one 26 px line (was 24; the bar effects' pieces are centred or near the top, so they still fit). `RazorMarkupTests.APlayersRowShowsDpsThenTheShareOverTheTotal` replaces the old order test (fail-first: the total as large as the share, the share dimmed, a column before the share). The boss card keeps its icon, changed "a little" because the plain skull was too like another meter's: a horned skull, also unlike the deaths' skull on a row (three options rendered; a crown was the other candidate). README and ARCHITECTURE updated. 446/446.
+
 **Not checked:** resizing a grown window from its edges (above), a display-scale change, a monitor's bottom edge, and anything in game.
 
-**Next:** with Harry's go-ahead, the traced resize check and the README GIFs and stills re-recorded without the pulse; Codex and CI; merge; rebuild Harry's copy.
+**Next:** with Harry's go-ahead, the traced resize check and the README GIFs and stills re-recorded with the still dot and the new rows; Codex and CI; merge; rebuild Harry's copy.
 
 ## 2026-10-25 — Spiritmaster, no white stripe, a margin under the rows
 
