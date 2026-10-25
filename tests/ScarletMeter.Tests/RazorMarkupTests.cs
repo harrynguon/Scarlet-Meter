@@ -249,6 +249,12 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?m)^\s*mask-image:\s*linear-gradient\(", cut);
         Assert.Matches(@"(?m)^\s*flex:\s*none;", Block(css, ".overlay[data-measuring] .rows"));
         Assert.True(css.IndexOf(".overlay.cut .rows {", StringComparison.Ordinal) < css.IndexOf(".overlay[data-measuring] .rows {", StringComparison.Ordinal));
+        // A capped list that gives way keeps its own narrow fade, not the 26 px give-way one, which half faded the
+        // pinned own row and the last row (audit on PR #35); later than the give-way rule and more specific.
+        static string Mask(string body) => Regex.Match(body, @"(?m)^\s*mask-image:\s*(?<value>[^;]+);").Groups["value"].Value;
+        Assert.NotEqual(string.Empty, Mask(Block(css, ".overlay.cut .rows.capped")));
+        Assert.Equal(Mask(Block(css, ".rows.capped")), Mask(Block(css, ".overlay.cut .rows.capped")));
+        Assert.True(css.IndexOf(".overlay.cut .rows {", StringComparison.Ordinal) < css.IndexOf(".overlay.cut .rows.capped {", StringComparison.Ordinal));
         Assert.Matches(@"(?m)^\s*flex:\s*none;", Block(alerts, ".alerts"));
         Assert.DoesNotMatch(@"(?m)^\s*min-height:", Block(alerts, ".alerts"));
         Assert.DoesNotMatch(@"(?m)^\s*max-height:", Block(alerts, ".alerts.expanded"));
@@ -520,9 +526,11 @@ public sealed partial class RazorMarkupTests
     // never scroll (TheOverlayPanelFitsItsContent). The cap is that many rows, by the row's own height and gap, in the
     // list's zoomed pixels; the next row's top shows in the padding, faded. The list is "capped" only with more rows
     // than that, so a small party's list stays clipped. The player's own row stays in view, pinned at either edge in a
-    // whole row's place, with a solid backdrop only while pinned; the glide script measures again on scroll, since a
-    // pinned row's offsetTop follows it. Source-text guards: the WebView has no test host here; a headless Edge render
-    // (WORKLOG) measured the pinned positions and the backdrop.
+    // whole row's place, with a backdrop of the panel's colour only while pinned (always, without scroll-state
+    // queries); the list does no scroll anchoring, and the glide script measures rows in the list's view and again
+    // on scroll and on a resize, since a pinned row's offsetTop follows both. Source-text guards: the WebView has no
+    // test host here; headless Edge renders (WORKLOG) measured the pinned positions, the backdrop and reorders while
+    // scrolled.
     [Fact]
     public void TheRowsScrollPastTheirCap()
     {
@@ -550,7 +558,16 @@ public sealed partial class RazorMarkupTests
         Assert.Equal(step, double.Parse(cap.Groups["step"].Value, System.Globalization.CultureInfo.InvariantCulture));
         Assert.Matches(@"(?m)^\s*overflow-y:\s*auto;", capped);
         Assert.Matches(@"(?m)^\s*overflow-x:\s*hidden;", capped);
-        Assert.Matches(@"(?m)^\s*mask-image:\s*linear-gradient\(to bottom, #000 calc\(100% - \d+px\), transparent\);", capped);
+        // No scroll anchoring, which shifted the view by a row with each swap at its edge (audit on PR #35).
+        Assert.Matches(@"(?m)^\s*overflow-anchor:\s*none;", capped);
+        // The fade is the last row's gap and the list's bottom padding: wider would fade the last row at the list's
+        // end, narrower would show the next row's top unfaded (audit on PR #35).
+        var fade = Regex.Match(capped, @"(?m)^\s*mask-image:\s*linear-gradient\(to bottom, #000 calc\(100% - (?<px>\d+)px\), transparent\);");
+        Assert.True(fade.Success, "the list's bottom edge fades");
+        var padding = Regex.Match(Block(css, ".rows"), @"(?m)^\s*padding:\s*[\d.]+px [\d.]+px (?<bottom>[\d.]+)px;");
+        Assert.True(padding.Success, "the list's padding gives its bottom");
+        Assert.Equal(Px(row, "margin-bottom") + double.Parse(padding.Groups["bottom"].Value, System.Globalization.CultureInfo.InvariantCulture),
+            double.Parse(fade.Groups["px"].Value, System.Globalization.CultureInfo.InvariantCulture));
         // Measured at its capped height: the measuring rule only gives the rows their full flex size back.
         Assert.DoesNotMatch(@"height", Block(css, ".overlay[data-measuring] .rows"));
 
@@ -560,10 +577,24 @@ public sealed partial class RazorMarkupTests
         Assert.Equal(Px(row, "margin-bottom"), Px(mine, "bottom")); // in the last whole row's place, above the fade
         Assert.Matches(@"(?m)^\s*container-type:\s*scroll-state;", mine);
         Assert.DoesNotMatch(@"background", Block(css, ".rows.capped > .row.me::before"));
-        Assert.Matches(@"@container scroll-state\(\(stuck: top\) or \(stuck: bottom\)\) \{\s*\.rows\.capped > \.row\.me::before \{\s*background:", css);
+        // The backdrop is the panel's colour token, while stuck, and always where scroll-state queries are missing.
+        Assert.Matches(@"@container scroll-state\(\(stuck: top\) or \(stuck: bottom\)\) \{\s*\.rows\.capped > \.row\.me::before \{\s*background: linear-gradient\(var\(--row\), var\(--row\)\), var\(--bg\);", css);
+        Assert.Matches(@"@supports not \(container-type: scroll-state\) \{\s*\.rows\.capped > \.row\.me::before \{\s*background: linear-gradient\(var\(--row\), var\(--row\)\), var\(--bg\);", css);
 
+        // The glide measures where rows are in the list's view, never in its content alone: a scroll position the
+        // browser moved during a reorder (the end of the list clamping) glided every visible row by a row and back
+        // (audit on PR #35). Every position goes through drawnTop; it measures again on scroll and on a change of
+        // the list's size, and the size observer goes with a replaced list.
         var fx = File.ReadAllText(Path.Combine(app, "wwwroot", "js", "overlay-fx.js"));
-        Assert.Contains("list.addEventListener('scroll', remember, { passive: true });", fx);
+        var fxCode = Regex.Replace(fx, @"(?m)//.*$", string.Empty);
+        Assert.Contains("return row.offsetTop - list.scrollTop;", fxCode);
+        Assert.Single(Regex.Matches(fxCode, @"\.offsetTop\b"));
+        Assert.Contains("tops.set(row, drawnTop(row));", fxCode);
+        Assert.Contains("const after = drawnTop(row);", fxCode);
+        Assert.Contains("list.addEventListener('scroll', remember, { passive: true });", fxCode);
+        Assert.Contains("sizeObserver = new ResizeObserver(remember);", fxCode);
+        Assert.Contains("sizeObserver.observe(list);", fxCode);
+        Assert.Contains("if (sizeObserver) sizeObserver.disconnect();", fxCode);
     }
 
     // The player's own row is marked by a ring round the row, never by a stripe on the bar (a white inset at the
