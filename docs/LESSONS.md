@@ -4,6 +4,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The background picture was scaled to the window, not the panel** (found by Harry after #26 to #31, fixed in #33).
+- What: when the panel became only as tall as its content (#26), its picture was laid out against the window (`background-attachment: fixed`) so it would not rescale as the panel changed height. But the window is often taller than the panel (the player's own size), and the picture was then scaled to the window's height and centred on it: the panel showed a zoomed-in slice, the middle of the picture often below it. A test pinned the `fixed` rule as intended.
+- Why: every render, GIF and window check of the picture had a window about as tall as its panel, where the two layouts look the same; the case that differs, a window taller than its content, was never drawn.
+- Guard: the picture covers the panel (`RazorMarkupTests.TheOverlayPanelFitsItsContent`: `center / cover`, no `fixed` anywhere); HANDOFF's picture check names a window taller than its rows. When a layout depends on a size relation (window and panel, container and content), render each side of it, not just the usual one.
+
+**A sticky table header left a gap that scrolled rows showed through** (found by Harry, fixed in #33; since the details window).
+- What: the details and history tables' header sticks at `top: 0` inside the tab body, which had 6 px of top padding; a sticky element stops at its scroll container's padding edge, so a 6 px strip above the header showed the rows scrolling under it.
+- Why: the tables were only looked at unscrolled, where the padding reads as spacing.
+- Guard: the tab body has no top padding and a spacer that scrolls away (`RazorMarkupTests.StickyTableHeadersSitFlushUnderTheTabs`), measured in headless Edge: the header's offset from the top of the scroll is 0 when scrolled. Check a sticky element scrolled, not only at rest.
+
 **The app icon came with a loader WPF already provides** (deep audit on #32, fixed before merge).
 - What: every window set its icon from a second, embedded copy of the .ico through a cached loader (`Windows/AppIcon`), but WPF already gives a window without an `Icon` the exe's own, so the loader changed nothing on screen while adding ways to fail: exceptions it did not catch, a failure the cache would replay on every window's construction, and a decoder tied to one thread. Its docs also described a fallback ("the default") that was the same icon. Its tests read file names and strings: a hook commented out, a new window without one, swapped or broken entries in the .ico all passed.
 - Why: the window code was written from the assumption that each window needs its icon set, without checking the framework's default for a window that sets none; the tests were again written for the code in mind rather than for the claim ("every window uses it").
@@ -125,6 +135,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - Guard: `SettingsTests.AFileSavedWithAByteOrderMarkLoads`. Seed test files the way people actually write them.
 
 ## In the process
+
+**A negative lookahead after `\s*` made a guard fail on clean code, and mutations looked caught** (#33, caught by a control before commit; the same slip in #30's shadow guard).
+- What: a source guard for "no padding other than 0" read `padding:\s*(?!0[\s;])`. The regex engine lets `\s*` give back the space, so the lookahead sees " 0" and the pattern matches `padding: 0 18px`: the test failed on the unchanged stylesheet, and five mutations run against it reported "caught" for a test that failed regardless.
+- Why: mutations were run before the changed test had passed on the clean tree, and a mutation run counts any failure as a catch.
+- Guard: put the whitespace inside the lookahead (`:(?!\s*0[\s;])`); run a changed guard on the clean tree before mutating, and include a control (a change the guard must let through) in every mutation run, so a guard that always fails shows up as a failed control.
 
 **A late history cleanup deleted a test's row** (CI's push run on #30's commit, found by #30's deep audit, 2026-10-25).
 - What: `HistoryTests.AFightSavedWithAnUnusableStartOrEndShowsItsPlayersOnly` failed once in CI (5 fights expected, 4 listed) and passed on the pull-request run of the same commit. Upstream's history store starts its expired-session cleanup on the thread pool from its constructor; on a busy runner it started after the test had damaged fight 904 to end two hours after `DateTime.MinValue`, and deleted it as expired. The same race would have reached every history test from 2026-11-19, when the fights each of them dates 2026-10-20 pass the default 30-day retention (their later fights a day or more after).

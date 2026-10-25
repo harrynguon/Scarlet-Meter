@@ -179,11 +179,40 @@ public sealed partial class RazorMarkupTests
         Assert.Equal(3, Regex.Matches(windows, @"\bRestoreForAlert\(\)").Count); // the two calls and its definition
     }
 
+    // A table's sticky header sits flush under the tabs while its rows scroll (Harry: rows showed through a gap above
+    // it): a sticky header (top: 0) stops at its scroll container's padding edge, so the scrolling tab body has no top
+    // padding, and a 6 px spacer that scrolls away stands in for it: a generated block (content, display: block), so it
+    // takes its height. No rule naming the tab body, in either stylesheet, gives it top padding again (padding,
+    // padding-top or padding-block[-start], any value but 0; comments ignored). Audit on PR #33: the first guard read
+    // only the spacer's height and rules starting with .tab-body.
+    [Fact]
+    public void StickyTableHeadersSitFlushUnderTheTabs()
+    {
+        var styles = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css");
+        var app = File.ReadAllText(Path.Combine(styles, "app.css"));
+        var views = File.ReadAllText(Path.Combine(styles, "views.css"));
+        static string Block(string source, string selector) =>
+            Regex.Match(source, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
+        var header = Block(views, ".grid-table th");
+        Assert.Matches(@"position:\s*sticky;", header);
+        Assert.Matches(@"(?m)^\s*top:\s*0;", header);
+        var body = Block(app, ".tab-body");
+        Assert.Matches(@"overflow-y:\s*auto;", body);
+        Assert.Matches(@"(?m)^\s*padding:\s*0 18px 18px;", body);
+        var spacer = Block(app, ".tab-body::before");
+        Assert.Matches(@"content:\s*"""";", spacer);
+        Assert.Matches(@"display:\s*block;", spacer);
+        Assert.Matches(@"height:\s*6px;", spacer);
+        var rules = Regex.Replace(app + "\n" + views, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline);
+        Assert.DoesNotMatch(@"(?m)^[^{}]*\.tab-body\b[^{}]*\{[^}]*padding(?:-top|-block(?:-start)?)?:(?!\s*0[\s;])", rules);
+    }
+
     // The overlay's panel is only as tall as its content, so the room the notices leave in a boss fight is see-through
     // rather than empty panel; nothing in it scrolls (Harry: "i dont like scrolling"): the notice strip always takes
     // its full height, the expanded strip has no cap, and the window grows instead (TheOverlayWindowGrowsToItsContent);
     // only where it cannot (the screen's height) do the rows give way, faded, never the notices (Codex review on
-    // PR #28); and the picture is laid out against the window, so it does not rescale as the panel changes height.
+    // PR #28); and the picture covers the panel, laid out against it (Harry: against the window, which is often taller
+    // than the panel, it "no longer fits in the background").
     [Fact]
     public void TheOverlayPanelFitsItsContent()
     {
@@ -200,7 +229,11 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?m)^\s*height:\s*100%;", Block(css, "html, body"));
         // No other rule for the panel itself (.overlay.fx, .overlay[...]; not its descendants) gives it a height.
         Assert.DoesNotMatch(@"(?m)^\.overlay[.:\[][^\s{,]*\s*\{[^}]*(?<![-\w])height\s*:", css.Replace(".overlay::before {", ".before-layer {"));
-        Assert.Matches(@"var\(--panel-image, none\) center / cover no-repeat fixed;", Block(css, ".overlay::before"));
+        var layer = Block(css, ".overlay::before");
+        Assert.Matches(@"var\(--panel-image, none\) center / cover no-repeat;", layer);
+        Assert.Matches(@"(?m)^\s*inset:\s*0;", layer); // the layer is the panel, so the picture covers the panel
+        Assert.DoesNotMatch(@"\bfixed\b", Regex.Replace(layer, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline));
+        Assert.DoesNotMatch(@"background-attachment", css);
         // The strip never shrinks, nor do the rows, except where the window cannot grow further (.overlay.cut, set by
         // the page from IMeterWindows.OverlayCutsContent), faded there, and measured at full height even then (the
         // data-measuring rule comes later, so it wins); and no rule in the overlay's styles makes anything scroll:

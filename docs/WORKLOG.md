@@ -2,6 +2,24 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-25 — No gap above a table's header; the picture fits the panel again
+
+**What:** (1) The tab body (details, history, settings) has no top padding; a 6 px spacer (`.tab-body::before`) that scrolls away keeps the space above the content. A table's sticky header (`top: 0`) stopped at the padding edge, 6 px below the top of the scroll, and the rows showed through that strip. (2) The overlay's picture covers the panel again (`center / cover`, laid out against the panel), instead of the window (`background-attachment: fixed`, since #26).
+
+**Why:** Harry, with screenshots: "in-between the skills row buffs.. row and the skills spec .. row, there's a bit of a gap, so when yoiuy're scrolling up and down you see some of the skills through taht gap. please close that gap", and "when choosing a background image, it no longer fits in the background" (a zoomed-in slice of the picture, against an older screenshot where all of it showed). Both reproduced in headless Edge (no window) with the real styles before fixing: the header 6 px below the top of the scroll when scrolled; and in a 480 × 640 window with about 250 px of panel, the picture scaled to the window's height and centred on it, below the panel.
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` 505/505 (`RazorMarkupTests.StickyTableHeadersSitFlushUnderTheTabs` new, `TheOverlayPanelFitsItsContent` now requires the picture on the panel). Fail-first, six mutations, each failing its test by name: `fixed` back on the picture, `background-attachment: fixed` added, the tab body's top padding back, no spacer, top padding on the log body, the header stuck at 6 px. Headless Edge after the fix: the scrolled header's offset is 0; the whole synthetic picture (both corner labels and its centre) shows in the panel in the tall window.
+
+**Not checked:** the meter itself (no window opened); the picture moving as the panel's height changes, the trade-off of laying it out against the panel (HANDOFF).
+
+**Shown to Harry:** the before and after renders, also with Harry's own picture (not committed); Harry asked to push it as a PR without merging.
+
+**Review (standard audit on 65f14a0; verdict: approve with nits; Codex found nothing):** the audit rendered every page using the tab body (details tabs including the Log tab's flex layout, history, settings) and found its spacing unchanged, and nothing else depending on the picture's attachment. Fixed: (1) HANDOFF still asked that the picture "does not jump when the notices come and go", which only laying it out against the window gave; it now asks that it moves only with the panel's height and never shows a zoomed slice. (2) "Rescales a little" understated it: the picture re-centres by half of any height change, and rescales only in a panel proportionally taller than it; the stylesheet comment and ARCHITECTURE say so. (3) The new guard read only the spacer's height and rules starting with `.tab-body`: a spacer without `content` or `display: block`, `padding-block-start`, a non-digit padding (`.4em`) or `.details .tab-body { padding-top }` all passed. It now pins the spacer's `content` and `display`, and reads every rule naming the tab body for `padding`, `padding-top` or `padding-block[-start]` other than 0, comments dropped. (4) This entry's next step was stale.
+
+**Checks after the review (SDK 10.0.402):** `scripts/Build.ps1` 505/505. Fail-first, the audit's five cases, each failing the guard, and a padding rule only inside a comment passing; the first six mutations fail it again with the new guard. The control caught a mistake in the first version of the new regex: `:\s*(?!0[\s;])` let `\s*` give back the space before a 0, so the guard failed on the clean stylesheet and every "caught" mutation meant nothing; it is `:(?!\s*0[\s;])` (LESSONS).
+
+**Next:** Codex and CI on the fixes; merge with Harry's go-ahead.
+
 ## 2026-10-25 — The history tests no longer race upstream's startup cleanup
 
 **What:** `TestEngineHost` replaces the history store's registration (the engine's, or the test's own, as `HistoryTests` makes) with one that returns the store only once its startup cleanup has logged that it finished, using the host's existing `HistoryCleanupWatcher`. So the test, the engine and the demo feed all get the store after the cleanup, and nothing a test writes can meet it. New `TestEngineHostTests.TheHistoryStoreIsHandedOutOnlyOnceItsStartupCleanupHasFinished` holds the cleanup (a proxy over upstream's settings that stops at the retention period, which only the cleanup reads, before it deletes anything) and checks the store is not handed out until it is released. `HistoryTests`' summary says why its damaged rows are safe. Test code only; nothing under `upstream/` or `src/` changed. ARCHITECTURE (the test-host paragraph), LESSONS.
