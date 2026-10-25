@@ -4,6 +4,7 @@ using AionDpsMeter.Services.Services.Entity;
 using AionDpsMeter.Services.Services.Session;
 using AionDpsMeter.Services.Services.Session.Persistence;
 using Microsoft.Extensions.Logging;
+using ScarletMeter.Engine.Odyle;
 
 namespace ScarletMeter.Engine.Upstream.Demo;
 
@@ -15,7 +16,10 @@ namespace ScarletMeter.Engine.Upstream.Demo;
 /// expected damage; the fight ends when its HP runs out or after <see cref="MaxFightLength"/>, through
 /// CompleteAndPersistActiveSessions, the same path that saves open fights when the meter closes (upstream itself
 /// only ends a fight on a 45-second idle timeout or a respawn), so each fight becomes one history entry. The next
-/// starts <see cref="BreakLength"/> later.
+/// starts <see cref="BreakLength"/> later. Odyle energy, which upstream does not decode, comes as the game's own
+/// records would, synthetic ones read by the engine's <see cref="OdyleEnergyTap"/> (a login list when the feed begins,
+/// an update as each later fight starts and spends some). They go to the tap directly rather than through upstream's
+/// stream reassembly, which synchronises a new stream only on a keep-alive left from an earlier chunk.
 /// </summary>
 /// <remarks>
 /// Not thread-safe: one thread drives it, through <see cref="Begin"/> and then <see cref="Step"/> with the
@@ -59,19 +63,33 @@ internal sealed class DemoCombatFeed
     private readonly PriorityQueue<DemoEvent, DateTime> schedule = new();
     private readonly HashSet<EventKind> failing = [];
     private readonly double expectedPartyDps;
+    private readonly OdyleEnergyTap? odyleTap;
     private Fight? fight;
     private int fightsStarted;
     private bool partyRegistered;
+    private OdyleEnergy odyle = new(StartingOdyle.Basic, StartingOdyle.Charged);
 
-    /// <summary>Checks the roster against upstream's game data; throws InvalidOperationException naming what does not resolve.</summary>
+    // The demo's Odyle energy: where it starts, what a fight spends and what a recharge moves from charged to basic
+    // once basic runs low. The entry key is made up.
+    private static readonly OdyleEnergy StartingOdyle = new(420, 1200);
+    private const int OdylePerFight = 10;
+    private const int OdyleRecharge = 200;
+    private const uint OdyleEntryKey = 4242;
+
+    /// <summary>
+    /// Checks the roster against upstream's game data; throws InvalidOperationException naming what does not resolve.
+    /// Without <paramref name="odyleTap"/> no Odyle energy is sent.
+    /// </summary>
     public DemoCombatFeed(
-        EntityTracker entities, CombatSessionManager sessions, ICombatHistoryStore history, ILogger logger, Random random)
+        EntityTracker entities, CombatSessionManager sessions, ICombatHistoryStore history, ILogger logger, Random random,
+        OdyleEnergyTap? odyleTap = null)
     {
         this.entities = entities;
         this.sessions = sessions;
         this.history = history;
         this.logger = logger;
         this.random = random;
+        this.odyleTap = odyleTap;
         var problems = DemoRosterCheck.Problems(gameData).ToList();
         if (problems.Count > 0)
             throw new InvalidOperationException("The demo roster does not match upstream's game data: " + string.Join("; ", problems));
@@ -84,7 +102,9 @@ internal sealed class DemoCombatFeed
     /// <summary>
     /// Starts (or, after a stop, restarts) the feed at <paramref name="now"/>: registers the party and summon
     /// the first time, abandons a fight a stop interrupted (upstream completes it on its idle timeout, as it
-    /// would after a real capture stopped) and starts a fresh fight and the ping at once.
+    /// would after a real capture stopped) and starts a fresh fight and the ping at once. The Odyle login list goes
+    /// to the tap here rather than through the schedule, which keeps the schedule's order (and so a seeded demo's
+    /// fights) as it was before the demo had Odyle energy.
     /// </summary>
     public void Begin(DateTime now)
     {
@@ -97,6 +117,7 @@ internal sealed class DemoCombatFeed
             RegisterParty();
             partyRegistered = true;
         }
+        odyleTap?.Observe(OdyleEnergyRecordWriter.List(odyle, OdyleEntryKey));
     }
 
     /// <summary>
@@ -198,6 +219,31 @@ internal sealed class DemoCombatFeed
         }
     }
 
+    // A fight starts: it spends Odyle energy, sent as the game's update record.
+    private void SpendOdyle()
+    {
+        odyle = AfterFight(odyle);
+        odyleTap?.Observe(OdyleEnergyRecordWriter.Update(odyle, OdyleEntryKey));
+    }
+
+    /// <summary>
+    /// The demo's Odyle energy after a fight: a raid costs <see cref="OdylePerFight"/> basic, and once basic runs below
+    /// that a recharge moves up to <see cref="OdyleRecharge"/> from charged to basic, so the numbers keep moving; basic
+    /// never goes below 0.
+    /// </summary>
+    internal static OdyleEnergy AfterFight(OdyleEnergy energy)
+    {
+        var basic = energy.Basic - OdylePerFight;
+        var charged = energy.Charged;
+        if (basic < OdylePerFight)
+        {
+            var recharge = Math.Min(OdyleRecharge, charged);
+            basic += recharge;
+            charged -= recharge;
+        }
+        return new OdyleEnergy(Math.Max(0, basic), charged);
+    }
+
     private void StartFight(DateTime at)
     {
         fightsStarted++;
@@ -219,6 +265,7 @@ internal sealed class DemoCombatFeed
         entities.UpdateTargetEntityHpCurrent(current.EntityId, hpTotal);
         logger.LogInformation("Demo fight {Number} against {Boss} started, {Hp} HP.",
             current.Number, entities.GetTargetMob(current.EntityId)?.Name, hpTotal);
+        if (fightsStarted > 1) SpendOdyle();
     }
 
     private void Cast(Fight current, int index, DateTime at)

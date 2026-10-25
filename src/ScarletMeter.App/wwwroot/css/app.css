@@ -326,6 +326,40 @@ button {
     font-weight: 600;
 }
 
+/* Odyle energy (MeterPage, OdyleText), left of the ping once the game has sent it: a crystal of Scarlet's own, the
+   basic energy and, in cyan, the charged energy in brackets. It takes the ping's push to the right, so the two sit
+   together at the line's end with the line's usual gap between them. */
+.odyle {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.odyle + .ping {
+    margin-left: 0;
+}
+
+.odyle-icon {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    fill: rgba(111, 211, 239, 0.18);
+    stroke: #6fd3ef;
+    stroke-width: 1.2;
+    stroke-linejoin: round;
+}
+
+.odyle-basic {
+    color: var(--text);
+}
+
+.odyle-charged {
+    color: #6fd3ef;
+    opacity: 0.85;
+}
+
 .ping {
     margin-left: auto;
     display: inline-flex;

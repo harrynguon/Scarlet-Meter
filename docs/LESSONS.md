@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**Synthetic records were modelled on our own writer, not on the documented sample** (deep audit on #34, fixed before merge).
+- What: every Odyle list in the tests gave the energy entry a two-value follower, the shape `OdyleEnergyRecordWriter` happened to write, while the game's list as A2Tools documented it has a one-value follower; a change that required the two-value kind would have stopped the meter reading the login list with every test green. The same audit found two catches each hidden by the other in the tests, and a guard tested on one bit of four.
+- Why: the fixtures were built from the parser's own understanding of the format, so they confirmed it rather than the source; the tests were checked by mutating the code that was written, not the shapes and failure paths the source and the upstream code allow.
+- Guard: the writer writes the documented shape, and `OdyleEnergyTests` covers both follower kinds, the documented trailing bytes, every overflow bit, and each catch on its own (a test seam for the bundle opener). When porting a parser, derive the synthetic fixtures from the source's documented samples (their shape, never their captured bytes), and mutate toward plausible "tightenings", not only removals.
+
 **The background picture was scaled to the window, not the panel** (found by Harry after #26 to #31, fixed in #33).
 - What: when the panel became only as tall as its content (#26), its picture was laid out against the window (`background-attachment: fixed`) so it would not rescale as the panel changed height. But the window is often taller than the panel (the player's own size), and the picture was then scaled to the window's height and centred on it: the panel showed a zoomed-in slice, the middle of the picture often below it. A test pinned the `fixed` rule as intended.
 - Why: every render, GIF and window check of the picture had a window about as tall as its panel, where the two layouts look the same; the case that differs, a window taller than its content, was never drawn.

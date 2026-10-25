@@ -74,6 +74,18 @@ public sealed class FormattingTests
         Assert.Equal("done", HpBand.RingClass(FightPhase.Defeated, null));
     }
 
+    // Odyle energy the way the game writes it: basic, then charged in brackets, with thousands separators whatever
+    // the PC's culture.
+    [Fact]
+    public void OdyleEnergyReadsAsTheGameWritesIt()
+    {
+        var energy = new ScarletMeter.Engine.OdyleEnergy(1240, 320);
+        Assert.Equal("1,240", OdyleText.Basic(energy));
+        Assert.Equal("(+320)", OdyleText.Charged(energy));
+        Assert.Equal("(+12,000)", OdyleText.Charged(new ScarletMeter.Engine.OdyleEnergy(0, 12000)));
+        Assert.Equal("0", OdyleText.Basic(new ScarletMeter.Engine.OdyleEnergy(0, 0)));
+    }
+
     [Fact]
     public void PagesOnlyGetUrlsOnTheLocalHosts()
     {

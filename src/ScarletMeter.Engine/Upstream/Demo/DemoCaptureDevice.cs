@@ -35,6 +35,7 @@ internal sealed class DemoCaptureDevice : IPacketCaptureDevice
     private readonly EntityTracker entities;
     private readonly CombatSessionManager sessions;
     private readonly ICombatHistoryStore history;
+    private readonly OdyleEnergyTap odyle;
     private readonly ILoggerFactory loggers;
     private readonly ILogger logger;
     private readonly Lock gate = new();
@@ -45,11 +46,12 @@ internal sealed class DemoCaptureDevice : IPacketCaptureDevice
     private bool disposed;
 
     public DemoCaptureDevice(
-        EntityTracker entities, CombatSessionManager sessions, ICombatHistoryStore history, ILoggerFactory loggers)
+        EntityTracker entities, CombatSessionManager sessions, ICombatHistoryStore history, OdyleEnergyTap odyle, ILoggerFactory loggers)
     {
         this.entities = entities;
         this.sessions = sessions;
         this.history = history;
+        this.odyle = odyle;
         this.loggers = loggers;
         logger = loggers.CreateLogger<DemoCaptureDevice>();
     }
@@ -82,7 +84,7 @@ internal sealed class DemoCaptureDevice : IPacketCaptureDevice
             // its own message; later starts resume the same feed (fight numbers and boss ids carry on).
             try
             {
-                feed ??= new DemoCombatFeed(entities, sessions, history, loggers.CreateLogger<DemoCombatFeed>(), new Random());
+                feed ??= new DemoCombatFeed(entities, sessions, history, loggers.CreateLogger<DemoCombatFeed>(), new Random(), odyle);
             }
             catch (InvalidOperationException ex)
             {

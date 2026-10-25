@@ -57,6 +57,8 @@ public static class ScarletEngineServiceCollectionExtensions
         services.AddSingleton<CombatSessionManager>();
         services.AddPacketProcessingRouting();
         services.AddSingleton<IPacketService, PacketPipelineService>();
+        // Odyle energy, which upstream does not decode: read beside the pipeline from the same reassembled stream.
+        services.AddSingleton<OdyleEnergyTap>();
 
         services.AddSingleton<ICombatEngine, UpstreamCombatEngine>();
         return services;

@@ -183,6 +183,12 @@ public sealed record AppearanceSettings
 
     /// <summary>Show each player's combat power beside their name, when the game has sent it.</summary>
     public bool ShowCombatPower { get; init; } = true;
+
+    /// <summary>
+    /// Show the player's Odyle energy beside the ping, basic (+charged), once the game has sent it: at login, after a
+    /// server transfer and when it changes (ICombatEngine.OdyleEnergy).
+    /// </summary>
+    public bool ShowOdyleEnergy { get; init; } = true;
 }
 
 /// <summary>Overlay behaviour.</summary>
