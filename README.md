@@ -7,7 +7,7 @@ It is built on [RATmeter](https://github.com/Kuroukihime/AIon2-Dps-Meter)'s prov
 overlay and extras: a boss card with a "Kill in" estimate, animated bar effects for every class, world-event
 alerts, and a background picture of your choice.
 
-<p align="center"><img src="docs/images/demo.gif" alt="Scarlet Meter in a boss fight (demo mode, made-up players): the boss card with its Kill in estimate, each class's animated bar effect, DPS and share with the total damage under it, rows gliding into place as players overtake, and world-event alerts below the bars" width="456"/></p>
+<p align="center"><img src="docs/images/demo.gif" alt="Scarlet Meter in a boss fight (demo mode, made-up players): the boss card with its Kill in estimate, each class's animated bar effect, DPS and share with the total damage under it, and rows gliding into place as players overtake; world-event alerts step aside during the fight" width="456"/></p>
 <p align="center"><sub>Demo mode, made-up players: <code>.\ScarletMeter.exe --demo</code></sub></p>
 
 > **Early release.** Its in-game checks are not finished, so numbers may be off. Reports are welcome in
@@ -97,7 +97,7 @@ and adds it up per player and per fight.
   there; links to other sites open in your browser (one every few seconds at most; a site link that redirects
   elsewhere stays put). It sits behind the game unless you pin it on top.
 
-<p align="center"><img src="docs/images/alerts.gif" alt="World-event alerts below the bars (demo mode): two shown with +2 more; clicking it shows all four with Show less, the meter growing to fit, and folds them away again" width="456"/></p>
+<p align="center"><img src="docs/images/alerts.gif" alt="World-event alerts back in the break after a boss fight (demo mode): two shown with +2 more; clicking it shows all four with Show less, and folds them away again" width="456"/></p>
 
 **Convenient**
 

@@ -79,7 +79,9 @@ public sealed class BossTimersWindow : Window
             Margin = new Thickness(8, 0, 8, 0),
         };
         keepOnTop = Tool(new ToggleButton { IsChecked = Topmost }, "", "Keep on top of other windows, the game included");
-        keepOnTop.Click += (_, _) => KeepOnTop(keepOnTop.IsChecked == true);
+        // The checked state, not Click: UI Automation's toggle (a screen reader, say) changes it without a click.
+        keepOnTop.Checked += (_, _) => KeepOnTop(true);
+        keepOnTop.Unchecked += (_, _) => KeepOnTop(false);
         var back = Tool(new Button(), "", "Back to the world-boss timers", (_, _) => OnPage(core => core.Navigate(BossTimersSite.Start.AbsoluteUri)));
         var reload = Tool(new Button(), "", "Reload", (_, _) => OnPage(core => core.Reload()));
         var openOutside = Tool(new Button(), "", "Open this page in your browser", (_, _) => OnPage(core => OpenInBrowser(CurrentSitePage(core))));

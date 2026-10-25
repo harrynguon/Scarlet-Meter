@@ -14,9 +14,13 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Checks after the review (SDK 10.0.402):** `scripts/Build.ps1` 500/500 (`BrowserLaunchGateTests` and the new `BossTimersSiteTests` cases). Fail-first, 11 mutations, each failing its test by name: any opener sending popups, redirects as clicks, local hosts and private IPv4 allowed, no launch limit, every popup taken as a click (the audit's surviving mutation), Reload unguarded, the launch inside WebView2's callback, screen capture allowed, the start not fully caught, and the null section not defaulted (the audit's other survivor).
 
-**Not checked:** the window in a real run (needs Harry's go-ahead; an automated run must not load the real site, so it maps the site's host names to "not found" with no proxy), and the real site by hand (HANDOFF).
+**Window check (Harry's go-ahead, out of game; demo, a throwaway data directory; `--no-proxy-server` and the site's host names mapped to "not found", so nothing was requested from aion2timers.com; UI Automation, no mouse; "Open in browser" never invoked):** the hourglass opened the window, not owned by the overlay and not topmost, 460 × 640 px, and created `webview2-timers`; it showed the browser's own "can't reach this page" (ERR_NAME_NOT_RESOLVED) under the dark title bar and the bar; a second click kept one window; closing the meter closed it, with exit code 0; the placement was saved under "timers" and restored on a second run. The first try of "Keep on top" through UI Automation's toggle did nothing: the switch listened for Click, which that toggle (and so a screen reader) does not raise. It now follows the checked state (guarded in `TheBossTimersWindowIsKeptApartFromTheMeter`), and the next run pinned the window (topmost, `"bossTimers": { "keepOnTop": true }` saved) and restored the pin on the second run. 500/500.
 
-**Next:** Codex and CI on the fixes; with Harry's go-ahead, the window check with the site blocked; Harry's check of the real site; merge.
+**Harry, on the README's demo GIFs:** "hide the event timers. since ina boss fight the event timers would be hidden automatcially". Re-recorded with the switches at their defaults: `demo.gif` in a boss fight with the notices held (it also shows the new hourglass), `alerts.gif` in the break after the kill, where they come back ("+2 more", all four, "Show less"), `background-picture.png` in a boss fight without notices, and `settings-alerts.png` with "Hide during boss fights" on. Alt texts say so.
+
+**Not checked:** the real site by hand (HANDOFF): the page itself, the server and faction kept after a restart, links elsewhere.
+
+**Next:** Codex and CI; Harry's check of the real site; merge with Harry's go-ahead; rebuild Harry's copy.
 
 ## 2026-10-25 — Event timers: a washed-out gold, never over the bars, nothing scrolls
 

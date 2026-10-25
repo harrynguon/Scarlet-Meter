@@ -288,6 +288,11 @@ public sealed partial class RazorMarkupTests
         Assert.Equal(3, Regex.Matches(window, @"\(_, _\) => OnPage\(core =>").Count);
         Assert.Matches(@"catch \(Exception ex\) when \(ex is InvalidOperationException or COMException or ObjectDisposedException\)", window);
         Assert.DoesNotMatch(@"webView\.CoreWebView2\?\.", window);
+        // "Keep on top" follows the checked state, so UI Automation's toggle works too (PR #29's window check: a Click
+        // handler missed it).
+        Assert.Contains("keepOnTop.Checked += (_, _) => KeepOnTop(true);", window);
+        Assert.Contains("keepOnTop.Unchecked += (_, _) => KeepOnTop(false);", window);
+        Assert.DoesNotContain("keepOnTop.Click +=", window, StringComparison.Ordinal);
         // Locked down before the first navigation (the call present, not only the method), and never started through
         // Source or CreationProperties (a default profile).
         var lockAt = window.IndexOf("            Lock(core);", StringComparison.Ordinal);
