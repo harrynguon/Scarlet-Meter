@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The app icon came with a loader WPF already provides** (deep audit on #32, fixed before merge).
+- What: every window set its icon from a second, embedded copy of the .ico through a cached loader (`Windows/AppIcon`), but WPF already gives a window without an `Icon` the exe's own, so the loader changed nothing on screen while adding ways to fail: exceptions it did not catch, a failure the cache would replay on every window's construction, and a decoder tied to one thread. Its docs also described a fallback ("the default") that was the same icon. Its tests read file names and strings: a hook commented out, a new window without one, swapped or broken entries in the .ico all passed.
+- Why: the window code was written from the assumption that each window needs its icon set, without checking the framework's default for a window that sets none; the tests were again written for the code in mind rather than for the claim ("every window uses it").
+- Guard: no window sets an icon (`AppIconTests.NoWindowSetsItsOwnIcon`, over every source file with comments dropped), the built exe and assembly carry all nine sizes (read from their resources), and the .ico's entries are checked against their own PNG headers and decoded; six mutations, each failing its test, and a commented-out setter passing. Before adding code for a platform behaviour, check what the platform does when the code is absent.
+
 **The one-bar event strip's guards were narrower than their comments** (deep audit on #30, fixed before merge).
 - What: the strip's bar was said to be "as tall as a notice" but was 2 px shorter (a button is border-box, a notice is content-box), the source guards did not pin what the closed bar shows (five mutations survived: the wrong notice named, no "+N", no progress line, a soft shadow under `.fx .row`, `--row-edge` turned off later), and the shadow guard only read selectors that start with `.row`.
 - Why: the change was looked at as a picture in headless Edge, not measured, and each guard was written for the mutation in mind rather than for the claim in its comment.

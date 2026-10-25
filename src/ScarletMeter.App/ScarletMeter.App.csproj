@@ -15,14 +15,10 @@
     <AssemblyName>ScarletMeter</AssemblyName>
     <RootNamespace>ScarletMeter.App</RootNamespace>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
-    <!-- The exe's icon (Explorer, shortcuts); the windows take the same file as a resource (Windows/AppIcon.cs).
-         Its source is in THIRD-PARTY-NOTICES.md, "Artwork". -->
+    <!-- The exe's icon (Explorer, shortcuts), which every window also shows: WPF gives a window that sets no Icon
+         the exe's own. Its source is in THIRD-PARTY-NOTICES.md, "Artwork". -->
     <ApplicationIcon>Assets\ScarletMeter.ico</ApplicationIcon>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Resource Include="Assets\ScarletMeter.ico" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="10.0.0" />
