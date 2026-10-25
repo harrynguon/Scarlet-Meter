@@ -4,14 +4,14 @@ using ScarletMeter.WorldEvents;
 namespace ScarletMeter.App.Alerts;
 
 /// <summary>
-/// What the overlay's alert strip (Components/AlertStrip.razor) shows: the first <see cref="CollapsedCount"/>
-/// notices, or every due one once the player expands it, the hover text listing the ones it hides, and whether it
-/// stands aside for a boss fight. Pure, so the component stays a view and the rules are tested without rendering.
+/// What the overlay's alert strip (Components/AlertStrip.razor) shows: closed, one bar with the most urgent notice
+/// and how many more are due; open, every due notice under it; the bar's hover text; and whether the strip stands
+/// aside for a boss fight. Pure, so the component stays a view and the rules are tested without rendering.
 /// </summary>
 public static class AlertStripLayout
 {
-    /// <summary>Notices the strip shows before it is expanded.</summary>
-    public const int CollapsedCount = 2;
+    /// <summary>Notices the screen-reader summary names, most urgent first.</summary>
+    public const int AnnouncedCount = 2;
 
     /// <summary>
     /// Whether the strip stands aside for the fight under way: with "Hide during boss fights" on, while
@@ -21,28 +21,24 @@ public static class AlertStripLayout
     public static bool HiddenForFight(bool hideDuringBossFights, bool bossFightUnderWay) =>
         hideDuringBossFights && bossFightUnderWay;
 
-    /// <summary>The notices to draw, most urgent first: all of them when expanded, else the first few.</summary>
+    /// <summary>
+    /// The notice rows under the bar, most urgent first: every one while the strip is open, none while it is closed
+    /// (the bar itself shows the most urgent).
+    /// </summary>
     public static IEnumerable<EventAlert> Shown(IReadOnlyList<EventAlert> alerts, bool expanded) =>
-        expanded ? alerts : alerts.Take(CollapsedCount);
+        expanded ? alerts : [];
 
-    /// <summary>How many notices the collapsed strip hides; 0 when they all fit, and then there is nothing to expand.</summary>
-    public static int HiddenCount(IReadOnlyList<EventAlert> alerts) => Math.Max(0, alerts.Count - CollapsedCount);
-
-    /// <summary>
-    /// Whether an expanded strip stays expanded: only while some notices would otherwise be hidden, so once the
-    /// extra events have passed it starts collapsed again the next time more are due.
-    /// </summary>
-    public static bool StaysExpanded(bool expanded, IReadOnlyList<EventAlert> alerts) => expanded && HiddenCount(alerts) > 0;
+    /// <summary>How many more notices are due than the closed bar names ("+2"); 0 when it names the only one.</summary>
+    public static int MoreCount(IReadOnlyList<EventAlert> alerts) => Math.Max(0, alerts.Count - 1);
 
     /// <summary>
-    /// The "+N more" tooltip: one line per hidden notice, as <see cref="Describe"/> words it. Clock times rather
-    /// than countdowns, so it does not go stale while the tooltip is open.
+    /// The closed bar's tooltip: one line per due notice, as <see cref="Describe"/> words it. Clock times rather than
+    /// countdowns, so it does not go stale while the tooltip is open.
     /// </summary>
-    public static string HiddenSummary(IReadOnlyList<EventAlert> alerts) =>
-        string.Join("\n", alerts.Skip(CollapsedCount).Select(Describe));
+    public static string List(IReadOnlyList<EventAlert> alerts) => string.Join("\n", alerts.Select(Describe));
 
-    /// <summary>The expanded strip's "Show less" tooltip.</summary>
-    public static string CollapseHint => $"Show only the first {CollapsedCount}";
+    /// <summary>The open bar's tooltip.</summary>
+    public static string CollapseHint => "Fold the world events into one line";
 
     /// <summary>A notice in one line, in local time: "&lt;name&gt; · &lt;location&gt; · starts 21:00" (or "closes" while open).</summary>
     public static string Describe(EventAlert alert) =>

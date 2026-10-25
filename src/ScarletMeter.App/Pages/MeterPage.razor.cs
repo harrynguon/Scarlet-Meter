@@ -36,7 +36,8 @@ public partial class MeterPage : IAsyncDisposable
     private bool bossFightUnderWay;
     private CombatSnapshot snapshot = CombatSnapshot.Empty;
     private AppearanceSettings appearance = new();
-    // The notices' switches: the header's bell (Enabled) and whether they stand aside for a boss fight.
+    // The notices' switches: the header's bell (Enabled), whether they stand aside for a boss fight and whether the
+    // strip is open (NoticesExpanded).
     private AlertSettings alertSettings = new();
     private int? ping;
     private Task? refreshLoop;
@@ -269,6 +270,9 @@ public partial class MeterPage : IAsyncDisposable
 
     // The header's bell: world-event notices on or off, saved like the switch in Settings, Alerts.
     private void ToggleAlerts() => Settings.Update(s => s with { Alerts = s.Alerts with { Enabled = !s.Alerts.Enabled } });
+
+    // The notice strip's bar: open or closed, saved so it stays as the player left it.
+    private void SetNoticesExpanded(bool expanded) => Settings.Update(s => s with { Alerts = s.Alerts with { NoticesExpanded = expanded } });
 
     private void Reset()
     {

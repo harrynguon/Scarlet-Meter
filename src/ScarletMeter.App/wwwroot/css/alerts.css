@@ -1,8 +1,9 @@
 /* World-event notices at the bottom of the overlay (Components/AlertStrip.razor), below the last DPS bar. Uses
-   app.css tokens. Nothing in the overlay scrolls: the strip always takes its full height (flex: none), the first two
-   notices and "+N more" collapsed, every due notice expanded, and when the window is too short for it and the bars,
-   the window grows (Windows/OverlayFit); once it is as tall as the screen the lowest rows give way instead (app.css,
-   .overlay.cut .rows). So a notice never covers a bar and is never cut, and "Show less" is always there. */
+   app.css tokens. One bar that opens and closes: closed, the most urgent notice in one line; open, a "World events"
+   header over every due notice. Nothing in the overlay scrolls: the strip always takes its full height (flex: none),
+   and when the window is too short for it and the bars, the window grows (Windows/OverlayFit); once it is as tall as
+   the screen the lowest rows give way instead (app.css, .overlay.cut .rows). So a notice never covers a bar and is
+   never cut, and the bar is always there to fold the list away. */
 .alerts {
     display: flex;
     flex-direction: column;
@@ -38,16 +39,20 @@
 }
 
 /* An upcoming event's dot and progress line in the washed-out gold (--soon, app.css), so the strip stays calm beside
-   the bars; an open entry's are teal. The dot stays still: a pulse beside the bars was distracting in a fight. */
-.alert.soon .alert-dot {
+   the bars; an open entry's are teal. The dot stays still: a pulse beside the bars was distracting in a fight. The
+   bar takes the most urgent notice's colours. */
+.alert.soon .alert-dot,
+.alert-bar.soon .alert-dot {
     background: var(--soon);
 }
 
-.alert.open {
+.alert.open,
+.alert-bar.open {
     border-color: rgba(78, 201, 176, 0.35);
 }
 
-.alert.open .alert-dot {
+.alert.open .alert-dot,
+.alert-bar.open .alert-dot {
     background: var(--good);
     box-shadow: 0 0 6px var(--good);
 }
@@ -77,11 +82,13 @@
     transition: width 1s linear;
 }
 
-.alert.soon .alert-progress {
+.alert.soon .alert-progress,
+.alert-bar.soon .alert-progress {
     opacity: 0.65;
 }
 
-.alert.open .alert-progress {
+.alert.open .alert-progress,
+.alert-bar.open .alert-progress {
     background: var(--good);
 }
 
@@ -90,30 +97,64 @@
     animation: none;
 }
 
-/* "+N more" / "Show less": a button that expands the strip to every due notice and collapses it again. */
-.alert.more {
-    justify-content: center;
+/* The strip's bar, a button: closed, the most urgent notice with its progress line, "+N" more and a chevron pointing
+   down; open, the "World events" header with the count, its chevron turned up. As tall as a notice, 26 px: a notice
+   is 24 px inside its 1 px border, and the bar, a button, measures its border in (border-box, which width: 100% also
+   needs). */
+.alert-bar {
+    position: relative;
+    overflow: hidden;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
     width: 100%;
-    height: 18px;
-    color: var(--muted);
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 6px;
+    background: rgba(11, 11, 15, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--text);
     font: inherit;
-    font-size: 11px;
+    font-size: 12px;
+    text-align: left;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
     cursor: pointer;
-    animation: none;
+    animation: alert-in 260ms ease-out;
 }
 
-.alert.more:hover,
-.alert.more:focus-visible {
-    color: var(--text);
+.alert-bar:hover,
+.alert-bar:focus-visible {
     background: rgba(255, 255, 255, 0.08);
     outline: none;
 }
 
-/* Expanded, the strip shows every due notice with "Show less" after them, the window growing to fit (.alerts). The
-   top line separates it from the rows above. */
-.alerts.expanded {
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
-    padding-top: 3px;
+.alert-count {
+    flex: none;
+    padding: 0 6px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(235, 233, 242, 0.75);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    line-height: 16px;
+}
+
+.alert-chevron {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    margin: 0 2px 3px 2px;
+    border-right: 1.5px solid var(--muted);
+    border-bottom: 1.5px solid var(--muted);
+    transform: rotate(45deg);
+    transition: transform 160ms ease-out;
+}
+
+.alerts.expanded .alert-chevron {
+    margin-bottom: -3px;
+    transform: rotate(-135deg);
 }
 
 /* The "newer RATmeter release" line, as quiet as the next-event line. */
