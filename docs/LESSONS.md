@@ -121,6 +121,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**A late history cleanup deleted a test's row** (CI's push run on #30's commit, found by #30's deep audit, 2026-10-25).
+- What: `HistoryTests.AFightSavedWithAnUnusableStartOrEndShowsItsPlayersOnly` failed once in CI (5 fights expected, 4 listed) and passed on the pull-request run of the same commit. Upstream's history store starts its expired-session cleanup on the thread pool from its constructor; on a busy runner it started after the test had damaged fight 904 to end two hours after `DateTime.MinValue`, and deleted it as expired. The same race would have reached every history test from 2026-11-19, when the fights each of them dates 2026-10-20 pass the default 30-day retention (their later fights a day or more after).
+- Why: the test host already knew about the cleanup, but only as something to wait for before deleting the test's directory; nobody asked what else it could do mid-test. Locally the cleanup always finished before a test wrote anything, so no run had shown it, and a fixed fixture date was not seen as something that ages into the retention period.
+- Guard: `TestEngineHost` hands the history store out (to the test, the engine and everything else) only after its cleanup has finished; `TestEngineHostTests` holds the cleanup and fails if the store is handed out meanwhile (shown to fail with the wait removed, and with the whole hand-out removed). A probe delaying the cleanup failed the test on the old host and passes on the new one (WORKLOG). When a dependency starts background work from a constructor, ask what data it touches and let tests start only after it.
+
 **A site that bars AI agents was fetched with a browser's user agent** (2026-10-25, found by the agent itself).
 - What: asked whether the meter could read aion2timers.com's boss timers, the agent fetched the page; the first fetch got a holding page, and a second, sent with a browser's user agent, got the page (not kept or read). Only then did it read the site's robots.txt, which bars AI agents by name, enforced server-side, and disallows its `/api/` for every crawler.
 - Why: the question was treated as a technical one (how is the data loaded?) before the site's own rules were read, and a block was treated as an obstacle rather than an answer.

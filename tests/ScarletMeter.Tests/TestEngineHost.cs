@@ -2,6 +2,7 @@ using System.IO;
 using System.Runtime.ExceptionServices;
 using AionDpsMeter.Services.Services.Session.Persistence;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using ScarletMeter.Engine;
@@ -9,10 +10,11 @@ using ScarletMeter.Engine;
 namespace ScarletMeter.Tests;
 
 /// <summary>
-/// The engine's real service graph over a throwaway data directory, for one test. Disposal waits for the
-/// cleanup upstream's history store starts, fire-and-forget, in its constructor (expired-session delete,
-/// VACUUM, ANALYZE): that task outlives the provider and re-creates the database when the directory is
-/// deleted under it. Then the graph is disposed and the directory deleted, so no test leaves files behind.
+/// The engine's real service graph over a throwaway data directory, for one test. Upstream's history store
+/// starts a cleanup, fire-and-forget, in its constructor (expired-session delete, VACUUM, ANALYZE). The host
+/// hands the store out only once that cleanup has finished, so it cannot delete a row a test writes, and
+/// disposal waits for it too: the task outlives the provider and re-creates the database when the directory
+/// is deleted under it. Then the graph is disposed and the directory deleted, so no test leaves files behind.
 /// </summary>
 internal sealed class TestEngineHost : IDisposable
 {
@@ -29,6 +31,7 @@ internal sealed class TestEngineHost : IDisposable
         var services = new ServiceCollection().AddScarletEngine(options);
         services.AddLogging(logging => logging.AddProvider(cleanup));
         configure?.Invoke(services);
+        HandOutHistoryStoreAfterItsCleanup(services);
         // ValidateOnBuild stays off: upstream registers every type in its processor namespace, including nested
         // records and compiler-generated iterators that nothing resolves and DI cannot construct. Resolving the
         // engine still constructs every real processor through the opcode registry.
@@ -39,6 +42,26 @@ internal sealed class TestEngineHost : IDisposable
 
     /// <summary>The absolute data directory the graph writes to.</summary>
     public string DataDirectory => directory.FullPath;
+
+    // Replaces the history store's registration (the test's own, when it makes one) with one that returns the
+    // store only after its startup cleanup has finished. The cleanup runs on the thread pool, so on a busy runner
+    // it can start seconds late and delete rows a test has written since: a fight past the retention period, or
+    // one damaged to end near DateTime.MinValue (LESSONS, "A late history cleanup"). Everything that writes
+    // history, the engine included, gets the store through here. A store that is not upstream's starts no
+    // cleanup and comes back at once.
+    private void HandOutHistoryStoreAfterItsCleanup(IServiceCollection services)
+    {
+        var registered = services.Last(d => d.ServiceType == typeof(ICombatHistoryStore) && !d.IsKeyedService);
+        services.RemoveAll<ICombatHistoryStore>();
+        services.AddSingleton<ICombatHistoryStore>(provider =>
+        {
+            var store = (ICombatHistoryStore)(registered.ImplementationInstance
+                ?? registered.ImplementationFactory?.Invoke(provider)
+                ?? ActivatorUtilities.CreateInstance(provider, registered.ImplementationType!));
+            cleanup.WaitUntilFinished(CleanupTimeout);
+            return store;
+        });
+    }
 
     // A timeout is reported after the graph and directory are released, together with any failure there, so
     // neither hides the other.

@@ -13,7 +13,10 @@ namespace ScarletMeter.Tests;
 /// Boss-fight history through the engine: synthetic fights are completed and saved through
 /// CompleteAndPersistActiveSessions (the path the demo and the engine's shutdown use), then listed, filtered,
 /// paged and reloaded from upstream's real SQLite store in the test's data directory. Damaged rows are made
-/// through upstream's own database context, as a damaged or edited file would hold them.
+/// through upstream's own database context, as a damaged or edited file would hold them. The store's startup
+/// cleanup deletes fights that ended before the retention period, which includes a row damaged to end near
+/// DateTime.MinValue and, from 2026-11-19, every fight dated <see cref="Day1"/>: TestEngineHost hands the store
+/// out only after that cleanup has finished, so it never meets these rows.
 /// </summary>
 public sealed class HistoryTests : IDisposable
 {
