@@ -12,6 +12,8 @@
     --accent-soft: rgba(230, 57, 70, 0.32);
     --me: #ffb703;
     --me-soft: rgba(255, 183, 3, 0.26);
+    /* An upcoming world event's notice (alerts.css): a washed-out gold, calmer than the "you" gold above. */
+    --soon: #dcc68c;
     --good: #4ec9b0;
     --fair: #dcdcaa;
     --slow: #ce9178;
@@ -70,9 +72,12 @@ button {
    of the panel's own colour at 1 - --image-alpha fades the picture into the panel ("Picture opacity"), exactly as
    the picture at that opacity over the colour would look; the dark veil above it keeps text readable. Without a
    picture both layers are the panel's colour, so nothing changes.
-   The panel is only as tall as its content, up to the window (max-height; the rows scroll beyond it): what it does
-   not cover is see-through to the game, so the room the notices leave in a boss fight, or below a small party's
-   rows, never shows as an empty panel. The window keeps the size the player gave it. Its bottom padding adds 8 px
+   The panel is only as tall as its content: what it does not cover is see-through to the game, so the room the
+   notices leave in a boss fight, or below a small party's rows, never shows as an empty panel. Nothing in it
+   scrolls: when the content is taller than the window, the window grows to fit (js/overlay-size.js reports the
+   height, Windows/OverlayFit places the window) and returns to the player's size once it fits again. max-height
+   keeps the panel inside the window for the moment until then, and for good once the window is as tall as the
+   screen, when the rows give way (.overlay.cut .rows), never the notices. Its bottom padding adds 8 px
    under whatever ends the panel, on top of the rows' and the notices' own spacing: measured, 18 px from the last
    row to the panel's edge and 15 px from the last notice. */
 .overlay {
@@ -329,30 +334,40 @@ button {
 .ping.bad { color: var(--bad); }
 .ping.bad i:nth-child(1) { background: var(--bad); }
 
-/* Positioned, so a row's offsetTop (js/overlay-fx.js) is measured from the list, not the panel above it. As tall as
-   its rows (the panel fits its content, .overlay), shrinking and scrolling only when the window is too short. Its
-   heavy shrink weight makes the rows give up their space before the expanded notice strip does: shrinking is
-   weighted by size, so with a plain 1 a full party would squeeze the strip down to one notice (alerts.css). */
+/* Positioned, so a row's offsetTop (js/overlay-fx.js) is measured from the list, not the panel above it. Nothing in
+   the overlay scrolls: the rows take their full height (flex: none) and the window grows to the content (.overlay).
+   Its overflow is clipped, not scrollable, so a row gliding into place (a transform) cannot stretch the measured
+   height for a moment and make the window jump. */
 .rows {
     position: relative;
     list-style: none;
     margin: 0;
     padding: 2px 6px 6px;
-    overflow-y: auto;
-    flex: 0 1000 auto;
-    min-height: 0;
+    overflow: clip;
+    flex: none;
     zoom: var(--row-scale, 1);
 }
 
-.rows::-webkit-scrollbar { width: 6px; }
-.rows::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 3px; }
+/* Only where the window cannot grow to the content (it is as tall as the screen, or the player is resizing it:
+   Pages/MeterPage.razor.cs, "cut") do the rows give way, the lowest first, their edge faded rather than a row cut
+   in half, so the notices below are never cut. Never for the moment before the window grows, which would squeeze
+   the rows. They are still measured at full height (data-measuring, js/overlay-size.js; after .cut, so it wins). */
+.overlay.cut .rows {
+    flex: 0 1 auto;
+    min-height: 0;
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
+}
+
+.overlay[data-measuring] .rows {
+    flex: none;
+}
 
 .row {
     position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
-    height: 24px;
+    height: 26px;
     padding: 0 8px 0 6px;
     margin-bottom: 3px;
     background: var(--row);
@@ -435,19 +450,33 @@ button {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
-/* DPS, then total damage, then share; the fixed widths keep each column lined up from row to row. */
+/* DPS, then the share over the total damage, in one slim line: DPS and the share read first (bold, white), and the
+   total sits under the share, smaller and dimmer, the one to look at less. The fixed widths keep each column lined
+   up from row to row. */
 .row .dps {
     min-width: 58px;
     font-weight: 600;
 }
 
-.row .total {
-    min-width: 46px;
+.row .share {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 1px;
+    min-width: 42px;
+    line-height: 1;
 }
 
 .row .pct {
-    min-width: 42px;
-    color: rgba(235, 233, 242, 0.75);
+    font-weight: 600;
+    color: var(--text);
+    font-size: 12.5px;
+}
+
+.row .total {
+    font-size: 10px;
+    color: rgba(235, 233, 242, 0.55);
 }
 
 /* Class gradients, as RATmeter's (upstream AionDpsMeter.UI/wwwroot/css/app.css), keyed by class id. */

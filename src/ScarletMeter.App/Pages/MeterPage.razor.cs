@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 using ScarletMeter.App.Alerts;
 using ScarletMeter.App.Combat;
 using ScarletMeter.App.Formatting;
@@ -40,6 +41,11 @@ public partial class MeterPage : IAsyncDisposable
     private int? ping;
     private Task? refreshLoop;
     private bool refreshFailing;
+    // The content height last sent to the window, which grows to show all of it (nothing in the meter scrolls).
+    private double reportedHeight = double.NaN;
+    private bool fitFailing;
+    // Whether the window, after the last fit, still cannot show all of the content (OverlayClass, "cut").
+    private bool contentCut;
 
     [Inject]
     private ICombatEngine Engine { get; set; } = default!;
@@ -64,15 +70,21 @@ public partial class MeterPage : IAsyncDisposable
     [Inject]
     private UpdateNotice Updates { get; set; } = default!;
 
+    // Reads the panel's content height after each render (js/overlay-size.js).
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
     // Upstream's rule: hide players the game has not named unless they already matter. Highest damage first.
     private IEnumerable<PlayerRow> Visible => snapshot.Players
         .Where(p => p.IsIdentified || p.DamageShare > 1)
         .OrderByDescending(p => p.TotalDamage);
 
     // "fx" with bar effects on; "settled" hides them once the fight is quiet or over (app.css), so nothing animates
-    // between pulls.
+    // between pulls. "cut" while the window cannot show all of the content (IMeterWindows.OverlayCutsContent): the
+    // rows give way then, faded, and the notices stay whole.
     private string OverlayClass =>
-        (appearance.BarEffects ? "fx" : "") + (phase is FightPhase.Settled or FightPhase.Defeated ? " settled" : "");
+        (appearance.BarEffects ? "fx" : "") + (phase is FightPhase.Settled or FightPhase.Defeated ? " settled" : "")
+        + (contentCut ? " cut" : "");
 
     // The header in a fight: what is being fought, or that it is down.
     private string StateText(TargetInfo target) => phase == FightPhase.Defeated
@@ -115,12 +127,58 @@ public partial class MeterPage : IAsyncDisposable
         Engine.PingUpdated += OnPingUpdated;
         Alerts.Changed += OnAlertsChanged;
         Updates.Changed += OnUpdateNoticeChanged;
+        Windows.OverlayFitted += OnOverlayFitted;
         refreshLoop = RefreshLoopAsync();
+    }
+
+    // After each render, the panel's content height goes to the window when it changed, so the window grows to show
+    // all of it or returns to the player's size (nothing in the meter scrolls; Windows/OverlayFit), and the page asks
+    // whether the window still cuts the content (as tall as the screen allows, or being resized), when the rows give
+    // way; a change renders once more. The script may not be loaded for the first render, and the page may be
+    // closing; the next render tries again. A fit that fails is logged once and retried on the next render: a
+    // cosmetic fit must never end the meter, which an exception thrown out of this method would (Blazor rethrows it
+    // on the dispatcher).
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (stopping.IsCancellationRequested) return;
+        double height;
+        try
+        {
+            height = await JS.InvokeAsync<double>("scarletOverlay.contentHeight", stopping.Token);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or OperationCanceledException or ObjectDisposedException)
+        {
+            return;
+        }
+        if (stopping.IsCancellationRequested) return;
+        try
+        {
+            if (OverlayFit.IsNewHeight(reportedHeight, height))
+            {
+                Windows.FitOverlayToContent(height);
+                reportedHeight = height;
+            }
+            var cut = Windows.OverlayCutsContent(height);
+            fitFailing = false;
+            if (cut == contentCut) return;
+            contentCut = cut;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            if (!fitFailing) Logger.LogWarning(ex, "Fitting the overlay window to its content failed; retrying on the next render.");
+            fitFailing = true;
+        }
     }
 
     private void OnAlertsChanged(object? sender, EventArgs e) => _ = RenderAsync();
 
     private void OnUpdateNoticeChanged(object? sender, EventArgs e) => _ = RenderAsync();
+
+    // The window fitted itself outside a render (a restore, the end of a resize, a display change, a delayed shrink):
+    // render now, so the "cut" question is asked again at once rather than at the next refresh, and the rows' fade
+    // never lingers once the window has room.
+    private void OnOverlayFitted(object? sender, EventArgs e) => _ = RenderAsync();
 
     private string DisplayName(PlayerRow player) => appearance.HideNicknames ? NicknameMask.Mask(player.Name) : player.Name;
 
@@ -230,6 +288,7 @@ public partial class MeterPage : IAsyncDisposable
         Engine.PingUpdated -= OnPingUpdated;
         Alerts.Changed -= OnAlertsChanged;
         Updates.Changed -= OnUpdateNoticeChanged;
+        Windows.OverlayFitted -= OnOverlayFitted;
         await stopping.CancelAsync();
         if (refreshLoop is not null) await refreshLoop;
         stopping.Dispose();

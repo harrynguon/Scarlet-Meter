@@ -60,6 +60,22 @@ public interface IMeterWindows
     /// for an event waits until they do. Cheap to call on every refresh.
     /// </summary>
     void HoldAlerts(bool held);
+
+    /// <summary>
+    /// The overlay page's content height (CSS pixels): nothing in the meter scrolls, so the overlay window grows to
+    /// show all of it and returns to the player's own size when it fits (<see cref="OverlayFit"/>).
+    /// </summary>
+    void FitOverlayToContent(double contentHeight);
+
+    /// <summary>
+    /// Whether the overlay window is shorter than content <paramref name="contentHeight"/> tall even after fitting: it
+    /// is as tall as the screen allows, or the player is resizing it. The page's rows then give way (app.css,
+    /// .overlay.cut), never the notices. Cheap to call on every render.
+    /// </summary>
+    bool OverlayCutsContent(double contentHeight);
+
+    /// <summary>Raised on the UI thread after the overlay window moved or resized itself to fit its content.</summary>
+    event EventHandler? OverlayFitted;
 }
 
 /// <summary>
@@ -98,10 +114,13 @@ public sealed class MeterWindows : IMeterWindows
 
     public event EventHandler? HotkeyStatusChanged;
 
+    public event EventHandler? OverlayFitted;
+
     /// <summary>Creates and shows the overlay. The app shuts down when it closes.</summary>
     public OverlayWindow ShowOverlay()
     {
         overlay = new OverlayWindow(services, CloseToolWindowsAsync) { CloseBlocked = () => modalOpen };
+        overlay.Fitted += (_, _) => OverlayFitted?.Invoke(this, EventArgs.Empty);
         overlay.SourceInitialized += (_, _) =>
         {
             hotkey = new GlobalHotkey(overlay);
@@ -171,6 +190,13 @@ public sealed class MeterWindows : IMeterWindows
     }
 
     public void BeginOverlayDrag() => overlay?.BeginDrag();
+
+    public void FitOverlayToContent(double contentHeight)
+    {
+        if (!closing) overlay?.FitToContent(contentHeight);
+    }
+
+    public bool OverlayCutsContent(double contentHeight) => !closing && overlay?.CutsContent(contentHeight) == true;
 
     public void MinimizeOverlay()
     {

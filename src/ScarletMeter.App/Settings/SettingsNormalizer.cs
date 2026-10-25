@@ -11,7 +11,9 @@ namespace ScarletMeter.App.Settings;
 /// </summary>
 public static class SettingsNormalizer
 {
-    private const double MinWindowSize = 120;
+    // A size any window allows (WindowPlacement.MinSize, the overlay's minimum height), or a player's own small
+    // overlay would be dropped as unusable, and its whole placement with it.
+    private const double MinWindowSize = WindowPlacement.MinSize;
     private const double MaxWindowSize = 20_000;
     private const double MaxWindowOffset = 100_000;
 

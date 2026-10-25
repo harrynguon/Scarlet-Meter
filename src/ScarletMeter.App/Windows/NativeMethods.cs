@@ -7,6 +7,14 @@ internal static class NativeMethods
 {
     public const int WmHotkey = 0x0312;
     public const int WmNclButtonDown = 0x00A1;
+    // The player starts and ends dragging or resizing a window (the system's move/size loop).
+    public const int WmEnterSizeMove = 0x0231;
+    public const int WmExitSizeMove = 0x0232;
+    // The display's scale, resolution or arrangement changed, or the work area did (a taskbar resized or set to hide).
+    public const int WmDpiChanged = 0x02E0;
+    public const int WmDisplayChange = 0x007E;
+    public const int WmSettingChange = 0x001A;
+    public const int SpiSetWorkArea = 0x002F;
     public const int HtCaption = 2;
     public const uint ModNoRepeat = 0x4000;
     public const int DwmUseImmersiveDarkMode = 20;
