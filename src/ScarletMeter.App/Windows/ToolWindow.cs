@@ -1,5 +1,4 @@
 using System.Windows;
-using System.Windows.Interop;
 using System.Windows.Media;
 
 namespace ScarletMeter.App.Windows;
@@ -14,8 +13,6 @@ public sealed record ToolWindowSpec(string Key, Type RootComponent, string Title
 /// </summary>
 public sealed class ToolWindow : ScarletWindow
 {
-    private const double Gap = 8;
-
     public ToolWindow(IServiceProvider services, ToolWindowSpec spec, Window? owner)
         : base(services, spec.RootComponent, spec.Key)
     {
@@ -37,26 +34,16 @@ public sealed class ToolWindow : ScarletWindow
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
         RestorePlacement();
-        SourceInitialized += (_, _) => UseDarkTitleBar();
+        SourceInitialized += (_, _) => DarkTitleBar.Apply(this);
     }
 
     public ToolWindowSpec Spec { get; }
 
-    // Right of the owner when it fits on the owner's monitor, otherwise left of it, clamped to that monitor's
-    // work area (the primary monitor's when the owner's cannot be determined).
     private void PlaceBeside(Window owner)
     {
         WindowStartupLocation = WindowStartupLocation.Manual;
-        var area = ScreenPlacement.WorkAreaOf(owner);
-        var left = owner.Left + owner.ActualWidth + Gap;
-        if (left + Width > area.Right) left = owner.Left - Width - Gap;
-        Left = Math.Clamp(left, area.Left, Math.Max(area.Left, area.Right - Width));
-        Top = Math.Clamp(owner.Top, area.Top, Math.Max(area.Top, area.Bottom - Height));
-    }
-
-    private void UseDarkTitleBar()
-    {
-        var enabled = 1;
-        _ = NativeMethods.DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, NativeMethods.DwmUseImmersiveDarkMode, ref enabled, sizeof(int));
+        var at = ScreenPlacement.Beside(owner, Width, Height);
+        Left = at.X;
+        Top = at.Y;
     }
 }

@@ -243,6 +243,54 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?m)^\.alert\.open \.alert-progress \{[^}]*background:\s*var\(--good\);", alerts);
     }
 
+    // The boss-timers window shows a third-party site, so it is kept apart from the meter: a plain WebView2 in its own
+    // profile, locked down before it navigates, every top-level navigation through BossTimersSite (tested there), and
+    // nothing that would let the page reach the meter, the meter's local hosts or other programs. Not owned by the
+    // overlay. The header's hourglass opens it. Source-text guards: the WebView has no test host here.
+    [Fact]
+    public void TheBossTimersWindowIsKeptApartFromTheMeter()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        Assert.Contains(@"@onclick=""Windows.OpenBossTimers""", File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor")));
+        var window = File.ReadAllText(Path.Combine(app, "Windows", "BossTimersWindow.cs"));
+        Assert.Contains("public sealed class BossTimersWindow : Window", window);
+        Assert.Contains("public const string ProfileFolder = \"webview2-timers\";", window);
+        Assert.Contains("CoreWebView2Environment.CreateAsync(browserExecutableFolder: null, userDataFolder: profile)", window);
+        Assert.Contains("await webView.EnsureCoreWebView2Async(environment);", window);
+        foreach (var locked in new[]
+        {
+            "s.AreHostObjectsAllowed = false;", "s.IsWebMessageEnabled = false;", "s.AreDevToolsEnabled = false;",
+            "s.IsPasswordAutosaveEnabled = false;", "s.IsGeneralAutofillEnabled = false;",
+            "core.DownloadStarting += (_, e) => e.Cancel = true;",
+            "core.PermissionRequested += (_, e) => e.State = CoreWebView2PermissionState.Deny;",
+            "core.BasicAuthenticationRequested += (_, e) => e.Cancel = true;",
+            "core.ClientCertificateRequested += (_, e) => e.Cancel = true;",
+            "core.LaunchingExternalUriScheme += (_, e) => e.Cancel = true;",
+            "core.NavigationStarting += OnNavigationStarting;", "core.NewWindowRequested += OnNewWindowRequested;",
+            "BossTimersSite.Decide(e.Uri, e.IsUserInitiated && !e.IsRedirected)",
+            "e.Handled = true;",
+            "!BossTimersSite.IsWebPage(uri)) return;",
+        })
+            Assert.Contains(locked, window);
+        // Locked down before the first navigation (the call present, not only the method), and never started through
+        // Source (a default profile).
+        var lockAt = window.IndexOf("        Lock(core.Settings);", StringComparison.Ordinal);
+        var firstNavigation = window.IndexOf("core.Navigate(BossTimersSite.Start.AbsoluteUri);", StringComparison.Ordinal);
+        Assert.True(lockAt >= 0 && firstNavigation > lockAt, "the settings are locked before the first navigation");
+        foreach (var reach in new[]
+        {
+            "BlazorWebView", "WebAssetHosts", "AddHostObjectToScript", "PostWebMessage", "ExecuteScriptAsync",
+            "AddScriptToExecuteOnDocumentCreated", "SetVirtualHostNameToFolderMapping", "WebResourceRequested",
+            ".Source =", "Source =", "Owner =", "= true; // devtools",
+        })
+            Assert.DoesNotContain(reach, window, StringComparison.Ordinal);
+        Assert.DoesNotMatch(@"Are\w+Enabled = true|Is\w+Enabled = true|AreHostObjectsAllowed = true", window);
+
+        var windows = File.ReadAllText(Path.Combine(app, "Windows", "MeterWindows.cs"));
+        Assert.Contains("var window = new BossTimersWindow(services, overlay);", windows);
+        Assert.Contains("bossTimers?.Close();", windows);
+    }
+
     // Nothing in the notice strip blinks or loops (Harry: the pulsing dot was "too distracting"): the only animations
     // are a notice's one-time entrance and the progress line's width transition.
     [Fact]

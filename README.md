@@ -92,6 +92,9 @@ and adds it up per player and per fight.
 - **Out of your way**: they sit below the bars and never cover one, step aside during boss fights, and a **bell**
   in the header turns them off in one click. "+N more" folds extra ones away; nothing scrolls, the meter grows to
   fit instead. Times follow the Global preset and are not yet verified in game.
+- **Boss timers**: the hourglass in the header opens [aion2timers.com](https://www.aion2timers.com/world-boss-timer/)'s
+  world-boss timers in a small window of their own, in or out of game. The site remembers your server and faction
+  there; links to other sites open in your browser. It sits behind the game unless you pin it on top.
 
 <p align="center"><img src="docs/images/alerts.gif" alt="World-event alerts below the bars (demo mode): two shown with +2 more; clicking it shows all four with Show less, the meter growing to fit, and folds them away again" width="456"/></p>
 
@@ -148,13 +151,16 @@ All in the `data` folder beside `ScarletMeter.exe`, so you can back it up, move 
 | Saved boss fights | `data\combat-history.db` (demo fights: `data\demo-history.db`) |
 | Your background picture | `data\backgrounds\` |
 | The meter's browser cache (WebView2) | `data\webview2\` |
+| The boss-timers window's own browser data (the site's cookies and choices) | `data\webview2-timers\` |
 
 A copy built and installed from source keeps the same files in `%LocalAppData%\ScarletMeter` instead.
 
 **Does it send anything anywhere?**
 Your settings, fights and logs never leave your PC. The meter itself makes only two kinds of request, both
 optional: an anonymous check for a newer RATmeter release on GitHub (every six hours, or ten minutes after a failed
-try), and skill icons from NCSOFT's own game-data site, as RATmeter does. Settings turn either off.
+try), and skill icons from NCSOFT's own game-data site, as RATmeter does. Settings turn either off. The boss-timers
+window loads aion2timers.com only when you open it, like a browser tab kept apart from the meter: the site sees a
+normal visit, and the meter never reads the page.
 
 **Can I get banned for using it?**
 It only reads network traffic, as RATmeter does, but NCSOFT's terms forbid unauthorised programs. Use it at your

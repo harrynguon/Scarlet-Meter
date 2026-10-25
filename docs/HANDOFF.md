@@ -49,6 +49,16 @@ Record the tested commit, observation date and Windows configuration. Pending:
 - [ ] With "Bar effects" on, the class effects on every bar, the gloss and the overtake glide do not cost frames in the game (compare FPS with the setting off, and with "Effects on every bar" off, in a full party); the glide looks right when players swap places often; each class's effect reads over the game at the chosen opacity.
 - [ ] Settings and window positions survive a restart; fight options (boss-only, combined summons, one-minute dummy) change new hits.
 
+## Next: the boss-timers window
+
+Wired as ARCHITECTURE.md "Windows" describes (`BossTimersWindow`). Only Harry loads the real site: aion2timers.com bars AI agents, so no automated check opens it. By hand:
+
+- [ ] The hourglass in the header opens a window beside the meter with aion2timers.com's world-boss timers, readable and dark-framed; clicking it again brings the open window forward.
+- [ ] Choose a server and faction on the site, close the window, restart the meter and open it again: the site still has the choice (kept in `data\webview2-timers`).
+- [ ] A link to another site opens in the default browser, not in the window; the site's own links stay in the window; nothing downloads; no site asks for notifications or location.
+- [ ] "Keep on top" keeps the window over the game and stays on after a restart; off, the game can cover it. The window's position and size survive a restart.
+- [ ] Back to the timers, Reload and "Open in browser" work; closing the meter closes the window.
+
 ## Next: world-event notices
 
 Wired as ARCHITECTURE.md "Overlay notices" describes. In the game:

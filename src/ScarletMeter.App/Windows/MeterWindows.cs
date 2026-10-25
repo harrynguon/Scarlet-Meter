@@ -22,6 +22,9 @@ public interface IMeterWindows
     /// <summary>Shows a player in the details window: from the live fight, or from a saved fight when <paramref name="fightId"/> is given.</summary>
     void OpenPlayerDetails(long playerId, Guid? fightId = null);
 
+    /// <summary>Opens the boss-timers window (aion2timers.com, <see cref="BossTimersWindow"/>), or brings it forward.</summary>
+    void OpenBossTimers();
+
     /// <summary>Puts text on the clipboard.</summary>
     void CopyText(string text);
 
@@ -94,6 +97,7 @@ public sealed class MeterWindows : IMeterWindows
     private readonly ILogger<MeterWindows> logger;
     private readonly Dictionary<string, ToolWindow> toolWindows = new(StringComparer.Ordinal);
     private OverlayWindow? overlay;
+    private BossTimersWindow? bossTimers;
     private GlobalHotkey? hotkey;
     private HotkeyBinding? hotkeyBinding;
     private bool hotkeySuspended;
@@ -154,6 +158,22 @@ public sealed class MeterWindows : IMeterWindows
     {
         services.GetRequiredService<DetailsSelection>().Select(new DetailsSource(playerId, fightId));
         Open(PlayerDetails);
+    }
+
+    // One window at a time; not owned by the overlay, so it can sit behind the game. Nothing once the meter is closing.
+    public void OpenBossTimers()
+    {
+        if (closing) return;
+        if (bossTimers is { } open)
+        {
+            if (open.WindowState == WindowState.Minimized) open.WindowState = WindowState.Normal;
+            open.Activate();
+            return;
+        }
+        var window = new BossTimersWindow(services, overlay);
+        bossTimers = window;
+        window.Closed += (_, _) => bossTimers = null;
+        window.Show();
     }
 
     public void CopyText(string text)
@@ -352,6 +372,8 @@ public sealed class MeterWindows : IMeterWindows
     private async ValueTask CloseToolWindowsAsync()
     {
         closing = true;
+        // The boss-timers window has no Blazor content to release: it simply closes, disposing its browser view.
+        bossTimers?.Close();
         var windows = toolWindows.Values.ToList();
         foreach (var window in windows) window.Close();
         try

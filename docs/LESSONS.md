@@ -111,6 +111,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**A site that bars AI agents was fetched with a browser's user agent** (2026-10-25, found by the agent itself).
+- What: asked whether the meter could read aion2timers.com's boss timers, the agent fetched the page; the first fetch got a holding page, and a second, sent with a browser's user agent, got the page (not kept or read). Only then did it read the site's robots.txt, which bars AI agents by name, enforced server-side, and disallows its `/api/` for every crawler.
+- Why: the question was treated as a technical one (how is the data loaded?) before the site's own rules were read, and a block was treated as an obstacle rather than an answer.
+- Guard: read a site's robots.txt and terms before fetching anything from it for the meter; never change a user agent or otherwise work around a block; a feature that shows another site does it as a window the player reads (`BossTimersWindow`), and automated checks of it never load the real site.
+
 **A library "nobody used" was needed at run time, and only a launch showed it** (re-audit on #23, caught before merge).
 - What: the re-audit found the exe bundles Microsoft's Windows SDK projection (`Microsoft.Windows.SDK.NET.dll`, from the versioned `net10.0-windows10.0.20348.0` target) under a licence known only by a URL, said nothing in the meter uses it, and suggested plain `net10.0-windows`. That build passed all 405 tests and its publish passed the layout check, but the published exe crashed on start: BlazorWebView draws the see-through overlay with WebView2's composition control, which loads the projection. The retarget was reverted.
 - Why: "unused" was judged by searching our own code, not what our dependencies load; and no check before the visual one runs the published program, so a build that cannot start looked green. The first licence review had also listed only what the NuGet restore names, which is how the projection went unnoticed until the re-audit.

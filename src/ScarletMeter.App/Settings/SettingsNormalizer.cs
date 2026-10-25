@@ -64,6 +64,7 @@ public static class SettingsNormalizer
             Overlay = overlay with { ToggleHotkey = hotkey },
             Alerts = NormalizeAlerts(input.Alerts, repairs),
             Updates = NormalizeUpdates(input.Updates, repairs),
+            BossTimers = input.BossTimers ?? new BossTimersSettings(),
             Windows = windows,
         };
         return (settings, repairs);
