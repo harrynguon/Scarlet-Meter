@@ -243,6 +243,76 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?m)^\.alert\.open \.alert-progress \{[^}]*background:\s*var\(--good\);", alerts);
     }
 
+    // The boss-timers window shows a third-party site, so it is kept apart from the meter: a plain WebView2 in its own
+    // profile, locked down before it navigates, every top-level navigation and new-window request through
+    // BossTimersSite's decisions (tested there), browser launches through the gate (BrowserLaunchGateTests) and out of
+    // WebView2's callback, and nothing that would let the page reach the meter, the meter's local hosts, this PC's
+    // files or other programs; its start and its buttons cannot end the meter (deep audit on PR #29: a click after
+    // the browser process crashed would have). Not owned by the overlay. The header's hourglass opens it.
+    // Source-text guards: the WebView has no test host here.
+    [Fact]
+    public void TheBossTimersWindowIsKeptApartFromTheMeter()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        Assert.Contains(@"@onclick=""Windows.OpenBossTimers""", File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor")));
+        var window = File.ReadAllText(Path.Combine(app, "Windows", "BossTimersWindow.cs"));
+        Assert.Contains("public sealed class BossTimersWindow : Window", window);
+        Assert.Contains("public const string ProfileFolder = \"webview2-timers\";", window);
+        Assert.Contains("CoreWebView2Environment.CreateAsync(browserExecutableFolder: null, userDataFolder: profile)", window);
+        Assert.Contains("await webView.EnsureCoreWebView2Async(environment);", window);
+        Assert.Contains("new() { DefaultBackgroundColor = PageBackground, AllowExternalDrop = false }", window);
+        foreach (var locked in new[]
+        {
+            "s.AreHostObjectsAllowed = false;", "s.IsWebMessageEnabled = false;", "s.AreDevToolsEnabled = false;",
+            "s.IsPasswordAutosaveEnabled = false;", "s.IsGeneralAutofillEnabled = false;",
+            "s.AreDefaultContextMenusEnabled = false;", "s.AreBrowserAcceleratorKeysEnabled = false;",
+            "core.DownloadStarting += (_, e) => e.Cancel = true;",
+            "core.SaveAsUIShowing += (_, e) => e.Cancel = true;",
+            "core.SaveFileSecurityCheckStarting += (_, e) => e.CancelSave = true;",
+            "core.PermissionRequested += (_, e) => e.State = CoreWebView2PermissionState.Deny;",
+            "core.ScreenCaptureStarting += (_, e) => e.Cancel = true;",
+            "core.BasicAuthenticationRequested += (_, e) => e.Cancel = true;",
+            "core.ClientCertificateRequested += (_, e) => e.Cancel = true;",
+            "core.LaunchingExternalUriScheme += (_, e) => e.Cancel = true;",
+            "core.NavigationStarting += OnNavigationStarting;", "core.NewWindowRequested += OnNewWindowRequested;",
+            "BossTimersSite.DecideNavigation(e.Uri, e.IsUserInitiated, e.IsRedirected)",
+            "BossTimersSite.DecideNewWindow(e.Uri, e.IsUserInitiated, e.OriginalSourceFrameInfo?.Source)",
+            "e.Handled = true;",
+            "!BossTimersSite.IsWebPage(uri) || !launches.TryPass()) return;",
+            "_ = Dispatcher.InvokeAsync(() => DefaultBrowser.Open(uri, logger));",
+        })
+            Assert.Contains(locked, window);
+        // The start catches everything (a window closed meanwhile simply stops), and every button acts through the
+        // guard that survives a crashed browser.
+        Assert.Matches(@"catch \(Exception\) when \(closed\)\s*\{\s*\}\s*catch \(Exception ex\)\s*\{", window);
+        Assert.Equal(3, Regex.Matches(window, @"\(_, _\) => OnPage\(core =>").Count);
+        Assert.Matches(@"catch \(Exception ex\) when \(ex is InvalidOperationException or COMException or ObjectDisposedException\)", window);
+        Assert.DoesNotMatch(@"webView\.CoreWebView2\?\.", window);
+        // "Keep on top" follows the checked state, so UI Automation's toggle works too (PR #29's window check: a Click
+        // handler missed it).
+        Assert.Contains("keepOnTop.Checked += (_, _) => KeepOnTop(true);", window);
+        Assert.Contains("keepOnTop.Unchecked += (_, _) => KeepOnTop(false);", window);
+        Assert.DoesNotContain("keepOnTop.Click +=", window, StringComparison.Ordinal);
+        // Locked down before the first navigation (the call present, not only the method), and never started through
+        // Source or CreationProperties (a default profile).
+        var lockAt = window.IndexOf("            Lock(core);", StringComparison.Ordinal);
+        var firstNavigation = window.IndexOf("core.Navigate(BossTimersSite.Start.AbsoluteUri);", StringComparison.Ordinal);
+        Assert.True(lockAt >= 0 && firstNavigation > lockAt, "the settings are locked before the first navigation");
+        foreach (var reach in new[]
+        {
+            "BlazorWebView", "WebAssetHosts", "AddHostObjectToScript", "PostWebMessage", "ExecuteScriptAsync",
+            "AddScriptToExecuteOnDocumentCreated", "SetVirtualHostNameToFolderMapping", "WebResourceRequested",
+            "CreationProperties", "SourceProperty", "Owner =", "Process.Start",
+        })
+            Assert.DoesNotContain(reach, window, StringComparison.Ordinal);
+        Assert.DoesNotMatch(@"\bSource\s*=[^=>]", window);
+        Assert.DoesNotMatch(@"Are\w+Enabled = true|Is\w+Enabled = true|AreHostObjectsAllowed = true|AllowExternalDrop = true", window);
+
+        var windows = File.ReadAllText(Path.Combine(app, "Windows", "MeterWindows.cs"));
+        Assert.Contains("var window = new BossTimersWindow(services, overlay);", windows);
+        Assert.Contains("bossTimers?.Close();", windows);
+    }
+
     // Nothing in the notice strip blinks or loops (Harry: the pulsing dot was "too distracting"): the only animations
     // are a notice's one-time entrance and the progress line's width transition.
     [Fact]

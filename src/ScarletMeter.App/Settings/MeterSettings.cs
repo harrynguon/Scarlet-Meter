@@ -23,6 +23,8 @@ public sealed record MeterSettings
 
     public UpdateSettings Updates { get; init; } = new();
 
+    public BossTimersSettings BossTimers { get; init; } = new();
+
     /// <summary>Saved window positions and sizes, keyed by <see cref="WindowKeys"/>.</summary>
     public IReadOnlyDictionary<string, WindowPlacement> Windows { get; init; } = new Dictionary<string, WindowPlacement>();
 
@@ -30,11 +32,21 @@ public sealed record MeterSettings
     // update that changes nothing is recognised as such. A test checks every property takes part.
     public bool Equals(MeterSettings? other) => other is not null
         && Version == other.Version && Fight == other.Fight && Appearance == other.Appearance && Overlay == other.Overlay
-        && Alerts == other.Alerts && Updates == other.Updates
+        && Alerts == other.Alerts && Updates == other.Updates && BossTimers == other.BossTimers
         && Windows.Count == other.Windows.Count
         && Windows.All(pair => other.Windows.TryGetValue(pair.Key, out var placement) && placement == pair.Value);
 
-    public override int GetHashCode() => HashCode.Combine(Version, Fight, Appearance, Overlay, Alerts, Updates, Windows.Count);
+    public override int GetHashCode() => HashCode.Combine(Version, Fight, Appearance, Overlay, Alerts, Updates, BossTimers, Windows.Count);
+}
+
+/// <summary>
+/// The boss-timers window (Windows/BossTimersWindow), which shows aion2timers.com. The site keeps its own choices
+/// (server, faction) in the window's own browser profile; nothing of the site's is stored here.
+/// </summary>
+public sealed record BossTimersSettings
+{
+    /// <summary>Keep the window above other windows, the game included. Off: it can sit behind the game.</summary>
+    public bool KeepOnTop { get; init; }
 }
 
 /// <summary>
@@ -207,9 +219,10 @@ public static class WindowKeys
     public const string Settings = "settings";
     public const string History = "history";
     public const string PlayerDetails = "details";
+    public const string BossTimers = "timers";
 
     public static IReadOnlySet<string> All { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
-        Overlay, Settings, History, PlayerDetails,
+        Overlay, Settings, History, PlayerDetails, BossTimers,
     };
 }

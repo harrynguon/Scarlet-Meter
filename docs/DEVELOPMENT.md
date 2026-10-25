@@ -58,6 +58,8 @@ The apphost needs a .NET 10 runtime it can find: an installed .NET 10 Desktop Ru
 
 Windows are named by their page's `data-window` attribute (`overlay`, `settings`). `-DataDirectory <absolute path> -KeepData` reuses and keeps a data directory, for example to check that settings and window positions survive a restart. Close other programs' windows away from the overlay before `Drag`, which uses the real mouse.
 
+`-BrowserArguments` adds Chromium switches for the run's WebView2 browsers. An automated check of the boss-timers window must never load aion2timers.com, which bars AI agents and crawlers from its API: pass `-BrowserArguments '--no-proxy-server --host-resolver-rules="MAP *.aion2timers.com ~NOTFOUND, MAP aion2timers.com ~NOTFOUND"'` (without `--no-proxy-server` a proxy would resolve the host itself), so the window shows the browser's own error page and nothing is requested from the site. Its page is not a meter page, so the script does not drive it; use UI Automation for its toolbar, and never invoke "Open in browser", which hands the site to the default browser, which has none of these switches.
+
 ## Publish
 
 ```powershell

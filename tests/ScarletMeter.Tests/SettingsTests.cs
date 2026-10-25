@@ -95,10 +95,11 @@ public sealed class SettingsTests : IDisposable
     public void NullSectionsFromAFileTakeDefaults()
     {
         File.WriteAllText(Path.Combine(directory.FullPath, "settings.json"),
-            """{ "version": 1, "fight": null, "appearance": { "classColors": false }, "windows": null }""");
+            """{ "version": 1, "fight": null, "appearance": { "classColors": false }, "bossTimers": null, "windows": null }""");
         var result = NewStore().Load();
         Assert.Equal(SettingsLoadStatus.Loaded, result.Status);
         Assert.Equal(new FightSettings(), result.Settings.Fight);
+        Assert.Equal(new BossTimersSettings(), result.Settings.BossTimers);
         Assert.False(result.Settings.Appearance.ClassColors);
         Assert.Equal(0.9, result.Settings.Appearance.BackgroundOpacity); // missing field keeps its default
         Assert.Empty(result.Settings.Windows);
@@ -131,7 +132,7 @@ public sealed class SettingsTests : IDisposable
         var sections = typeof(MeterSettings).GetProperties()
             .Where(p => p.Name is not (nameof(MeterSettings.Version) or nameof(MeterSettings.Windows)))
             .ToList();
-        Assert.Equal(5, sections.Count);
+        Assert.Equal(6, sections.Count);
         foreach (var section in sections)
         {
             Assert.True(section.CanWrite && section.PropertyType.IsClass && section.PropertyType.Namespace == typeof(MeterSettings).Namespace,
@@ -149,6 +150,7 @@ public sealed class SettingsTests : IDisposable
         }
         Assert.Contains(flipped, f => f.Flag.Name == nameof(AlertSettings.HideDuringBossFights));
         Assert.Contains(flipped, f => f.Flag.Name == nameof(AppearanceSettings.BarEffects));
+        Assert.Contains(flipped, f => f.Flag.Name == nameof(BossTimersSettings.KeepOnTop));
 
         store.Save(settings);
         var loaded = store.Load().Settings;
@@ -209,7 +211,7 @@ public sealed class SettingsTests : IDisposable
         // Adding a property to MeterSettings must extend its Equals; this count is the reminder.
         var properties = typeof(MeterSettings).GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.Name != "EqualityContract").Select(p => p.Name).Order().ToList();
-        Assert.Equal(new[] { "Alerts", "Appearance", "Fight", "Overlay", "Updates", "Version", "Windows" }, properties);
+        Assert.Equal(new[] { "Alerts", "Appearance", "BossTimers", "Fight", "Overlay", "Updates", "Version", "Windows" }, properties);
 
         var baseline = SettingsNormalizer.Normalize(null).Settings with
         {
@@ -237,7 +239,30 @@ public sealed class SettingsTests : IDisposable
         Assert.NotEqual(baseline, baseline with { Alerts = alerts with { LeadMinutes = 7 } });
         Assert.NotEqual(baseline, baseline with { Updates = baseline.Updates with { CheckUpstreamReleases = false } });
         Assert.NotEqual(baseline, baseline with { Updates = baseline.Updates with { DismissedRelease = "v1.11.6.350" } });
+        Assert.NotEqual(baseline, baseline with { BossTimers = baseline.BossTimers with { KeepOnTop = true } });
         Assert.NotEqual(baseline, baseline with { Windows = new Dictionary<string, WindowPlacement> { [WindowKeys.Overlay] = new(1, 3, 300, 200) } });
+    }
+
+    // The boss-timers window starts off the top (it can sit behind the game), its "Keep on top" survives a save, a
+    // file from before it loads with it off, and its placement is one the settings keep.
+    [Fact]
+    public void TheBossTimersWindowStartsOffTheTopAndKeepsItsChoices()
+    {
+        Assert.False(new MeterSettings().BossTimers.KeepOnTop);
+        var store = NewStore();
+        Directory.CreateDirectory(directory.FullPath);
+        File.WriteAllText(store.FilePath, """{ "version": 1, "alerts": { "leadMinutes": 15 } }""");
+        Assert.False(store.Load().Settings.BossTimers.KeepOnTop);
+
+        store.Save(new MeterSettings
+        {
+            BossTimers = new BossTimersSettings { KeepOnTop = true },
+            Windows = new Dictionary<string, WindowPlacement> { [WindowKeys.BossTimers] = new(50, 60, 460, 640) },
+        });
+        var loaded = store.Load().Settings;
+        Assert.True(loaded.BossTimers.KeepOnTop);
+        Assert.Equal(new WindowPlacement(50, 60, 460, 640), loaded.Windows[WindowKeys.BossTimers]);
+        Assert.Contains("\"bossTimers\"", File.ReadAllText(store.FilePath), StringComparison.Ordinal);
     }
 
     [Fact]

@@ -46,6 +46,21 @@ public static class ScreenPlacement
     }
 
     /// <summary>
+    /// Where a window <paramref name="width"/> by <paramref name="height"/> opens beside <paramref name="owner"/>: right
+    /// of it when it fits on the owner's monitor, otherwise left of it, clamped to that monitor's work area (the
+    /// primary monitor's when the owner's cannot be determined).
+    /// </summary>
+    public static Point Beside(Window owner, double width, double height, double gap = 8)
+    {
+        var area = WorkAreaOf(owner);
+        var left = owner.Left + owner.ActualWidth + gap;
+        if (left + width > area.Right) left = owner.Left - width - gap;
+        return new Point(
+            Math.Clamp(left, area.Left, Math.Max(area.Left, area.Right - width)),
+            Math.Clamp(owner.Top, area.Top, Math.Max(area.Top, area.Bottom - height)));
+    }
+
+    /// <summary>
     /// The monitors' rectangles in device-independent pixels at the system DPI, the units of
     /// <see cref="SystemParameters.VirtualScreenLeft"/> and of a window's saved position. Falls back to the
     /// virtual screen when the monitors cannot be listed, so a placement is never refused for that alone.

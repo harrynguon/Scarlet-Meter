@@ -7,7 +7,7 @@ It is built on [RATmeter](https://github.com/Kuroukihime/AIon2-Dps-Meter)'s prov
 overlay and extras: a boss card with a "Kill in" estimate, animated bar effects for every class, world-event
 alerts, and a background picture of your choice.
 
-<p align="center"><img src="docs/images/demo.gif" alt="Scarlet Meter in a boss fight (demo mode, made-up players): the boss card with its Kill in estimate, each class's animated bar effect, DPS and share with the total damage under it, rows gliding into place as players overtake, and world-event alerts below the bars" width="456"/></p>
+<p align="center"><img src="docs/images/demo.gif" alt="Scarlet Meter in a boss fight (demo mode, made-up players): the boss card with its Kill in estimate, each class's animated bar effect, DPS and share with the total damage under it, and rows gliding into place as players overtake; world-event alerts step aside during the fight" width="456"/></p>
 <p align="center"><sub>Demo mode, made-up players: <code>.\ScarletMeter.exe --demo</code></sub></p>
 
 > **Early release.** Its in-game checks are not finished, so numbers may be off. Reports are welcome in
@@ -92,8 +92,12 @@ and adds it up per player and per fight.
 - **Out of your way**: they sit below the bars and never cover one, step aside during boss fights, and a **bell**
   in the header turns them off in one click. "+N more" folds extra ones away; nothing scrolls, the meter grows to
   fit instead. Times follow the Global preset and are not yet verified in game.
+- **Boss timers**: the hourglass in the header opens [aion2timers.com](https://www.aion2timers.com/world-boss-timer/)'s
+  world-boss timers in a small window of their own, in or out of game. The site remembers your server and faction
+  there; links to other sites open in your browser (one every few seconds at most; a site link that redirects
+  elsewhere stays put). It sits behind the game unless you pin it on top.
 
-<p align="center"><img src="docs/images/alerts.gif" alt="World-event alerts below the bars (demo mode): two shown with +2 more; clicking it shows all four with Show less, the meter growing to fit, and folds them away again" width="456"/></p>
+<p align="center"><img src="docs/images/alerts.gif" alt="World-event alerts back in the break after a boss fight (demo mode): two shown with +2 more; clicking it shows all four with Show less, and folds them away again" width="456"/></p>
 
 **Convenient**
 
@@ -148,13 +152,17 @@ All in the `data` folder beside `ScarletMeter.exe`, so you can back it up, move 
 | Saved boss fights | `data\combat-history.db` (demo fights: `data\demo-history.db`) |
 | Your background picture | `data\backgrounds\` |
 | The meter's browser cache (WebView2) | `data\webview2\` |
+| The boss-timers window's own browser data (the site's cookies and choices) | `data\webview2-timers\` |
 
 A copy built and installed from source keeps the same files in `%LocalAppData%\ScarletMeter` instead.
 
 **Does it send anything anywhere?**
 Your settings, fights and logs never leave your PC. The meter itself makes only two kinds of request, both
 optional: an anonymous check for a newer RATmeter release on GitHub (every six hours, or ten minutes after a failed
-try), and skill icons from NCSOFT's own game-data site, as RATmeter does. Settings turn either off.
+try), and skill icons from NCSOFT's own game-data site, as RATmeter does. Settings turn either off. The boss-timers
+window loads aion2timers.com only when you open it, like a browser tab kept apart from the meter: the site sees a
+normal visit, Microsoft's SmartScreen checks the addresses it opens (as Edge does), and the meter never reads the
+page.
 
 **Can I get banned for using it?**
 It only reads network traffic, as RATmeter does, but NCSOFT's terms forbid unauthorised programs. Use it at your
