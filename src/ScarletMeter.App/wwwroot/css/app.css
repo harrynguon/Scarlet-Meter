@@ -130,9 +130,10 @@ button {
 
 /* Scarlet's face at the header's left, always there (images/avatar.png, from the app icon's portrait; its source is in
    THIRD-PARTY-NOTICES.md, "Artwork"), then in a fight "Boss combat" or "Combat" and the duration. Its ring takes the
-   target's HP (Formatting/HpBand): green from 66%, yellow from 33%, red below, glowing while the HP moves and without
-   the glow, a touch dimmer, once it has been still a while (.still); grey when the target is down; between fights
-   only a faint edge. A truer green than the theme's teal (--good), which looked off beside the portrait's reds. */
+   target's HP (Formatting/HpBand): green from 66%, yellow from 33%, red below, the meter's white-ish while the
+   target's total HP is not known yet (.hp-unknown), glowing while the HP moves and without the glow, a touch dimmer,
+   once it has been still a while (.still); grey when the target is down; between fights only a faint edge. A truer
+   green than the theme's teal (--good), which looked off beside the portrait's reds. */
 .ov-avatar {
     flex: none;
     width: 20px;
@@ -145,16 +146,19 @@ button {
 .ov-avatar.hp-high { --ring: #5ed36a; }
 .ov-avatar.hp-mid { --ring: #f2c94c; }
 .ov-avatar.hp-low { --ring: #f04c56; }
+.ov-avatar.hp-unknown { --ring: rgba(235, 233, 242, 0.75); }
 
 .ov-avatar.hp-high,
 .ov-avatar.hp-mid,
-.ov-avatar.hp-low {
+.ov-avatar.hp-low,
+.ov-avatar.hp-unknown {
     box-shadow: 0 0 0 1.5px var(--ring), 0 0 7px var(--ring);
 }
 
 .ov-avatar.hp-high.still,
 .ov-avatar.hp-mid.still,
-.ov-avatar.hp-low.still {
+.ov-avatar.hp-low.still,
+.ov-avatar.hp-unknown.still {
     box-shadow: 0 0 0 1.5px var(--ring);
     opacity: 0.85;
 }

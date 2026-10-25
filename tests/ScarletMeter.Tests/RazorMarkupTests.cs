@@ -422,10 +422,11 @@ public sealed partial class RazorMarkupTests
 
     // Scarlet's face sits at the header's left in place of the old state dot (Harry: "in permanent place of the grey
     // dot"), always, between fights too: it comes before the fight branch, not inside it. Its ring takes the target's HP
-    // band (HpBand, whose boundaries FormattingTests pin: green, yellow, red), glowing while the HP moves and without
-    // the glow once it has been still; grey when the target is down; none between fights. The green is not the theme's
-    // teal, which Harry found "a bit weird" there. The image ships with the meter (the publish layout check requires
-    // it) and is a 64 px PNG, enough for 20 px at 300%.
+    // band (HpBand.RingClass, whose behaviour FormattingTests pins), glowing while the HP moves and without the glow,
+    // a touch dimmer, once it has been still; white-ish while the target's total HP is unknown; grey when the target
+    // is down; none between fights. The green is not the theme's teal, which Harry found "a bit weird" there. The
+    // history list keeps a dot of its own, styled in views.css alone. The image ships with the meter (the publish
+    // layout check requires it) and is a 64 px PNG, enough for 20 px at 300%.
     [Fact]
     public void TheHeaderShowsScarletsFaceRingedByTheFightsState()
     {
@@ -433,8 +434,7 @@ public sealed partial class RazorMarkupTests
         var markup = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
         Assert.Matches(@"(?s)<div class=""ov-title"">\s*(?:@\*.*?\*@\s*)?<span class=""ov-avatar @AvatarClass"" aria-hidden=""true""></span>\s*@if \(snapshot\.Target is \{ \} fighting\)", markup);
         Assert.DoesNotContain("state-dot", markup);
-        Assert.Matches(@"(?s)AvatarClass => phase switch\s*\{\s*FightPhase\.Live => HpBand\.Of\(snapshot\.Target\?\.HpPercent \?\? 0\),\s*"
-            + @"FightPhase\.Settled => HpBand\.Of\(snapshot\.Target\?\.HpPercent \?\? 0\) \+ "" still"",\s*FightPhase\.Defeated => ""done"",\s*_ => string\.Empty,\s*\}",
+        Assert.Contains("private string AvatarClass => HpBand.RingClass(phase, snapshot.Target);",
             File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs")));
 
         var css = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "app.css"));
@@ -448,13 +448,16 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"--ring:\s*#5ed36a;", Block(css, ".ov-avatar.hp-high"));
         Assert.Matches(@"--ring:\s*#f2c94c;", Block(css, ".ov-avatar.hp-mid"));
         Assert.Matches(@"--ring:\s*#f04c56;", Block(css, ".ov-avatar.hp-low"));
-        var glowing = Regex.Match(css, @"(?m)^\.ov-avatar\.hp-high,\s*\.ov-avatar\.hp-mid,\s*\.ov-avatar\.hp-low \{(?<body>[^}]*)\}").Groups["body"].Value;
+        Assert.Matches(@"--ring:\s*rgba\(235, 233, 242, 0\.75\);", Block(css, ".ov-avatar.hp-unknown"));
+        var glowing = Regex.Match(css, @"(?m)^\.ov-avatar\.hp-high,\s*\.ov-avatar\.hp-mid,\s*\.ov-avatar\.hp-low,\s*\.ov-avatar\.hp-unknown \{(?<body>[^}]*)\}").Groups["body"].Value;
         Assert.Matches(@"box-shadow:\s*0 0 0 1\.5px var\(--ring\), 0 0 7px var\(--ring\);", glowing);
-        var still = Regex.Match(css, @"(?m)^\.ov-avatar\.hp-high\.still,\s*\.ov-avatar\.hp-mid\.still,\s*\.ov-avatar\.hp-low\.still \{(?<body>[^}]*)\}").Groups["body"].Value;
+        var still = Regex.Match(css, @"(?m)^\.ov-avatar\.hp-high\.still,\s*\.ov-avatar\.hp-mid\.still,\s*\.ov-avatar\.hp-low\.still,\s*\.ov-avatar\.hp-unknown\.still \{(?<body>[^}]*)\}").Groups["body"].Value;
         Assert.Matches(@"box-shadow:\s*0 0 0 1\.5px var\(--ring\);", still); // the same colour, its glow gone
+        Assert.Matches(@"opacity:\s*0\.85;", still); // and a touch dimmer
         Assert.Matches(@"box-shadow:\s*0 0 0 1\.5px var\(--muted\);", Block(css, ".ov-avatar.done"));
         Assert.DoesNotMatch(@"\.ov-avatar[^{]*\{[^}]*var\(--good\)", css); // not the theme's teal
-        Assert.DoesNotMatch(@"(?m)^\.state-dot", css); // the history list keeps its own dot, in views.css
+        Assert.DoesNotMatch(@"(?m)^\.state-dot", css);
+        Assert.Matches(@"(?m)^\.state-dot \{", File.ReadAllText(Path.Combine(app, "wwwroot", "css", "views.css"))); // the history list's own
 
         var png = File.ReadAllBytes(Path.Combine(app, "wwwroot", "images", "avatar.png"));
         Assert.Equal(new byte[] { 0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A }, png[..8]);

@@ -14,7 +14,9 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Not checked:** the meter itself (HANDOFF): the face's sharpness at the display's scale, the ring in a real fight, dragging by the header over the face, the larger icons at every row size.
 
-**Next:** Harry's look at the render; with Harry's go-ahead, push to PR 32 (Auto-fix watches it), Codex and CI, and rebuild Harry's copy.
+**Review:** pushed to PR 32 as 0e478cd with Harry's go-ahead; Codex found nothing and CI passed on it; Harry's copy was rebuilt from it. A standard audit on 0e478cd (approve with nits) found: (1) a live fight whose target's total HP is not known yet (`HpPercent` reads 0 then) showed no ring, like the gap between fights, while the docs and a NaN test case described an "unknown" that `HpPercent` can never return; the mapping moved into `HpBand.RingClass(phase, target)`, a white-ish ring now marks that case (`.hp-unknown`), and `FormattingTests.HeaderRings` tests every phase and the unknown total instead of the source text. (2) The guard did not check the still ring's dimming or that the history list keeps its own dot in views.css; it does now. (3) This entry's next step was stale. (4) Noted, not changed: 19.5 px is a fractional size, so at 100% scale the icon's edges may be slightly soft; Harry asked for 5 to 10%, and the HANDOFF check covers how it looks.
+
+**Next:** Codex and CI on the fixes; merge and a v0.2.0 release with Harry's go-ahead (given: "run the audit. fix what it finds. then merge and release").
 
 ## 2026-10-25 — No gap above a table's header; the picture fits the panel again
 
