@@ -7,7 +7,7 @@ It is built on [RATmeter](https://github.com/Kuroukihime/AIon2-Dps-Meter)'s prov
 overlay and extras: a boss card with a "Kill in" estimate, animated bar effects for every class, world-event
 alerts, and a background picture of your choice.
 
-<p align="center"><img src="docs/images/demo.gif" alt="Scarlet Meter in a boss fight (demo mode, made-up players): the boss card with its Kill in estimate, each class's animated bar effect, and rows gliding into place as players overtake" width="400"/></p>
+<p align="center"><img src="docs/images/demo.gif" alt="Scarlet Meter in a boss fight (demo mode, made-up players): the boss card with its Kill in estimate, each class's animated bar effect, DPS and share with the total damage under it, rows gliding into place as players overtake, and world-event alerts below the bars" width="456"/></p>
 <p align="center"><sub>Demo mode, made-up players: <code>.\ScarletMeter.exe --demo</code></sub></p>
 
 > **Early release.** Its in-game checks are not finished, so numbers may be off. Reports are welcome in
@@ -77,7 +77,7 @@ and adds it up per player and per fight.
 - **Class colours**, **relative bars** (against the top player), row size, and **hidden names** for streams and
   screenshots.
 
-<p align="center"><img src="docs/images/background-picture.png" alt="A background picture at 50% picture opacity (demo data, a generated test picture)" width="400"/></p>
+<p align="center"><img src="docs/images/background-picture.png" alt="A background picture at 50% picture opacity (demo data, a generated test picture)" width="456"/></p>
 
 **After the fight**
 
@@ -93,6 +93,8 @@ and adds it up per player and per fight.
   in the header turns them off in one click. "+N more" folds extra ones away; nothing scrolls, the meter grows to
   fit instead. Times follow the Global preset and are not yet verified in game.
 
+<p align="center"><img src="docs/images/alerts.gif" alt="World-event alerts below the bars (demo mode): two shown with +2 more; clicking it shows all four with Show less, the meter growing to fit, and folds them away again" width="456"/></p>
+
 **Convenient**
 
 - **Portable**: one folder, unzip and run, move or delete it as one. Your data lives inside it.
@@ -101,7 +103,7 @@ and adds it up per player and per fight.
   positions remembered across restarts.
 - **Fight options**: boss fights only, summons folded into their owner, a one-minute cap on training dummies.
 
-<p align="center"><img src="docs/images/settings-alerts.png" alt="Settings, Alerts tab" width="420"/></p>
+<p align="center"><img src="docs/images/settings-alerts.png" alt="Settings, Alerts tab" width="500"/></p>
 
 ## Compared with RATmeter
 
