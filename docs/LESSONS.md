@@ -131,6 +131,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**A negative lookahead after `\s*` made a guard fail on clean code, and mutations looked caught** (#33, caught by a control before commit; the same slip in #30's shadow guard).
+- What: a source guard for "no padding other than 0" read `padding:\s*(?!0[\s;])`. The regex engine lets `\s*` give back the space, so the lookahead sees " 0" and the pattern matches `padding: 0 18px`: the test failed on the unchanged stylesheet, and five mutations run against it reported "caught" for a test that failed regardless.
+- Why: mutations were run before the changed test had passed on the clean tree, and a mutation run counts any failure as a catch.
+- Guard: put the whitespace inside the lookahead (`:(?!\s*0[\s;])`); run a changed guard on the clean tree before mutating, and include a control (a change the guard must let through) in every mutation run, so a guard that always fails shows up as a failed control.
+
 **A late history cleanup deleted a test's row** (CI's push run on #30's commit, found by #30's deep audit, 2026-10-25).
 - What: `HistoryTests.AFightSavedWithAnUnusableStartOrEndShowsItsPlayersOnly` failed once in CI (5 fights expected, 4 listed) and passed on the pull-request run of the same commit. Upstream's history store starts its expired-session cleanup on the thread pool from its constructor; on a busy runner it started after the test had damaged fight 904 to end two hours after `DateTime.MinValue`, and deleted it as expired. The same race would have reached every history test from 2026-11-19, when the fights each of them dates 2026-10-20 pass the default 30-day retention (their later fights a day or more after).
 - Why: the test host already knew about the cleanup, but only as something to wait for before deleting the test's directory; nobody asked what else it could do mid-test. Locally the cleanup always finished before a test wrote anything, so no run had shown it, and a fixed fixture date was not seen as something that ages into the retention period.

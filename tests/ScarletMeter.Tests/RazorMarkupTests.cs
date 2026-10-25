@@ -181,7 +181,10 @@ public sealed partial class RazorMarkupTests
 
     // A table's sticky header sits flush under the tabs while its rows scroll (Harry: rows showed through a gap above
     // it): a sticky header (top: 0) stops at its scroll container's padding edge, so the scrolling tab body has no top
-    // padding, and a 6 px spacer that scrolls away stands in for it. No later tab-body rule puts top padding back.
+    // padding, and a 6 px spacer that scrolls away stands in for it: a generated block (content, display: block), so it
+    // takes its height. No rule naming the tab body, in either stylesheet, gives it top padding again (padding,
+    // padding-top or padding-block[-start], any value but 0; comments ignored). Audit on PR #33: the first guard read
+    // only the spacer's height and rules starting with .tab-body.
     [Fact]
     public void StickyTableHeadersSitFlushUnderTheTabs()
     {
@@ -196,8 +199,12 @@ public sealed partial class RazorMarkupTests
         var body = Block(app, ".tab-body");
         Assert.Matches(@"overflow-y:\s*auto;", body);
         Assert.Matches(@"(?m)^\s*padding:\s*0 18px 18px;", body);
-        Assert.Matches(@"height:\s*6px;", Block(app, ".tab-body::before"));
-        Assert.DoesNotMatch(@"(?m)^\.tab-body[^{]*\{[^}]*padding(?:-top)?:\s*[1-9]", app + "\n" + views);
+        var spacer = Block(app, ".tab-body::before");
+        Assert.Matches(@"content:\s*"""";", spacer);
+        Assert.Matches(@"display:\s*block;", spacer);
+        Assert.Matches(@"height:\s*6px;", spacer);
+        var rules = Regex.Replace(app + "\n" + views, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline);
+        Assert.DoesNotMatch(@"(?m)^[^{}]*\.tab-body\b[^{}]*\{[^}]*padding(?:-top|-block(?:-start)?)?:(?!\s*0[\s;])", rules);
     }
 
     // The overlay's panel is only as tall as its content, so the room the notices leave in a boss fight is see-through

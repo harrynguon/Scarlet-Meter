@@ -10,9 +10,15 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Checks (SDK 10.0.402):** `scripts/Build.ps1` 505/505 (`RazorMarkupTests.StickyTableHeadersSitFlushUnderTheTabs` new, `TheOverlayPanelFitsItsContent` now requires the picture on the panel). Fail-first, six mutations, each failing its test by name: `fixed` back on the picture, `background-attachment: fixed` added, the tab body's top padding back, no spacer, top padding on the log body, the header stuck at 6 px. Headless Edge after the fix: the scrolled header's offset is 0; the whole synthetic picture (both corner labels and its centre) shows in the panel in the tall window.
 
-**Not checked:** the meter itself (no window opened); the picture rescaling a little when the panel's height changes, the trade-off of laying it out against the panel (HANDOFF).
+**Not checked:** the meter itself (no window opened); the picture moving as the panel's height changes, the trade-off of laying it out against the panel (HANDOFF).
 
-**Next:** Harry's look at the preview; with Harry's go-ahead, push, PR, audit (standard: styles only), Codex and CI.
+**Shown to Harry:** the before and after renders, also with Harry's own picture (not committed); Harry asked to push it as a PR without merging.
+
+**Review (standard audit on 65f14a0; verdict: approve with nits; Codex found nothing):** the audit rendered every page using the tab body (details tabs including the Log tab's flex layout, history, settings) and found its spacing unchanged, and nothing else depending on the picture's attachment. Fixed: (1) HANDOFF still asked that the picture "does not jump when the notices come and go", which only laying it out against the window gave; it now asks that it moves only with the panel's height and never shows a zoomed slice. (2) "Rescales a little" understated it: the picture re-centres by half of any height change, and rescales only in a panel proportionally taller than it; the stylesheet comment and ARCHITECTURE say so. (3) The new guard read only the spacer's height and rules starting with `.tab-body`: a spacer without `content` or `display: block`, `padding-block-start`, a non-digit padding (`.4em`) or `.details .tab-body { padding-top }` all passed. It now pins the spacer's `content` and `display`, and reads every rule naming the tab body for `padding`, `padding-top` or `padding-block[-start]` other than 0, comments dropped. (4) This entry's next step was stale.
+
+**Checks after the review (SDK 10.0.402):** `scripts/Build.ps1` 505/505. Fail-first, the audit's five cases, each failing the guard, and a padding rule only inside a comment passing; the first six mutations fail it again with the new guard. The control caught a mistake in the first version of the new regex: `:\s*(?!0[\s;])` let `\s*` give back the space before a 0, so the guard failed on the clean stylesheet and every "caught" mutation meant nothing; it is `:(?!\s*0[\s;])` (LESSONS).
+
+**Next:** Codex and CI on the fixes; merge with Harry's go-ahead.
 
 ## 2026-10-25 — The history tests no longer race upstream's startup cleanup
 

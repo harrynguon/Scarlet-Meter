@@ -103,8 +103,9 @@ button {
         linear-gradient(rgba(11, 11, 15, calc(1 - var(--image-alpha, 1))), rgba(11, 11, 15, calc(1 - var(--image-alpha, 1)))),
         /* Laid out against the panel, which it covers, centred. Not against the window (fixed, from #26 until #33): the
            window is often taller than the panel, and the picture was then scaled to the window's height and centred
-           on it, so the panel showed a zoomed-in slice. The cost: the picture rescales a little when the panel's
-           height changes (a player joins, a notice comes or goes). */
+           on it, so the panel showed a zoomed-in slice. The cost: when the panel's height changes (a player joins, a
+           notice comes or goes) the picture re-centres, by half the change, and in a panel proportionally taller
+           than the picture it also rescales. */
         var(--panel-image, none) center / cover no-repeat;
     /* Its own declaration, so a bad value in the layers above drops only them, never the panel's colour. */
     background-color: var(--bg);
