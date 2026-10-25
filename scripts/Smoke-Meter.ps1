@@ -16,6 +16,9 @@ unless -KeepData) and with WebView2 remote debugging on a localhost port for thi
 
 Window names are each page's data-window attribute. Never use this against a meter holding real data;
 the debugging port is open only while the script runs. Paths derive from this script's location.
+-BrowserArguments adds Chromium switches for this run's WebView2 browsers, for example
+--host-resolver-rules="MAP *.aion2timers.com ~NOTFOUND" so that an automated run never loads that site
+(it bars AI agents) while the boss-timers window is checked.
 
 .EXAMPLE
 & "<checkout>\scripts\Smoke-Meter.ps1" -Steps { param($m) $m.WaitFor('overlay', "document.querySelector('.target-name')?.textContent", 15) }
@@ -26,6 +29,7 @@ param(
     [string[]]$Arguments = @('--no-capture'),
     [string]$DataDirectory,
     [int]$DevToolsPort = 0,
+    [string]$BrowserArguments,
     [scriptblock]$Steps,
     [switch]$KeepData,
     [switch]$KeepRunning
@@ -117,7 +121,7 @@ if ($DevToolsPort -eq 0) {
     $listener.Start(); $DevToolsPort = $listener.LocalEndpoint.Port; $listener.Stop()
 }
 $previousArgs = $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
-$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$DevToolsPort"
+$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = ("--remote-debugging-port=$DevToolsPort " + $BrowserArguments).Trim()
 $allArgs = @($Arguments) + @('--data-dir', "`"$DataDirectory`"")
 $process = Start-Process -FilePath $Exe -ArgumentList $allArgs -PassThru
 $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = $previousArgs
