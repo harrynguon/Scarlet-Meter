@@ -98,7 +98,7 @@ and adds it up per player and per fight.
   there; links to other sites open in your browser (one every few seconds at most; a site link that redirects
   elsewhere stays put). It sits behind the game unless you pin it on top.
 
-<p align="center"><img src="docs/images/alerts.gif" alt="World-event alerts back in the break after a boss fight (demo mode): two shown with +2 more; clicking it shows all four with Show less, and folds them away again" width="456"/></p>
+<p align="center"><img src="docs/images/alerts.gif" alt="World-event alerts back in the break after a boss fight (demo mode), recorded before the alerts folded into one bar: two shown with +2 more; clicking it shows all four with Show less, and folds them away again" width="456"/></p>
 
 **Convenient**
 

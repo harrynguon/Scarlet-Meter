@@ -3,8 +3,7 @@
 @*
     The overlay's world-event notices: one slim bar at the bottom of the meter that opens and closes. Closed (the
     default), it shows the most urgent notice in one line, with its progress line, how many more are due ("+2") and a
-    chevron; hovering
-    lists every due notice. Open, it becomes a "World events" header over every notice with its countdown: "Soon"
+    chevron; hovering lists every due notice. Open, it becomes a "World events" header over every notice with its countdown: "Soon"
     counts down to the start with a line that fills over the lead time, "Open" to the end of the entry or portal
     window. The player's choice is kept in settings (AlertSettings.NoticesExpanded), so it stays as they left it.
     Countdowns use the time the parent passes in, so they tick with the overlay's own refresh. Screen readers hear
@@ -39,7 +38,10 @@ else if (View.Alerts.Count > 0)
                 {
                     <span class="alert-count">+@more</span>
                 }
-                <span class="alert-progress" style="width:@Compact.Percent(Progress(first, first.Deadline - Now))"></span>
+                @* Keyed to the notice, so when another becomes the most urgent its line starts afresh rather than gliding
+                   from the last one's fill. *@
+                <span class="alert-progress" @key="@($"{first.Rule.Id}-{first.Kind}-{first.Start.UtcTicks}")"
+                      style="width:@Compact.Percent(Progress(first, first.Deadline - Now))"></span>
             }
             <span class="alert-chevron" aria-hidden="true"></span>
         </button>
@@ -80,6 +82,7 @@ else if (View.Next is { } next)
     // The notices stand aside for a boss fight: nothing shows, and nothing is announced until they come back.
     [Parameter] public bool Held { get; set; }
 
+    // The bar's click: asks the parent to open or close the strip; the parent saves the choice and passes it back.
     private Task Toggle() => ExpandedChanged.InvokeAsync(!Expanded);
 
     private string Announcement => string.Join("; ", View.Alerts.Take(AlertStripLayout.AnnouncedCount).Select(a => a.Kind == AlertKind.Soon

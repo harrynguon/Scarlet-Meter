@@ -36,7 +36,8 @@ public partial class MeterPage : IAsyncDisposable
     private bool bossFightUnderWay;
     private CombatSnapshot snapshot = CombatSnapshot.Empty;
     private AppearanceSettings appearance = new();
-    // The notices' switches: the header's bell (Enabled) and whether they stand aside for a boss fight.
+    // The notices' switches: the header's bell (Enabled), whether they stand aside for a boss fight and whether the
+    // strip is open (NoticesExpanded).
     private AlertSettings alertSettings = new();
     private int? ping;
     private Task? refreshLoop;
