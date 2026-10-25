@@ -52,7 +52,7 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 ## 2026-10-25 — An app icon
 
-**What:** the meter has an icon: `src/ScarletMeter.App/Assets/ScarletMeter.ico`, the exe's `ApplicationIcon`, which every window shows on its title bar and taskbar button through WPF's default (no window sets one; see Review). Nine PNG entries, 16 to 256 px: 64 px and up from a wider crop of the portrait (hair ornament, tassel and the little meter bars), 48 px and down from a face crop, high-quality downscales, a light sharpen at 48 px and below, rounded corners. `AppIconTests`; THIRD-PARTY-NOTICES.md "Artwork" names the source; ARCHITECTURE and HANDOFF updated.
+**What:** the meter has an icon: `src/ScarletMeter.App/Assets/ScarletMeter.ico`, the exe's `ApplicationIcon`, which every window shows on its title bar and taskbar button through WPF's default (no window sets one; see Review). Nine PNG entries, 16 to 256 px, each from the whole picture (see Replaced), high-quality downscales, a light sharpen at 48 px and below, rounded corners. `AppIconTests`; THIRD-PARTY-NOTICES.md "Artwork" names the source; ARCHITECTURE and HANDOFF updated.
 
 **Why:** Harry wanted an icon for the exe, at first a character from Re:Zero or NIKKE. Those are copyrighted characters and the meter is public and released, so original designs were drawn instead (four emblems, three chibi mascots, a hand-drawn-style headshot); Harry then generated two portraits with GPT 6.1 Astra and asked to use the better one, with a disclaimer, noting the project is non-commercial. Of the two, the second holds up better at 16 to 32 px (crisper line work and higher contrast, especially on a light taskbar); compared at real sizes on dark and light taskbars before choosing. The resemblance of the portrait to Re:Zero's Emilia (silver hair, violet eyes, elf ears, flower hairpin, braid) and to NIKKE's Scarlet's hat was pointed out to Harry; using it is Harry's call.
 
@@ -66,7 +66,11 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Checks after the review (SDK 10.0.402):** `scripts/Build.ps1` 509/509, no warnings outside upstream. Fail-first, six mutations, each failing its test by name: the boss-timers window setting `Icon`, a window setting it in an initializer, the `<Resource>` copy put back, no `ApplicationIcon` (all three icon tests that read the build or the project fail), the 32 and 64 px directory entries swapped, and a broken 32 px entry (WPF drops it); a setter only in a comment passes, as it should.
 
-**Next:** Codex and CI on the fixes; merge and a release with Harry's go-ahead.
+**Merged main after #33:** only LESSONS conflicted (both added entries at the top); all are kept, newest first. `scripts/Build.ps1` 510/510; Codex found nothing on b5fc73d and CI passed.
+
+**Replaced:** Harry replaced the portrait with a pixel-art one, also generated with GPT 6.1 Astra, with the meter's bars in a corner. A first version showed a wider scene; three ways to draw its small sizes were compared at real size on dark and light taskbars (the whole picture, a face crop, the bars badge alone), and Harry chose the whole picture, then found it hard to read on the taskbar and generated a close-up: the face fills the frame and the bars are larger. That close-up is the icon, whole at every size; compared with the wider scene at real size, its face and eyes read at 24 and 32 px and the bars from 20 px. The .ico has the same nine sizes (192,796 bytes, no text or EXIF chunks); THIRD-PARTY-NOTICES and ARCHITECTURE describe it. Like the first, it resembles an existing character (NIKKE's Scarlet: silver hair, red eyes, a wide white hat, red tassels), which was pointed out to Harry; using it is Harry's call.
+
+**Next:** Codex and CI on the new icon; Harry's look at it in a rebuilt copy; merge and a release with Harry's go-ahead.
 
 ## 2026-10-25 — A boss-timers window for aion2timers.com
 
