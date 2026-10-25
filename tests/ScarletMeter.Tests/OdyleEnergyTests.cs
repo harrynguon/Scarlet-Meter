@@ -16,7 +16,8 @@ using ScarletMeter.Engine.Upstream.Demo;
 namespace ScarletMeter.Tests;
 
 /// <summary>
-/// Odyle energy: the game's two records as A2Tools documented them (OdyleEnergyRecords), read from upstream's real
+/// Odyle energy: the game's two records as A2Tools documented them (OdyleEnergyRecords; #63 and its fixes 2723bff and
+/// 29e7193: the entry's three kinds and updates that start 00), read from upstream's real
 /// stream reassembly beside its pipeline, plain or inside an LZ4 bundle (OdyleEnergyTap), and the demo's records.
 /// Every byte here is synthetic, written by hand or by OdyleEnergyRecordWriter; none was captured.
 /// </summary>
@@ -75,8 +76,64 @@ public sealed class OdyleEnergyTests
     [InlineData("0C 01 92 21 1E F0 06 04 03 92 21 14")]    // the second entry is not in slot 2
     [InlineData("0C 01 92 21 1E F0 06 0C 02 93 21 0E 00")] // a two-value second entry with another key
     [InlineData("0C 01 92 21 1E F0 06")]                   // no second entry
-    [InlineData("04 01 92 21 1E 04 02 92 21 14")]          // a one-value entry in slot 1
+    [InlineData("04 01 92 21 1E 04 03 92 21 14")]          // a one-value entry whose second entry is not in slot 2
+    [InlineData("08 01 92 21 1E 04 02 93 21 14")]          // a charged-only entry whose second entry has another key
     public void AListWithoutTheShapeGivesNone(string body) => Assert.Null(OdyleEnergyRecords.Read(Frame(0x610B, body)));
+
+    // The kind says which values follow, a zero being left out (A2Tools 2723bff and 29e7193): 0c both, 04 basic only,
+    // 08 charged only. Reading only 0c missed the energy of anyone with either at 0 (Harry: "odyle counter doesnt
+    // work"). In the list (with the data before it) and in an update.
+    [Theory]
+    [InlineData(0x610B, "0C 01 92 21 1E F0 06 04 02 92 21 0E", 30, 880)]
+    [InlineData(0x610B, "04 01 92 21 C8 06 04 02 92 21 0E", 840, 0)]
+    [InlineData(0x610B, "08 01 92 21 AB 0E 04 02 92 21 0E", 0, 1835)]
+    [InlineData(0x610B, "49 00 00 00 0A 01 01 03 08 01 92 21 AB 0E 04 02 92 21 14 04 03 92 21 0E", 0, 1835)]
+    [InlineData(0x610C, "01 04 01 92 21 C8 06", 840, 0)]
+    [InlineData(0x610C, "01 08 01 92 21 DB 0D", 0, 1755)]
+    [InlineData(0x610C, "02 04 05 01 07 08 01 92 21 DB 0D", 0, 1755)]
+    public void TheEnergyIsReadInEachOfTheGamesKinds(int opcode, string body, int basic, int charged) =>
+        Assert.Equal(new OdyleEnergy(basic, charged), OdyleEnergyRecords.Read(Frame((ushort)opcode, body)));
+
+    // An update's first byte is not a count to trust: updates with 00 there carry an entry too (A2Tools 29e7193), so
+    // at least one entry is read; one without the energy after it still gives none.
+    [Theory]
+    [InlineData("00 08 01 92 21 DB 0D 03", 0, 1755)]
+    [InlineData("00 0C 01 92 21 1E F0 06", 30, 880)]
+    [InlineData("00 00 09 92 21 03", -1, -1)]       // no entry kind after the 00
+    [InlineData("00 04 0C 00 00 00 0E 02", -1, -1)] // an entry in another slot
+    public void AnUpdateThatStartsWithZeroIsRead(string body, int basic, int charged) =>
+        Assert.Equal(basic < 0 ? (OdyleEnergy?)null : new OdyleEnergy(basic, charged), OdyleEnergyRecords.Read(Frame(0x610C, body)));
+
+    // The game never sends a zero in an entry, so an entry with a 0 where its kind says a value is, is bytes that only
+    // look like one: the data before the list opens with such a look-alike ("0c 01 00 00 00" in A2Tools' sample).
+    // Here one is backed by a slot-2 look-alike, and the energy (charged only) comes after it: reading only the
+    // two-value kind and taking zeros, the meter read this list as 0 (+0), what Harry saw.
+    [Fact]
+    public void ALookAlikeWithZerosIsNeverTheEnergy()
+    {
+        Assert.Equal(new OdyleEnergy(0, 1835),
+            OdyleEnergyRecords.Read(Frame(0x610B, "49 0C 01 00 00 00 04 02 00 0E 08 01 92 21 AB 0E 04 02 92 21 0E")));
+        Assert.Null(OdyleEnergyRecords.Read(Frame(0x610B, "49 0C 01 00 00 00 04 02 00 0E")));
+        Assert.Null(OdyleEnergyRecords.Read(Frame(0x610C, "01 0C 01 92 21 1E 00")));
+        Assert.Null(OdyleEnergyRecords.Read(Frame(0x610C, "01 0C 01 92 21 00 F0 06")));
+        Assert.Null(OdyleEnergyRecords.Read(Frame(0x610C, "01 04 01 92 21 00")));
+        Assert.Null(OdyleEnergyRecords.Read(Frame(0x610C, "01 08 01 92 21 00")));
+    }
+
+    // The writer leaves a zero out as the game does, and refuses no energy at all, whose form is not documented.
+    [Fact]
+    public void TheWriterLeavesAZeroOutAsTheGameDoes()
+    {
+        Assert.Equal(Hex("0D 0C 61 01 04 01 92 21 C8 06"), OdyleEnergyRecordWriter.Update(new(840, 0), Key));
+        Assert.Equal(Hex("0D 0C 61 01 08 01 92 21 AB 0E"), OdyleEnergyRecordWriter.Update(new(0, 1835), Key));
+        foreach (var energy in new OdyleEnergy[] { new(840, 0), new(0, 1835), Sample })
+        {
+            Assert.Equal(energy, OdyleEnergyRecords.Read(OdyleEnergyRecordWriter.Update(energy, Key)));
+            Assert.Equal(energy, OdyleEnergyRecords.Read(OdyleEnergyRecordWriter.List(energy, Key)));
+        }
+        Assert.Throws<ArgumentOutOfRangeException>(() => OdyleEnergyRecordWriter.Update(new(0, 0), Key));
+        Assert.Throws<ArgumentOutOfRangeException>(() => OdyleEnergyRecordWriter.List(new(-1, 5), Key));
+    }
 
     [Fact]
     public void ImplausibleValuesAreTurnedAway()
@@ -205,6 +262,29 @@ public sealed class OdyleEnergyTests
         Assert.Equal(Sample, tap.Current);
         Assert.Single(log.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("failed", StringComparison.Ordinal));
         Assert.Single(log.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("works again", StringComparison.Ordinal));
+    }
+
+    // A change is logged with the record it came from, the list or an update, so a wrong reading can be traced; never
+    // the value (the player's progress) nor the bytes. The same value again logs nothing.
+    [Fact]
+    public void TheTapLogsWhereAChangeCameFromButNotTheValue()
+    {
+        var stream = new TcpStreamBuffer(NullLogger<TcpStreamBuffer>.Instance);
+        var log = new ListLogger();
+        using var tap = new OdyleEnergyTap(stream, openBundle: null, log);
+        tap.Observe(OdyleEnergyRecordWriter.List(new(777, 1999), Key));
+        tap.Observe(OdyleEnergyRecordWriter.Update(new(767, 1999), Key));
+        tap.Observe(OdyleEnergyRecordWriter.Update(new(767, 1999), Key));
+        Assert.Equal(new OdyleEnergy(767, 1999), tap.Current);
+        var changes = log.Entries.Where(e => e.Message.StartsWith("Odyle energy changed", StringComparison.Ordinal)).Select(e => e.Message).ToList();
+        Assert.Equal(2, changes.Count);
+        Assert.Contains("list of entry counts", changes[0], StringComparison.Ordinal);
+        Assert.Contains("an update", changes[1], StringComparison.Ordinal);
+        Assert.All(log.Entries, e =>
+        {
+            foreach (var number in new[] { "777", "767", "1999", "1,999", "92 21", "9221" })
+                Assert.DoesNotContain(number, e.Message, StringComparison.Ordinal);
+        });
     }
 
     [Fact]

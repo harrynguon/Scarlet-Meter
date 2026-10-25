@@ -27,8 +27,9 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   https://github.com/harrynguon/AIon2-Dps-Meter, GNU GPL v3.
 - **A2Tools DPS Meter** (the layout of the game's Odyle energy records and how to find the energy in them,
   `ScarletMeter.Engine/Odyle/OdyleEnergyRecords`), https://github.com/taengu/A2Tools-DPS-Meter pull request #63, merged
-  as 94dda50fe5c324bb02fae72d25d0533cb0ef12cd, GNU GPL v3: its Rust parsing ported to C#. No captured bytes were
-  taken; Scarlet's tests use synthetic records.
+  as 94dda50fe5c324bb02fae72d25d0533cb0ef12cd, and its fixes 2723bff70cb7154442f32ca4e4c484d4cf4f62d6 (the
+  one-value entry) and 29e7193a193c24980ce9ad1bd16aa56d2a3196e1 (charged-only entries, updates that start 00), GNU
+  GPL v3: its Rust parsing ported to C#. No captured bytes were taken; Scarlet's tests use synthetic records.
 - **.NET** (the runtime bundled in the self-contained `ScarletMeter.exe`, with WPF), Copyright (c) .NET Foundation
   and Contributors, MIT. Its licence and third-party notices are in the release zip's `licenses/runtime/`, and
   WPF's in `licenses/dotnet-wpf/`; for .NET 10 they are also at

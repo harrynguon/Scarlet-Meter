@@ -91,15 +91,16 @@ internal sealed class OdyleEnergyTap : IDisposable
         var opcode = OdyleEnergyRecords.OpcodeOf(record);
         if (opcode is OdyleEnergyRecords.ListOpcode or OdyleEnergyRecords.UpdateOpcode)
         {
-            Report(OdyleEnergyRecords.Read(record));
+            Report(OdyleEnergyRecords.Read(record), opcode.Value);
             return;
         }
         if (opcode != BundleOpcode || openBundle is null) return;
         foreach (var inner in openBundle(record))
         {
             if (inner.Data is null) continue;
-            if (OdyleEnergyRecords.OpcodeOf(inner.Data) is OdyleEnergyRecords.ListOpcode or OdyleEnergyRecords.UpdateOpcode)
-                Report(OdyleEnergyRecords.Read(inner.Data));
+            if (OdyleEnergyRecords.OpcodeOf(inner.Data) is { } innerOpcode
+                && innerOpcode is OdyleEnergyRecords.ListOpcode or OdyleEnergyRecords.UpdateOpcode)
+                Report(OdyleEnergyRecords.Read(inner.Data), innerOpcode);
         }
     }
 
@@ -120,8 +121,9 @@ internal sealed class OdyleEnergyTap : IDisposable
     }
 
     // Keeps a value read from a record and raises Updated when it differs from the last; a subscriber that throws is
-    // logged, so the rest of a bundle is still read.
-    private void Report(OdyleEnergy? energy)
+    // logged, so the rest of a bundle is still read. A change is logged with the kind of record it came from, never
+    // the value (the player's progress) or the bytes, so a wrong reading can be traced to the list or an update.
+    private void Report(OdyleEnergy? energy, ushort opcode)
     {
         if (energy is not { } value) return;
         lock (gate)
@@ -129,6 +131,8 @@ internal sealed class OdyleEnergyTap : IDisposable
             if (current == value) return;
             current = value;
         }
+        logger.LogInformation("Odyle energy changed, read from {Record}.",
+            opcode == OdyleEnergyRecords.ListOpcode ? "the list of entry counts (0b 61)" : "an update (0c 61)");
         try
         {
             Updated?.Invoke(this, value);

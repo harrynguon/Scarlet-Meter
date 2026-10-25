@@ -8,7 +8,7 @@ namespace ScarletMeter.Engine.Odyle;
 /// </summary>
 internal static class OdyleEnergyRecordWriter
 {
-    /// <summary>A <c>0c 61</c> record whose one changed entry is the energy.</summary>
+    /// <summary>A <c>0c 61</c> record whose one changed entry is the energy (not both parts 0: see AddEnergyEntry).</summary>
     public static byte[] Update(OdyleEnergy energy, uint key)
     {
         var body = new List<byte> { 1 };
@@ -33,12 +33,23 @@ internal static class OdyleEnergyRecordWriter
         return Frame(OdyleEnergyRecords.ListOpcode, body);
     }
 
+    // The energy entry as the game writes it, a zero left out: both values (0c), basic only (04) or charged only (08).
+    // How the game writes both at 0 is not documented, so the writer refuses it rather than make a form up.
     private static void AddEnergyEntry(List<byte> body, OdyleEnergy energy, uint key)
     {
-        body.AddRange([0x0C, 0x01]);
+        ArgumentOutOfRangeException.ThrowIfNegative(energy.Basic);
+        ArgumentOutOfRangeException.ThrowIfNegative(energy.Charged);
+        var kind = (energy.Basic > 0, energy.Charged > 0) switch
+        {
+            (true, true) => OdyleEnergyRecords.BothValuesKind,
+            (true, false) => OdyleEnergyRecords.FirstValueKind,
+            (false, true) => OdyleEnergyRecords.SecondValueKind,
+            _ => throw new ArgumentOutOfRangeException(nameof(energy), "The game's form for no energy at all is not documented."),
+        };
+        body.AddRange([kind, OdyleEnergyRecords.EnergySlot]);
         AddVarInt(body, key);
-        AddVarInt(body, (uint)energy.Basic);
-        AddVarInt(body, (uint)energy.Charged);
+        if (energy.Basic > 0) AddVarInt(body, (uint)energy.Basic);
+        if (energy.Charged > 0) AddVarInt(body, (uint)energy.Charged);
     }
 
     // Length varint, two opcode bytes (little-endian), body.

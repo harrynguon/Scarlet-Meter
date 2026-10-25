@@ -219,10 +219,12 @@ internal sealed class DemoCombatFeed
         }
     }
 
-    // A fight starts: it spends Odyle energy, sent as the game's update record.
+    // A fight starts: it spends Odyle energy, sent as the game's update record. Once both parts are 0 nothing is sent
+    // (the game's form for that is not documented: OdyleEnergyRecordWriter), so the display keeps the last value.
     private void SpendOdyle()
     {
         odyle = AfterFight(odyle);
+        if (odyle.Basic == 0 && odyle.Charged == 0) return;
         odyleTap?.Observe(OdyleEnergyRecordWriter.Update(odyle, OdyleEntryKey));
     }
 
