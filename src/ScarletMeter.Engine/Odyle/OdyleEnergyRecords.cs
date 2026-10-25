@@ -79,11 +79,14 @@ internal static class OdyleEnergyRecords
         return null;
     }
 
+    // The energy, when the entry is it: a two-value entry in slot 1 whose values are plausible. The casts are safe
+    // after the bound.
     private static OdyleEnergy? EnergyOf(Entry entry) =>
         entry.Kind == TwoValueKind && entry.Slot == EnergySlot && IsPlausible(entry.First) && IsPlausible(entry.Second)
             ? new OdyleEnergy((int)entry.First, (int)entry.Second)
             : null;
 
+    // Within the generous bound (MaxValue), which only turns away bytes that merely look like the entry.
     private static bool IsPlausible(uint value) => value <= MaxValue;
 
     private readonly record struct Entry(byte Kind, byte Slot, uint Key, uint First, uint Second);

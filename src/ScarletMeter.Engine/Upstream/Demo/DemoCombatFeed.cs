@@ -102,13 +102,14 @@ internal sealed class DemoCombatFeed
     /// <summary>
     /// Starts (or, after a stop, restarts) the feed at <paramref name="now"/>: registers the party and summon
     /// the first time, abandons a fight a stop interrupted (upstream completes it on its idle timeout, as it
-    /// would after a real capture stopped) and starts a fresh fight, the ping and the Odyle login list at once.
+    /// would after a real capture stopped) and starts a fresh fight and the ping at once. The Odyle login list goes
+    /// to the tap here rather than through the schedule, which keeps the schedule's order (and so a seeded demo's
+    /// fights) as it was before the demo had Odyle energy.
     /// </summary>
     public void Begin(DateTime now)
     {
         schedule.Clear();
         fight = null;
-        Schedule(new DemoEvent(EventKind.OdyleLogin), now);
         Schedule(new DemoEvent(EventKind.StartFight), now);
         Schedule(new DemoEvent(EventKind.Ping), now);
         if (!partyRegistered)
@@ -116,6 +117,7 @@ internal sealed class DemoCombatFeed
             RegisterParty();
             partyRegistered = true;
         }
+        odyleTap?.Observe(OdyleEnergyRecordWriter.List(odyle, OdyleEntryKey));
     }
 
     /// <summary>
@@ -214,26 +216,32 @@ internal sealed class DemoCombatFeed
                 Schedule(next, at + PingInterval);
                 sessions.FirePingUpdate(random.Next(32, 58));
                 break;
-            case EventKind.OdyleLogin:
-                odyleTap?.Observe(OdyleEnergyRecordWriter.List(odyle, OdyleEntryKey));
-                break;
         }
     }
 
-    // A raid costs Odyle energy: each fight spends some, and a recharge moves energy from charged to basic once basic
-    // runs low, so the demo's numbers move.
+    // A fight starts: it spends Odyle energy, sent as the game's update record.
     private void SpendOdyle()
     {
-        var basic = odyle.Basic - OdylePerFight;
-        var charged = odyle.Charged;
+        odyle = AfterFight(odyle);
+        odyleTap?.Observe(OdyleEnergyRecordWriter.Update(odyle, OdyleEntryKey));
+    }
+
+    /// <summary>
+    /// The demo's Odyle energy after a fight: a raid costs <see cref="OdylePerFight"/> basic, and once basic runs below
+    /// that a recharge moves up to <see cref="OdyleRecharge"/> from charged to basic, so the numbers keep moving; basic
+    /// never goes below 0.
+    /// </summary>
+    internal static OdyleEnergy AfterFight(OdyleEnergy energy)
+    {
+        var basic = energy.Basic - OdylePerFight;
+        var charged = energy.Charged;
         if (basic < OdylePerFight)
         {
             var recharge = Math.Min(OdyleRecharge, charged);
             basic += recharge;
             charged -= recharge;
         }
-        odyle = new OdyleEnergy(Math.Max(0, basic), charged);
-        odyleTap?.Observe(OdyleEnergyRecordWriter.Update(odyle, OdyleEntryKey));
+        return new OdyleEnergy(Math.Max(0, basic), charged);
     }
 
     private void StartFight(DateTime at)
@@ -381,7 +389,6 @@ internal sealed class DemoCombatFeed
         Buff,
         Deadline,
         Ping,
-        OdyleLogin,
     }
 
     /// <summary>

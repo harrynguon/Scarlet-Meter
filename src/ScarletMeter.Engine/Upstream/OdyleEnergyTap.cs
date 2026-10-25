@@ -17,9 +17,15 @@ namespace ScarletMeter.Engine.Upstream;
 /// a meter started mid-session has none until then.
 /// </summary>
 /// <remarks>
-/// Runs on the capture (or demo feed) thread, inside the stream buffer's callback: a record that is neither Odyle
-/// record nor a bundle costs two byte reads, and nothing escapes, since an exception thrown back into the buffer would
-/// stop the records after it from reaching upstream's pipeline. A failure is logged once until reading works again.
+/// <para>Runs on the capture thread, inside upstream's PacketAccumulator callback and under its lock. A record that is
+/// neither an Odyle record nor a bundle costs a varint and two byte reads. A bundle (<c>ff ff</c>, most of the game's
+/// records) is opened a second time, after upstream's pipeline has opened it: a full LZ4 decompression into a buffer
+/// sized from its header (up to 10 MB for a corrupt one), with a list and a copy of each inner record, and upstream
+/// logs a broken frame once for each opening.</para>
+/// <para>Nothing escapes. An exception thrown back into the accumulator would skip its removal of the record, so the
+/// record would stay at the head of its buffer and come again with the next chunk, to upstream's pipeline too (its hits
+/// counted twice), and one that always throws would stall the stream until the accumulator's 10 MB reset. A reading
+/// failure is logged once until reading works again; a subscriber's, each time.</para>
 /// </remarks>
 internal sealed class OdyleEnergyTap : IDisposable
 {
@@ -31,14 +37,20 @@ internal sealed class OdyleEnergyTap : IDisposable
     private readonly ILogger<OdyleEnergyTap> logger;
     private readonly Lock gate = new();
     private OdyleEnergy? current;
-    private bool failing;
+    private bool failing; // touched only on the capture thread: upstream's CaptureDevice has one processing thread
     private bool disposed;
 
     public OdyleEnergyTap(TcpStreamBuffer stream, PacketProcessor processor, ILogger<OdyleEnergyTap> logger)
+        : this(stream, BindBundleOpener(processor), logger)
+    {
+    }
+
+    /// <summary>With a bundle opener of the caller's (null for none): the constructor above, and tests.</summary>
+    internal OdyleEnergyTap(TcpStreamBuffer stream, Func<byte[], List<Packet>>? openBundle, ILogger<OdyleEnergyTap> logger)
     {
         this.stream = stream;
+        this.openBundle = openBundle;
         this.logger = logger;
-        openBundle = BindBundleOpener(processor);
         if (openBundle is null)
             logger.LogWarning("Odyle energy is shown only from records outside LZ4 bundles: upstream's PacketProcessor no longer has the ProcessPacket(byte[]) this reads them with.");
         stream.PacketExtracted += OnPacketExtracted;
@@ -56,13 +68,21 @@ internal sealed class OdyleEnergyTap : IDisposable
     /// <summary>
     /// Upstream's PacketProcessor.ProcessPacket(byte[]) as a delegate: a record that is an LZ4 bundle comes back as
     /// the records inside it, each with its own length and opcode; any other record comes back alone. Null when the
-    /// pinned release no longer has it with that shape.
+    /// pinned release no longer has it with that shape, or it cannot be bound, so the engine still starts.
     /// </summary>
     internal static Func<byte[], List<Packet>>? BindBundleOpener(PacketProcessor processor)
     {
         var method = typeof(PacketProcessor).GetMethod(
             "ProcessPacket", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, binder: null, [typeof(byte[])], modifiers: null);
-        return method?.ReturnType == typeof(List<Packet>) ? method.CreateDelegate<Func<byte[], List<Packet>>>(processor) : null;
+        if (method?.ReturnType != typeof(List<Packet>)) return null;
+        try
+        {
+            return method.CreateDelegate<Func<byte[], List<Packet>>>(processor);
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
     }
 
     /// <summary>Reads one record from the stream: an Odyle record, or a bundle that may hold one.</summary>
@@ -83,6 +103,7 @@ internal sealed class OdyleEnergyTap : IDisposable
         }
     }
 
+    // Upstream's reassembly found a record: read it, letting nothing back into the accumulator (see remarks).
     private void OnPacketExtracted(object? sender, TcpPacketEventArgs e)
     {
         try
@@ -98,6 +119,8 @@ internal sealed class OdyleEnergyTap : IDisposable
         }
     }
 
+    // Keeps a value read from a record and raises Updated when it differs from the last; a subscriber that throws is
+    // logged, so the rest of a bundle is still read.
     private void Report(OdyleEnergy? energy)
     {
         if (energy is not { } value) return;
@@ -112,11 +135,11 @@ internal sealed class OdyleEnergyTap : IDisposable
         }
         catch (Exception ex)
         {
-            // A subscriber's failure is its own; the capture thread carries on.
             logger.LogWarning(ex, "An Odyle energy subscriber failed.");
         }
     }
 
+    /// <summary>Stops listening to the stream. Safe to call twice (the engine and the container both do).</summary>
     public void Dispose()
     {
         if (disposed) return;

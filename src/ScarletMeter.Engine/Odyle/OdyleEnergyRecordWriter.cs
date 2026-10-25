@@ -18,19 +18,18 @@ internal static class OdyleEnergyRecordWriter
 
     /// <summary>
     /// A <c>0b 61</c> record: unrelated data, then the list of entry counts, the energy first and its second entry
-    /// (slot 2, the same key) after it, then a one-value entry.
+    /// after it (slot 2, the same key, a one-value entry as in the game's own list), then another entry.
     /// </summary>
     public static byte[] List(OdyleEnergy energy, uint key)
     {
         var body = new List<byte> { 0x49, 0x00, 0x00, 0x00, 0x0A, 0x01, 0x01, 0x03 };
         AddEnergyEntry(body, energy, key);
-        body.AddRange([0x0C, 0x02]);
+        body.AddRange([0x04, 0x02]);
+        AddVarInt(body, key);
+        AddVarInt(body, 20);
+        body.AddRange([0x04, 0x03]);
         AddVarInt(body, key);
         AddVarInt(body, 14);
-        AddVarInt(body, 0);
-        body.AddRange([0x04, 0x03]);
-        AddVarInt(body, key + 1);
-        AddVarInt(body, 2);
         return Frame(OdyleEnergyRecords.ListOpcode, body);
     }
 
