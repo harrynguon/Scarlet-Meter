@@ -61,6 +61,7 @@ public sealed class BossTimersWindow : Window
         profile = Path.Combine(services.GetRequiredService<EngineOptions>().DataDirectory, ProfileFolder);
 
         Title = "Scarlet Meter · Boss timers";
+        if (AppIcon.Source is { } icon) Icon = icon;
         Width = 460;
         Height = 640;
         MinWidth = 320;

@@ -52,6 +52,13 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   not shipped: the meter loads them from NCSOFT's game-data site at run time, as RATmeter does, and the "Skill
   icons" setting turns that off.
 
+## Artwork
+
+- **App icon** (`src/ScarletMeter.App/Assets/ScarletMeter.ico`, the exe's and every window's icon): an AI-generated
+  portrait, made for this project by its owner (harrynguon) with GPT 6.1 Astra on 2026-10-25, then cropped and resized
+  into the icon's sizes. It is not affiliated with or endorsed by any game, anime or studio. Scarlet Meter is a free,
+  non-commercial project.
+
 ## NuGet packages
 
 Every package that ships in the published program (build-only analyzers and tasks are left out), with the licence

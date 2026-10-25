@@ -48,6 +48,7 @@ Record the tested commit, observation date and Windows configuration. Pending:
 - [ ] Each player's combat power beside their name matches the game (upstream reads it from a heuristic scan; note any wrong or missing value).
 - [ ] With "Bar effects" on, the class effects on every bar, the gloss and the overtake glide do not cost frames in the game (compare FPS with the setting off, and with "Effects on every bar" off, in a full party); the glide looks right when players swap places often; each class's effect reads over the game at the chosen opacity.
 - [ ] Settings and window positions survive a restart; fight options (boss-only, combined summons, one-minute dummy) change new hits.
+- [ ] The meter's icon shows on `ScarletMeter.exe` in Explorer, on its taskbar button and on the title bars of the settings, history, details and boss-timers windows, crisp at the taskbar's size.
 
 ## Next: the boss-timers window
 

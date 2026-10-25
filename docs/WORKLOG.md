@@ -32,6 +32,20 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Next:** Codex and CI on the fixes; re-record `alerts.gif` once Harry is out of game; merge with Harry's go-ahead.
 
+## 2026-10-25 — An app icon
+
+**What:** the meter has an icon: `src/ScarletMeter.App/Assets/ScarletMeter.ico`, the exe's `ApplicationIcon`, and every window's title-bar and taskbar icon through `Windows/AppIcon` (a WPF resource; the whole multi-size icon, or the default if it cannot be read). Nine PNG entries, 16 to 256 px: 64 px and up from a wider crop of the portrait (hair ornament, tassel and the little meter bars), 48 px and down from a face crop, high-quality downscales, a light sharpen at 48 px and below, rounded corners. `AppIconTests`; THIRD-PARTY-NOTICES.md "Artwork" names the source; ARCHITECTURE and HANDOFF updated.
+
+**Why:** Harry wanted an icon for the exe, at first a character from Re:Zero or NIKKE. Those are copyrighted characters and the meter is public and released, so original designs were drawn instead (four emblems, three chibi mascots, a hand-drawn-style headshot); Harry then generated two portraits with GPT 6.1 Astra and asked to use the better one, with a disclaimer, noting the project is non-commercial. Of the two, the second holds up better at 16 to 32 px (crisper line work and higher contrast, especially on a light taskbar); compared at real sizes on dark and light taskbars before choosing. The resemblance of the portrait to Re:Zero's Emilia (silver hair, violet eyes, elf ears, flower hairpin, braid) and to NIKKE's Scarlet's hat was pointed out to Harry; using it is Harry's call.
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` 503/503. Windows' own icon decoder reads all nine sizes.
+
+**Not checked:** the icon on the taskbar and title bars in a running meter (HANDOFF).
+
+**Shown to Harry:** the icon at real sizes and the rebuilt portable copy, which Harry has since run (built with #30 on a local-only branch). Harry then asked to bring the branch up to date with main and push it as a PR, without merging or releasing yet. Rebased onto main after #30 and #31 (only this log conflicted; the three entries are kept in the order they were written); `scripts/Build.ps1` 507/507 after it.
+
+**Next:** the deep audit (window code), Codex and CI; merge and a release with Harry's go-ahead.
+
 ## 2026-10-25 — A boss-timers window for aion2timers.com
 
 **What:** an hourglass in the overlay's header opens `Windows/BossTimersWindow`, a small window showing aion2timers.com's world-boss timers (`BossTimers/BossTimersSite.Start`). It is a plain WPF window with the WPF `WebView2` control, not a `ScarletWindow`: no Blazor, its own WebView2 environment and profile (`webview2-timers` in the data directory, where the site keeps its server and faction choice), locked down before its first navigation (no host objects, web messages, developer tools, saved passwords or form data; downloads, permission prompts, HTTP and client-certificate authentication and external protocols refused; SmartScreen on), and every top-level navigation, redirects included, through the pure `BossTimersSite.Decide`: the site's https pages show, another web page opens in the default browser only after the player's click, anything else is refused; new-window requests never open a second browser window. A bar above the page: Back to the timers, Reload, the site's name (or why the page stopped), "Keep on top" (`BossTimersSettings.KeepOnTop`, a new settings section, off by default) and "Open in browser". Not owned by the overlay, so it can sit behind the game; placement remembered under `WindowKeys.BossTimers` ("timers"); closed with the tool windows. Shared helpers: `ScreenPlacement.Beside` (from `ToolWindow`) and `DarkTitleBar`. `BossTimersSiteTests`, `RazorMarkupTests.TheBossTimersWindowIsKeptApartFromTheMeter`, `SettingsTests.TheBossTimersWindowStartsOffTheTopAndKeepsItsChoices` (and the two section-count reminders). ARCHITECTURE ("Windows", "Storage", tests, folders), SECURITY ("Network"), README (feature, Q&A, data table), HANDOFF (checks by hand), LESSONS.

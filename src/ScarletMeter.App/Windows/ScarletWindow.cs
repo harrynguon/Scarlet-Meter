@@ -42,6 +42,7 @@ public abstract class ScarletWindow : Window
         WebView.RootComponents.Add(new RootComponent { Selector = "#app", ComponentType = rootComponent });
         WebView.Services = services;
         Content = WebView;
+        if (AppIcon.Source is { } icon) Icon = icon;
 
         placement = new WindowPlacementTracker(this, placementKey, services.GetRequiredService<SettingsService>(), () => PlacementBounds);
         deferredClose = new DeferredWindowClose(
