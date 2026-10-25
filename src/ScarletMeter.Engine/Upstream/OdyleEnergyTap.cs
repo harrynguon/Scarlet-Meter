@@ -14,7 +14,8 @@ namespace ScarletMeter.Engine.Upstream;
 /// upstream's own <see cref="PacketProcessor"/> (its internal ProcessPacket, bound once by reflection; a test guards
 /// the binding against the pinned release), and reads the two Odyle records with <see cref="OdyleEnergyRecords"/>.
 /// The value is kept until the game sends another: it comes at login, after a server transfer and when it changes, so
-/// a meter started mid-session has none until then.
+/// a meter started mid-session has none until then. The energy entry's key from the last list picks the energy among
+/// an update's entries; before any list, an update's first slot-1 entry is taken.
 /// </summary>
 /// <remarks>
 /// <para>Runs on the capture thread, inside upstream's PacketAccumulator callback and under its lock. A record that is
@@ -37,6 +38,9 @@ internal sealed class OdyleEnergyTap : IDisposable
     private readonly ILogger<OdyleEnergyTap> logger;
     private readonly Lock gate = new();
     private OdyleEnergy? current;
+    // The energy entry's key from the last list, so an update's other slot-1 entries are passed over; null until a
+    // list comes (OdyleEnergyRecords.ReadEntry). Under the gate: the capture and the demo feed both read records.
+    private uint? energyKey;
     private bool failing; // touched only on the capture thread: upstream's CaptureDevice has one processing thread
     private bool disposed;
 
@@ -91,16 +95,30 @@ internal sealed class OdyleEnergyTap : IDisposable
         var opcode = OdyleEnergyRecords.OpcodeOf(record);
         if (opcode is OdyleEnergyRecords.ListOpcode or OdyleEnergyRecords.UpdateOpcode)
         {
-            Report(OdyleEnergyRecords.Read(record));
+            Take(record, opcode.Value);
             return;
         }
         if (opcode != BundleOpcode || openBundle is null) return;
         foreach (var inner in openBundle(record))
         {
             if (inner.Data is null) continue;
-            if (OdyleEnergyRecords.OpcodeOf(inner.Data) is OdyleEnergyRecords.ListOpcode or OdyleEnergyRecords.UpdateOpcode)
-                Report(OdyleEnergyRecords.Read(inner.Data));
+            if (OdyleEnergyRecords.OpcodeOf(inner.Data) is { } innerOpcode
+                && innerOpcode is OdyleEnergyRecords.ListOpcode or OdyleEnergyRecords.UpdateOpcode)
+                Take(inner.Data, innerOpcode);
         }
+    }
+
+    // Reads one Odyle record with the energy key from the last list, keeps the key a list defines, and reports the
+    // energy it holds.
+    private void Take(ReadOnlySpan<byte> record, ushort opcode)
+    {
+        OdyleEnergyReading? reading;
+        lock (gate)
+        {
+            reading = OdyleEnergyRecords.ReadEntry(record, energyKey);
+            if (reading is { } read && opcode == OdyleEnergyRecords.ListOpcode) energyKey = read.Key;
+        }
+        if (reading is { } value) Report(value.Energy, opcode);
     }
 
     // Upstream's reassembly found a record: read it, letting nothing back into the accumulator (see remarks).
@@ -120,15 +138,17 @@ internal sealed class OdyleEnergyTap : IDisposable
     }
 
     // Keeps a value read from a record and raises Updated when it differs from the last; a subscriber that throws is
-    // logged, so the rest of a bundle is still read.
-    private void Report(OdyleEnergy? energy)
+    // logged, so the rest of a bundle is still read. A change is logged with the kind of record it came from, never
+    // the value (the player's progress) or the bytes, so a wrong reading can be traced to the list or an update.
+    private void Report(OdyleEnergy value, ushort opcode)
     {
-        if (energy is not { } value) return;
         lock (gate)
         {
             if (current == value) return;
             current = value;
         }
+        logger.LogInformation("Odyle energy changed, read from {Record}.",
+            opcode == OdyleEnergyRecords.ListOpcode ? "the list of entry counts (0b 61)" : "an update (0c 61)");
         try
         {
             Updated?.Invoke(this, value);
