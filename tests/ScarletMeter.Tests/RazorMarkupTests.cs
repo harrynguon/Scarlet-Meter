@@ -208,11 +208,12 @@ public sealed partial class RazorMarkupTests
     }
 
     // The overlay's panel is only as tall as its content, so the room the notices leave in a boss fight is see-through
-    // rather than empty panel; nothing in it scrolls (Harry: "i dont like scrolling"): the notice strip always takes
+    // rather than empty panel; the notices never scroll (Harry: "i dont like scrolling"): the notice strip always takes
     // its full height, the expanded strip has no cap, and the window grows instead (TheOverlayWindowGrowsToItsContent);
     // only where it cannot (the screen's height) do the rows give way, faded, never the notices (Codex review on
-    // PR #28); and the picture covers the panel, laid out against it (Harry: against the window, which is often taller
-    // than the panel, it "no longer fits in the background").
+    // PR #28); the player list alone scrolls, past its cap (TheRowsScrollPastTheirCap); and the picture covers the
+    // panel, laid out against it (Harry: against the window, which is often taller than the panel, it "no longer fits
+    // in the background").
     [Fact]
     public void TheOverlayPanelFitsItsContent()
     {
@@ -236,9 +237,9 @@ public sealed partial class RazorMarkupTests
         Assert.DoesNotMatch(@"background-attachment", css);
         // The strip never shrinks, nor do the rows, except where the window cannot grow further (.overlay.cut, set by
         // the page from IMeterWindows.OverlayCutsContent), faded there, and measured at full height even then (the
-        // data-measuring rule comes later, so it wins); and no rule in the overlay's styles makes anything scroll:
-        // the rows' overflow is clipped (a gliding row cannot stretch the measured height), the expanded strip has
-        // no cap.
+        // data-measuring rule comes later, so it wins); and no rule in the overlay's styles makes anything scroll but
+        // the capped player list (.rows.capped): up to the cap the rows' overflow is clipped (a gliding row cannot
+        // stretch the measured height), the expanded strip has no cap.
         var rows = Block(css, ".rows");
         Assert.Matches(@"(?m)^\s*flex:\s*none;", rows);
         Assert.Matches(@"(?m)^\s*overflow:\s*clip;", rows);
@@ -248,6 +249,12 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?m)^\s*mask-image:\s*linear-gradient\(", cut);
         Assert.Matches(@"(?m)^\s*flex:\s*none;", Block(css, ".overlay[data-measuring] .rows"));
         Assert.True(css.IndexOf(".overlay.cut .rows {", StringComparison.Ordinal) < css.IndexOf(".overlay[data-measuring] .rows {", StringComparison.Ordinal));
+        // A capped list that gives way keeps its own narrow fade, not the 26 px give-way one, which half faded the
+        // pinned own row and the last row (audit on PR #35); later than the give-way rule and more specific.
+        static string Mask(string body) => Regex.Match(body, @"(?m)^\s*mask-image:\s*(?<value>[^;]+);").Groups["value"].Value;
+        Assert.NotEqual(string.Empty, Mask(Block(css, ".overlay.cut .rows.capped")));
+        Assert.Equal(Mask(Block(css, ".rows.capped")), Mask(Block(css, ".overlay.cut .rows.capped")));
+        Assert.True(css.IndexOf(".overlay.cut .rows {", StringComparison.Ordinal) < css.IndexOf(".overlay.cut .rows.capped {", StringComparison.Ordinal));
         Assert.Matches(@"(?m)^\s*flex:\s*none;", Block(alerts, ".alerts"));
         Assert.DoesNotMatch(@"(?m)^\s*min-height:", Block(alerts, ".alerts"));
         Assert.DoesNotMatch(@"(?m)^\s*max-height:", Block(alerts, ".alerts.expanded"));
@@ -255,7 +262,9 @@ public sealed partial class RazorMarkupTests
         Assert.DoesNotMatch(@"position:\s*sticky", alerts);
         var overlayRules = Regex.Matches(css, @"(?m)^(?<selector>\.(overlay|rows|row|target|ov-)[^{]*)\{(?<body>[^}]*)\}");
         Assert.NotEmpty(overlayRules);
-        Assert.All(overlayRules, rule => Assert.DoesNotMatch(@"overflow(-[xy])?:\s*(auto|scroll)", rule.Groups["body"].Value));
+        var scrolling = overlayRules.Where(rule => Regex.IsMatch(rule.Groups["body"].Value, @"overflow(-[xy])?:\s*(auto|scroll)"))
+            .Select(rule => rule.Groups["selector"].Value.Trim()).ToList();
+        Assert.Equal([".rows.capped"], scrolling);
         // A margin under whatever ends the panel (the last row, or the notices), as above the header and card.
         Assert.Matches(@"(?m)^\s*padding-bottom:\s*[1-9]\d*px;", overlay);
     }
@@ -510,6 +519,82 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"margin-left:\s*auto;", Block(css, ".odyle"));
         Assert.Matches(@"margin-left:\s*0;", Block(css, ".odyle + .ping"));
         Assert.Matches(@"margin-left:\s*auto;", Block(css, ".ping")); // without the energy, the ping still ends the line
+    }
+
+    // Past "Rows before scrolling" the player list scrolls (Harry: in big raids the meter was "just too long
+    // vertically"; "cap the dps bars to like 8-10 players"), so the window stops growing there; the notices below
+    // never scroll (TheOverlayPanelFitsItsContent). The cap is that many rows, by the row's own height and gap, in the
+    // list's zoomed pixels; the next row's top shows in the padding, faded. The list is "capped" only with more rows
+    // than that, so a small party's list stays clipped. The player's own row stays in view, pinned at either edge in a
+    // whole row's place, with a backdrop of the panel's colour only while pinned (always, without scroll-state
+    // queries); the list does no scroll anchoring, and the glide script measures rows in the list's view and again
+    // on scroll and on a resize, since a pinned row's offsetTop follows both. Source-text guards: the WebView has no
+    // test host here; headless Edge renders (WORKLOG) measured the pinned positions, the backdrop and reorders while
+    // scrolled.
+    [Fact]
+    public void TheRowsScrollPastTheirCap()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        var markup = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
+        Assert.Contains(@"<ul class=""rows @RowsClass"">", markup);
+        var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
+        Assert.Contains(@"private string RowsClass => Visible.Count() > appearance.VisibleRows ? ""capped"" : string.Empty;", code);
+        Assert.Contains("--visible-rows:{appearance.VisibleRows};", code);
+        var settings = File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor"));
+        // Within the one element ("=>" in its lambdas rules out [^>]).
+        Assert.Matches(@"(?s)<RangeSetting Label=""Rows before scrolling""(?:(?!/>).)*Min=""@AppearanceSettings\.MinVisibleRows"" Max=""@AppearanceSettings\.MaxVisibleRows"" Step=""1""(?:(?!/>).)*VisibleRows = \(int\)Math\.Round\(v\)", settings);
+
+        var css = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "app.css"));
+        static string Block(string source, string selector) =>
+            Regex.Match(source, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
+        static double Px(string body, string property) => double.Parse(
+            Regex.Match(body, @"(?m)^\s*" + property + @":\s*([\d.]+)px;").Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        var row = Block(css, ".row");
+        var step = Px(row, "height") + Px(row, "margin-bottom");
+        var capped = Block(css, ".rows.capped");
+        var cap = Regex.Match(capped, @"(?m)^\s*max-height:\s*calc\(var\(--visible-rows, (?<rows>\d+)\) \* (?<step>[\d.]+)px\);");
+        Assert.True(cap.Success, "the list's height is a number of rows");
+        Assert.Equal(new ScarletMeter.App.Settings.AppearanceSettings().VisibleRows, int.Parse(cap.Groups["rows"].Value, System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal(step, double.Parse(cap.Groups["step"].Value, System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Matches(@"(?m)^\s*overflow-y:\s*auto;", capped);
+        Assert.Matches(@"(?m)^\s*overflow-x:\s*hidden;", capped);
+        // No scroll anchoring, which shifted the view by a row with each swap at its edge (audit on PR #35).
+        Assert.Matches(@"(?m)^\s*overflow-anchor:\s*none;", capped);
+        // The fade is the last row's gap and the list's bottom padding: wider would fade the last row at the list's
+        // end, narrower would show the next row's top unfaded (audit on PR #35).
+        var fade = Regex.Match(capped, @"(?m)^\s*mask-image:\s*linear-gradient\(to bottom, #000 calc\(100% - (?<px>\d+)px\), transparent\);");
+        Assert.True(fade.Success, "the list's bottom edge fades");
+        var padding = Regex.Match(Block(css, ".rows"), @"(?m)^\s*padding:\s*[\d.]+px [\d.]+px (?<bottom>[\d.]+)px;");
+        Assert.True(padding.Success, "the list's padding gives its bottom");
+        Assert.Equal(Px(row, "margin-bottom") + double.Parse(padding.Groups["bottom"].Value, System.Globalization.CultureInfo.InvariantCulture),
+            double.Parse(fade.Groups["px"].Value, System.Globalization.CultureInfo.InvariantCulture));
+        // Measured at its capped height: the measuring rule only gives the rows their full flex size back.
+        Assert.DoesNotMatch(@"height", Block(css, ".overlay[data-measuring] .rows"));
+
+        var mine = Block(css, ".rows.capped > .row.me");
+        Assert.Matches(@"(?m)^\s*position:\s*sticky;", mine);
+        Assert.Matches(@"(?m)^\s*top:\s*0;", mine);
+        Assert.Equal(Px(row, "margin-bottom"), Px(mine, "bottom")); // in the last whole row's place, above the fade
+        Assert.Matches(@"(?m)^\s*container-type:\s*scroll-state;", mine);
+        Assert.DoesNotMatch(@"background", Block(css, ".rows.capped > .row.me::before"));
+        // The backdrop is the panel's colour token, while stuck, and always where scroll-state queries are missing.
+        Assert.Matches(@"@container scroll-state\(\(stuck: top\) or \(stuck: bottom\)\) \{\s*\.rows\.capped > \.row\.me::before \{\s*background: linear-gradient\(var\(--row\), var\(--row\)\), var\(--bg\);", css);
+        Assert.Matches(@"@supports not \(container-type: scroll-state\) \{\s*\.rows\.capped > \.row\.me::before \{\s*background: linear-gradient\(var\(--row\), var\(--row\)\), var\(--bg\);", css);
+
+        // The glide measures where rows are in the list's view, never in its content alone: a scroll position the
+        // browser moved during a reorder (the end of the list clamping) glided every visible row by a row and back
+        // (audit on PR #35). Every position goes through drawnTop; it measures again on scroll and on a change of
+        // the list's size, and the size observer goes with a replaced list.
+        var fx = File.ReadAllText(Path.Combine(app, "wwwroot", "js", "overlay-fx.js"));
+        var fxCode = Regex.Replace(fx, @"(?m)//.*$", string.Empty);
+        Assert.Contains("return row.offsetTop - list.scrollTop;", fxCode);
+        Assert.Single(Regex.Matches(fxCode, @"\.offsetTop\b"));
+        Assert.Contains("tops.set(row, drawnTop(row));", fxCode);
+        Assert.Contains("const after = drawnTop(row);", fxCode);
+        Assert.Contains("list.addEventListener('scroll', remember, { passive: true });", fxCode);
+        Assert.Contains("sizeObserver = new ResizeObserver(remember);", fxCode);
+        Assert.Contains("sizeObserver.observe(list);", fxCode);
+        Assert.Contains("if (sizeObserver) sizeObserver.disconnect();", fxCode);
     }
 
     // The player's own row is marked by a ring round the row, never by a stripe on the bar (a white inset at the

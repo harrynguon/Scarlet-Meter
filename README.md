@@ -77,6 +77,8 @@ and adds it up per player and per fight.
   plus the **background opacity** of the whole meter. Text and bars always stay solid.
 - **Class colours**, **relative bars** (against the top player), row size, and **hidden names** for streams and
   screenshots.
+- **Stays compact in big raids**: past 10 players (**Rows before scrolling**, 3 to 40) the bars scroll instead of
+  the meter growing, and your own bar stays in view, pinned to the top or bottom edge when it would scroll away.
 
 <p align="center"><img src="docs/images/background-picture.png" alt="A background picture at 50% picture opacity (demo data, a generated test picture)" width="456"/></p>
 
@@ -92,7 +94,7 @@ and adds it up per player and per fight.
   Dimensional Invasion, Watcher Kaira and more) and while their entry is open, with a countdown.
 - **Out of your way**: they sit below the bars and never cover one, step aside during boss fights, and a **bell**
   in the header turns them off in one click. They fold into one slim bar showing the next event and "+N" more;
-  click it to open the list, and it stays as you left it. Nothing scrolls, the meter grows to fit instead. Times
+  click it to open the list, and it stays as you left it. They never scroll, the meter grows to fit instead. Times
   follow the Global preset and are not yet verified in game.
 - **Boss timers**: the hourglass in the header opens [aion2timers.com](https://www.aion2timers.com/world-boss-timer/)'s
   world-boss timers in a small window of their own, in or out of game. The site remembers your server and faction
@@ -172,7 +174,8 @@ It only reads network traffic, as RATmeter does, but NCSOFT's terms forbid unaut
 own risk (see [Safety and terms](#safety-and-terms)).
 
 **Why does the meter sometimes get taller?**
-Nothing in the meter scrolls. When the world-event alerts and the bars need more room than the size you gave it,
+Only the bars scroll, and only once there are more players than **Rows before scrolling** (10 unless you change
+it in Settings, Appearance). When the world-event alerts and the bars need more room than the size you gave it,
 it grows downwards (upwards at the bottom of the screen) and goes back to your size a moment after. The alerts
 always sit below the last bar, never over it, and the size remembered for next time is always yours. If it is
 already as tall as the screen, the lowest rows fade out and the alerts stay whole.

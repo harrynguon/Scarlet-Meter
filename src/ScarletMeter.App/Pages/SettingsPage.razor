@@ -53,6 +53,10 @@
                     <RangeSetting Label="Row size" Value="@S.Appearance.RowScale" Min="@AppearanceSettings.MinRowScale" Max="@AppearanceSettings.MaxRowScale" Step="0.05"
                                   Format="@(v => $"{v:0.00}x")"
                                   ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { RowScale = v } }))" />
+                    <RangeSetting Label="Rows before scrolling" Description="With more players, the list scrolls and the meter stops growing. Your own row stays in view; the event timers below never scroll."
+                                  Value="@S.Appearance.VisibleRows" Min="@AppearanceSettings.MinVisibleRows" Max="@AppearanceSettings.MaxVisibleRows" Step="1"
+                                  Format="@(v => $"{v:0}")"
+                                  ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { VisibleRows = (int)Math.Round(v) } }))" />
                 </section>
                 <section>
                     <h2>Player list</h2>

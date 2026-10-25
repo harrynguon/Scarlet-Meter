@@ -91,6 +91,21 @@ public sealed class SettingsTests : IDisposable
         }
     }
 
+    // "Rows before scrolling" keeps to its range, each repair reported; a value inside it, its edges included, stays.
+    [Theory]
+    [InlineData(0, AppearanceSettings.MinVisibleRows, true)]
+    [InlineData(-5, AppearanceSettings.MinVisibleRows, true)]
+    [InlineData(int.MaxValue, AppearanceSettings.MaxVisibleRows, true)]
+    [InlineData(AppearanceSettings.MinVisibleRows, AppearanceSettings.MinVisibleRows, false)]
+    [InlineData(AppearanceSettings.MaxVisibleRows, AppearanceSettings.MaxVisibleRows, false)]
+    [InlineData(8, 8, false)]
+    public void RowsBeforeScrollingKeepToTheirRange(int saved, int kept, bool repaired)
+    {
+        var (settings, repairs) = SettingsNormalizer.Normalize(new MeterSettings { Appearance = new AppearanceSettings { VisibleRows = saved } });
+        Assert.Equal(kept, settings.Appearance.VisibleRows);
+        Assert.Equal(repaired, repairs.Any(r => r.StartsWith("Rows before scrolling", StringComparison.Ordinal)));
+    }
+
     [Fact]
     public void NullSectionsFromAFileTakeDefaults()
     {
@@ -319,8 +334,9 @@ public sealed class SettingsTests : IDisposable
         Assert.True(loaded.Appearance.ShowCombatPower);
         Assert.True(loaded.Appearance.ShowOdyleEnergy);
         Assert.Equal(1.0, loaded.Appearance.PictureOpacity); // the picture as it looked before the setting
+        Assert.Equal(10, loaded.Appearance.VisibleRows); // Harry: "cap the dps bars to like 8-10 players"
 
-        var plain = loaded with { Appearance = loaded.Appearance with { BarEffects = false, EffectsOnEveryBar = false, ShowCombatPower = false, PictureOpacity = 0.4 } };
+        var plain = loaded with { Appearance = loaded.Appearance with { BarEffects = false, EffectsOnEveryBar = false, ShowCombatPower = false, PictureOpacity = 0.4, VisibleRows = 6 } };
         store.Save(plain);
         Assert.Equal(plain, store.Load().Settings);
     }

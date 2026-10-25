@@ -1,6 +1,7 @@
 /* Scarlet Meter theme: near-black panels, scarlet accent, tabular numbers. Shared by every window. */
 :root {
-    /* Also written out as rgba(11, 11, 15, ...) in .overlay::before's veil and picture fade: change those with it. */
+    /* Also written out as rgba(11, 11, 15, ...) in .overlay::before's veil and picture fade: change those with it.
+       The pinned own row's backdrop (.rows.capped > .row.me::before) uses it as is. */
     --bg: #0b0b0f;
     --panel: #121218;
     --panel-2: #17171f;
@@ -73,8 +74,9 @@ button {
    the picture at that opacity over the colour would look; the dark veil above it keeps text readable. Without a
    picture both layers are the panel's colour, so nothing changes.
    The panel is only as tall as its content: what it does not cover is see-through to the game, so the room the
-   notices leave in a boss fight, or below a small party's rows, never shows as an empty panel. Nothing in it
-   scrolls: when the content is taller than the window, the window grows to fit (js/overlay-size.js reports the
+   notices leave in a boss fight, or below a small party's rows, never shows as an empty panel. Only the player
+   list scrolls, past "Rows before scrolling" (.rows.capped); the notices never do. Otherwise, when the content is
+   taller than the window, the window grows to fit (js/overlay-size.js reports the
    height, Windows/OverlayFit places the window) and returns to the player's size once it fits again. max-height
    keeps the panel inside the window for the moment until then, and for good once the window is as tall as the
    screen, when the rows give way (.overlay.cut .rows), never the notices. Its bottom padding adds 8 px
@@ -387,9 +389,10 @@ button {
 .ping.bad { color: var(--bad); }
 .ping.bad i:nth-child(1) { background: var(--bad); }
 
-/* Positioned, so a row's offsetTop (js/overlay-fx.js) is measured from the list, not the panel above it. Nothing in
-   the overlay scrolls: the rows take their full height (flex: none) and the window grows to the content (.overlay).
-   Its overflow is clipped, not scrollable, so a row gliding into place (a transform) cannot stretch the measured
+/* Positioned, so a row's offsetTop (js/overlay-fx.js) is measured from the list, not the panel above it. Up to
+   "Rows before scrolling" the rows take their full height (flex: none) and the window grows to the content
+   (.overlay); past it the list scrolls (.rows.capped). Up to it, its overflow is clipped, not scrollable, so a row
+   gliding into place (a transform) cannot stretch the measured
    height for a moment and make the window jump. --row-edge is the crisp dark edge every bit of a row's text sits
    on, a tight outline shadow, so white text stays readable over the brightest class bars (gold, green) as well as
    the dark track; a soft shadow alone washed out there. */
@@ -416,6 +419,69 @@ button {
 
 .overlay[data-measuring] .rows {
     flex: none;
+}
+
+/* A capped list that gives way still scrolls, so it needs no 26 px give-way fade, which would half fade the pinned
+   own row at the bottom and the last row at the end: only its own 9 px fade (.rows.capped). After .overlay.cut .rows
+   and more specific than it. Audit on PR #35. */
+.overlay.cut .rows.capped {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 9px), transparent);
+}
+
+/* More players than "Rows before scrolling" (Settings, Appearance; Pages/MeterPage.razor.cs, RowsClass; Harry: in
+   big raids the meter was "just too long vertically"): the list stops at that many rows and scrolls, so the window
+   stops growing there; the notices below never scroll. Each row takes 29 px (26 px and its 3 px gap), so the
+   content box holds that many rows and the padding shows the top 6 px of the next one, faded out at the bottom
+   edge as a sign that more follow; scrolled to the end, only the last row's gap is in the fade. The list's zoom
+   (Row size) scales the cap with the rows. The page measures it at this height (js/overlay-size.js), so the
+   window fits the capped list. No scroll anchoring: when rows swap at the view's edge, Chromium would otherwise
+   move the scroll position by a row to keep the row it anchored on in place, so the view would drift by a rank
+   with each swap (js/overlay-fx.js measures in the view's coordinates either way; audit on PR #35). */
+.rows.capped {
+    max-height: calc(var(--visible-rows, 10) * 29px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overflow-anchor: none;
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 9px), transparent);
+}
+
+.rows.capped::-webkit-scrollbar { width: 6px; }
+.rows.capped::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 3px; }
+
+/* In a scrolling list the player's own row never scrolls out of sight: it stops at the top edge, or at the bottom
+   in the last whole row's place (3 px above the padding, which is the fade), over whichever row is there. Only
+   while it is stuck (a scroll-state query on the row itself) does a backdrop of the panel's colour (--bg) cover the
+   row beneath; it is opaque whatever the background opacity, so the row beneath never shows through, and at a low
+   background opacity the stuck row reads as a solid bar on the see-through panel. Unstuck it looks like every other
+   row, over the picture. Its offsetTop is where it is drawn, so js/overlay-fx.js measures it again on scroll. A
+   WebView2 runtime without scroll-state queries (before Chromium 133) keeps the backdrop on (@supports below), so
+   rows never overlap there either. */
+.rows.capped > .row.me {
+    position: sticky;
+    top: 0;
+    bottom: 3px;
+    z-index: 1;
+    container-type: scroll-state;
+}
+
+.rows.capped > .row.me::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+}
+
+@container scroll-state((stuck: top) or (stuck: bottom)) {
+    .rows.capped > .row.me::before {
+        background: linear-gradient(var(--row), var(--row)), var(--bg);
+    }
+}
+
+@supports not (container-type: scroll-state) {
+    .rows.capped > .row.me::before {
+        background: linear-gradient(var(--row), var(--row)), var(--bg);
+    }
 }
 
 .row {

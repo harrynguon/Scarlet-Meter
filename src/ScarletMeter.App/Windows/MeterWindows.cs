@@ -65,8 +65,9 @@ public interface IMeterWindows
     void HoldAlerts(bool held);
 
     /// <summary>
-    /// The overlay page's content height (CSS pixels): nothing in the meter scrolls, so the overlay window grows to
-    /// show all of it and returns to the player's own size when it fits (<see cref="OverlayFit"/>).
+    /// The overlay page's content height (CSS pixels), the player list at its capped height: only that list scrolls,
+    /// so the overlay window grows to show all of it and returns to the player's own size when it fits
+    /// (<see cref="OverlayFit"/>).
     /// </summary>
     void FitOverlayToContent(double contentHeight);
 

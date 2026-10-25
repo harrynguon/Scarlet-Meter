@@ -4,8 +4,9 @@ using ScarletMeter.App.Windows;
 namespace ScarletMeter.Tests;
 
 /// <summary>
-/// Where the overlay window goes so its whole content shows (nothing in the meter scrolls): the player's placement
-/// when the content fits, taller when it does not, moved up only to stay inside the work area, never above it.
+/// Where the overlay window goes so its whole content shows (only the capped player list scrolls): the player's
+/// placement when the content fits, taller when it does not, moved up only to stay inside the work area, never above
+/// it.
 /// </summary>
 public sealed class OverlayFitTests
 {

@@ -3,9 +3,9 @@ using System.Windows;
 namespace ScarletMeter.App.Windows;
 
 /// <summary>
-/// Where the overlay window goes so all of its content shows. Nothing in the meter scrolls, so when the page's
-/// content (the DPS rows and the world-event notices) is taller than the height the player gave the window, the window
-/// grows to fit, and it goes back to the player's own placement once the content fits again. It grows downwards; near
+/// Where the overlay window goes so all of its content shows. Only the player list scrolls, past "Rows before
+/// scrolling" (the page reports it at that capped height), so when the page's content (the DPS rows and the
+/// world-event notices) is taller than the height the player gave the window, the window grows to fit, and it goes back to the player's own placement once the content fits again. It grows downwards; near
 /// the bottom of the screen it moves up just enough to stay inside the monitor's work area, never above the work
 /// area's top (or the player's own top, if that is higher), and it is never made taller than the work area unless the
 /// player's own height already is. Pure, so the rules are tested without a window.
