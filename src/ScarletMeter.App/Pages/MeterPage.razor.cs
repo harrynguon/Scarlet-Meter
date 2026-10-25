@@ -270,6 +270,9 @@ public partial class MeterPage : IAsyncDisposable
     // The header's bell: world-event notices on or off, saved like the switch in Settings, Alerts.
     private void ToggleAlerts() => Settings.Update(s => s with { Alerts = s.Alerts with { Enabled = !s.Alerts.Enabled } });
 
+    // The notice strip's bar: open or closed, saved so it stays as the player left it.
+    private void SetNoticesExpanded(bool expanded) => Settings.Update(s => s with { Alerts = s.Alerts with { NoticesExpanded = expanded } });
+
     private void Reset()
     {
         Engine.Reset();

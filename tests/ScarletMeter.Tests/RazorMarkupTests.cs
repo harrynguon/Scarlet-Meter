@@ -238,9 +238,10 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?m)^\s*--soon:\s*#dcc68c;", app);
         Assert.DoesNotContain("var(--me)", alerts, StringComparison.Ordinal);
         Assert.DoesNotContain("255, 183, 3", alerts, StringComparison.Ordinal);
-        Assert.Matches(@"(?m)^\.alert\.soon \.alert-dot \{[^}]*background:\s*var\(--soon\);", alerts);
+        // The strip's bar takes the same colours as the notice it names.
+        Assert.Matches(@"(?m)^\.alert\.soon \.alert-dot,\s*\.alert-bar\.soon \.alert-dot \{[^}]*background:\s*var\(--soon\);", alerts);
         Assert.Matches(@"(?m)^\.alert-progress \{[^}]*background:\s*var\(--soon\);", alerts);
-        Assert.Matches(@"(?m)^\.alert\.open \.alert-progress \{[^}]*background:\s*var\(--good\);", alerts);
+        Assert.Matches(@"(?m)^\.alert\.open \.alert-progress,\s*\.alert-bar\.open \.alert-progress \{[^}]*background:\s*var\(--good\);", alerts);
     }
 
     // The boss-timers window shows a third-party site, so it is kept apart from the meter: a plain WebView2 in its own
@@ -314,7 +315,7 @@ public sealed partial class RazorMarkupTests
     }
 
     // Nothing in the notice strip blinks or loops (Harry: the pulsing dot was "too distracting"): the only animations
-    // are a notice's one-time entrance and the progress line's width transition.
+    // are a notice's one-time entrance, the progress line's width transition and the bar's chevron turning.
     [Fact]
     public void TheNoticeStripNeverBlinks()
     {
@@ -323,6 +324,48 @@ public sealed partial class RazorMarkupTests
         Assert.DoesNotContain("alternate", alerts, StringComparison.Ordinal);
         Assert.DoesNotMatch(@"animation-iteration-count", alerts);
         Assert.Equal(["alert-in"], Regex.Matches(alerts, @"@keyframes\s+([\w-]+)").Select(m => m.Groups[1].Value));
+    }
+
+    // The notice strip is one bar that opens and closes (Harry asked for the whole section to fold away rather than
+    // always show two): a real button that says whether it is open, listing the notices only when open, and bound to
+    // the player's saved choice, so it stays as they left it.
+    [Fact]
+    public void TheNoticeStripIsOneBarThatOpensAndCloses()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        var strip = File.ReadAllText(Path.Combine(app, "Components", "AlertStrip.razor"));
+        Assert.Contains(@"<button type=""button"" class=""alert-bar @Kind(first)"" aria-expanded=""@(Expanded ? ""true"" : ""false"")""", strip);
+        Assert.Contains(@"@onclick=""Toggle""", strip);
+        Assert.Contains("private Task Toggle() => ExpandedChanged.InvokeAsync(!Expanded);", strip);
+        Assert.Contains("@foreach (var alert in AlertStripLayout.Shown(View.Alerts, Expanded))", strip);
+        Assert.Single(Regex.Matches(strip, @"@foreach\b"));
+
+        var pages = Path.Combine(app, "Pages");
+        Assert.Matches(@"<AlertStrip [^>]*Expanded=""alertSettings\.NoticesExpanded"" ExpandedChanged=""SetNoticesExpanded""",
+            File.ReadAllText(Path.Combine(pages, "MeterPage.razor")));
+        Assert.Contains("Settings.Update(s => s with { Alerts = s.Alerts with { NoticesExpanded = expanded } })",
+            File.ReadAllText(Path.Combine(pages, "MeterPage.razor.cs")));
+
+        var alerts = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "alerts.css"));
+        Assert.Matches(@"(?m)^\.alerts\.expanded \.alert-chevron \{[^}]*transform:\s*rotate\(-135deg\);", alerts);
+        Assert.Matches(@"(?m)^\.alert-bar \{[^}]*height:\s*24px;", alerts); // as tall as a notice: closing never jumps
+    }
+
+    // A row's text reads over any bar (Harry found the white names hard to read): every bit of it sits on a
+    // crisp dark edge, the names are bold, and the death count is the meter's white-ish text, not an alarm red.
+    [Fact]
+    public void ARowsTextSitsOnACrispDarkEdge()
+    {
+        var css = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "app.css"));
+        static string Block(string source, string selector) =>
+            Regex.Match(source, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
+        Assert.Matches(@"--row-edge:\s*0 0 1px rgba\(0, 0, 0, 0\.95\)", Block(css, ".rows"));
+        foreach (var text in new[] { ".row .name", ".row .cp", ".row .deaths", ".row .num" })
+            Assert.Matches(@"text-shadow:\s*var\(--row-edge\);", Block(css, text));
+        Assert.Matches(@"font-weight:\s*700;", Block(css, ".row .name"));
+        Assert.Matches(@"color:\s*rgba\(235, 233, 242, 0\.85\);", Block(css, ".row .deaths"));
+        // Nothing later sets a row's text back to a soft shadow.
+        Assert.DoesNotMatch(@"(?m)^\.row[^{]*\{[^}]*text-shadow:(?!\s*var\(--row-edge\);)", css);
     }
 
     // The player's own row is marked by a ring round the row, never by a stripe on the bar (a white inset at the

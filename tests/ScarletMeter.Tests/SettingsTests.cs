@@ -226,13 +226,14 @@ public sealed class SettingsTests : IDisposable
         // Every AlertSettings member, since it has a hand-written Equals too.
         var alertProperties = typeof(AlertSettings).GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.Name != "EqualityContract").Select(p => p.Name).Order().ToList();
-        Assert.Equal(new[] { "Enabled", "Events", "HideDuringBossFights", "LeadMinutes", "RestoreMinimizedMeter", "ServerOffsetHours", "ShowNextEvent" }, alertProperties);
+        Assert.Equal(new[] { "Enabled", "Events", "HideDuringBossFights", "LeadMinutes", "NoticesExpanded", "RestoreMinimizedMeter", "ServerOffsetHours", "ShowNextEvent" }, alertProperties);
         var alerts = baseline.Alerts;
         Assert.Equal(alerts, alerts with { Events = alerts.Events.ToList() });
         Assert.NotEqual(alerts, alerts with { Enabled = !alerts.Enabled });
         Assert.NotEqual(alerts, alerts with { HideDuringBossFights = !alerts.HideDuringBossFights });
         Assert.NotEqual(alerts, alerts with { Events = alerts.Events.Skip(1).ToList() });
         Assert.NotEqual(alerts, alerts with { LeadMinutes = 7 });
+        Assert.NotEqual(alerts, alerts with { NoticesExpanded = !alerts.NoticesExpanded });
         Assert.NotEqual(alerts, alerts with { RestoreMinimizedMeter = !alerts.RestoreMinimizedMeter });
         Assert.NotEqual(alerts, alerts with { ServerOffsetHours = 8 });
         Assert.NotEqual(alerts, alerts with { ShowNextEvent = !alerts.ShowNextEvent });

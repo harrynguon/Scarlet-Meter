@@ -132,6 +132,6 @@
         </div>
     }
     @* Always rendered, held empty while the notices stand aside for a boss fight (NoticesHeld), so its live region
-       and the player's "+N more" choice survive the fight. *@
-    <AlertStrip View="Alerts.Current" Now="Clock.GetUtcNow()" Held="NoticesHeld" />
+       survives the fight. Open or closed is the player's choice, kept in settings. *@
+    <AlertStrip View="Alerts.Current" Now="Clock.GetUtcNow()" Expanded="alertSettings.NoticesExpanded" ExpandedChanged="SetNoticesExpanded" Held="NoticesHeld" />
 </div>

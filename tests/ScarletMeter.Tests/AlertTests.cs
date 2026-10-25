@@ -192,38 +192,48 @@ public sealed class AlertTests : IDisposable
         Assert.Equal("07:00 UTC", EventText.Schedule(rules[EventIds.Daily]));
     }
 
+    // The strip is one bar (Harry asked for the whole section to fold away rather than always show two): closed, the
+    // bar alone names the most urgent notice and no rows show; open, every notice shows under it.
     [Fact]
-    public void TheStripShowsTwoNoticesUntilExpandedThenAll()
+    public void TheClosedBarShowsNoRowsAndTheOpenOneShowsEvery()
     {
         var alerts = FourDue();
-        Assert.Equal(alerts.Take(2), AlertStripLayout.Shown(alerts, expanded: false));
+        Assert.Empty(AlertStripLayout.Shown(alerts, expanded: false));
         Assert.Equal(alerts, AlertStripLayout.Shown(alerts, expanded: true));
-        Assert.Equal(2, AlertStripLayout.HiddenCount(alerts));
-        Assert.Equal(1, AlertStripLayout.HiddenCount([.. alerts.Take(3)]));
-        Assert.Equal(0, AlertStripLayout.HiddenCount([.. alerts.Take(2)]));
-        Assert.Equal(0, AlertStripLayout.HiddenCount([]));
+        Assert.Empty(AlertStripLayout.Shown([], expanded: true));
     }
 
     [Fact]
-    public void AnExpandedStripCollapsesOnceEveryNoticeFits()
+    public void TheClosedBarCountsTheNoticesItDoesNotName()
     {
         var alerts = FourDue();
-        Assert.True(AlertStripLayout.StaysExpanded(true, alerts));
-        Assert.True(AlertStripLayout.StaysExpanded(true, [.. alerts.Take(3)])); // one hidden: still worth expanding
-        Assert.False(AlertStripLayout.StaysExpanded(false, alerts));
-        Assert.False(AlertStripLayout.StaysExpanded(true, [.. alerts.Take(2)]));
-        Assert.Equal("Show only the first 2", AlertStripLayout.CollapseHint);
+        Assert.Equal(3, AlertStripLayout.MoreCount(alerts));
+        Assert.Equal(1, AlertStripLayout.MoreCount([.. alerts.Take(2)]));
+        Assert.Equal(0, AlertStripLayout.MoreCount([.. alerts.Take(1)])); // the only one: no "+0"
+        Assert.Equal(0, AlertStripLayout.MoreCount([]));
+        Assert.Equal(2, AlertStripLayout.AnnouncedCount);
     }
 
     [Fact]
-    public void TheMoreTooltipListsEachHiddenNoticeWithItsClockTime()
+    public void TheClosedBarsTooltipListsEveryNoticeWithItsClockTime()
     {
         var alerts = FourDue();
         string Line(EventAlert a, string verb) => $"{a.Rule.Name} · {a.Rule.Location} · {verb} {EventText.LocalTime(a.Deadline)}";
         Assert.Equal(Line(alerts[0], "closes"), AlertStripLayout.Describe(alerts[0]));
         Assert.Equal(Line(alerts[1], "starts"), AlertStripLayout.Describe(alerts[1]));
-        Assert.Equal(Line(alerts[2], "starts") + "\n" + Line(alerts[3], "starts"), AlertStripLayout.HiddenSummary(alerts));
-        Assert.Equal(string.Empty, AlertStripLayout.HiddenSummary([.. alerts.Take(2)]));
+        Assert.Equal(string.Join("\n", Line(alerts[0], "closes"), Line(alerts[1], "starts"), Line(alerts[2], "starts"), Line(alerts[3], "starts")),
+            AlertStripLayout.List(alerts));
+        Assert.Equal(string.Empty, AlertStripLayout.List([]));
+        Assert.Equal("Fold the world events into one line", AlertStripLayout.CollapseHint);
+    }
+
+    // Open or closed is the player's choice, closed by default and kept in settings (the overlay's binding is guarded
+    // in RazorMarkupTests).
+    [Fact]
+    public void TheStripStartsClosed()
+    {
+        Assert.False(new AlertSettings().NoticesExpanded);
+        Assert.NotEqual(new AlertSettings(), new AlertSettings { NoticesExpanded = true });
     }
 
     [Fact]

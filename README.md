@@ -90,8 +90,9 @@ and adds it up per player and per fight.
 - **Alerts** at the bottom of the meter before world events and field bosses (Spacetime Rift, Shugo Festival,
   Dimensional Invasion, Watcher Kaira and more) and while their entry is open, with a countdown.
 - **Out of your way**: they sit below the bars and never cover one, step aside during boss fights, and a **bell**
-  in the header turns them off in one click. "+N more" folds extra ones away; nothing scrolls, the meter grows to
-  fit instead. Times follow the Global preset and are not yet verified in game.
+  in the header turns them off in one click. They fold into one slim bar showing the next event and "+N" more;
+  click it to open the list, and it stays as you left it. Nothing scrolls, the meter grows to fit instead. Times
+  follow the Global preset and are not yet verified in game.
 - **Boss timers**: the hourglass in the header opens [aion2timers.com](https://www.aion2timers.com/world-boss-timer/)'s
   world-boss timers in a small window of their own, in or out of game. The site remembers your server and faction
   there; links to other sites open in your browser (one every few seconds at most; a site link that redirects
