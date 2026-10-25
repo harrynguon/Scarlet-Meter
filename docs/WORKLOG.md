@@ -2,6 +2,18 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-25 — No gap above a table's header; the picture fits the panel again
+
+**What:** (1) The tab body (details, history, settings) has no top padding; a 6 px spacer (`.tab-body::before`) that scrolls away keeps the space above the content. A table's sticky header (`top: 0`) stopped at the padding edge, 6 px below the top of the scroll, and the rows showed through that strip. (2) The overlay's picture covers the panel again (`center / cover`, laid out against the panel), instead of the window (`background-attachment: fixed`, since #26).
+
+**Why:** Harry, with screenshots: "in-between the skills row buffs.. row and the skills spec .. row, there's a bit of a gap, so when yoiuy're scrolling up and down you see some of the skills through taht gap. please close that gap", and "when choosing a background image, it no longer fits in the background" (a zoomed-in slice of the picture, against an older screenshot where all of it showed). Both reproduced in headless Edge (no window) with the real styles before fixing: the header 6 px below the top of the scroll when scrolled; and in a 480 × 640 window with about 250 px of panel, the picture scaled to the window's height and centred on it, below the panel.
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` 505/505 (`RazorMarkupTests.StickyTableHeadersSitFlushUnderTheTabs` new, `TheOverlayPanelFitsItsContent` now requires the picture on the panel). Fail-first, six mutations, each failing its test by name: `fixed` back on the picture, `background-attachment: fixed` added, the tab body's top padding back, no spacer, top padding on the log body, the header stuck at 6 px. Headless Edge after the fix: the scrolled header's offset is 0; the whole synthetic picture (both corner labels and its centre) shows in the panel in the tall window.
+
+**Not checked:** the meter itself (no window opened); the picture rescaling a little when the panel's height changes, the trade-off of laying it out against the panel (HANDOFF).
+
+**Next:** Harry's look at the preview; with Harry's go-ahead, push, PR, audit (standard: styles only), Codex and CI.
+
 ## 2026-10-25 — The history tests no longer race upstream's startup cleanup
 
 **What:** `TestEngineHost` replaces the history store's registration (the engine's, or the test's own, as `HistoryTests` makes) with one that returns the store only once its startup cleanup has logged that it finished, using the host's existing `HistoryCleanupWatcher`. So the test, the engine and the demo feed all get the store after the cleanup, and nothing a test writes can meet it. New `TestEngineHostTests.TheHistoryStoreIsHandedOutOnlyOnceItsStartupCleanupHasFinished` holds the cleanup (a proxy over upstream's settings that stops at the retention period, which only the cleanup reads, before it deletes anything) and checks the store is not handed out until it is released. `HistoryTests`' summary says why its damaged rows are safe. Test code only; nothing under `upstream/` or `src/` changed. ARCHITECTURE (the test-host paragraph), LESSONS.
