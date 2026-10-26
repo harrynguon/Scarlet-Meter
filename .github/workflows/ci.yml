@@ -49,6 +49,22 @@ jobs:
           "SCARLET_EXPECTED_UPSTREAM_RELEASE=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "Pinned upstream release: $tag ($pinned)"
 
+      # The app's version (src/Directory.Build.props) has its CHANGELOG.md section, read by the script the release
+      # workflow uses, so a version bump without one fails here rather than at the tag.
+      - name: The changelog has the app version's section
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content -LiteralPath "${{ github.workspace }}/src/Directory.Build.props" -Raw
+          $version = @($props.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ })[0]
+          $section = & "${{ github.workspace }}/scripts/Get-ChangelogSection.ps1" -Version $version
+          Write-Host "CHANGELOG.md has $version, $(@($section -split "`n" | Where-Object { $_ -like '- *' }).Count) changes."
+
+      # The script's refusals and section bounds on throwaway changelogs (a missing section, a missing or impossible
+      # date, an empty section, a reference link inside one).
+      - name: Changelog script cases
+        shell: pwsh
+        run: '& "${{ github.workspace }}/scripts/Test-ChangelogSection.ps1"'
+
       - name: Setup .NET 10
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:

@@ -31,6 +31,7 @@ You need Windows 11, 64-bit (Windows 10 has not been tried; it may need the
 That is all. **Ctrl+Shift+D** hides and shows the meter (changeable). Windows may warn that the file comes from an
 unknown publisher, because it is not code-signed: choose "More info", then "Run anyway". Each release comes with
 SHA-256 checksums and its complete source, and is built by GitHub Actions from the tagged source, not on anyone's PC.
+What changed in each release, and what is coming in the next, is in the [changelog](CHANGELOG.md).
 
 - **Try it without the game:** in the `ScarletMeter` folder, Shift+right-click an empty space, choose "Open in
   Terminal" and run `.\ScarletMeter.exe --demo` for made-up boss fights.
@@ -52,7 +53,10 @@ and adds it up per player and per fight.
   RATmeter release on GitHub, and skill icons from NCSOFT's own game-data site, as RATmeter does. Settings turn
   either off.
 - **Damage to whom?** Upstream decides the current target (the one you hit last), the meter shows the party's
-  damage on it, and boss fights are saved to your history.
+  damage on it, and boss fights are saved to your history. Other players' fights on a **training dummy** near you
+  are ignored, neither shown nor saved, unless you hit that dummy too (then everyone on it shows, as in any fight).
+  The meter learns which character is yours from what the game sends when you log in; started after that, it treats
+  every dummy fight as before until it has seen your character (your own bar's ring is the sign it has).
 
 ## Features
 
@@ -136,6 +140,7 @@ opacity, a background picture, class colours, hidden names and a show/hide hotke
 | World-event and field-boss alerts | Yes | No |
 | Odyle energy beside the ping | Yes | No |
 | Pauses itself in the Abyss | Yes | No |
+| Ignores other players' training-dummy fights | Yes | No |
 | Demo mode with made-up fights | Yes | No |
 | Buff and skill-cooldown overlays | No | Yes |
 | Stat Efficiency Calculator | No | Yes |
@@ -193,6 +198,12 @@ yours.
 **How do I hide it quickly?**
 **Ctrl+Shift+D**, a system-wide shortcut, hides and shows it. Change the shortcut in Settings.
 
+**I stood by the training dummies and other players' fights filled my meter and history.**
+Not any more: a dummy fight you have not hit is ignored. The meter keeps showing your own last fight, and History
+neither lists nor saves theirs. Hit a dummy yourself and your fight counts, with everyone on that dummy. This needs
+the meter to know your character, which it learns when you log in: if it was started after that (no ring round your
+own bar), log in again. Fights saved before this change stay in History.
+
 **A player shows as `Player_xxxx`.**
 The game sends names only at certain moments (teleporting, entering a dungeon). The meter shows a placeholder until
 then, as RATmeter does.
@@ -232,6 +243,7 @@ git clone --recurse-submodules https://github.com/harrynguon/Scarlet-Meter.git "
 | `tests/ScarletMeter.Tests` | Boundary, engine, settings, alert and UI-rule tests (no Npcap needed). |
 | `scripts/` | Build, portable publish and update (`Update-Meter.ps1` moves to RATmeter's latest release), install, smoke tests. |
 | `docs/` | Maintainer documentation: start with [docs/README.md](docs/README.md); releases in [DEVELOPMENT.md](docs/DEVELOPMENT.md). |
+| `CHANGELOG.md` | What changed for players in each release, and what is unreleased. |
 
 ## Licence and credits
 

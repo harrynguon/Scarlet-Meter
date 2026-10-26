@@ -12,13 +12,16 @@ namespace ScarletMeter.Engine.Upstream;
 /// TCP reassembly, frame decoding and the opcode processors that feed CombatSessionManager; snapshots, details
 /// and history are read back from that manager (and saved fights from its history store), then converted by
 /// <see cref="UpstreamMapping"/>. Saved data is untrusted: it is cleaned by <see cref="SavedFightSanitizer"/>, and
-/// history reads fail soft (logged) rather than throw. Only the Upstream folder touches upstream types, so an
-/// upstream API change is contained there.
+/// history reads fail soft (logged) rather than throw. Training-dummy fights the player is not in (strangers' fights
+/// nearby) are left out of the snapshot, the details and the history list, as <see cref="DummyFightFilter"/> decides;
+/// <see cref="DummyFightHistoryStore"/> keeps them out of the saved history. Only the Upstream folder touches
+/// upstream types, so an upstream API change is contained there.
 /// </summary>
 internal sealed class UpstreamCombatEngine : ICombatEngine
 {
-    // A details read that straddles a change of fight is taken again, this many times in all, then given up.
+    // A details or snapshot read that straddles a change of fight is taken again, this many times in all, then given up.
     private const int DetailsReadAttempts = 3;
+    private const int SnapshotReadAttempts = 3;
 
     private readonly IPacketService pipeline;
     private readonly IPacketCaptureDevice capture;
@@ -29,7 +32,11 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     private readonly OdyleEnergyTap odyle;
     private readonly MapLoadTap maps;
     private readonly AbyssPause pause;
+    private readonly DummyFightFilter dummies;
     private readonly ILogger<UpstreamCombatEngine> logger;
+    private readonly Lock shownLock = new(); // orders GetSnapshot and Reset around `shown`
+    private CombatSnapshot shown = CombatSnapshot.Empty; // the snapshot GetSnapshot last returned
+    private bool shownOnDummy; // whether `shown` is a training-dummy fight
     private volatile bool savedHistoryDamaged; // set while upstream's store cannot read the saved list
     private bool disposed;
 
@@ -43,6 +50,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         OdyleEnergyTap odyle,
         MapLoadTap maps,
         AbyssPause pause,
+        DummyFightFilter dummies,
         ILogger<UpstreamCombatEngine> logger)
     {
         this.pipeline = pipeline;
@@ -54,11 +62,15 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         this.odyle = odyle;
         this.maps = maps;
         this.pause = pause;
+        this.dummies = dummies;
         this.logger = logger;
     }
 
     /// <summary>Test seam: runs in every details read between its first and last check of the active fight. Null in production.</summary>
     internal Action? BetweenDetailsReads { get; set; }
+
+    /// <summary>Test seam: runs in every snapshot read after the active target is read and before its players are. Null in production.</summary>
+    internal Action? BetweenSnapshotReads { get; set; }
 
     public event EventHandler<int>? PingUpdated
     {
@@ -121,26 +133,68 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     // Fight state only, under the session manager's lock. Upstream's IPacketService.Reset would also clear the
     // summon-to-owner map (a pet already out would show as an unidentified player) and the TCP reassembly
     // buffer (frames are dropped until the stream re-synchronises), both without a lock while the capture
-    // thread writes them. Upstream's own UI never calls it.
-    public void Reset() => sessions.Reset();
+    // thread writes them. Upstream's own UI never calls it. The snapshot held for a left-out dummy fight goes too.
+    public void Reset()
+    {
+        lock (shownLock)
+        {
+            sessions.Reset();
+            shown = CombatSnapshot.Empty;
+            shownOnDummy = false;
+        }
+    }
 
     public CombatSnapshot GetSnapshot()
     {
-        // Paused for the Abyss: nothing shows (and the rows of a crowd's boss fight are never built).
-        if (pause.Paused) return CombatSnapshot.Empty;
+        lock (shownLock)
+        {
+            // Paused for the Abyss: nothing shows (and the rows of a crowd's boss fight are never built), and nothing
+            // shown before the Abyss is held over it.
+            if (pause.Paused)
+            {
+                shownOnDummy = false;
+                return shown = CombatSnapshot.Empty;
+            }
 
-        // Each upstream getter takes the session manager's lock on its own, so a snapshot is a composition of
-        // three consistent reads taken a few microseconds apart, which is what upstream's own UI does.
-        var mob = sessions.GetActiveTargetInfo();
-        var duration = sessions.GetCombatDuration();
-        var stats = sessions.PlayerStats;
-        if (mob is null && stats.Count == 0) return CombatSnapshot.Empty;
+            // Each upstream getter takes the session manager's lock on its own, so a snapshot is a composition of
+            // consistent reads taken a few microseconds apart, which is what upstream's own UI does. If upstream switched
+            // the active fight between them, they would mix two fights (one's target, the other's players), and the
+            // snapshot held for an ignored dummy fight would keep that mix up; so the active fight is compared before
+            // and after the reads and the read taken again, as GetPlayerDetails does. A read that keeps straddling a
+            // change shows nothing new: the next poll reads afresh.
+            for (var attempt = 1; attempt <= SnapshotReadAttempts; attempt++)
+            {
+                var session = sessions.GetActiveTargetSession();
+                var mob = sessions.GetActiveTargetInfo();
+                BetweenSnapshotReads?.Invoke();
+                var duration = sessions.GetCombatDuration();
+                var stats = sessions.PlayerStats;
+                if (!ReferenceEquals(sessions.GetActiveTargetSession(), session)) continue;
+                if (session is not null && mob?.Id != session.TargetId) continue;
 
-        var players = stats.Select(UpstreamMapping.ToPlayerRow).ToList();
-        long totalDamage = players.Sum(p => p.TotalDamage);
-        double partyDps = duration.TotalSeconds > 0 ? totalDamage / duration.TotalSeconds : 0;
-        var target = mob is null ? null : new TargetInfo(mob.Id, mob.Name, mob.HpCurrent, mob.HpTotal, mob.IsBoss);
-        return new CombatSnapshot(target, duration, partyDps, players);
+                // Upstream makes a stranger's training-dummy fight the active one once the player's own last hit is
+                // five seconds old. Such a fight is ignored: the overlay keeps the fight it showed last, as it stood,
+                // as if those hits had not happened.
+                if (!dummies.Keeps(mob, stats)) return Held();
+                shownOnDummy = mob?.IsDummy == true;
+                if (mob is null && stats.Count == 0) return shown = CombatSnapshot.Empty;
+
+                var players = stats.Select(UpstreamMapping.ToPlayerRow).ToList();
+                long totalDamage = players.Sum(p => p.TotalDamage);
+                double partyDps = duration.TotalSeconds > 0 ? totalDamage / duration.TotalSeconds : 0;
+                var target = mob is null ? null : new TargetInfo(mob.Id, mob.Name, mob.HpCurrent, mob.HpTotal, mob.IsBoss);
+                return shown = new CombatSnapshot(target, duration, partyDps, players);
+            }
+            return shown;
+        }
+    }
+
+    // The snapshot to show while the active fight is ignored: the one shown last, unless that one is itself a dummy
+    // fight the user is not in, shown before the meter knew the user (the only way one is shown), which goes too.
+    private CombatSnapshot Held()
+    {
+        if (shownOnDummy && !shown.Players.Any(p => p.IsUser)) shown = CombatSnapshot.Empty;
+        return shown;
     }
 
     public PlayerDetails? GetPlayerDetails(long playerId)
@@ -149,13 +203,17 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         // between the first check and the last (it ended, or the party switched targets), the parts could mix two
         // fights, so the read is taken again, and given up (null) if it keeps straddling: the caller polls again.
         // The check is by identity, so a switch away and back between the two checks goes unnoticed (documented on
-        // ICombatEngine). The session's start is set once, so reading it unlocked is safe. Paused for the Abyss: none.
+        // ICombatEngine). The session's start and target are set once, so reading them unlocked is safe. Paused for the
+        // Abyss: none.
         if (pause.Paused) return null;
         for (var attempt = 1; attempt <= DetailsReadAttempts; attempt++)
         {
             var session = sessions.GetActiveTargetSession();
             if (session is null) return null;
-            var stats = sessions.PlayerStats.FirstOrDefault(p => p.PlayerId == playerId);
+            var players = sessions.PlayerStats;
+            // A training-dummy fight the player is not in is not shown (GetSnapshot), so neither are its details.
+            if (!dummies.Keeps(session.TargetInfo, players)) return null;
+            var stats = players.FirstOrDefault(p => p.PlayerId == playerId);
             if (stats is null) return null;
             var duration = sessions.GetCombatDuration();
             var skills = sessions.GetPlayerSkillStats(playerId);
@@ -179,14 +237,19 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         try
         {
             // Upstream merges the running boss fights with the saved ones and pages across both, under its lock.
-            var page = sessions.GetHistoryPage(new HistorySessionQuery
+            var upstreamQuery = new HistorySessionQuery
             {
                 BossNameContains = valid.TargetNameContains,
                 DateFrom = valid.From,
                 DateTo = valid.To,
                 PageNumber = valid.Page,
                 PageSize = valid.PageSize,
-            });
+            };
+            var page = sessions.GetHistoryPage(upstreamQuery);
+            // Unless a running fight is a training-dummy fight the player is not in, which the list leaves out as the
+            // overlay and the saved history do: the page is then put together again without it.
+            var running = RunningFights(upstreamQuery, page.TotalCount);
+            if (running.Any(fight => fight.LeftOut)) return PageWithout(running, valid);
             return new HistoryPage(
                 page.Items.Select(UpstreamMapping.ToHistoryEntry).ToList(), page.TotalCount, page.PageNumber, page.PageSize);
         }
@@ -199,6 +262,59 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
             savedHistoryDamaged = true;
             return ReadDamagedHistory(valid);
         }
+    }
+
+    // The running boss fights that match the query, newest first, each with whether the list leaves it out. The store
+    // holds finished fights only, so upstream's count less the store's is how many are running, and upstream lists
+    // them ahead of the saved ones: a first page that size holds them all and reads no saved row. A fight that starts
+    // or ends between these reads can be missed, so a left-out fight can still show on that one read.
+    private List<(HistorySessionListItem Item, bool LeftOut)> RunningFights(HistorySessionQuery query, int totalCount)
+    {
+        var count = totalCount - history.GetSessionCount(query.DateFrom, query.DateTo, query.BossNameContains);
+        if (count <= 0) return [];
+        var head = sessions.GetHistoryPage(new HistorySessionQuery
+        {
+            BossNameContains = query.BossNameContains,
+            DateFrom = query.DateFrom,
+            DateTo = query.DateTo,
+            PageNumber = 1,
+            PageSize = count,
+        });
+        return head.Items
+            .TakeWhile(item => item.State != SessionState.Completed)
+            .Select(item => (item, LeavesOut(item)))
+            .ToList();
+    }
+
+    // Whether the list leaves out a running fight: a training-dummy fight the player is not in. Only a dummy's fight
+    // is snapshotted to find its players, since a snapshot copies every hit under the session lock. The session's
+    // target is set once, so reading it unlocked is safe.
+    private bool LeavesOut(HistorySessionListItem item)
+    {
+        var live = sessions.GetTargetHistory(item.TargetId).FirstOrDefault(fight => fight.SessionId == item.SessionId);
+        if (live is null || !live.TargetInfo.IsDummy) return false;
+        var fight = sessions.GetHistorySession(item.SessionId);
+        return fight is not null && !dummies.Keeps(live.TargetInfo, fight.PlayerStats);
+    }
+
+    // Upstream's merge (CombatSessionManager.GetHistoryPage) without the left-out fights: the other running fights
+    // first, then the saved ones, newest first, paged across both, so the count and the pages agree. Unlike
+    // upstream's, it is not one read under the session lock, so a fight that ends meanwhile can be missing from
+    // this one page.
+    private HistoryPage PageWithout(List<(HistorySessionListItem Item, bool LeftOut)> running, HistoryQuery valid)
+    {
+        var shownRunning = running.Where(fight => !fight.LeftOut).Select(fight => fight.Item).ToList();
+        var runningIds = running.Select(fight => fight.Item.SessionId).ToHashSet();
+        var savedCount = history.GetSessionCount(valid.From, valid.To, valid.TargetNameContains, runningIds);
+        var skip = (valid.Page - 1) * valid.PageSize;
+        var items = shownRunning.Skip(skip).Take(valid.PageSize).ToList();
+        if (items.Count < valid.PageSize)
+        {
+            items.AddRange(history.GetSessionPage(valid.From, valid.To, valid.TargetNameContains,
+                Math.Max(0, skip - shownRunning.Count), valid.PageSize - items.Count, runningIds));
+        }
+        return new HistoryPage(
+            items.Select(UpstreamMapping.ToHistoryEntry).ToList(), shownRunning.Count + savedCount, valid.Page, valid.PageSize);
     }
 
     // Whether upstream's store reads every saved row's list columns again; once it does, damaged mode ends. It
@@ -226,8 +342,14 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
             // which holds the session lock while it decompresses and deserialises every hit of the fight: a
             // performance choice, so that loading a large fight cannot stall the capture thread. A fight is saved
             // only once it has left upstream's live sessions, so only a running fight is left for the session
-            // manager, which then snapshots it.
-            var snapshot = history.GetSession(fightId) ?? sessions.GetHistorySession(fightId);
+            // manager, which then snapshots it; one the history list leaves out (a training-dummy fight the player
+            // is not in) is not found either.
+            var snapshot = history.GetSession(fightId);
+            if (snapshot is null)
+            {
+                snapshot = sessions.GetHistorySession(fightId);
+                if (snapshot is not null && !dummies.Keeps(snapshot)) snapshot = null;
+            }
             return snapshot is null ? null : MapFight(snapshot);
         }
         catch (Exception ex)

@@ -30,12 +30,18 @@ public interface ICombatEngine : IDisposable
     /// <summary>Whether capture runs and, once the game's connection is found, which adapter carries it.</summary>
     CaptureState Capture { get; }
 
-    /// <summary>An immutable view of the active fight, cheap enough to poll several times a second.</summary>
+    /// <summary>
+    /// An immutable view of the active fight, cheap enough to poll several times a second. Training-dummy fights the
+    /// user has not hit (other players' fights nearby) are ignored: while one is the active fight, the snapshot
+    /// returned last is returned again, until a fight that counts or <see cref="Reset"/>. Until the meter knows which
+    /// player is the user (from the character's info at login), every dummy fight counts.
+    /// </summary>
     CombatSnapshot GetSnapshot();
 
     /// <summary>
     /// One player's breakdown of the active fight, or null when the player has dealt no damage in it (or no
-    /// fight is active). Like <see cref="GetSnapshot"/> it is a composition of consecutive reads, each under
+    /// fight is active, or the active fight is a training-dummy fight <see cref="GetSnapshot"/> ignores). Like
+    /// <see cref="GetSnapshot"/> it is a composition of consecutive reads, each under
     /// upstream's session lock: a hit landing between them can show in one part (say the skills) and not yet
     /// in another (the log). The active fight is compared before and after the reads, and a read during which
     /// it changed (the fight ended, or the party switched targets) is taken again; if three reads in a row
@@ -47,7 +53,9 @@ public interface ICombatEngine : IDisposable
     PlayerDetails? GetPlayerDetails(long playerId);
 
     /// <summary>
-    /// A page of boss-fight history: the running boss fight first, then the saved ones, newest first. Upstream
+    /// A page of boss-fight history: the running boss fight first, then the saved ones, newest first. Upstream counts
+    /// training dummies as bosses; dummy fights the user has not hit are neither listed while they run nor saved
+    /// (see <see cref="GetSnapshot"/> for while the user is not known). Upstream
     /// runs the database query under its session lock, which holds up hit processing for that time, so read it
     /// on demand rather than on a timer. A damaged row in the history database does not make it throw: the
     /// fights that can be read are returned with <see cref="HistoryPage.IsComplete"/> false, and the damage is
@@ -57,8 +65,9 @@ public interface ICombatEngine : IDisposable
     HistoryPage GetHistory(HistoryQuery query);
 
     /// <summary>
-    /// A whole fight from history, saved or still running, or null when the id is unknown or its row cannot be
-    /// read (logged). A fight that has just ended can be missing for a moment: upstream saves it in the
+    /// A whole fight from history, saved or still running, or null when the id is unknown, its row cannot be
+    /// read (logged) or it is a running fight <see cref="GetHistory"/> leaves out. A fight that has just ended can
+    /// be missing for a moment: upstream saves it in the
     /// background. Saved fights are read from upstream's history store directly rather than through its
     /// session manager, which would hold its session lock while it deserialises every hit; that choice keeps
     /// loading a large fight from holding up live capture. Loading still takes a while (the store decompresses

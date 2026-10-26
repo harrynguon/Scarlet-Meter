@@ -37,7 +37,9 @@ public sealed class TestEngineHostTests
         {
             retention.Release();
         }
-        Assert.IsType<CombatHistoryStore>(await resolving.WaitAsync(Patience, token));
+        // Upstream's store, inside Scarlet's decorator (DummyFightHistoryStore).
+        var store = Assert.IsType<DummyFightHistoryStore>(await resolving.WaitAsync(Patience, token));
+        Assert.IsType<CombatHistoryStore>(store.Inner);
     }
 
     /// <summary>
