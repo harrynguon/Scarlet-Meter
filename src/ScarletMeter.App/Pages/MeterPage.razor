@@ -95,7 +95,7 @@
         </span>
     </div>
 
-    @* The bar area: a row per player, up to five (BarRows, Pages/BarArea); with more players it scrolls, the player's own row pinned in view (RowsClass, app.css .rows.scrolls). *@
+    @* The bar area: a row per player, up to five, dropping to fewer after a pause (barRows; Pages/BarArea, BarRowsHold); with more players it scrolls, the player's own row pinned in view (RowsClass, app.css .rows.scrolls). *@
     <ul class="rows @RowsClass">
         @foreach (var player in Visible)
         {

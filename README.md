@@ -78,7 +78,8 @@ and adds it up per player and per fight.
 - **Class colours**, **relative bars** (against the top player), row size, and **hidden names** for streams and
   screenshots.
 - **A bar area that sizes itself**: no bars until there is someone to show, then a bar per player, up to five (a
-  dungeon party fits whole); the last fight's bars stay until the next. With more players (a raid), the top five
+  dungeon party fits whole); the last fight's bars stay until the next, and turning to an add that fewer have hit
+  only shrinks it if you stay on the add for 15 seconds. With more players (a raid), the top five
   show, the rest scroll, and your own bar stays in view, pinned to the top or bottom edge when it would scroll away.
   Nothing to resize: the event timers below keep their own size.
 

@@ -80,12 +80,15 @@ public sealed partial class RazorMarkupTests
         // own, so the page follows at once.
         Assert.Matches(@"var cut = Windows\.OverlayCutsContent\(height\);[^}]*if \(cut == contentCut\) return;\s*contentCut = cut;\s*StateHasChanged\(\);", afterRender);
         Assert.Matches(@"\}\s*catch \(Exception ex\)\s*\{\s*if \(!fitFailing\)", afterRender);
-        // The rows follow the players shown (BarArea, tested in OverlayFitTests), every one of them in the list.
-        Assert.Contains("private int BarRows => BarArea.Rows(Visible.Count());", page);
+        // The rows follow the players shown (BarArea, tested in OverlayFitTests), every one of them in the list, with
+        // every snapshot, dropping to fewer only after a pause (BarRowsHold, tested in BarRowsHoldTests); a reset forgets
+        // them at once.
+        Assert.Contains("barRows = rowsHold.Update(BarArea.Rows(Visible.Count()), now);", page);
+        Assert.Matches(@"rowsHold\.Clear\(\);\s*barRows = 0;", page);
         Assert.Contains("private string RowsClass => BarArea.Scrolls(Visible.Count(), contentCut) ? \"scrolls\" : string.Empty;", page);
         Assert.Contains("@foreach (var player in Visible)", File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor")));
-        Assert.Contains("--bar-rows:{BarRows};", page);
-        Assert.DoesNotMatch(@"\bresizing\b|\bsizing\b|BarRows\s*=(?!>)", page);
+        Assert.Contains("--bar-rows:{barRows};", page);
+        Assert.DoesNotMatch(@"\bresizing\b|\bsizing\b|BarRows\b", page);
         Assert.Contains("Windows.OverlayFitted += OnOverlayFitted;", page);
         Assert.Contains("Windows.OverlayFitted -= OnOverlayFitted;", page);
         Assert.Contains("private void OnOverlayFitted(object? sender, EventArgs e) => _ = RenderAsync();", page);
@@ -118,7 +121,8 @@ public sealed partial class RazorMarkupTests
         Assert.DoesNotContain("WmSizing", File.ReadAllText(Path.Combine(app, "Windows", "NativeMethods.cs")));
         // The end of a move or of any sizing (from the keyboard, say) takes the content's height back at once.
         Assert.Matches(@"msg == NativeMethods\.WmEnterSizeMove\)\s*\{\s*sizingOrMoving = true;\s*\}", overlay);
-        Assert.Matches(@"sizingOrMoving = false;\s*overlayPlacement\.PlayerPlaced\(Top, ActualHeight\);(?:\s*//[^\n]*)*\s*Refit\(shrinkNow: true\);", overlay);        Assert.Contains("overlayPlacement.MovedTo(Top);", overlay);
+        Assert.Matches(@"sizingOrMoving = false;\s*overlayPlacement\.PlayerPlaced\(Top, ActualHeight\);(?:\s*//[^\n]*)*\s*Refit\(shrinkNow: true\);", overlay);
+        Assert.Contains("overlayPlacement.MovedTo(Top);", overlay);
         Assert.Contains("SavePlacementSoon();", overlay);
         Assert.Contains("if (changed) Fitted?.Invoke(this, EventArgs.Empty);", overlay);
         Assert.Contains("Closed += (_, _) => shrinkLater.Stop();", overlay);

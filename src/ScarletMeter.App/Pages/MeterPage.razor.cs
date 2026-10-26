@@ -31,6 +31,10 @@ public partial class MeterPage : IAsyncDisposable
     private readonly FightState fightState = new();
     // Whether a boss fight is under way, adds included, for the notices that stand aside during one.
     private readonly BossFightHold bossFight = new();
+    // The bar area's height in rows, set with every snapshot: one per player shown, up to BarArea.MostRows, dropping to
+    // fewer only after a pause (BarRowsHold), so switching between a boss and its adds does not resize the meter.
+    private readonly BarRowsHold rowsHold = new();
+    private int barRows;
     private TimeSpan? killIn;
     private FightPhase phase;
     private bool bossFightUnderWay;
@@ -73,7 +77,7 @@ public partial class MeterPage : IAsyncDisposable
     [Inject]
     private UpdateNotice Updates { get; set; } = default!;
 
-    // Reads the panel's heights after each render (js/overlay-size.js).
+    // Reads the panel's height after each render (js/overlay-size.js).
     [Inject]
     private IJSRuntime JS { get; set; } = default!;
 
@@ -82,8 +86,6 @@ public partial class MeterPage : IAsyncDisposable
         .Where(p => p.IsIdentified || p.DamageShare > 1)
         .OrderByDescending(p => p.TotalDamage);
 
-    // The bar area's height in rows: one per player shown, up to BarArea.MostRows (Pages/BarArea).
-    private int BarRows => BarArea.Rows(Visible.Count());
 
     // "fx" with bar effects on; "settled" hides them once the fight is quiet or over (app.css), so nothing animates
     // between pulls.
@@ -120,7 +122,7 @@ public partial class MeterPage : IAsyncDisposable
         get
         {
             var style = string.Create(CultureInfo.InvariantCulture,
-                $"--panel-alpha:{appearance.BackgroundOpacity:0.###};--image-alpha:{appearance.PictureOpacity:0.###};--row-scale:{appearance.RowScale:0.###};--bar-rows:{BarRows};");
+                $"--panel-alpha:{appearance.BackgroundOpacity:0.###};--image-alpha:{appearance.PictureOpacity:0.###};--row-scale:{appearance.RowScale:0.###};--bar-rows:{barRows};");
             return WebAssetHosts.BackgroundUrl(appearance.BackgroundImage) is { } url ? style + $"--panel-image:url('{url}');" : style;
         }
     }
@@ -181,9 +183,8 @@ public partial class MeterPage : IAsyncDisposable
 
     private void OnUpdateNoticeChanged(object? sender, EventArgs e) => _ = RenderAsync();
 
-    // The window fitted itself outside a render (a restore, the end of a resize, a display change, a delayed shrink),
-    // or a resize of its edge started or ended: render now, so the questions are asked again at once rather than at the
-    // next refresh, and the bar area follows the edge as soon as it is dragged.
+    // The window fitted itself outside a render (a restore, the end of a move or of a resize from the keyboard, a display
+    // change, a delayed shrink): render now, so the questions are asked again at once rather than at the next refresh.
     private void OnOverlayFitted(object? sender, EventArgs e) => _ = RenderAsync();
 
     private string DisplayName(PlayerRow player) => appearance.HideNicknames ? NicknameMask.Mask(player.Name) : player.Name;
@@ -223,6 +224,7 @@ public partial class MeterPage : IAsyncDisposable
                     killIn = killTimer.Update(snapshot.Target, now);
                     phase = fightState.Update(snapshot.Target, now);
                     bossFightUnderWay = bossFight.Update(snapshot.Target, now);
+                    barRows = rowsHold.Update(BarArea.Rows(Visible.Count()), now);
                     Windows.HoldAlerts(NoticesHeld);
                     await RenderAsync();
                     if (refreshFailing) Logger.LogInformation("Refreshing the meter works again.");
@@ -291,6 +293,8 @@ public partial class MeterPage : IAsyncDisposable
         phase = FightPhase.None;
         bossFight.Clear();
         bossFightUnderWay = false;
+        rowsHold.Clear();
+        barRows = 0;
         Windows.HoldAlerts(NoticesHeld);
     }
 
