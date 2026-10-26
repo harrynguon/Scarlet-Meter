@@ -111,8 +111,11 @@ public sealed record FightSettings
     public const int MinRetentionDays = 1;
     public const int MaxRetentionDays = 9999;
 
-    /// <summary>Only count hits on bosses.</summary>
-    public bool BossOnlyCapture { get; init; }
+    /// <summary>
+    /// Only count hits on bosses (training dummies count as bosses, as upstream has them). On by default (Harry,
+    /// 2026-10-26: "ensure 'boss fights only' is set to on by default"); a settings file that saved either value keeps it.
+    /// </summary>
+    public bool BossOnlyCapture { get; init; } = true;
 
     /// <summary>Fold a summon's damage into its owner's skill breakdown.</summary>
     public bool GroupSummonDamage { get; init; } = true;
