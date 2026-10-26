@@ -23,11 +23,13 @@ public sealed class AbyssPauseTests
     private static readonly DateTime FightStart = new(2026, 10, 26, 17, 0, 0, DateTimeKind.Local);
 
     // 20 (seen in the game) and 22 (from three sources) are the Abyss; 21 (AetherDPS's alone), the open world, a
-    // dungeon and impossible ids are not.
+    // dungeon and impossible ids are not, nor the Artifact Corridor (503001), an instance of two minutes entered from the
+    // Abyss, where the meter tracks (Harry, 2026-10-27: "Don't pause the meter there").
     [Theory]
     [InlineData(20, true)]
     [InlineData(22, true)]
     [InlineData(21, false)]
+    [InlineData(503001, false)]
     [InlineData(1010, false)]
     [InlineData(600021, false)]
     [InlineData(0, false)]
@@ -185,6 +187,27 @@ public sealed class AbyssPauseTests
 
         settings.PauseInAbyss = false;
         Assert.False(engine.PausedInAbyss);
+    }
+
+    // The Artifact Corridor, as Harry's game loaded it (2026-10-26): from the Abyss and back, on the same connection.
+    // Its load ends the pause, so the meter tracks inside it (Harry: "Don't pause the meter there"), and the load of the
+    // Abyss on the way out starts the pause again.
+    [Fact]
+    public void TheArtifactCorridorTracksAndTheAbyssPausesAgainAfterIt()
+    {
+        using var host = new TestEngineHost(CaptureMode.None);
+        var engine = host.Services.GetRequiredService<ICombatEngine>();
+        var stream = host.Services.GetRequiredService<TcpStreamBuffer>();
+        Synchronise(stream, AbyssConnection);
+        stream.AddData(AbyssConnection, MapLoad(20), 0);
+        Assert.True(engine.PausedInAbyss);
+
+        stream.AddData(AbyssConnection, MapLoad(503001), 0);
+        Assert.Equal(503001, engine.MapId);
+        Assert.False(engine.PausedInAbyss);
+
+        stream.AddData(AbyssConnection, MapLoad(20), 0);
+        Assert.True(engine.PausedInAbyss);
     }
 
     // Pausing and tracking again are each logged once, with the map's number alone; another Abyss map in between logs

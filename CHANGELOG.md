@@ -8,6 +8,11 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ## [Unreleased]
 
+### Added
+
+- Settings, About names the Artifact Corridor, the two-minute instance you enter from the Abyss. The meter keeps
+  tracking there; it pauses again once you are back in the Abyss. ([#47](https://github.com/harrynguon/Scarlet-Meter/pull/47))
+
 ## [0.3.0] - 2026-10-26
 
 ### Added

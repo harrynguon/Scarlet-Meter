@@ -369,8 +369,10 @@ public sealed partial class MapProbeTests
     }
 
     // The names as their sources give them: the open world and the Abyss (SkeeveAN's names for AetherDPS's ids) and
-    // A2Tools' dungeons, with the difficulty in brackets where A2Tools gives one and its lower-case "the" capitalised.
+    // A2Tools' dungeons, with the difficulty in brackets where A2Tools gives one and its lower-case "the" capitalised;
+    // and the Artifact Corridor, the id seen in Harry's game, the name Harry's.
     [Theory]
+    [InlineData(503001, "Artifact Corridor")]
     [InlineData(1010, "Verteron")]
     [InlineData(1011, "Eltnen")]
     [InlineData(1110, "Altgard")]
@@ -399,15 +401,16 @@ public sealed partial class MapProbeTests
     [InlineData(int.MaxValue)]
     public void OtherMapsHaveNoName(int mapId) => Assert.Null(MapNames.Of(mapId));
 
-    // The whole table: the six open-world and Abyss maps, A2Tools' 60 dungeons (all instance ids, 600000 to 699999),
-    // and every name tidy (no blank, no stray spaces), so a dropped or mistyped line of the import shows.
+    // The whole table: the six open-world and Abyss maps, the Artifact Corridor seen in the game, A2Tools' 60 dungeons
+    // (all instance ids, 600000 to 699999), and every name tidy (no blank, no stray spaces), so a dropped or mistyped
+    // line of the import shows.
     [Fact]
     public void TheNameTableHoldsTheSourcesWhole()
     {
         var ids = MapNames.Ids.ToList();
-        Assert.Equal([20, 22, 1010, 1011, 1110, 1111], ids.Where(id => id < 600_000).Order());
+        Assert.Equal([20, 22, 1010, 1011, 1110, 1111, 503001], ids.Where(id => id < 600_000).Order());
         Assert.Equal(60, ids.Count(id => id is >= 600_000 and < 700_000));
-        Assert.Equal(66, ids.Count);
+        Assert.Equal(67, ids.Count);
         Assert.All(ids, id =>
         {
             var name = MapNames.Of(id);

@@ -5,7 +5,9 @@ namespace ScarletMeter.Engine.Maps;
 /// Harry's game named on entering the Abyss (2026-10-26, 17:05:57 +11:00, the test copy's log), which A2Tools, AetherDPS
 /// and SkeeveAN's data also give the Abyss's lower layer. 22 is Chaotic Middle Reshanta in the same three sources, not
 /// yet seen in the game. AetherDPS also lists 21, which no other source names, so it is left out until it is seen.
-/// None is a dungeon (those are 600000 to 699999), so a wrong id here can never pause the meter in one.
+/// None is a dungeon (those are 600000 to 699999), so a wrong id here can never pause the meter in one. The Artifact
+/// Corridor (503001), a two-minute instance entered from the Abyss, is left out on purpose: the pause is for the Abyss's
+/// crowds, and Harry asked for the meter to track there (2026-10-27); going back out loads 20 again, which pauses it.
 /// </summary>
 internal static class AbyssMaps
 {
