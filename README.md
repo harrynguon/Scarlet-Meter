@@ -80,10 +80,11 @@ and adds it up per player and per fight.
   plus the **background opacity** of the whole meter. Text and bars always stay solid.
 - **Class colours**, **relative bars** (against the top player), row size, and **hidden names** for streams and
   screenshots.
-- **A bar area you size**: drag the meter's bottom edge to make the bars' area anything from none to ten bars tall;
-  it snaps to whole bars and keeps that size, with empty rows when fewer are playing. The event timers below keep
-  their own size. With more players than fit, the bars scroll and your own bar stays in view, pinned to the top or
-  bottom edge when it would scroll away.
+- **A bar area that sizes itself**: no bars until there is someone to show, then a bar per player, up to five (a
+  dungeon party fits whole); the last fight's bars stay until the next, and turning to an add that fewer have hit
+  only shrinks it if you stay on the add for 15 seconds. With more players (a raid), the top five
+  show, the rest scroll, and your own bar stays in view, pinned to the top or bottom edge when it would scroll away.
+  Nothing to resize: the event timers below keep their own size.
 
 <p align="center"><img src="docs/images/background-picture.png" alt="A background picture at 50% picture opacity (demo data, a generated test picture)" width="456"/></p>
 
@@ -95,24 +96,26 @@ and adds it up per player and per fight.
 
 **World events**
 
-- **Alerts** at the bottom of the meter before world events and field bosses (Spacetime Rift, Shugo Festival,
-  Dimensional Invasion, Watcher Kaira and more) and while their entry is open, with a countdown.
-- **Out of your way**: they sit below the bars and never cover one, step aside during boss fights, and a **bell**
-  in the header turns them off in one click. They fold into one slim bar showing the next event and "+N" more;
-  click it to open the list, and it stays as you left it. They never scroll, the meter grows to fit instead. Times
-  follow the Global preset and are not yet verified in game.
+- **Event icons** in one row at the bottom of the meter, one for each world event and field boss you choose (Shugo
+  Festival, Dimensional Invasion, Spacetime Rift, Abyss Siege, Watcher Kaira and more). An icon lights up with the
+  time left ("2:19") once its event is within your warning time: gold before it starts, teal while its entry or
+  portal is open. Hover over an icon to see what it is, where and when; click it for a line with its countdown (open
+  as many as you like), and click again to close it.
+- **Out of your way**: one row below the bars, never over one; it steps aside during boss fights, and a **bell** in
+  the header turns it off in one click. It never scrolls, the meter grows to fit instead. Times follow the Global
+  preset and are not yet verified in game.
 - **Boss timers**: the hourglass in the header opens [aion2timers.com](https://www.aion2timers.com/world-boss-timer/)'s
   world-boss timers in a small window of their own, in or out of game. The site remembers your server and faction
   there; links to other sites open in your browser (one every few seconds at most; a site link that redirects
   elsewhere stays put). It sits behind the game unless you pin it on top.
 
-<p align="center"><img src="docs/images/alerts.gif" alt="World-event alerts back in the break after a boss fight (demo mode), recorded before the alerts folded into one bar: two shown with +2 more; clicking it shows all four with Show less, and folds them away again" width="456"/></p>
+<p align="center"><img src="docs/images/alerts.gif" alt="World-event alerts back in the break after a boss fight (demo mode), recorded before they became a row of icons, as a list of notices" width="456"/></p>
 
 **Convenient**
 
 - **Portable**: one folder, unzip and run, move or delete it as one. Your data lives inside it.
 - **No installer, no .NET install, no administrator rights** (with Npcap set up as above).
-- A **global hotkey** to hide and show it, an always-on-top chromeless overlay you can drag and resize, and window
+- A **global hotkey** to hide and show it, an always-on-top chromeless overlay you can drag and make wider or narrower, and window
   positions remembered across restarts.
 - **Fight options**: boss fights only, summons folded into their owner, a one-minute cap on training dummies.
 
@@ -180,10 +183,11 @@ It only reads network traffic, as RATmeter does, but NCSOFT's terms forbid unaut
 own risk (see [Safety and terms](#safety-and-terms)).
 
 **Why does the meter sometimes get taller?**
-The bars' area stays the size you dragged it to; the bars scroll inside it. The rest of the meter keeps its own
-size: when the world-event alerts open or a boss card appears, the meter grows downwards by that much (upwards at the
-bottom of the screen), and goes back a moment after they go. The alerts always sit below the bars, never over them,
-and the place remembered for next time is always yours.
+The bars' area has a bar per player shown, up to five, so the meter grows when a fight's players come; more than five
+scroll inside it. The rest keeps its own size: when an event's line opens under the event icons or a boss card
+appears, the meter grows downwards by that much (upwards at the bottom of the screen), and goes back a moment after
+they go. The event icons always sit below the bars, never over them, and the place remembered for next time is always
+yours.
 
 **How do I hide it quickly?**
 **Ctrl+Shift+D**, a system-wide shortcut, hides and shows it. Change the shortcut in Settings.

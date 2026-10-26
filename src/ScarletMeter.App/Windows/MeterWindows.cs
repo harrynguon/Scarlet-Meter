@@ -65,11 +65,10 @@ public interface IMeterWindows
     void HoldAlerts(bool held);
 
     /// <summary>
-    /// The overlay page's heights (CSS pixels): <paramref name="contentHeight"/>, which the window is as tall as;
-    /// <paramref name="emptyHeight"/>, its content with no rows; and <paramref name="rowStep"/>, a row with its gap,
-    /// by which a resize of the bar area counts rows (<see cref="OverlayFit"/>).
+    /// The overlay page's content height (CSS pixels), which the window is as tall as (<see cref="OverlayFit"/>): the
+    /// bar area's rows follow the players shown (Pages/BarArea), so nothing else sizes it.
     /// </summary>
-    void FitOverlayToContent(double contentHeight, double emptyHeight, double rowStep);
+    void FitOverlayToContent(double contentHeight);
 
     /// <summary>
     /// Whether the overlay window is shorter than content <paramref name="contentHeight"/> tall: it is as tall as the
@@ -78,13 +77,7 @@ public interface IMeterWindows
     /// </summary>
     bool OverlayCutsContent(double contentHeight);
 
-    /// <summary>Whether the player is dragging an edge of the overlay: the page lets its bars fill the window meanwhile.</summary>
-    bool OverlayResizing { get; }
-
-    /// <summary>
-    /// Raised on the UI thread after the overlay window moved or resized itself to fit its content, or a resize of an
-    /// edge started or ended.
-    /// </summary>
+    /// <summary>Raised on the UI thread after the overlay window moved or resized itself to fit its content.</summary>
     event EventHandler? OverlayFitted;
 }
 
@@ -218,14 +211,12 @@ public sealed class MeterWindows : IMeterWindows
 
     public void BeginOverlayDrag() => overlay?.BeginDrag();
 
-    public void FitOverlayToContent(double contentHeight, double emptyHeight, double rowStep)
+    public void FitOverlayToContent(double contentHeight)
     {
-        if (!closing) overlay?.FitToContent(contentHeight, emptyHeight, rowStep);
+        if (!closing) overlay?.FitToContent(contentHeight);
     }
 
     public bool OverlayCutsContent(double contentHeight) => !closing && overlay?.CutsContent(contentHeight) == true;
-
-    public bool OverlayResizing => !closing && overlay?.Resizing == true;
 
     public void MinimizeOverlay()
     {

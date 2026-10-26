@@ -60,8 +60,8 @@ public sealed record AlertSettings
     public const double MinServerOffsetHours = -12;
     public const double MaxServerOffsetHours = 14;
 
-    /// <summary>Events alerted by default: the world events and bosses, not the daily and weekly resets.</summary>
-    public static IReadOnlyList<string> DefaultEvents { get; } = ["kaira", "nahma", "executors", "rift", "siege", "invasion", "shugo"];
+    /// <summary>Events alerted by default, in catalog order: the world events and bosses, not the daily and weekly resets.</summary>
+    public static IReadOnlyList<string> DefaultEvents { get; } = ["shugo", "invasion", "rift", "siege", "kaira", "nahma", "executors"];
 
     /// <summary>Show notices at all.</summary>
     public bool Enabled { get; init; } = true;
@@ -75,7 +75,7 @@ public sealed record AlertSettings
     /// <summary>The event ids with notices, in catalog order.</summary>
     public IReadOnlyList<string> Events { get; init; } = DefaultEvents;
 
-    /// <summary>When nothing is due, show the next alerted event as one dim line.</summary>
+    /// <summary>When nothing is due, the next alerted event's icon in the event row shows the time to its start, dimly.</summary>
     public bool ShowNextEvent { get; init; }
 
     /// <summary>
@@ -91,21 +91,18 @@ public sealed record AlertSettings
     /// </summary>
     public bool HideDuringBossFights { get; init; } = true;
 
-    /// <summary>
-    /// The overlay's notice strip open, every due notice listed under its bar; closed (the default), the bar shows the
-    /// most urgent one in a single line. The player's last choice, from the bar itself.
-    /// </summary>
-    public bool NoticesExpanded { get; init; }
+    // The overlay's old notice strip kept whether it was open here (noticesExpanded); the event row that replaced it
+    // keeps no such choice, and a file that still has it loads, the value ignored (SettingsTests).
 
     // Value equality including the event list.
     public bool Equals(AlertSettings? other) => other is not null
         && Enabled == other.Enabled && LeadMinutes == other.LeadMinutes && ServerOffsetHours.Equals(other.ServerOffsetHours)
         && ShowNextEvent == other.ShowNextEvent && RestoreMinimizedMeter == other.RestoreMinimizedMeter
-        && HideDuringBossFights == other.HideDuringBossFights && NoticesExpanded == other.NoticesExpanded
+        && HideDuringBossFights == other.HideDuringBossFights
         && Events.SequenceEqual(other.Events, StringComparer.Ordinal);
 
     public override int GetHashCode() =>
-        HashCode.Combine(Enabled, LeadMinutes, ServerOffsetHours, ShowNextEvent, RestoreMinimizedMeter, HideDuringBossFights, NoticesExpanded, Events.Count);
+        HashCode.Combine(Enabled, LeadMinutes, ServerOffsetHours, ShowNextEvent, RestoreMinimizedMeter, HideDuringBossFights, Events.Count);
 }
 
 /// <summary>Fight rules upstream applies to every hit; mirrored into the engine's EngineSettings.</summary>
@@ -136,8 +133,6 @@ public sealed record AppearanceSettings
     public const double MaxPictureOpacity = 1.0;
     public const double MinRowScale = 0.75;
     public const double MaxRowScale = 1.5;
-    public const int MaxBarRows = 10;
-    public const int DefaultBarRows = 8;
 
     /// <summary>Opacity of the overlay's background (0.1 to 1); text and bars stay opaque.</summary>
     public double BackgroundOpacity { get; init; } = 0.9;
@@ -169,14 +164,8 @@ public sealed record AppearanceSettings
     /// <summary>Size of the meter's rows and text (0.75 to 1.5).</summary>
     public double RowScale { get; init; } = 1.0;
 
-    /// <summary>
-    /// How many rows tall the overlay's bar area is (0 to 10), set by dragging the meter's bottom edge (Harry: "make
-    /// sure the resizing only changes the size of the dps bar area"): more players scroll inside it, fewer leave the
-    /// rest of it empty, and the notices below keep their own height. Null until the meter first fits, which takes
-    /// it from the window's height an earlier build saved (Windows/OverlayWindow), so a player's size is kept; the
-    /// page shows <see cref="DefaultBarRows"/> until then.
-    /// </summary>
-    public int? BarRows { get; init; }
+    // The bar area's rows were the player's (barRows, set by dragging the meter's edge, #37) until they followed the
+    // players shown (Pages/BarArea, 2026-10-26); a file that still has them loads, the value passed over (SettingsTests).
 
     /// <summary>Show skill and buff icons, which load from NC's game-data CDN as in RATmeter.</summary>
     public bool SkillIcons { get; init; } = true;

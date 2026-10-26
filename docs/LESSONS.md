@@ -263,9 +263,9 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - What: Codex never finished reviewing three PRs; their three findings surfaced only when the review was requested again.
 - Guard: the same rule: a summary that never says Completed means no review happened; comment `@codex review`.
 
-**A check that proved nothing** (this session, twice).
-- What: a "fails with the bug put back" run passed because the test edit had not been applied (the editor refused an unread file), and a mutation did not compile.
-- Guard: a fail-first check counts only when the output names the new test as failed. Read the output, not the exit code.
+**A check that proved nothing** (this session, twice; again on 2026-10-26 for the event row).
+- What: a "fails with the bug put back" run passed because the test edit had not been applied (the editor refused an unread file), and a mutation did not compile. On the event row, a `sed` meant for one `return null;` also hit another method's, the mutated build failed, and the runner went on to test the previous build, reporting the mutation as surviving.
+- Guard: a fail-first check counts only when the output names the new test as failed. Read the output, not the exit code. A mutation run (the scratch scripts are not in the repository) must stop with "did not build, not run" when the mutated build reports an error, rather than test the last good build, and must show a test count above zero; scope a `sed` mutation to its method (an address range) when the line it matches is not unique.
 
 **A wait loop matched the wrong commit** (#12).
 - What: it waited for `b62ae8f` while the commit was `b62ae8b`, so it ran to its time limit.
@@ -281,4 +281,5 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 **Shell quoting on this machine** (throughout).
 - What: Windows PowerShell 5.1 splits native arguments at embedded double quotes (a commit message was lost, `gh --jq` filters broke); its double-quoted here-strings eat backticks; Bash heredocs above about 10 KB fail.
-- Guard: commit with `git commit -F -` and a quoted Bash heredoc; run `gh --jq` from Bash; build Markdown-carrying scripts from single-quoted here-strings saved as UTF-8 with a BOM; write large files with the editor. All in the scarlet-ship and scarlet-smoke skills.
+- Also (2026-10-26): Git Bash's `sed -i` writes a CRLF file back with LF line ends, so a later exact-text replacement written with CRLF found nothing (caught by the replacement's own not-found check); PowerShell names are case-insensitive, so a local `$tip` took over a `[switch]$Tip` parameter; and `R` is PowerShell's alias for `Invoke-History`, so a helper function named `R` never ran (aliases win over functions).
+- Guard: commit with `git commit -F -` and a quoted Bash heredoc; run `gh --jq` from Bash; build Markdown-carrying scripts from single-quoted here-strings saved as UTF-8 with a BOM; write large files with the editor. All in the scarlet-ship and scarlet-smoke skills. Normalise line ends to CRLF after any `sed -i`, make every scripted replacement throw when its text is not found, and give script helpers and variables names no alias or parameter shares (`Swap-Text`, `$tipHtml`).

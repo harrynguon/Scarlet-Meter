@@ -1,0 +1,99 @@
+@using ScarletMeter.App.Alerts
+@using ScarletMeter.WorldEvents
+@*
+    The overlay's world events: one row of icons at the bottom of the meter, one per alerted event in catalog order
+    (Alerts/EventGlyphs; Harry asked for icons in place of the list, 2026-10-26). An icon lights up while its event is
+    due: washed-out gold with the time to its start (minutes and seconds under an hour, EventText.IconTime) once that is
+    within the lead time, teal with the time to its close while its entry or portal is open. With nothing due and "show
+    the next event" on, the next event's icon shows its time, dimly. Hovering or focusing an icon shows its tip: the
+    name, what it is doing and where. Clicking an icon opens its detail line under the row (the name and the countdown,
+    with a progress line while it is due), beside any already open, in the row's order; clicking it again closes its
+    line. Which lines are open is the row's own state, not saved; a click tells the page (LinesChanged), so the meter's
+    window takes the new height at once rather than on the page's next refresh.
+    The rules are Alerts/EventRowLayout's. Countdowns use the time the parent passes in, so they tick with the
+    overlay's own refresh. Screen readers hear only the hidden summary, which changes when a notice appears or changes
+    kind, not every second. It is always rendered (empty when nothing is due), because a live region inserted already
+    filled is often not announced. While Held (the row stands aside for a boss fight) it shows nothing and its live
+    region is empty, so what came due meanwhile is announced when the fight ends.
+*@
+<span class="sr-only" role="status">@(Held ? string.Empty : Announcement)</span>
+@if (Held)
+{
+    @* Standing aside for a boss fight. *@
+}
+else if (EventRowLayout.Icons(View) is { Count: > 0 } icons)
+{
+    var zone = TimeZoneInfo.Local;
+    <div class="alerts" role="group" aria-label="World events">
+        <div class="ev-row">
+            @foreach (var icon in icons)
+            {
+                var status = EventRowLayout.Status(icon, Now, View.ServerOffset, zone);
+                <button type="button" class="ev @icon.State.ToString().ToLowerInvariant()" @key="icon.Rule.Id"
+                        aria-expanded="@(IsOpen(icon) ? "true" : "false")" aria-label="@($"{icon.Rule.Name}, {status}")"
+                        @onclick="() => Toggle(icon.Rule.Id)">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="@EventGlyphs.For(icon.Rule.Id)" /></svg>
+                    @if (icon.Until is { } until)
+                    {
+                        <span class="ev-time">@EventText.IconTime(until - Now)</span>
+                    }
+                    <span class="ev-tip" aria-hidden="true">
+                        <span class="ev-tip-head"><b>@icon.Rule.Name</b> · @status</span>
+                        <span class="ev-tip-where">@icon.Rule.Location</span>
+                    </span>
+                </button>
+            }
+        </div>
+        @foreach (var shown in EventRowLayout.Opened(icons, open))
+        {
+            @* Keyed to the event's state and occurrence, so when it moves from Soon to Open its progress line starts
+               afresh rather than gliding from the last fill. *@
+            <div class="alert @Kind(shown)" @key="@($"{shown.Rule.Id}-{shown.State}-{shown.Alert?.Start.UtcTicks}")">
+                <span class="alert-dot"></span>
+                <span class="alert-name">@shown.Rule.Name</span>
+                <span class="alert-when">@EventRowLayout.When(shown, Now, View.ServerOffset, zone)</span>
+                @if (EventRowLayout.Progress(shown, Now, View.Lead) is { } progress)
+                {
+                    <span class="alert-progress" style="width:@Compact.Percent(progress)"></span>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public AlertView View { get; set; } = AlertView.None;
+
+    [Parameter] public DateTimeOffset Now { get; set; }
+
+    // The row stands aside for a boss fight: nothing shows, and nothing is announced until it comes back.
+    [Parameter] public bool Held { get; set; }
+
+    // A detail line opened or closed. The page renders on it, and so measures its new height for the window at once;
+    // a click alone would re-render only this row, and the page would measure on its next refresh, up to a tick later.
+    [Parameter] public EventCallback LinesChanged { get; set; }
+
+    // The events whose detail lines are open under the row.
+    private IReadOnlySet<string> open = new HashSet<string>(StringComparer.Ordinal);
+
+    // An icon's click: opens its line beside any others, or closes it when it was open, then tells the page.
+    private Task Toggle(string id)
+    {
+        open = EventRowLayout.Toggle(open, id);
+        return LinesChanged.InvokeAsync();
+    }
+
+    private bool IsOpen(EventIcon icon) => open.Contains(icon.Rule.Id);
+
+    private string Announcement => string.Join("; ", View.Alerts.Take(EventRowLayout.AnnouncedCount).Select(a => a.Kind == AlertKind.Soon
+        ? $"{a.Rule.Name} starts at {EventText.LocalTime(a.Start)}"
+        : $"{a.Rule.Name}: {EventText.OpenLabel(a.Rule)} until {EventText.LocalTime(a.Deadline)}"));
+
+    // The detail line's colours: gold before a due start, teal while open, plain while the event is not due.
+    private static string Kind(EventIcon icon) => icon.State switch
+    {
+        EventIconState.Open => "open",
+        EventIconState.Soon => "soon",
+        _ => "idle",
+    } + " kind-" + icon.Rule.Kind.ToString().ToLowerInvariant();
+}
