@@ -4,9 +4,11 @@ using AionDpsMeter.Services.PacketCapture;
 using AionDpsMeter.Services.Services;
 using AionDpsMeter.Services.Services.Entity;
 using AionDpsMeter.Services.Services.Session;
+using AionDpsMeter.Services.Services.Session.Persistence;
 using AionDpsMeter.Services.Services.Settings;
 using AionDpsMeter.Services.Services.Timed;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using ScarletMeter.Engine.Upstream;
 using ScarletMeter.Engine.Upstream.Demo;
 
@@ -31,8 +33,11 @@ public static class ScarletEngineServiceCollectionExtensions
         services.AddSingleton(settings ?? new EngineSettings());
         services.AddSingleton<IAppSettingsService, UpstreamSettingsBridge>();
 
-        // Upstream history store: SQLite through EF Core, at an absolute path under the data directory.
+        // Upstream history store: SQLite through EF Core, at an absolute path under the data directory. Behind
+        // Scarlet's decorator, which does not save training-dummy fights the player did not hit.
         services.AddCombatHistoryPersistence(options.HistoryDatabasePath);
+        services.AddSingleton<DummyFightFilter>();
+        WrapHistoryStore(services);
 
         // Upstream capture and TCP reassembly. No FilePacketWriter is registered, so payloads are never logged.
         // Demo mode swaps the adapter for the synthetic feed, which upstream's pipeline starts and stops alike.
@@ -62,5 +67,20 @@ public static class ScarletEngineServiceCollectionExtensions
 
         services.AddSingleton<ICombatEngine, UpstreamCombatEngine>();
         return services;
+    }
+
+    // Replaces upstream's one ICombatHistoryStore registration with DummyFightHistoryStore around the store that
+    // registration builds, so upstream's session manager saves through the decorator. If an upstream release registers
+    // no store or several, Single() makes AddScarletEngine throw, failing every engine test.
+    private static void WrapHistoryStore(IServiceCollection services)
+    {
+        var upstream = services.Single(d => d.ServiceType == typeof(ICombatHistoryStore) && !d.IsKeyedService);
+        services.Remove(upstream);
+        services.AddSingleton<ICombatHistoryStore>(provider => new DummyFightHistoryStore(
+            (ICombatHistoryStore)(upstream.ImplementationInstance
+                ?? upstream.ImplementationFactory?.Invoke(provider)
+                ?? ActivatorUtilities.CreateInstance(provider, upstream.ImplementationType!)),
+            provider.GetRequiredService<DummyFightFilter>(),
+            provider.GetRequiredService<ILogger<DummyFightHistoryStore>>()));
     }
 }
