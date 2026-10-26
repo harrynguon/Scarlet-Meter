@@ -27,7 +27,7 @@ Keep the path short (native SQLite fails under long paths). Parallel work goes i
 
 ## 3. Document
 
-Update the docs the change touches (ARCHITECTURE for structure, DEVELOPMENT for commands, SECURITY for data or network, HANDOFF for acceptance items) and add a `docs/WORKLOG.md` entry at the top: what, why, checks actually run with results, not checked, next. Never describe an unchecked acceptance item as done. A mistake found on the way (by a test, the audit, Codex, a smoke run or the player) gets an entry in `docs/LESSONS.md`, with the guard that now catches it.
+Update the docs the change touches (ARCHITECTURE for structure, DEVELOPMENT for commands, SECURITY for data or network, HANDOFF for acceptance items) and add a `docs/WORKLOG.md` entry at the top: what, why, checks actually run with results, not checked, next. Never describe an unchecked acceptance item as done. A change a player would notice gets a line under `## [Unreleased]` in `CHANGELOG.md` (Added, Changed, Removed or Fixed, in player words, with the PR's link once the PR is open; AGENTS.md, "Changelog"). A mistake found on the way (by a test, the audit, Codex, a smoke run or the player) gets an entry in `docs/LESSONS.md`, with the guard that now catches it.
 
 ## 4. Pull request
 

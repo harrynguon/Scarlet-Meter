@@ -31,6 +31,7 @@ You need Windows 11, 64-bit (Windows 10 has not been tried; it may need the
 That is all. **Ctrl+Shift+D** hides and shows the meter (changeable). Windows may warn that the file comes from an
 unknown publisher, because it is not code-signed: choose "More info", then "Run anyway". Each release comes with
 SHA-256 checksums and its complete source, and is built by GitHub Actions from the tagged source, not on anyone's PC.
+What changed in each release, and what is coming in the next, is in the [changelog](CHANGELOG.md).
 
 - **Try it without the game:** in the `ScarletMeter` folder, Shift+right-click an empty space, choose "Open in
   Terminal" and run `.\ScarletMeter.exe --demo` for made-up boss fights.
@@ -237,6 +238,7 @@ git clone --recurse-submodules https://github.com/harrynguon/Scarlet-Meter.git "
 | `tests/ScarletMeter.Tests` | Boundary, engine, settings, alert and UI-rule tests (no Npcap needed). |
 | `scripts/` | Build, portable publish and update (`Update-Meter.ps1` moves to RATmeter's latest release), install, smoke tests. |
 | `docs/` | Maintainer documentation: start with [docs/README.md](docs/README.md); releases in [DEVELOPMENT.md](docs/DEVELOPMENT.md). |
+| `CHANGELOG.md` | What changed for players in each release, and what is unreleased. |
 
 ## Licence and credits
 
