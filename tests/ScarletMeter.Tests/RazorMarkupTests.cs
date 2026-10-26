@@ -595,6 +595,22 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"margin-left:\s*auto;", Block(css, ".ping")); // without the energy, the ping still ends the line
     }
 
+    // The character roster opens from the overlay's Odyle energy and from Settings, which works with the energy hidden or
+    // not sent yet. Its page masks names as every window does with "Hide nicknames" on, and writes no name without it.
+    [Fact]
+    public void TheRosterOpensFromTheOdyleEnergyAndMasksNames()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        Assert.Matches(@"<span class=""odyle""[^>]*@onclick=""Windows\.OpenRoster""", File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor")));
+        Assert.Matches(@"(?s)<span class=""label"">Characters</span>.*?@onclick=""Windows\.OpenRoster""", File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor")));
+        var roster = File.ReadAllText(Path.Combine(app, "Pages", "RosterPage.razor"));
+        Assert.Contains("@Name(character)", roster);
+        Assert.DoesNotMatch(@"@\(?(character|row\.Character)\.Name\b", roster);
+        var code = File.ReadAllText(Path.Combine(app, "Pages", "RosterPage.razor.cs"));
+        Assert.Matches(@"Settings\.Current\.Appearance\.HideNicknames \? NicknameMask\.Mask\(character\.Name\) : character\.Name", code);
+        Assert.Matches(@"(?s)public void Dispose\(\).*Roster\.Changed -= OnRosterChanged;.*Settings\.Changed -= OnSettingsChanged;", code);
+    }
+
     // The bar area has a row per player shown, up to five (Pages/BarArea, a row being its own height and gap in the rows'
     // zoomed pixels; Harry, 2026-10-26: "it automatically expands up to five dps bar players worth of area"), none
     // before the page sets it. It scrolls once it cannot show every row (more players than its rows, or the screen too

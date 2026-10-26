@@ -4,6 +4,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**A switch whose first records were lost would have put one character's counts on another** (deep audit on #48, fixed before merge).
+- What: the roster's reader kept the character named last across a new connection, since counts are the character's. But a switch is a new connection too, and upstream can lose a new connection's first records, the login's list and the self record among them; the new character's updates would then have been reported as the last one's, and the roster would have shown them on the wrong row until that character logged in again. Separately, a tutorial character's placeholder name (`$` and a code) became a character, since upstream's decoding drops the `$`.
+- Why: the earlier lesson ("The map probe kept a map after the game changed server") was read as about values that belong to where the player is; the owner of the counts was taken as belonging to the character, without asking what else a new connection can be. The name came from upstream's decoded identity, and A2Tools' placeholder rule, beside the owner rule that was ported, was not.
+- Guard: a new connection leaves the character unconfirmed and holds the reports until a self record names it again, the same one getting them and another dropping them (`EntryListTests.ANewConnectionHoldsReportsUntilTheCharacterIsNamedAgain`); placeholders name no one (`ARecordWithoutARealNameNamesNoOne`, and through upstream `UpstreamsNameForATutorialCharacterIsNotACharacter`); each shown to fail with its guard removed. For any value tied to a who or a where, test it across a new connection whose first records are lost, and port a source's rules for what a record means beside its layout.
+
+**The first Odyle port read an entry's id as a slot and a key** (found 2026-10-27, porting A2Tools' whole entry list for the character roster; in 0.3.0).
+- What: `OdyleEnergyRecords` read the energy as kind `0c`, "slot 01" and a varint "key" `87 93 03`, as A2Tools' PR #63 described the bytes it saw. They are the entry's u32 id, 60000001, little-endian: every entry of the list is a kind, a four-byte id and its values. So the reader could read no other entry, found the list by a "slot 2 with the same key" follower that only held by chance, and turned away as "look-alikes" bytes that were real entries (`0c 01 00 00 00 …` is id 1, Shugo Festival, with its counts), guarded and tested as if they were noise. It read the energy correctly, so nothing looked wrong.
+- Why: the port modelled the format on one PR's description of the bytes, not their structure, and when look-alikes turned up, guards were added against them instead of asking why the format kept producing them. The earlier lesson's check (list the source's commits since the pinned one) was run on the ported functions' names; A2Tools' reading by id (b79969a, 2026-10-25) came under new names and was not looked at until a feature needed more of the list.
+- Guard: `EntryListRecords` reads the list by id, as A2Tools now does, with `EntryListTests` in its documented shapes (each kind, time entries, the list found where it ends, an id-1 entry read as a count). When a parser needs guards against bytes the format itself sends, decode them under the source's newest reading before guarding against them; when re-checking a ported reader, search the source's history by what it reads (the opcode, `0b 61`), not by the ported function's name.
+
 **Cutting the bar area at its last whole row first clipped the player's own ring** (2026-10-26, seen in a headless render before commit).
 - What: hiding the sliver of the next bar below the fifth, the first hard cut took the full 9 px of padding and gap, which also took the bottom line of the player's own gold ring: a `box-shadow` spread 1 px outside the row, so outside the row's box that the cut was measured from.
 - Why: the cut was worked out from the row boxes' geometry, and a ring drawn outside a box is not part of it.
@@ -180,6 +190,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - Guard: `SettingsTests.AFileSavedWithAByteOrderMarkLoads`. Seed test files the way people actually write them.
 
 ## In the process
+
+**A mutation runner's restore kept the file's old time, so the next build kept the mutation** (2026-10-27, the character roster; caught by a control).
+- What: the scratch runner restored each mutated file with `Copy-Item`, which keeps the original's write time. That time was older than the mutated build's output, so MSBuild took the project as up to date and kept the mutation compiled in: the run's last engine mutation (`ToIdentity` without its user check) stayed in the engine for every run after it. Those runs mutated only the app and ran only its tests, so their catches stood, but the next run's control failed on `EntryListTests.UpstreamsUserIsTheCharacter`.
+- Why: the runner checked that each mutated build compiled, not that the restored source was compiled again, and its only control ran first.
+- Guard: the runner marks a restored file as changed (write time now) and ends every run with a control over every test class it ran; a run counts only when both controls pass. A restore by copy is a restore of content, not of build state.
 
 **A mutation run that ran no test passed its controls** (2026-10-26, the dummy-fight change; caught before any result was used).
 - What: the fail-first script ran the test executable with `--filter-class`, the testing platform's option, but the executable is xunit's own runner (`-class`): it refused the option and ran nothing. Every mutation came out "missed" and both controls "passed", since nothing failed.

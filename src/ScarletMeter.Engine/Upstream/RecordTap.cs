@@ -1,4 +1,5 @@
 using System.Reflection;
+using AionDpsMeter.Services.Models;
 using AionDpsMeter.Services.PacketCapture;
 using AionDpsMeter.Services.PacketProcessing;
 using AionDpsMeter.Services.PacketProcessing.Routing;
@@ -9,7 +10,7 @@ namespace ScarletMeter.Engine.Upstream;
 
 /// <summary>
 /// The game's records beside upstream's pipeline, for the readers of records upstream does not decode
-/// (<see cref="OdyleEnergyTap"/>, <see cref="MapLoadTap"/>). Upstream's opcode table takes only processors marked with
+/// (<see cref="EntryListTap"/>, <see cref="MapLoadTap"/>). Upstream's opcode table takes only processors marked with
 /// its own internal attribute, so this listens to upstream's TCP reassembly (<see cref="TcpStreamBuffer.PacketExtracted"/>,
 /// the event the pipeline itself listens to), opens LZ4 bundles with upstream's own <see cref="PacketProcessor"/> (its
 /// internal ProcessPacket, bound once by reflection; a test guards the binding against the pinned release), and hands
@@ -54,9 +55,15 @@ internal sealed class RecordTap : IDisposable
     private bool failing; // touched only on the capture thread: upstream's CaptureDevice has one processing thread
     private bool disposed;
 
-    public RecordTap(TcpStreamBuffer stream, PacketProcessor processor, IEnumerable<IRecordReader> readers, ILogger<RecordTap> logger)
+    /// <param name="pipeline">
+    /// Upstream's pipeline, taken only so the container builds it first: it subscribes to the stream in its constructor,
+    /// so upstream has read each record, and every record of a bundle, before the tap hands it on. The entry list's
+    /// owner depends on it (<see cref="EntryListTap"/> asks upstream who the player's own record named).
+    /// </param>
+    public RecordTap(TcpStreamBuffer stream, PacketProcessor processor, IPacketService pipeline, IEnumerable<IRecordReader> readers, ILogger<RecordTap> logger)
         : this(stream, BindBundleOpener(processor), readers, logger)
     {
+        ArgumentNullException.ThrowIfNull(pipeline);
     }
 
     /// <summary>With a bundle opener of the caller's (null for none): the constructor above, and tests.</summary>

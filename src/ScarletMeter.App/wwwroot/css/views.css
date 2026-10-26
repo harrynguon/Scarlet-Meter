@@ -299,7 +299,7 @@ tr.child td {
     padding: 10px 0 8px;
 }
 
-.log-filters select, .history-filters input {
+.log-filters select, .history-filters input, .roster-sort select {
     background: #0e0e13;
     border: 1px solid var(--line);
     border-radius: 6px;
@@ -390,3 +390,48 @@ tr.child td {
 
 .fight-title { flex: 1; min-width: 0; }
 .grid-table .class-icon { display: inline-block; vertical-align: middle; }
+
+/* ---------- Character roster (RosterPage) ---------- */
+
+.roster-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 18px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line);
+}
+
+.roster-next { color: var(--text); }
+.roster-sort { margin-left: auto; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+
+/* A name in a row reads at the table's size, not the details header's. */
+.roster-table .who-name { font-size: 13px; }
+.roster-table .who-sub { font-size: 11px; margin-top: 1px; }
+.roster-table tr.me .who-name { color: var(--me); }
+
+/* An estimate (≈) is dimmer than what the game said. Charged energy is cyan, as on the overlay (.odyle-charged). */
+.roster-table .estimate { color: #c9c6d6; font-style: italic; }
+.roster-full { color: var(--good); margin-right: 6px; }
+
+.roster-cap {
+    margin-left: 6px;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    font-size: 11px;
+    color-scheme: dark;
+}
+
+.roster-cap:hover { border-color: var(--line); }
+
+.btn.small { padding: 1px 8px; font-size: 12px; }
+.btn.danger { border-color: rgba(244, 71, 71, 0.5); color: #ff8a8a; }
+
+.roster-foot {
+    padding: 8px 18px 10px;
+    border-top: 1px solid var(--line);
+    font-size: 11px;
+    line-height: 1.45;
+}

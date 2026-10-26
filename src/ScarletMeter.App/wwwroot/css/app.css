@@ -332,10 +332,11 @@ button {
 
 /* Odyle energy (MeterPage, OdyleText), left of the ping once the game has sent it: a crystal of Scarlet's own, the
    basic energy and, in cyan, the charged energy in brackets. It takes the ping's push to the right, so the two sit
-   together at the line's end with the line's usual gap between them. */
+   together at the line's end with the line's usual gap between them. A click opens the character roster. */
 .odyle {
     margin-left: auto;
     display: inline-flex;
+    cursor: pointer; /* opens the character roster */
     align-items: center;
     gap: 4px;
     white-space: nowrap;

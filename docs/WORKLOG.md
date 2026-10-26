@@ -2,6 +2,43 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-27 — The character roster: Odyle energy, its refill, Nightmare and Ascension
+
+**What:** a character roster (ARCHITECTURE.md "Character roster"): every character the player logs in on with the meter running, with Odyle energy (basic, +charged), when basic energy is full again, Nightmare and Ascension Trial entries left (+extra), last played, the one being played marked; estimates (≈) of the recharges since the game last said; sorts, a cap per character (560, 840 with a membership, automatic by default), removal. It opens from the overlay's Odyle energy and from Settings, Appearance, "Characters". Underneath:
+- **Entry list** (ARCHITECTURE.md "Entry list and Odyle energy"): `Entries/EntryListRecords` reads the game's whole list of entry counts by entry id, as A2Tools now does (b79969a, 2149936, caa7ed4, unchanged up to b933531), replacing `Odyle/OdyleEnergyRecords`, which read the Odyle entry's id as "slot 1, key 87 93 03" (LESSONS). `Upstream/EntryListTap` replaces `OdyleEnergyTap`: it also takes the player's own character record (`33 36`), asks upstream's tracker who upstream read it as (`UpstreamMapping.ToIdentity`), and gives a login's counts to the character the next self record names (A2Tools' owner rule); `ICombatEngine.Character` and `ProgressObserved` are new, `OdyleEnergy` comes from the counts. `RecordTap` now takes upstream's pipeline in its constructor, so upstream has read each record before the tap hands it on, whatever is resolved first.
+- **Storage**: `Storage/ProtectedJsonFile` is settings.json's protections (atomic writes, backup, damaged file kept aside, newer read-only, saving off when a write could destroy something), moved out of `SettingsStore`, which keeps every branch and message; `Roster/RosterStore` uses it for `roster.json` (`demo-roster.json` in demo mode), checked on load by `RosterNormalizer`.
+- **Rules** (`Roster/RosterRules`, `RechargeCalendar`, pure): from A2Tools' Roster plugin (taengu/A2Tools-Plugins `plugins/alt-roster` at 7a4720b): +15 basic every three hours on the hours that meet the daily reset, caps 560/840; Nightmare (entry 4) +2 a day to 14; Ascension Trial (80000001) +3 a week to 3; the resets from the world-event schedule.
+- **Live** (`Roster/RosterService`): follows `ProgressObserved` from before capture starts, keeps a count only when read later than the kept one, saves two seconds after the last change and at exit. **Page**: `Pages/RosterPage` (a tool window, `WindowKeys.Roster`), names through the "Hide names" mask.
+- The demo sends a login list with Nightmare and Ascension and its user's own record, so its character shows (in `demo-roster.json`). THIRD-PARTY-NOTICES, SECURITY (the roster is the player's progress, never logged), README, HANDOFF (in-game checks).
+
+**Why:** Harry, after a scoping of the whole dashboard (Odyle, its recharge, Kinah, Abyss corridors; a screenshot of another tool's Odyle dashboard): "Start with the Odyle roster here: the entry-list rework, the roster store, Odyle energy with its refill estimate, and the Nightmare/Ascension counts, as a first PR with the usual audit, Codex and CI. Corridors and Kinah later."
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` Debug and Release 740/740. New: `EntryListTests` (replacing `OdyleEnergyTests`; synthetic bytes in A2Tools' documented shapes, none of its samples' bytes; through upstream's real reassembly, upstream's own `PlayerInfoProcessor` naming the character from the writer's self record, plain and bundled), `RosterTests`, `RazorMarkupTests.TheRosterOpensFromTheOdyleEnergyAndMasksNames`; `MapProbeTests` moved to the new reader. Fail-first: 28 mutations on a scratch copy, each caught by its named test (the list's end, the update's tail, the id and value bounds, the Odyle by id and as the list's condition, the tap's bound, a list waiting for its character, another character dropping the counts, updates raised, the record tap after upstream's pipeline, only the user; the refill floor, the cap, weekly against daily, the full time, an older report, saving off, the save delay, the membership, the normalizer's dates, control characters and duplicates, the full ones first; a newer file read-only, a file not set aside not saved, settings recovered from the backup; the overlay's link), with controls before and after passing (203 tests). A second run's control first failed: the runner's restores kept the files' old times, so a build kept the last engine mutation compiled in (LESSONS); with the runner fixed, all 28 again, both controls passing. A headless Edge render of a synthetic roster page with the real styles (no window on the desktop) showed basic energy in cyan and a light sort box; both fixed and rendered again. Nothing has run with the game.
+
+**Unresolved:** everything in HANDOFF "Next: the character roster": the ids, the order of a login's records (list, then the self record), the self record at server changes, and every recharge time come from A2Tools and are not seen in Harry's game. Abyss corridors and Kinah are later PRs, as asked.
+
+**Review (PR #48):** the deep audit asked for changes. Findings and what was done:
+- **Major**: a switch whose list and self record upstream lost would have put the new character's counts on the last one. A new connection now leaves the character unconfirmed and holds reports until a self record names it again (LESSONS).
+- **Minor**: a kept count dated after now (a clock set back) would never be replaced; now any read replaces it, and `LastSeen` is the report's time.
+- **Minor**: a tutorial character's placeholder name (`$` and a code, upstream dropping the `$`) became a character; now it names no one (`Entries/SelfRecords`, A2Tools' rule).
+- **Minor**: no test covered a backup that cannot be opened with no main file; one now does for the roster (settings maps that branch to its own read-only notice whatever the helper says).
+- **Nits**: an unknown cap name made the whole roster unreadable, so caps are now read by `Storage/LenientEnumConverter` and reset by the normalizer; the save wrote under the lock the capture thread's reports take, so it now writes a copy outside it, and `Dispose` stops taking changes before its last save; this entry lacked a blank line and the review record.
+- **Accepted**: the settings refactor logs "could not keep settings.json.bak aside" before "settings.json could not be read" in eight unreadable-file cases (main had it after). The audit ran main's `SettingsStore` and this one over 121 file states: status, saving, notice, settings and the files on disk were the same in every one.
+- **Residual**: the owner rule assumes a login's list comes before its self record, as A2Tools saw (HANDOFF).
+
+Codex reviewed 039ab5f with one P1: the changelog had no roster line. It was added in c04dc45, right after the PR was opened, as AGENTS.md asks; answered on the thread.
+
+**Checks after the review:** `scripts/Build.ps1` Debug 747/747. Ten more mutations, each caught by its named test, with controls before (84 tests) and after (130) passing:
+- the new connection leaving the character unconfirmed;
+- the updates held meanwhile;
+- a self record confirming the character;
+- a placeholder naming no one, its length rule, and no name flag;
+- a count dated after now;
+- a number, and an unknown name, as no cap;
+- a backup that cannot be opened switching saving off.
+
+**Next:** Codex on the new head, CI, Harry's go-ahead to merge; then Harry's in-game checks.
+
 ## 2026-10-27 — The Artifact Corridor named, and not paused
 
 **What:** `Maps/MapNames` names map 503001 "Artifact Corridor", so Settings, About shows "Artifact Corridor (map 503001)" there instead of "Map 503001 (no name known)". `Maps/AbyssMaps` is unchanged: the corridor is not one of the Abyss's maps for the pause, now said in its comment and pinned by a test.

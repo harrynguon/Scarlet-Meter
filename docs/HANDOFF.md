@@ -1,4 +1,4 @@
-# Handoff — 2026-10-25
+# Handoff — 2026-10-27
 
 Repository: https://github.com/harrynguon/Scarlet-Meter (public since 2026-10-25; default branch `main`; releases at https://github.com/harrynguon/Scarlet-Meter/releases, built by the Release workflow from a tag). Sibling fork of upstream with the World Companion feature: https://github.com/harrynguon/AIon2-Dps-Meter.
 
@@ -12,6 +12,8 @@ Repository: https://github.com/harrynguon/Scarlet-Meter (public since 2026-10-25
 ## State
 
 What ARCHITECTURE.md describes exists: `upstream/` submodule at release v1.11.5.341, the engine over upstream's pipeline, a chromeless translucent overlay with a settings window (appearance, fight options, hotkey, remembered positions, all saved in `settings.json`), a player details window (skills, buffs, damage graph, combat log; live or from a saved fight) and a history window of saved boss fights, a `--demo` mode with synthetic fights, a row of world-event icons at the bottom of the overlay, boundary, mapping, settings and close-ordering tests, build, upstream-update, publish-layout and UI smoke scripts, CI. The upstream release check and installer are in (see Updates below); a quiet line in the overlay says when RATmeter has a newer release (WORKLOG.md). Checks that have actually run are listed in WORKLOG.md; nothing has been tried in the game.
+
+The character roster (2026-10-27, ARCHITECTURE.md "Character roster") lists every character the player logs in on with Odyle energy, its refill and the Nightmare and Ascension counts, from the game's list of entry counts; not yet tried in the game (below).
 
 World-event notices are in the overlay: `src/ScarletMeter.WorldEvents` (ARCHITECTURE.md "World events") holds the schedules and the alert planner, ported from the fork's World Companion, and the overlay shows them as a row of icons that light up with the minutes left ("Overlay notices"), five minutes ahead by default, with an Alerts tab in settings. The times are not verified in the game.
 
@@ -65,6 +67,18 @@ Harry asked for the meter to switch its tracking off in the Abyss (hundreds of p
 - [ ] The middle layer (Chaotic Middle Reshanta), if you go there: About should show map 22 and the meter stay paused; note what it shows. Any other Abyss area with a loading screen: note its id (AetherDPS also lists 21, which is not paused until seen). Seen so far: the Artifact Corridor, 503001 (2026-10-26, 23:47:26 +11:00, loaded from the Abyss's 20 and back to 20 at 23:49:49 on the same connection), now named in About and deliberately not paused (Harry, 2026-10-27). Still to see with a build that has the name: About naming it, the header leaving "In the Abyss · meter paused" inside it and showing it again back in the Abyss.
 - [ ] "Pause in the Abyss" off: the Abyss tracks as before; turned on while there, the meter pauses at once; off again, it tracks again.
 - [ ] Note any map name that is wrong for where you are, and the game's name for a map shown without one, so the table can be corrected and filled.
+
+## Next: the character roster
+
+Harry asked for a dashboard like other tools' Odyle dashboards, starting with Odyle energy, its recharge and the Nightmare and Ascension counts (corridors and Kinah later). Wired as ARCHITECTURE.md "Entry list and Odyle energy" and "Character roster" describe: the engine reads the game's whole list of entry counts by entry id (A2Tools' reading), ties a login's list to the character the next self record names, and the roster keeps every character in `roster.json`, with estimates of the recharges since. Nothing of it has run with the game yet: the ids, the order of the login's records and every recharge time come from A2Tools.
+
+- [ ] Log in on a character with the meter running: the overlay shows its Odyle energy as before, and the roster (click the Odyle energy) lists the character with its server and the same Odyle energy, Nightmare and Ascension Trial counts the game shows (Nightmare is entry 4 and Ascension 80000001, A2Tools' ids), marked "Playing"; the log says "Entry list read" and then "The entry counts were matched to the character the game named" (never a name or a number).
+- [ ] Switch characters (log out to the character list, then in on another): the roster gets the new character with its own counts, the first keeps its own, and nothing of one shows on the other. A2Tools saw a login's list come seconds before the record naming who logged in; if the counts land on the wrong character, note the times from the log.
+- [ ] Enter and leave a dungeon (a server change) and spend a Nightmare entry: the roster's count goes down for the character played. After a server change the meter holds the counts until the game names the character again (the log says "entry counts are held until the game names the character again"); if the roster's count stays where it was until a later login or zone change, note how long, and if the log says the last character's counts were dropped while you stayed on the same character, note it too (the self record would then be missing at server changes).
+- [ ] Odyle energy's refill while away: note a character's basic energy, play another for a few hours, then compare the roster's estimate (≈) with what the character shows at login. The rule is +15 every three hours at 01:00, 04:00, 07:00 … UTC for Global (A2Tools saw one refill, at 16:00 UTC); "Full" and "Next +15" follow it.
+- [ ] Nightmare's +2 at the daily reset (07:00 UTC) and Ascension Trial's +3 at Wednesday's, as the game's tooltips say: compare the estimate with the game after a reset.
+- [ ] The cap: a character with a membership shows "cap 840 (auto)" once more than 560 has been seen; set it by hand if not, or when a membership ends.
+- [ ] Close and start the meter again: the roster is as it was (`data\roster.json`, and `roster.json.bak` after a second save).
 
 ## Next: the boss-timers window
 

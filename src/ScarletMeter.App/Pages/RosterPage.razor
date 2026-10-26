@@ -1,0 +1,132 @@
+@using ScarletMeter.App.Roster
+@*
+    The character roster (Windows/MeterWindows.Roster): a row per character the meter has seen the player log in on, the
+    one being played marked. Odyle energy is basic (+charged) and "Full" when basic energy reaches its cap; Nightmare and
+    Ascension Trial are entries left (+extra from items). A value marked ≈ is the game's last word plus the recharges
+    since (Roster/RosterRules), which logging in on the character corrects.
+*@
+@{
+    var now = Now;
+    var calendar = Calendar;
+    var rows = Rows(Roster.Characters, Roster.Current, now, calendar, sort);
+    var nextRefill = calendar.NextOdyleRefill(now);
+}
+<div class="tool roster" data-window="roster">
+    <div class="roster-head">
+        <span class="muted">@rows.Count @(rows.Count == 1 ? "character" : "characters")</span>
+        <span class="roster-next" title="Basic Odyle energy refills by 15 every three hours, up to its cap (an estimate)">
+            Next +15 Odyle <b>@RosterText.At(nextRefill, now)</b> <span class="muted">in @RosterText.Until(nextRefill - now)</span>
+        </span>
+        <label class="roster-sort">
+            Sort
+            <select value="@sort" @onchange="OnSortChanged">
+                <option value="@RosterSort.MostOdyle">Most Odyle</option>
+                <option value="@RosterSort.FullSoonest">Full soonest</option>
+                <option value="@RosterSort.Name">Name</option>
+                <option value="@RosterSort.LastSeen">Last played</option>
+            </select>
+        </label>
+    </div>
+    @if (Roster.Notice is { } notice)
+    {
+        <div class="notice">@notice</div>
+    }
+    <div class="tab-body">
+        @if (rows.Count == 0)
+        {
+            <div class="empty-state">No characters yet. Log in on a character with the meter running: the game sends its Odyle energy and entries at login, and the character appears here.</div>
+        }
+        else
+        {
+            <table class="grid-table roster-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th class="left">Character</th>
+                        <th title="Basic energy, then charged energy in brackets">Odyle</th>
+                        <th class="left" title="When basic energy reaches its cap, if none is spent">Full</th>
+                        <th title="Entries left (+extra from recharge items); +@RosterRules.Nightmare.Add a day, up to @RosterRules.Nightmare.Cap">Nightmare</th>
+                        <th title="Entries left (+extra from recharge items); +@RosterRules.Ascension.Add a week, up to @RosterRules.Ascension.Cap">Ascension</th>
+                        <th class="left">Last played</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in rows)
+                    {
+                        var character = row.Character;
+                        <tr class="@(row.IsCurrent ? "me" : "")" @key="row.Key">
+                            <td class="icon-cell">@if (WebAssetHosts.ClassIconUrl(character.ClassId) is { } icon) { <span class="class-icon" style="background-image:url('@icon')"></span> }</td>
+                            <td class="left">
+                                <div class="who-name">@Name(character) @if (row.IsCurrent) { <span class="badge you">Playing</span> }</div>
+                                <div class="who-sub muted">@RosterText.ServerAndClass(character)</div>
+                            </td>
+                            <td>
+                                @if (row.Odyle is { } odyle)
+                                {
+                                    <span class="@(odyle.Gained > 0 ? "estimate" : "")" title="@(odyle.Gained > 0 ? "The game last said " + DetailFormat.Full(character.Odyle!.First) + "; refills since are estimated" : "As the game last said")">@RosterText.Count(odyle)</span>
+                                    <span class="odyle-charged"> @RosterText.Extra(character.Odyle!.Second, always: true)</span>
+                                }
+                                else
+                                {
+                                    <span class="muted">?</span>
+                                }
+                            </td>
+                            <td class="left">
+                                @if (row.Odyle is { Full: true })
+                                {
+                                    <span class="roster-full">Full</span>
+                                }
+                                else if (row.FullAt is { } full)
+                                {
+                                    <span title="@RosterText.At(full, now)">in @RosterText.Until(full - now)</span>
+                                }
+                                <select class="roster-cap" title="Basic energy cap: 840 with a membership, 560 without" value="@character.OdyleCap" @onchange="e => OnCapChanged(row.Key, e)">
+                                    <option value="@OdyleCapChoice.Automatic">cap @(character.MembershipSeen ? RosterRules.MembershipCap : RosterRules.StandardCap) (auto)</option>
+                                    <option value="@OdyleCapChoice.Standard">cap @RosterRules.StandardCap</option>
+                                    <option value="@OdyleCapChoice.Membership">cap @RosterRules.MembershipCap</option>
+                                </select>
+                            </td>
+                            <td>@ContentCell(row.Nightmare, character.Nightmare)</td>
+                            <td>@ContentCell(row.Ascension, character.Ascension)</td>
+                            <td class="left muted">@RosterText.At(character.LastSeen, now)</td>
+                            <td>
+                                <button type="button" class="btn small @(IsArmed(row.Key) ? "danger" : "")" title="Remove from the roster; the character comes back when you play it" @onclick="() => ClickRemove(row.Key)">@(IsArmed(row.Key) ? "Remove?" : "×")</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+    <footer class="roster-foot muted">
+        ≈ marks an estimate: basic Odyle energy +15 every three hours from the daily reset, Nightmare +@RosterRules.Nightmare.Add at each daily reset, Ascension Trial +@RosterRules.Ascension.Add at the weekly reset, none yet checked in the game. Logging in on a character corrects them.
+        @if (!Roster.CanSave)
+        {
+            <span> Changes are not saved this run.</span>
+        }
+    </footer>
+</div>
+
+@code {
+    // A content's entries left (+extra), marked ≈ when estimated; "?" before the game has sent it.
+    private static RenderFragment ContentCell(Estimate? estimate, RosterCount? seen) => builder =>
+    {
+        if (estimate is not { } value || seen is null)
+        {
+            builder.AddMarkupContent(0, "<span class=\"muted\">?</span>");
+            return;
+        }
+        builder.OpenElement(1, "span");
+        builder.AddAttribute(2, "class", value.Gained > 0 ? "estimate" : string.Empty);
+        builder.AddContent(3, RosterText.Count(value));
+        builder.CloseElement();
+        if (RosterText.Extra(seen.Second, always: false) is { Length: > 0 } extra)
+        {
+            builder.OpenElement(4, "span");
+            builder.AddAttribute(5, "class", "muted");
+            builder.AddContent(6, " " + extra);
+            builder.CloseElement();
+        }
+    };
+}

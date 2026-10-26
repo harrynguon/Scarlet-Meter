@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using ScarletMeter.App.Formatting;
 using ScarletMeter.Engine;
 using ScarletMeter.Engine.Maps;
-using ScarletMeter.Engine.Odyle;
+using ScarletMeter.Engine.Entries;
 using ScarletMeter.Engine.Upstream;
 using static ScarletMeter.Tests.SyntheticRecords;
 
@@ -26,7 +26,11 @@ public sealed partial class MapProbeTests
 {
     private const int MapA = 424242; // made up; "32 79 06 00" little-endian
     private const int MapB = 7311;   // made up
-    private const uint OdyleKey = 0x1092; // made up, as in OdyleEnergyTests
+    // An update of the entry list carrying Odyle energy alone (EntryListTests has the list's own tests).
+    private static byte[] OdyleUpdate(int basic, int charged) => EntryListRecordWriter.Update([new(EntryIds.OdyleEnergy, basic, charged)]);
+
+    // The entry-list reader alone: no character is ever named here.
+    private static EntryListTap NewEntryTap() => new(_ => null, TimeProvider.System, NullLogger<EntryListTap>.Instance);
 
     // The whole record in the shape A2Tools documents, written out: length 0x34 (52: what follows it plus 4, as upstream
     // counts), opcode 21 36, the u32 A2Tools calls a count (1 on entering), the id, then 38 more bytes to the 49 every
@@ -186,7 +190,7 @@ public sealed partial class MapProbeTests
         var other = Frame(0x3603, "00 00 00 00 00 00 00 00 00");
 
         Synchronise(stream, "Client:50001");
-        stream.AddData("Client:50001", [.. MapLoad(MapA), .. OdyleEnergyRecordWriter.Update(new(30, 880), OdyleKey)], 0);
+        stream.AddData("Client:50001", [.. MapLoad(MapA), .. OdyleUpdate(30, 880)], 0);
         Assert.Equal(MapA, engine.MapId);
 
         Synchronise(stream, "Client:50002");
@@ -268,7 +272,7 @@ public sealed partial class MapProbeTests
         var engine = host.Services.GetRequiredService<ICombatEngine>();
         var stream = host.Services.GetRequiredService<TcpStreamBuffer>();
         Synchronise(stream);
-        stream.AddData("synthetic", Bundle([.. Frame(0x3603, "00 00 00 00 00 00 00 00 00"), .. MapLoad(MapA), .. OdyleEnergyRecordWriter.Update(new(30, 880), OdyleKey)]), 0);
+        stream.AddData("synthetic", Bundle([.. Frame(0x3603, "00 00 00 00 00 00 00 00 00"), .. MapLoad(MapA), .. OdyleUpdate(30, 880)]), 0);
         Assert.Equal(MapA, engine.MapId);
         Assert.Equal(new OdyleEnergy(30, 880), engine.OdyleEnergy);
     }
@@ -284,14 +288,14 @@ public sealed partial class MapProbeTests
         Assert.NotNull(open);
         var openings = 0;
         var stream = new TcpStreamBuffer(NullLogger<TcpStreamBuffer>.Instance);
-        var odyle = new OdyleEnergyTap(NullLogger<OdyleEnergyTap>.Instance);
+        var odyle = NewEntryTap();
         var maps = new MapLoadTap(NullLogger<MapLoadTap>.Instance);
         using var tap = new RecordTap(stream, record => { openings++; return open(record); }, [odyle, maps], NullLogger<RecordTap>.Instance);
         Synchronise(stream);
-        stream.AddData("synthetic", Bundle([.. OdyleEnergyRecordWriter.Update(new(30, 880), OdyleKey), .. MapLoad(MapA)]), 0);
+        stream.AddData("synthetic", Bundle([.. OdyleUpdate(30, 880), .. MapLoad(MapA)]), 0);
         Assert.Equal(1, openings);
         Assert.Equal(MapA, maps.Current);
-        Assert.Equal(new OdyleEnergy(30, 880), odyle.Current);
+        Assert.Equal(new OdyleEnergy(30, 880), odyle.Odyle);
     }
 
     // The engine's graph has the one tap and its two readers, the same instances the engine reads from.
@@ -301,7 +305,7 @@ public sealed partial class MapProbeTests
         using var host = new TestEngineHost(CaptureMode.None);
         var readers = host.Services.GetServices<IRecordReader>().ToList();
         Assert.Equal(2, readers.Count);
-        Assert.Same(host.Services.GetRequiredService<OdyleEnergyTap>(), Assert.Single(readers.OfType<OdyleEnergyTap>()));
+        Assert.Same(host.Services.GetRequiredService<EntryListTap>(), Assert.Single(readers.OfType<EntryListTap>()));
         Assert.Same(host.Services.GetRequiredService<MapLoadTap>(), Assert.Single(readers.OfType<MapLoadTap>()));
         Assert.Same(host.Services.GetRequiredService<RecordTap>(), host.Services.GetRequiredService<RecordTap>());
     }
@@ -330,17 +334,17 @@ public sealed partial class MapProbeTests
         var open = RecordTap.BindBundleOpener(host.Services.GetRequiredService<PacketProcessor>());
         var stream = new TcpStreamBuffer(NullLogger<TcpStreamBuffer>.Instance);
         var log = new RecordingLogger<RecordTap>();
-        var odyle = new OdyleEnergyTap(NullLogger<OdyleEnergyTap>.Instance);
+        var odyle = NewEntryTap();
         var maps = new MapLoadTap(NullLogger<MapLoadTap>.Instance);
         using var tap = new RecordTap(stream, open, [new ThrowingReader(MapLoadRecords.Opcode), maps, odyle], log);
         Synchronise(stream);
 
-        stream.AddData("synthetic", [.. MapLoad(MapA), .. Bundle([.. MapLoad(MapB), .. OdyleEnergyRecordWriter.Update(new(30, 880), OdyleKey)])], 0);
+        stream.AddData("synthetic", [.. MapLoad(MapA), .. Bundle([.. MapLoad(MapB), .. OdyleUpdate(30, 880)])], 0);
         Assert.Equal(MapB, maps.Current);
-        Assert.Equal(new OdyleEnergy(30, 880), odyle.Current);
-        stream.AddData("synthetic", OdyleEnergyRecordWriter.Update(new(20, 880), OdyleKey), 0);
-        stream.AddData("synthetic", OdyleEnergyRecordWriter.Update(new(10, 880), OdyleKey), 0);
-        Assert.Equal(new OdyleEnergy(10, 880), odyle.Current);
+        Assert.Equal(new OdyleEnergy(30, 880), odyle.Odyle);
+        stream.AddData("synthetic", OdyleUpdate(20, 880), 0);
+        stream.AddData("synthetic", OdyleUpdate(10, 880), 0);
+        Assert.Equal(new OdyleEnergy(10, 880), odyle.Odyle);
         Assert.Single(log.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("failed", StringComparison.Ordinal));
         Assert.Single(log.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("works again", StringComparison.Ordinal));
 
@@ -360,8 +364,8 @@ public sealed partial class MapProbeTests
         var stream = host.Services.GetRequiredService<TcpStreamBuffer>();
         engine.MapChanged += (_, _) => throw new InvalidOperationException("A failing subscriber.");
         Synchronise(stream);
-        stream.AddData("synthetic", Bundle([.. MapLoad(MapA), .. OdyleEnergyRecordWriter.Update(new(30, 880), OdyleKey)]), 0);
-        stream.AddData("synthetic", Bundle([.. MapLoad(MapB), .. OdyleEnergyRecordWriter.Update(new(20, 880), OdyleKey)]), 0);
+        stream.AddData("synthetic", Bundle([.. MapLoad(MapA), .. OdyleUpdate(30, 880)]), 0);
+        stream.AddData("synthetic", Bundle([.. MapLoad(MapB), .. OdyleUpdate(20, 880)]), 0);
         Assert.Equal(MapB, engine.MapId);
         Assert.Equal(new OdyleEnergy(20, 880), engine.OdyleEnergy);
         Assert.Equal(2, warnings.Warnings.Count(w => w.StartsWith("A map subscriber failed.", StringComparison.Ordinal)));

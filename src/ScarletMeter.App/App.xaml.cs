@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ScarletMeter.App.Alerts;
+using ScarletMeter.App.Roster;
 using ScarletMeter.App.Settings;
 using ScarletMeter.App.Updates;
 using ScarletMeter.App.Windows;
@@ -96,6 +97,10 @@ public partial class App : Application
         builder.Services.AddScarletEngine(options);
         builder.Services.AddSingleton(services => new SettingsStore(options.DataDirectory, services.GetRequiredService<ILogger<SettingsStore>>()));
         builder.Services.AddSingleton<SettingsService>();
+        // The character roster: its own file, demo-roster.json in demo mode so made-up characters stay apart.
+        builder.Services.AddSingleton(services => new RosterStore(options.DataDirectory, options.Capture == CaptureMode.Demo,
+            services.GetRequiredService<ILogger<RosterStore>>()));
+        builder.Services.AddSingleton<RosterService>();
         builder.Services.AddSingleton<MeterWindows>();
         builder.Services.AddSingleton<IMeterWindows>(services => services.GetRequiredService<MeterWindows>());
         builder.Services.AddSingleton<DetailsSelection>();
@@ -110,6 +115,8 @@ public partial class App : Application
         // Settings load before the engine resolves, so upstream sees the saved fight rules from the first hit.
         host.Services.GetRequiredService<SettingsService>();
         engine = host.Services.GetRequiredService<ICombatEngine>();
+        // Before capture starts, so the first login's counts reach the roster.
+        host.Services.GetRequiredService<RosterService>().Start();
         engine.Start();
 
         var windows = host.Services.GetRequiredService<MeterWindows>();
