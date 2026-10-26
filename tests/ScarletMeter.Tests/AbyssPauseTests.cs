@@ -189,6 +189,27 @@ public sealed class AbyssPauseTests
         Assert.False(engine.PausedInAbyss);
     }
 
+    // The Artifact Corridor, as Harry's game loaded it (2026-10-26): from the Abyss and back, on the same connection.
+    // Its load ends the pause, so the meter tracks inside it (Harry: "Don't pause the meter there"), and the load of the
+    // Abyss on the way out starts the pause again.
+    [Fact]
+    public void TheArtifactCorridorTracksAndTheAbyssPausesAgainAfterIt()
+    {
+        using var host = new TestEngineHost(CaptureMode.None);
+        var engine = host.Services.GetRequiredService<ICombatEngine>();
+        var stream = host.Services.GetRequiredService<TcpStreamBuffer>();
+        Synchronise(stream, AbyssConnection);
+        stream.AddData(AbyssConnection, MapLoad(20), 0);
+        Assert.True(engine.PausedInAbyss);
+
+        stream.AddData(AbyssConnection, MapLoad(503001), 0);
+        Assert.Equal(503001, engine.MapId);
+        Assert.False(engine.PausedInAbyss);
+
+        stream.AddData(AbyssConnection, MapLoad(20), 0);
+        Assert.True(engine.PausedInAbyss);
+    }
+
     // Pausing and tracking again are each logged once, with the map's number alone; another Abyss map in between logs
     // nothing more.
     [Fact]
