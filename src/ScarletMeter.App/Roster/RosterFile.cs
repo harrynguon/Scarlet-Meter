@@ -67,9 +67,26 @@ public sealed record RosterCharacter
     /// <summary>Whether more basic energy than the standard cap has ever been seen, which only a membership allows.</summary>
     public bool MembershipSeen { get; init; }
 
+    /// <summary>
+    /// When the character entered the Artifact Corridor, as the meter saw it, oldest first: the most recent
+    /// <see cref="RosterRules.CorridorRunsKept"/>. The roster counts those since the last Abyss Siege.
+    /// </summary>
+    public IReadOnlyList<DateTimeOffset> CorridorRuns { get; init; } = [];
+
     /// <summary>The character's key in the roster (not saved: it is the name and server).</summary>
     [JsonIgnore]
     public RosterKey Key => new(Server, Name);
+
+    /// <summary>Equal when every value is, the corridor runs compared one by one (a record compares a list by reference).</summary>
+    public bool Equals(RosterCharacter? other) =>
+        other is not null
+        && Name == other.Name && Server == other.Server && ClassId == other.ClassId && ClassName == other.ClassName
+        && CombatPower == other.CombatPower && LastSeen == other.LastSeen
+        && Equals(Odyle, other.Odyle) && Equals(Nightmare, other.Nightmare) && Equals(Ascension, other.Ascension)
+        && OdyleCap == other.OdyleCap && MembershipSeen == other.MembershipSeen
+        && CorridorRuns.SequenceEqual(other.CorridorRuns);
+
+    public override int GetHashCode() => HashCode.Combine(Name, Server, LastSeen, CorridorRuns.Count);
 }
 
 /// <summary>A count as the game last sent it: its two values and when.</summary>

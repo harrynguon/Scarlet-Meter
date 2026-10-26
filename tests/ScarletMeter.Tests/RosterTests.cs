@@ -8,6 +8,7 @@ using ScarletMeter.App.Pages;
 using ScarletMeter.App.Roster;
 using ScarletMeter.App.Storage;
 using ScarletMeter.Engine;
+using ScarletMeter.Engine.Maps;
 using ScarletMeter.WorldEvents;
 
 namespace ScarletMeter.Tests;
@@ -60,6 +61,31 @@ public sealed class RosterTests : IDisposable
         Assert.Equal(2, Calendar.DailyResetsBetween(Monday, Monday.AddDays(30), 2)); // stops once enough
         Assert.Equal(0, Calendar.WeeklyResetsBetween(Monday, Monday.AddDays(2), 5));
         Assert.Equal(1, Calendar.WeeklyResetsBetween(Monday, Monday.AddDays(2.2), 5));
+    }
+
+    // The Abyss Siege on the world-event schedule: Mondays, Thursdays and Saturdays at 21:00 server time, 12:00 UTC at the
+    // default UTC+9; a siege at an instant is the last one then.
+    [Fact]
+    public void SiegesAreTheWorldEventSchedules()
+    {
+        var saturday = new DateTimeOffset(2026, 10, 24, 12, 0, 0, TimeSpan.Zero);
+        var monday = new DateTimeOffset(2026, 10, 26, 12, 0, 0, TimeSpan.Zero);
+        Assert.Equal(saturday, Calendar.LastSiege(Monday));
+        Assert.Equal(monday, Calendar.NextSiege(Monday));
+        Assert.Equal(monday, Calendar.LastSiege(monday));
+        Assert.Equal(new DateTimeOffset(2026, 10, 29, 12, 0, 0, TimeSpan.Zero), Calendar.NextSiege(monday));
+        Assert.Equal(saturday.AddHours(-1), RechargeCalendar.Default(TimeSpan.FromHours(10)).LastSiege(Monday)); // the server's clock moves it
+    }
+
+    // Corridor entries count from the last siege: one just before it does not.
+    [Fact]
+    public void CorridorRunsCountFromTheLastSiege()
+    {
+        var saturday = new DateTimeOffset(2026, 10, 24, 12, 0, 0, TimeSpan.Zero);
+        DateTimeOffset[] runs = [saturday.AddHours(-1), saturday, saturday.AddHours(1), Monday.AddHours(-1)];
+        Assert.Equal(2, RosterRules.CorridorRunsSinceSiege(runs, Monday, Calendar));
+        Assert.Equal(0, RosterRules.CorridorRunsSinceSiege(runs, Monday.AddDays(1), Calendar)); // Monday's siege since
+        Assert.Equal(0, RosterRules.CorridorRunsSinceSiege([], Monday, Calendar));
     }
 
     // ---------- Estimates ----------
@@ -350,16 +376,18 @@ public sealed class RosterTests : IDisposable
     private sealed class FakeEngine : ICombatEngine
     {
         public event EventHandler<CharacterProgress>? ProgressObserved;
+        public event EventHandler<int?>? MapChanged;
         public int Subscribers => ProgressObserved?.GetInvocationList().Length ?? 0;
+        public int MapSubscribers => MapChanged?.GetInvocationList().Length ?? 0;
         public void Raise(CharacterProgress progress) => ProgressObserved?.Invoke(this, progress);
-        public CharacterIdentity? Character => null;
+        public void RaiseMap(int? mapId) => MapChanged?.Invoke(this, mapId);
+        public CharacterIdentity? Character { get; set; }
         public OdyleEnergy? OdyleEnergy => null;
         public int? MapId => null;
         public bool PausedInAbyss => false;
         public CaptureState Capture => new(false, null);
         public event EventHandler<int>? PingUpdated { add { } remove { } }
         public event EventHandler<OdyleEnergy>? OdyleEnergyUpdated { add { } remove { } }
-        public event EventHandler<int?>? MapChanged { add { } remove { } }
         public void Start() { }
         public void Stop() { }
         public void Reset() { }
@@ -385,7 +413,7 @@ public sealed class RosterTests : IDisposable
         using var service = new RosterService(engine, store, clock, NullLogger<RosterService>.Instance);
         service.Start();
         service.Start();
-        Assert.Equal(1, engine.Subscribers);
+        Assert.Equal((1, 1), (engine.Subscribers, engine.MapSubscribers));
 
         engine.Raise(Progress(AlphaIdentity, (EntryIds.OdyleEnergy, 600, 1200, Monday), (EntryIds.Nightmare, 11, 1, Monday), (99, 5, 5, Monday)));
         var alpha = Assert.Single(service.Characters);
@@ -494,5 +522,136 @@ public sealed class RosterTests : IDisposable
         Assert.Equal(2, store.Load(Monday).File.Characters.Count);
         Assert.Single(log.Entries, e => e.Message.Contains("works again", StringComparison.Ordinal));
         Assert.All(log.Entries, e => Assert.DoesNotContain("Alpha", e.Message, StringComparison.Ordinal));
+    }
+
+    // ---------- Artifact Corridor runs ----------
+
+    // Entering the Artifact Corridor from another map is a run for the character being played: kept, saved and counted
+    // since the last siege; a load of the corridor again (a teleport inside) or a change between other maps is none.
+    [Fact]
+    public void EnteringTheCorridorIsARunForTheCharacterPlayed()
+    {
+        var clock = new FakeTimeProvider(Monday);
+        var engine = new FakeEngine { Character = AlphaIdentity };
+        var store = NewStore();
+        using var service = new RosterService(engine, store, clock, NullLogger<RosterService>.Instance);
+        service.Start();
+        engine.RaiseMap(20);
+        engine.RaiseMap(MapNames.ArtifactCorridor);
+        engine.RaiseMap(MapNames.ArtifactCorridor); // the engine raises a change only, but a repeat is no new run either
+        clock.Advance(TimeSpan.FromMinutes(3));
+        engine.RaiseMap(20);
+        engine.RaiseMap(1010);
+        var alpha = Assert.Single(service.Characters);
+        Assert.Equal([Monday], alpha.CorridorRuns);
+        Assert.Equal(1, RosterRules.CorridorRunsSinceSiege(alpha.CorridorRuns, clock.GetUtcNow(), Calendar));
+        clock.Advance(RosterService.SaveDelay);
+        Assert.Equal([Monday], Assert.Single(store.Load(clock.GetUtcNow()).File.Characters).CorridorRuns);
+    }
+
+    // While the engine is not sure who is playing (after a move, before a record names the character), a run is put on no
+    // one, and says so without naming anyone.
+    [Fact]
+    public void ARunWhileTheCharacterIsNotSureIsNotCounted()
+    {
+        var clock = new FakeTimeProvider(Monday);
+        var log = new RecordingLogger<RosterService>();
+        var engine = new FakeEngine();
+        using var service = new RosterService(engine, NewStore(), clock, log);
+        service.TakeMap(20);
+        service.TakeMap(MapNames.ArtifactCorridor);
+        Assert.Empty(service.Characters);
+        Assert.Single(log.Entries, e => e.Message.Contains("not sure; not counted", StringComparison.Ordinal));
+    }
+
+    // A reconnection inside the corridor loads it again after an unknown map: within five minutes of the last run that is
+    // the same run; later, entering straight from an unknown map (the Abyss's load missed) is a new one.
+    [Fact]
+    public void AReconnectionInsideTheCorridorIsNotASecondRun()
+    {
+        var clock = new FakeTimeProvider(Monday);
+        using var service = new RosterService(new FakeEngine { Character = AlphaIdentity }, NewStore(), clock, NullLogger<RosterService>.Instance);
+        service.TakeMap(20);
+        service.TakeMap(MapNames.ArtifactCorridor);
+        clock.Advance(TimeSpan.FromMinutes(1));
+        service.TakeMap(null);
+        service.TakeMap(MapNames.ArtifactCorridor);
+        Assert.Single(Assert.Single(service.Characters).CorridorRuns);
+
+        clock.Advance(RosterService.CorridorReentryWindow);
+        service.TakeMap(null);
+        service.TakeMap(MapNames.ArtifactCorridor);
+        Assert.Equal(2, Assert.Single(service.Characters).CorridorRuns.Count);
+    }
+
+    // The most recent runs are kept, oldest first.
+    [Fact]
+    public void TheMostRecentRunsAreKept()
+    {
+        var clock = new FakeTimeProvider(Monday);
+        using var service = new RosterService(new FakeEngine { Character = AlphaIdentity }, NewStore(), clock, NullLogger<RosterService>.Instance);
+        for (var run = 0; run < RosterRules.CorridorRunsKept + 3; run++)
+        {
+            service.TakeMap(20);
+            service.TakeMap(MapNames.ArtifactCorridor);
+            clock.Advance(TimeSpan.FromMinutes(10));
+        }
+        var runs = Assert.Single(service.Characters).CorridorRuns;
+        Assert.Equal(RosterRules.CorridorRunsKept, runs.Count);
+        Assert.Equal(Monday.AddMinutes(30), runs[0]);
+        Assert.Equal(runs.Order(), runs);
+    }
+
+    // Saved runs are checked like every date: unusable ones go, the rest in order, the most recent kept.
+    [Fact]
+    public void TheNormalizerKeepsUsableCorridorRunsInOrder()
+    {
+        var runs = Enumerable.Range(0, RosterRules.CorridorRunsKept + 2).Select(i => Monday.AddHours(-i)).ToList();
+        runs.Add(Monday.AddDays(5)); // past tomorrow
+        runs.Add(new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var (file, repairs) = RosterNormalizer.Normalize(new RosterFile { Characters = [new RosterCharacter { Name = "Alpha", Server = "SIE", LastSeen = Monday, CorridorRuns = runs }] }, Monday);
+        var kept = Assert.Single(file.Characters).CorridorRuns;
+        Assert.Equal(RosterRules.CorridorRunsKept, kept.Count);
+        Assert.Equal(Monday, kept[^1]);
+        Assert.Equal(kept.Order(), kept);
+        Assert.NotEmpty(repairs);
+        var (none, _) = RosterNormalizer.Normalize(new RosterFile { Characters = [new RosterCharacter { Name = "Alpha", Server = "SIE", LastSeen = Monday, CorridorRuns = null! }] }, Monday);
+        Assert.Empty(Assert.Single(none.Characters).CorridorRuns);
+    }
+
+    // A record compares a list by reference, so the roster's own equality compares every value, the corridor runs one by
+    // one: a change to any property makes two characters differ, and the same values in a new list do not.
+    [Fact]
+    public void TwoCharactersAreEqualOnlyWhenEveryValueIs()
+    {
+        var baseline = Alpha(Monday) with { CorridorRuns = [Monday] };
+        Assert.Equal(baseline, baseline with { CorridorRuns = [Monday] });
+        Assert.Equal(baseline.GetHashCode(), (baseline with { CorridorRuns = [Monday] }).GetHashCode());
+        var clone = typeof(RosterCharacter).GetMethod("<Clone>$")!;
+        foreach (var property in typeof(RosterCharacter).GetProperties().Where(p => p.CanWrite))
+        {
+            var copy = (RosterCharacter)clone.Invoke(baseline, null)!;
+            object changed = property.GetValue(baseline) switch
+            {
+                string text => text + "x",
+                int number => number + 1,
+                bool flag => !flag,
+                DateTimeOffset date => date.AddMinutes(1),
+                RosterCount count => count with { First = count.First + 1 },
+                OdyleCapChoice cap => cap == OdyleCapChoice.Standard ? OdyleCapChoice.Membership : OdyleCapChoice.Standard,
+                IReadOnlyList<DateTimeOffset> list => (IReadOnlyList<DateTimeOffset>)[.. list, Monday.AddHours(1)],
+                var other => throw new InvalidOperationException($"No change made for {property.Name} ({other?.GetType().Name})."),
+            };
+            property.SetValue(copy, changed);
+            Assert.False(baseline.Equals(copy), property.Name);
+        }
+    }
+
+    [Fact]
+    public void TheRowsCountCorridorRunsSinceTheSiege()
+    {
+        var saturday = new DateTimeOffset(2026, 10, 24, 12, 0, 0, TimeSpan.Zero);
+        var character = new RosterCharacter { Name = "Alpha", Server = "SIE", LastSeen = Monday, CorridorRuns = [saturday.AddHours(-2), saturday.AddHours(2)] };
+        Assert.Equal(1, Assert.Single(RosterPage.Rows([character], null, Monday, Calendar, RosterSort.Name)).Corridors);
     }
 }

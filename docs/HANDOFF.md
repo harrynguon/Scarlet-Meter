@@ -79,6 +79,7 @@ Harry asked for a dashboard like other tools' Odyle dashboards, starting with Od
 - [ ] Nightmare's +2 at the daily reset (07:00 UTC) and Ascension Trial's +3 at Wednesday's, as the game's tooltips say: compare the estimate with the game after a reset.
 - [ ] The cap: a character with a membership shows "cap 840 (auto)" once more than 560 has been seen; set it by hand if not, or when a membership ends.
 - [ ] Close and start the meter again: the roster is as it was (`data\roster.json`, and `roster.json.bak` after a second save).
+- [ ] Corridors: enter the Artifact Corridor from the Abyss with the meter running; the character's Corridors count goes up by one when the corridor loads, not again inside it or on the way back out, and goes back to 0 after the next Abyss Siege (Mon, Thu or Sat 21:00 server time on the world-event schedule; note if the game's corridors reset at another time). If it does not count, note whether the log says "not sure; not counted" (the character was not named again after entering the Abyss) or nothing (the corridor's map record was missed). A second layer's corridor, if there is one, has its own map id: note it from Settings, About.
 
 ## Next: the boss-timers window
 

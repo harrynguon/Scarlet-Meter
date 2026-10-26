@@ -22,6 +22,12 @@ namespace ScarletMeter.Engine.Maps;
 /// </summary>
 public static class MapNames
 {
+    /// <summary>
+    /// The Artifact Corridor's map id, 503001 (seen in Harry's game, see above): the character roster counts the times a
+    /// character enters it.
+    /// </summary>
+    public const int ArtifactCorridor = 503001;
+
     private static readonly FrozenDictionary<int, string> Names = new Dictionary<int, string>
     {
         // The open world and the Abyss (SkeeveAN's names, AetherDPS's ids).
@@ -32,7 +38,7 @@ public static class MapNames
         [20] = "Chaotic Lower Reshanta",
         [22] = "Chaotic Middle Reshanta",
         // Seen in Harry's game, named by Harry: entered from the Abyss, and not the Abyss for its pause (AbyssMaps).
-        [503001] = "Artifact Corridor",
+        [ArtifactCorridor] = "Artifact Corridor",
         // Dungeons (A2Tools' list; "the Hall of Illusion" capitalised).
         [600001] = "Krao Cave (Normal)",
         [600002] = "Krao Cave (Exploration)",

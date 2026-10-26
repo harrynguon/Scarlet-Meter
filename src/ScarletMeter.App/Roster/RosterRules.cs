@@ -19,16 +19,19 @@ public sealed class RechargeCalendar
 
     private readonly EventRule daily;
     private readonly EventRule weekly;
+    private readonly EventRule siege;
     private readonly TimeSpan serverOffset;
     private readonly DateTimeOffset refillAnchor;
 
     /// <param name="daily">The daily reset's rule: one reset a day, so the three-hour refills meet each one.</param>
     /// <param name="weekly">The weekly reset's rule.</param>
+    /// <param name="siege">The Abyss Siege's rule: the corridors a side may run are handed out anew at each.</param>
     /// <param name="serverOffset">The server clock, for rules on it (the settings' server offset).</param>
-    public RechargeCalendar(EventRule daily, EventRule weekly, TimeSpan serverOffset)
+    public RechargeCalendar(EventRule daily, EventRule weekly, EventRule siege, TimeSpan serverOffset)
     {
         this.daily = daily;
         this.weekly = weekly;
+        this.siege = siege;
         this.serverOffset = serverOffset;
         refillAnchor = EventSchedule.Occurrence(daily, GridOrigin, serverOffset).Next;
     }
@@ -37,6 +40,7 @@ public sealed class RechargeCalendar
     public static RechargeCalendar Default(TimeSpan serverOffset) => new(
         EventCatalog.Default.Single(rule => rule.Id == EventIds.Daily),
         EventCatalog.Default.Single(rule => rule.Id == EventIds.Weekly),
+        EventCatalog.Default.Single(rule => rule.Id == EventIds.Siege),
         serverOffset);
 
     /// <summary>The first basic-energy refill strictly after <paramref name="instant"/>.</summary>
@@ -56,6 +60,25 @@ public sealed class RechargeCalendar
 
     /// <summary>The next weekly reset strictly after <paramref name="instant"/>.</summary>
     public DateTimeOffset NextWeeklyReset(DateTimeOffset instant) => EventSchedule.Occurrence(weekly, instant, serverOffset).Next;
+
+    /// <summary>The next Abyss Siege strictly after <paramref name="instant"/>.</summary>
+    public DateTimeOffset NextSiege(DateTimeOffset instant) => EventSchedule.Occurrence(siege, instant, serverOffset).Next;
+
+    /// <summary>
+    /// The last Abyss Siege at or before <paramref name="instant"/>: found by walking forward from eight days before,
+    /// which holds one for any schedule with a siege at least weekly (the catalog's are three a week).
+    /// </summary>
+    public DateTimeOffset LastSiege(DateTimeOffset instant)
+    {
+        var at = instant - TimeSpan.FromDays(8);
+        var last = at;
+        while (EventSchedule.Occurrence(siege, at, serverOffset).Next is var next && next <= instant)
+        {
+            last = next;
+            at = next;
+        }
+        return last;
+    }
 
     // Which three-hour slot of the refill grid an instant falls in (a refill at the slot's start belongs to it).
     private long RefillTick(DateTimeOffset instant)
@@ -115,6 +138,22 @@ public static class RosterRules
 
     /// <summary>Ascension Trial (entry 80000001): +3 at each weekly reset, up to 3.</summary>
     public static readonly ContentRule Ascension = new("ascension", "Ascension Trial", 3, 3, Weekly: true);
+
+    /// <summary>How many of a character's Artifact Corridor entries are kept: more than a siege's worth.</summary>
+    public const int CorridorRunsKept = 12;
+
+    /// <summary>
+    /// The most corridors a side runs between two sieges, one per artifact it holds (A2Tools' Roster plugin: "up to 3");
+    /// how many a side holds now is not read, so the page shows the runs alone, with this as the bound.
+    /// </summary>
+    public const int CorridorsPerSiege = 3;
+
+    /// <summary>The Artifact Corridor entries since the last Abyss Siege at <paramref name="now"/>.</summary>
+    public static int CorridorRunsSinceSiege(IReadOnlyList<DateTimeOffset> runs, DateTimeOffset now, RechargeCalendar calendar)
+    {
+        var since = calendar.LastSiege(now);
+        return runs.Count(run => run > since);
+    }
 
     /// <summary>The cap the character's basic energy refills to: the player's choice, or 840 once more than 560 was seen.</summary>
     public static int OdyleCap(RosterCharacter character) => character.OdyleCap switch

@@ -95,8 +95,9 @@ and adds it up per player and per fight.
   and uptime, a damage graph and the combat log.
 - **History** of saved boss fights, searchable, kept for as long as you choose.
 - **Characters**: every character you log in on with the meter running, with its Odyle energy, when basic energy is
-  full again, and Nightmare and Ascension entries left, estimated (≈) from what the game last said. Click the Odyle
-  energy, or Settings, Appearance, Characters. The recharge times are not yet checked in the game.
+  full again, and Nightmare and Ascension entries left, estimated (≈) from what the game last said, and the Artifact
+  Corridors it entered since the last Abyss Siege, as the meter saw them. Click the Odyle energy, or Settings,
+  Appearance, Characters. The recharge and siege times are not yet checked in the game.
 
 **World events**
 

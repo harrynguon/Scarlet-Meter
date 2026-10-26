@@ -3,19 +3,25 @@
     The character roster (Windows/MeterWindows.Roster): a row per character the meter has seen the player log in on, the
     one being played marked. Odyle energy is basic (+charged) and "Full" when basic energy reaches its cap; Nightmare and
     Ascension Trial are entries left (+extra from items). A value marked ≈ is the game's last word plus the recharges
-    since (Roster/RosterRules), which logging in on the character corrects.
+    since (Roster/RosterRules), which logging in on the character corrects. Corridors are the Artifact Corridor entries the
+    meter saw since the last Abyss Siege.
 *@
 @{
     var now = Now;
     var calendar = Calendar;
     var rows = Rows(Roster.Characters, Roster.Current, now, calendar, sort);
     var nextRefill = calendar.NextOdyleRefill(now);
+    var lastSiege = calendar.LastSiege(now);
+    var nextSiege = calendar.NextSiege(now);
 }
 <div class="tool roster" data-window="roster">
     <div class="roster-head">
         <span class="muted">@rows.Count @(rows.Count == 1 ? "character" : "characters")</span>
         <span class="roster-next" title="Basic Odyle energy refills by 15 every three hours, up to its cap (an estimate)">
             Next +15 Odyle <b>@RosterText.At(nextRefill, now)</b> <span class="muted">in @RosterText.Until(nextRefill - now)</span>
+        </span>
+        <span class="roster-next" title="Corridors count from the last Abyss Siege (@RosterText.At(lastSiege, now)) to the next, on the world-event schedule; not checked in the game">
+            Corridors reset <b>@RosterText.At(nextSiege, now)</b>
         </span>
         <label class="roster-sort">
             Sort
@@ -47,6 +53,7 @@
                         <th class="left" title="When basic energy reaches its cap, if none is spent">Full</th>
                         <th title="Entries left (+extra from recharge items); +@RosterRules.Nightmare.Add a day, up to @RosterRules.Nightmare.Cap">Nightmare</th>
                         <th title="Entries left (+extra from recharge items); +@RosterRules.Ascension.Add a week, up to @RosterRules.Ascension.Cap">Ascension</th>
+                        <th title="Artifact Corridors entered since the last Abyss Siege, as the meter saw them; up to @RosterRules.CorridorsPerSiege between sieges, as your side's artifacts allow">Corridors</th>
                         <th class="left">Last played</th>
                         <th></th>
                     </tr>
@@ -89,6 +96,7 @@
                             </td>
                             <td>@ContentCell(row.Nightmare, character.Nightmare)</td>
                             <td>@ContentCell(row.Ascension, character.Ascension)</td>
+                            <td class="@(row.Corridors == 0 ? "muted" : "")">@row.Corridors</td>
                             <td class="left muted">@RosterText.At(character.LastSeen, now)</td>
                             <td>
                                 <button type="button" class="btn small @(IsArmed(row.Key) ? "danger" : "")" title="Remove from the roster; the character comes back when you play it" @onclick="() => ClickRemove(row.Key)">@(IsArmed(row.Key) ? "Remove?" : "×")</button>
@@ -100,7 +108,7 @@
         }
     </div>
     <footer class="roster-foot muted">
-        ≈ marks an estimate: basic Odyle energy +15 every three hours from the daily reset, Nightmare +@RosterRules.Nightmare.Add at each daily reset, Ascension Trial +@RosterRules.Ascension.Add at the weekly reset, none yet checked in the game. Logging in on a character corrects them.
+        ≈ marks an estimate: basic Odyle energy +15 every three hours from the daily reset, Nightmare +@RosterRules.Nightmare.Add at each daily reset, Ascension Trial +@RosterRules.Ascension.Add at the weekly reset, none yet checked in the game. Logging in on a character corrects them. Corridors are the Artifact Corridor entries the meter saw since the last Abyss Siege, not estimated: one entered with the meter closed is not counted.
         @if (!Roster.CanSave)
         {
             <span> Changes are not saved this run.</span>

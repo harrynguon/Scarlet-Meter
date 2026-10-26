@@ -267,7 +267,7 @@ public sealed class EntryListTests
         tap.Observe(EntryListRecordWriter.List([new(EntryIds.OdyleEnergy, 500, 0), new(EntryIds.AscensionTrial, 2, 0)]));
         tap.Observe(EntryListRecordWriter.Update([new(EntryIds.AscensionTrial, 1, 0)])); // before the record: still waits
         Assert.Empty(raised);
-        Assert.Same(Alpha, tap.Character);
+        Assert.Null(tap.Character); // who is playing is not sure until the record names them
 
         tap.Observe(SelfRecord(9));
         var progress = Assert.Single(raised);
@@ -382,8 +382,9 @@ public sealed class EntryListTests
         tap.Observe(EntryListRecordWriter.Update([new(EntryIds.OdyleEnergy, 20, 880)]));
         Assert.Empty(raised);
         Assert.Equal(new OdyleEnergy(20, 880), tap.Odyle); // the overlay shows it at once
-        Assert.Same(Alpha, tap.Character);
+        Assert.Null(tap.Character); // not sure until a record names the character again
         tap.Observe(SelfRecord(7));
+        Assert.Same(Alpha, tap.Character);
         Assert.Equal(20, Assert.Single(raised).Entries[EntryIds.OdyleEnergy].First);
         tap.Observe(EntryListRecordWriter.Update([new(EntryIds.OdyleEnergy, 10, 880)]));
         Assert.Equal(2, raised.Count); // confirmed again: updates are raised at once

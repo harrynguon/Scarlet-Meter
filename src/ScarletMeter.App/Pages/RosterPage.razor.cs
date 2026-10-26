@@ -19,9 +19,13 @@ public enum RosterSort
     LastSeen,
 }
 
-/// <summary>One character as the page shows it at an instant: its estimates and when its energy is full.</summary>
+/// <summary>
+/// One character as the page shows it at an instant: its estimates, when its energy is full, and its Artifact Corridor
+/// entries since the last Abyss Siege.
+/// </summary>
 public sealed record RosterRow(
-    RosterCharacter Character, bool IsCurrent, int Cap, Estimate? Odyle, DateTimeOffset? FullAt, Estimate? Nightmare, Estimate? Ascension)
+    RosterCharacter Character, bool IsCurrent, int Cap, Estimate? Odyle, DateTimeOffset? FullAt, Estimate? Nightmare, Estimate? Ascension,
+    int Corridors)
 {
     public RosterKey Key => Character.Key;
 }
@@ -29,7 +33,8 @@ public sealed record RosterRow(
 /// <summary>
 /// The character roster: every character the meter has seen the player log in on, with Odyle energy, when basic energy
 /// is full again, and Nightmare and Ascension Trial entries left, each as the game last said plus the recharges since
-/// (<see cref="RosterRules"/>, marked ≈). Re-reads the roster when it changes and every half minute, for the estimates.
+/// (<see cref="RosterRules"/>, marked ≈), and the Artifact Corridors entered since the last Abyss Siege, as the meter saw
+/// them. Re-reads the roster when it changes and every half minute, for the estimates.
 /// </summary>
 public partial class RosterPage : IDisposable
 {
@@ -71,7 +76,8 @@ public partial class RosterPage : IDisposable
                 character.Odyle is { } odyle ? RosterRules.OdyleNow(odyle, cap, now, calendar) : null,
                 character.Odyle is { } seen ? RosterRules.OdyleFullAt(seen, cap, calendar) : null,
                 character.Nightmare is { } nightmare ? RosterRules.ContentNow(RosterRules.Nightmare, nightmare, now, calendar) : null,
-                character.Ascension is { } ascension ? RosterRules.ContentNow(RosterRules.Ascension, ascension, now, calendar) : null);
+                character.Ascension is { } ascension ? RosterRules.ContentNow(RosterRules.Ascension, ascension, now, calendar) : null,
+                RosterRules.CorridorRunsSinceSiege(character.CorridorRuns, now, calendar));
         });
         return sort switch
         {

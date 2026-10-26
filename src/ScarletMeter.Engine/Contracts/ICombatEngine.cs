@@ -91,8 +91,11 @@ public interface ICombatEngine : IDisposable
     event EventHandler<OdyleEnergy>? OdyleEnergyUpdated;
 
     /// <summary>
-    /// The character the game last named as the player's, from the character's own record that upstream reads at
-    /// login (and on loads after it), or null until one is named. Kept across Stop and Reset.
+    /// The character being played, from the character's own record that upstream reads at login (and on loads after it),
+    /// or null while that is not sure: until one is named, after a login's list until the record naming who logged in,
+    /// and after a move to a new connection (a server change, or a switch whose first records were lost) until a record
+    /// names the character again. What happens meanwhile (an Artifact Corridor entered) is then not put on anyone. Kept
+    /// across Stop and Reset.
     /// </summary>
     CharacterIdentity? Character { get; }
 
