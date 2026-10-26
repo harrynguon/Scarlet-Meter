@@ -24,7 +24,7 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Merged `main` (#38 and #41, 17f444a) into this branch:** conflicts in `UpstreamCombatEngine` (both features add to the constructor and `GetSnapshot`: the pause is checked first, inside the dummy filter's snapshot lock, and also clears what was shown, so nothing from before the Abyss is held over it), the ARCHITECTURE file table's Upstream row (both descriptions merged), README's comparison table, LESSONS and this log (both entries kept, newest first). `scripts/Build.ps1` 714/714 in Debug and in Release; the `upstream` pin unchanged (aa3ffc6 on both sides).
 
-**Next:** Harry asked (2026-10-26) to commit, push and open the PR into main, the main session taking it from there: the deep audit (capture and parsing, the engine's upstream mapping, threading, settings), Codex and CI; the `CHANGELOG.md` line follows once the PR has its number. The test copy with the fix and the pause waits for Harry to close the earlier one (`Publish-Portable.ps1` refused while it ran).
+**Next:** Harry asked (2026-10-26) to commit, push and open the PR into main, the main session taking it from there: PR #42, with its two `CHANGELOG.md` lines under Unreleased, Added (`ChangelogTests` pass); then the deep audit (capture and parsing, the engine's upstream mapping, threading, settings), Codex and CI. The test copy with the fix and the pause waits for Harry to close the earlier one (`Publish-Portable.ps1` refused while it ran).
 
 ## 2026-10-26 — A changelog, and each release lists what changed
 
