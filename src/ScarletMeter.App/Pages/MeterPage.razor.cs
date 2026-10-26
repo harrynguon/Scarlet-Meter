@@ -44,15 +44,11 @@ public partial class MeterPage : IAsyncDisposable
     private OdyleEnergy? odyle;
     private Task? refreshLoop;
     private bool refreshFailing;
-    // The heights last sent to the window (OnAfterRenderAsync): the content, the content with no rows, and a row's step.
+    // The content height last sent to the window (OnAfterRenderAsync).
     private double reportedContent = double.NaN;
-    private double reportedEmpty = double.NaN;
-    private double reportedStep = double.NaN;
     private bool fitFailing;
-    // Whether the window, after the last fit, is shorter than the content (RowsClass, "scrolls"), and whether the player
-    // is dragging its edge (OverlayClass, "sizing").
+    // Whether the window, after the last fit, is shorter than the content (RowsClass, "scrolls").
     private bool contentCut;
-    private bool resizing;
 
     [Inject]
     private ICombatEngine Engine { get; set; } = default!;
@@ -86,27 +82,18 @@ public partial class MeterPage : IAsyncDisposable
         .Where(p => p.IsIdentified || p.DamageShare > 1)
         .OrderByDescending(p => p.TotalDamage);
 
-    // The bar area's height in rows (AppearanceSettings.BarRows), which dragging the meter's bottom edge sets; the
-    // default until the window has taken it from an earlier build's height.
-    private int BarRows => appearance.BarRows ?? AppearanceSettings.DefaultBarRows;
+    // The bar area's height in rows: one per player shown, up to BarArea.MostRows (Pages/BarArea).
+    private int BarRows => BarArea.Rows(Visible.Count());
 
     // "fx" with bar effects on; "settled" hides them once the fight is quiet or over (app.css), so nothing animates
-    // between pulls. "sizing" while the player drags the meter's edge (IMeterWindows.OverlayResizing): the panel fills
-    // the window and the bar area follows the edge.
+    // between pulls.
     private string OverlayClass =>
-        (appearance.BarEffects ? "fx" : "") + (phase is FightPhase.Settled or FightPhase.Defeated ? " settled" : "")
-        + (resizing ? " sizing" : "");
+        (appearance.BarEffects ? "fx" : "") + (phase is FightPhase.Settled or FightPhase.Defeated ? " settled" : "");
 
-    // The rows the bar area holds: none when it has no rows (the empty meter), unless its edge is being dragged, when
-    // the bars follow the edge. A bar area of no rows still holding them showed a sliver of the pinned own row over a
-    // scrollbar (audit on PR #37).
-    private IEnumerable<PlayerRow> Shown => BarRows == 0 && !resizing ? [] : Visible;
-
-    // "scrolls" once the bar area cannot show every row: more players than its rows (some), the window as tall as the
-    // screen allows (IMeterWindows.OverlayCutsContent), or a resize under way. The list scrolls then, the player's own
-    // row pinned in view (app.css, .rows.scrolls). Otherwise it is clipped, so a gliding row never shows a scrollbar
-    // for a moment.
-    private string RowsClass => (BarRows > 0 && Visible.Count() > BarRows) || contentCut || resizing ? "scrolls" : string.Empty;
+    // "scrolls" once the bar area cannot show every row: more players than its rows, or the window as tall as the
+    // screen allows (IMeterWindows.OverlayCutsContent). The list scrolls then, the player's own row pinned in view
+    // (app.css, .rows.scrolls). Otherwise it is clipped, so a gliding row never shows a scrollbar for a moment.
+    private string RowsClass => BarArea.Scrolls(Visible.Count(), contentCut) ? "scrolls" : string.Empty;
 
     // The header in a fight: what is being fought, or that it is down.
     private string StateText(TargetInfo target) => phase == FightPhase.Defeated
@@ -151,45 +138,36 @@ public partial class MeterPage : IAsyncDisposable
         refreshLoop = RefreshLoopAsync();
     }
 
-    // After each render the page measures itself (js/overlay-size.js): its content, with the bar area at its rows, and
-    // its content with no rows. Both, with a row's step at the row size, go to the window when they changed
-    // (Windows/OverlayFit: the window is as tall as the content, and counts a resize of the bar area in rows), and the
-    // page asks whether the window is shorter than the content (as tall as the screen allows), when the rows scroll,
-    // and whether the player is dragging its edge; a change renders once more. The script may not be loaded for the
-    // first render, and the page may be closing; the next render tries again. A fit that fails is logged once and
-    // retried on the next render: a cosmetic fit must never end the meter, which an exception thrown out of this
-    // method would (Blazor rethrows it on the dispatcher).
+    // After each render the page measures its content, with the bar area at its rows (js/overlay-size.js); the height
+    // goes to the window when it changed (Windows/OverlayFit: the window is as tall as the content), and the page asks
+    // whether the window is shorter than the content (as tall as the screen allows), when the rows scroll; a change
+    // renders once more. The script may not be loaded for the first render, and the page may be closing; the next render
+    // tries again. A fit that fails is logged once and retried on the next render: a cosmetic fit must never end the
+    // meter, which an exception thrown out of this method would (Blazor rethrows it on the dispatcher).
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (stopping.IsCancellationRequested) return;
-        OverlayHeights? heights;
+        double? measured;
         try
         {
-            heights = await JS.InvokeAsync<OverlayHeights?>("scarletOverlay.heights", stopping.Token);
+            measured = await JS.InvokeAsync<double?>("scarletOverlay.contentHeight", stopping.Token);
         }
         catch (Exception ex) when (ex is JSException or JSDisconnectedException or OperationCanceledException or ObjectDisposedException)
         {
             return;
         }
-        if (stopping.IsCancellationRequested || heights is null) return;
+        if (stopping.IsCancellationRequested || measured is not { } height) return;
         try
         {
-            // The step too: at no rows a row-size notch moves the heights by less than half a pixel (audit on PR #37).
-            var step = OverlayFit.RowStep(appearance.RowScale);
-            if (OverlayFit.IsNewHeight(reportedContent, heights.Content) || OverlayFit.IsNewHeight(reportedEmpty, heights.Empty)
-                || OverlayFit.IsNewHeight(reportedStep, step))
+            if (OverlayFit.IsNewHeight(reportedContent, height))
             {
-                Windows.FitOverlayToContent(heights.Content, heights.Empty, step);
-                reportedContent = heights.Content;
-                reportedEmpty = heights.Empty;
-                reportedStep = step;
+                Windows.FitOverlayToContent(height);
+                reportedContent = height;
             }
-            var cut = Windows.OverlayCutsContent(heights.Content);
-            var sizing = Windows.OverlayResizing;
+            var cut = Windows.OverlayCutsContent(height);
             fitFailing = false;
-            if (cut == contentCut && sizing == resizing) return;
+            if (cut == contentCut) return;
             contentCut = cut;
-            resizing = sizing;
             StateHasChanged();
         }
         catch (Exception ex)
@@ -327,7 +305,4 @@ public partial class MeterPage : IAsyncDisposable
         if (refreshLoop is not null) await refreshLoop;
         stopping.Dispose();
     }
-
-    // What js/overlay-size.js measures, in CSS pixels: the panel with the bar area at its rows, and with no rows.
-    private sealed record OverlayHeights(double Content, double Empty);
 }

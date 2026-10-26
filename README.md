@@ -77,10 +77,10 @@ and adds it up per player and per fight.
   plus the **background opacity** of the whole meter. Text and bars always stay solid.
 - **Class colours**, **relative bars** (against the top player), row size, and **hidden names** for streams and
   screenshots.
-- **A bar area you size**: drag the meter's bottom edge to make the bars' area anything from none to ten bars tall;
-  it snaps to whole bars and keeps that size, with empty rows when fewer are playing. The event timers below keep
-  their own size. With more players than fit, the bars scroll and your own bar stays in view, pinned to the top or
-  bottom edge when it would scroll away.
+- **A bar area that sizes itself**: no bars until there is someone to show, then a bar per player, up to five (a
+  dungeon party fits whole); the last fight's bars stay until the next. With more players (a raid), the top five
+  show, the rest scroll, and your own bar stays in view, pinned to the top or bottom edge when it would scroll away.
+  Nothing to resize: the event timers below keep their own size.
 
 <p align="center"><img src="docs/images/background-picture.png" alt="A background picture at 50% picture opacity (demo data, a generated test picture)" width="456"/></p>
 
@@ -109,7 +109,7 @@ and adds it up per player and per fight.
 
 - **Portable**: one folder, unzip and run, move or delete it as one. Your data lives inside it.
 - **No installer, no .NET install, no administrator rights** (with Npcap set up as above).
-- A **global hotkey** to hide and show it, an always-on-top chromeless overlay you can drag and resize, and window
+- A **global hotkey** to hide and show it, an always-on-top chromeless overlay you can drag and make wider or narrower, and window
   positions remembered across restarts.
 - **Fight options**: boss fights only, summons folded into their owner, a one-minute cap on training dummies.
 
@@ -176,8 +176,9 @@ It only reads network traffic, as RATmeter does, but NCSOFT's terms forbid unaut
 own risk (see [Safety and terms](#safety-and-terms)).
 
 **Why does the meter sometimes get taller?**
-The bars' area stays the size you dragged it to; the bars scroll inside it. The rest of the meter keeps its own
-size: when the world-event alerts open or a boss card appears, the meter grows downwards by that much (upwards at the
+The bars' area has a bar per player shown, up to five, so the meter grows when a fight's players come; more than five
+scroll inside it. The rest keeps its own size: when the world-event alerts open or a boss card appears, the meter
+grows downwards by that much (upwards at the
 bottom of the screen), and goes back a moment after they go. The alerts always sit below the bars, never over them,
 and the place remembered for next time is always yours.
 

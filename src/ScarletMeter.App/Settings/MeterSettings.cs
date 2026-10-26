@@ -136,8 +136,6 @@ public sealed record AppearanceSettings
     public const double MaxPictureOpacity = 1.0;
     public const double MinRowScale = 0.75;
     public const double MaxRowScale = 1.5;
-    public const int MaxBarRows = 10;
-    public const int DefaultBarRows = 8;
 
     /// <summary>Opacity of the overlay's background (0.1 to 1); text and bars stay opaque.</summary>
     public double BackgroundOpacity { get; init; } = 0.9;
@@ -169,14 +167,8 @@ public sealed record AppearanceSettings
     /// <summary>Size of the meter's rows and text (0.75 to 1.5).</summary>
     public double RowScale { get; init; } = 1.0;
 
-    /// <summary>
-    /// How many rows tall the overlay's bar area is (0 to 10), set by dragging the meter's bottom edge (Harry: "make
-    /// sure the resizing only changes the size of the dps bar area"): more players scroll inside it, fewer leave the
-    /// rest of it empty, and the notices below keep their own height. Null until the meter first fits, which takes
-    /// it from the window's height an earlier build saved (Windows/OverlayWindow), so a player's size is kept; the
-    /// page shows <see cref="DefaultBarRows"/> until then.
-    /// </summary>
-    public int? BarRows { get; init; }
+    // The bar area's rows were the player's (barRows, set by dragging the meter's edge, #37) until they followed the
+    // players shown (Pages/BarArea, 2026-10-26); a file that still has them loads, the value passed over (SettingsTests).
 
     /// <summary>Show skill and buff icons, which load from NC's game-data CDN as in RATmeter.</summary>
     public bool SkillIcons { get; init; } = true;
