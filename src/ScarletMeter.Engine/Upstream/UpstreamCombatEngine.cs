@@ -19,8 +19,9 @@ namespace ScarletMeter.Engine.Upstream;
 /// </summary>
 internal sealed class UpstreamCombatEngine : ICombatEngine
 {
-    // A details read that straddles a change of fight is taken again, this many times in all, then given up.
+    // A details or snapshot read that straddles a change of fight is taken again, this many times in all, then given up.
     private const int DetailsReadAttempts = 3;
+    private const int SnapshotReadAttempts = 3;
 
     private readonly IPacketService pipeline;
     private readonly IPacketCaptureDevice capture;
@@ -58,6 +59,9 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
 
     /// <summary>Test seam: runs in every details read between its first and last check of the active fight. Null in production.</summary>
     internal Action? BetweenDetailsReads { get; set; }
+
+    /// <summary>Test seam: runs in every snapshot read after the active target is read and before its players are. Null in production.</summary>
+    internal Action? BetweenSnapshotReads { get; set; }
 
     public event EventHandler<int>? PingUpdated
     {
@@ -126,23 +130,35 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         lock (shownLock)
         {
             // Each upstream getter takes the session manager's lock on its own, so a snapshot is a composition of
-            // three consistent reads taken a few microseconds apart, which is what upstream's own UI does.
-            var mob = sessions.GetActiveTargetInfo();
-            var duration = sessions.GetCombatDuration();
-            var stats = sessions.PlayerStats;
+            // consistent reads taken a few microseconds apart, which is what upstream's own UI does. If upstream switched
+            // the active fight between them, they would mix two fights (one's target, the other's players), and the
+            // snapshot held for an ignored dummy fight would keep that mix up; so the active fight is compared before
+            // and after the reads and the read taken again, as GetPlayerDetails does. A read that keeps straddling a
+            // change shows nothing new: the next poll reads afresh.
+            for (var attempt = 1; attempt <= SnapshotReadAttempts; attempt++)
+            {
+                var session = sessions.GetActiveTargetSession();
+                var mob = sessions.GetActiveTargetInfo();
+                BetweenSnapshotReads?.Invoke();
+                var duration = sessions.GetCombatDuration();
+                var stats = sessions.PlayerStats;
+                if (!ReferenceEquals(sessions.GetActiveTargetSession(), session)) continue;
+                if (session is not null && mob?.Id != session.TargetId) continue;
 
-            // Upstream makes a stranger's training-dummy fight the active one once the player's own last hit is five
-            // seconds old. Such a fight is ignored: the overlay keeps the fight it showed last, as it stood, as if
-            // those hits had not happened.
-            if (!dummies.Keeps(mob, stats)) return Held();
-            shownOnDummy = mob?.IsDummy == true;
-            if (mob is null && stats.Count == 0) return shown = CombatSnapshot.Empty;
+                // Upstream makes a stranger's training-dummy fight the active one once the player's own last hit is
+                // five seconds old. Such a fight is ignored: the overlay keeps the fight it showed last, as it stood,
+                // as if those hits had not happened.
+                if (!dummies.Keeps(mob, stats)) return Held();
+                shownOnDummy = mob?.IsDummy == true;
+                if (mob is null && stats.Count == 0) return shown = CombatSnapshot.Empty;
 
-            var players = stats.Select(UpstreamMapping.ToPlayerRow).ToList();
-            long totalDamage = players.Sum(p => p.TotalDamage);
-            double partyDps = duration.TotalSeconds > 0 ? totalDamage / duration.TotalSeconds : 0;
-            var target = mob is null ? null : new TargetInfo(mob.Id, mob.Name, mob.HpCurrent, mob.HpTotal, mob.IsBoss);
-            return shown = new CombatSnapshot(target, duration, partyDps, players);
+                var players = stats.Select(UpstreamMapping.ToPlayerRow).ToList();
+                long totalDamage = players.Sum(p => p.TotalDamage);
+                double partyDps = duration.TotalSeconds > 0 ? totalDamage / duration.TotalSeconds : 0;
+                var target = mob is null ? null : new TargetInfo(mob.Id, mob.Name, mob.HpCurrent, mob.HpTotal, mob.IsBoss);
+                return shown = new CombatSnapshot(target, duration, partyDps, players);
+            }
+            return shown;
         }
     }
 
@@ -249,7 +265,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         var live = sessions.GetTargetHistory(item.TargetId).FirstOrDefault(fight => fight.SessionId == item.SessionId);
         if (live is null || !live.TargetInfo.IsDummy) return false;
         var fight = sessions.GetHistorySession(item.SessionId);
-        return fight is not null && !dummies.Keeps(fight);
+        return fight is not null && !dummies.Keeps(live.TargetInfo, fight.PlayerStats);
     }
 
     // Upstream's merge (CombatSessionManager.GetHistoryPage) without the left-out fights: the other running fights

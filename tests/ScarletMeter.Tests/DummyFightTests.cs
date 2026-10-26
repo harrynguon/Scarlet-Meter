@@ -52,7 +52,8 @@ public sealed class DummyFightTests : IDisposable
         // finished fights, included) resolves to the decorator around upstream's own store.
         var services = new ServiceCollection().AddScarletEngine(
             new EngineOptions { DataDirectory = host.DataDirectory, Capture = CaptureMode.None });
-        Assert.Single(services, descriptor => descriptor.ServiceType == typeof(ICombatHistoryStore));
+        var registration = Assert.Single(services, descriptor => descriptor.ServiceType == typeof(ICombatHistoryStore));
+        Assert.Equal(ServiceLifetime.Singleton, registration.Lifetime); // upstream's, which its session manager relies on
 
         var store = Assert.IsType<DummyFightHistoryStore>(host.Services.GetRequiredService<ICombatHistoryStore>());
         Assert.IsType<CombatHistoryStore>(store.Inner);
@@ -150,6 +151,62 @@ public sealed class DummyFightTests : IDisposable
         Assert.Equal(BossEntity, next.Target?.Id);
         Assert.Equal(6_000, Assert.Single(next.Players).TotalDamage);
         Assert.NotNull(Engine.GetPlayerDetails(UserId));
+    }
+
+    // The snapshot's reads are separate upstream calls. When a stranger's hit makes their dummy fight the active one
+    // between them, the target read before (the user's boss) and the players read after (the stranger's) would mix two
+    // fights, and the overlay, which keeps what it showed while a dummy fight is ignored, would keep the mix up.
+    [Fact]
+    public void ASnapshotReadAcrossAChangeOfFightIsTakenAgain()
+    {
+        var user = User();
+        var stranger = Stranger();
+        var dummy = Dummy();
+        combat.Hit(user, Boss(), Start, 2_000, strike);
+        var own = Engine.GetSnapshot();
+
+        var switched = false;
+        ((UpstreamCombatEngine)Engine).BetweenSnapshotReads = () =>
+        {
+            if (switched) return;
+            switched = true;
+            combat.Hit(stranger, dummy, Start.AddSeconds(6), 500, strike); // six seconds after the user's last hit
+        };
+        Assert.Same(own, Engine.GetSnapshot());
+        Assert.True(switched);
+        Assert.Equal(DummyEntity, combat.Sessions.GetActiveTargetInfo()?.Id);
+    }
+
+    // A fight the user is not in but that is no dummy fight (the user's party fighting on while the user is dead, say)
+    // stays up like any other while a stranger's dummy fight is ignored.
+    [Fact]
+    public void AFightWithoutTheUserStaysUpWhileAStrangersDummyFightIsIgnored()
+    {
+        User();
+        var stranger = Stranger();
+        var other = combat.Player(9, "Gamma", SyntheticCombat.Class(17, "Cleric"));
+        combat.Hit(stranger, Boss(), Start, 2_000, strike);
+        var party = Engine.GetSnapshot();
+        Assert.Equal(BossEntity, party.Target?.Id);
+
+        combat.Hit(other, Dummy(), Start.AddSeconds(6), 500, strike);
+        Assert.Equal(DummyEntity, combat.Sessions.GetActiveTargetInfo()?.Id);
+        Assert.Same(party, Engine.GetSnapshot());
+    }
+
+    // Saved fights are never filtered: one saved while the meter did not know the user (or before this change) still
+    // lists and opens once it does.
+    [Fact]
+    public void AFightSavedBeforeTheUserWasKnownStillOpensOnceTheUserIs()
+    {
+        var stranger = Stranger();
+        combat.Hit(stranger, Dummy(), Start, 500, strike);
+        combat.CompleteAndSave(Start.AddSeconds(30));
+        var saved = Assert.Single(combat.History.GetSessionList());
+
+        User();
+        Assert.Equal(saved.SessionId, Assert.Single(Engine.GetHistory(new HistoryQuery()).Entries).FightId);
+        Assert.NotNull(Engine.GetHistoryFight(saved.SessionId));
     }
 
     [Fact]

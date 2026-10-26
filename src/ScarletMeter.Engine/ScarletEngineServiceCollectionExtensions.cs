@@ -70,17 +70,18 @@ public static class ScarletEngineServiceCollectionExtensions
     }
 
     // Replaces upstream's one ICombatHistoryStore registration with DummyFightHistoryStore around the store that
-    // registration builds, so upstream's session manager saves through the decorator. If an upstream release registers
-    // no store or several, Single() makes AddScarletEngine throw, failing every engine test.
+    // registration builds, with that registration's lifetime, so upstream's session manager saves through the
+    // decorator. If an upstream release registers no store or several, Single() makes AddScarletEngine throw, failing
+    // every engine test.
     private static void WrapHistoryStore(IServiceCollection services)
     {
         var upstream = services.Single(d => d.ServiceType == typeof(ICombatHistoryStore) && !d.IsKeyedService);
         services.Remove(upstream);
-        services.AddSingleton<ICombatHistoryStore>(provider => new DummyFightHistoryStore(
+        services.Add(ServiceDescriptor.Describe(typeof(ICombatHistoryStore), provider => new DummyFightHistoryStore(
             (ICombatHistoryStore)(upstream.ImplementationInstance
                 ?? upstream.ImplementationFactory?.Invoke(provider)
                 ?? ActivatorUtilities.CreateInstance(provider, upstream.ImplementationType!)),
             provider.GetRequiredService<DummyFightFilter>(),
-            provider.GetRequiredService<ILogger<DummyFightHistoryStore>>()));
+            provider.GetRequiredService<ILogger<DummyFightHistoryStore>>()), upstream.Lifetime));
     }
 }

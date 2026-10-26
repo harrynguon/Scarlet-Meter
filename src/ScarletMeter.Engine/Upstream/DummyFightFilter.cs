@@ -28,7 +28,21 @@ internal sealed class DummyFightFilter(EntityTracker entities)
     public bool Keeps(HistorySessionSnapshot fight)
     {
         ArgumentNullException.ThrowIfNull(fight);
-        return Keeps(entities.GetTargetMob(fight.TargetId), fight.PlayerStats);
+        return Keeps(TargetOf(fight.TargetId), fight.PlayerStats);
+    }
+
+    // The tracker's target with this entity id, or null (not known, so the fight is kept) when the read fails. Saves
+    // read it on the capture thread, which writes the tracker, but opening a running fight reads it from another.
+    private Mob? TargetOf(int entityId)
+    {
+        try
+        {
+            return entities.GetTargetMob(entityId);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private bool IsUserKnown()
