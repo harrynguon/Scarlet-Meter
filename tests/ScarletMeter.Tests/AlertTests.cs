@@ -284,6 +284,17 @@ public sealed class AlertTests : IDisposable
         Assert.Equal("next Sun 12:00", StatusAt(At0056, EventIds.Nahma));                     // server Sun 21:00
     }
 
+    // The row reads its tips and lines with the view's server offset, which must be the player's setting, not the
+    // preset's: at UTC+8 the siege's server Saturday 21:00 is 13:00 UTC, an hour after the preset's.
+    [Fact]
+    public void TheRowsTimesFollowThePlayersServerOffset()
+    {
+        var view = AlertMonitor.Compute(Only(EventIds.Siege) with { ServerOffsetHours = 8 }, At0056);
+        Assert.Equal(TimeSpan.FromHours(8), view.ServerOffset);
+        var siege = Assert.Single(EventRowLayout.Icons(view));
+        Assert.Equal("next 13:00", EventRowLayout.Status(siege, At0056, view.ServerOffset, TimeZoneInfo.Utc));
+    }
+
     [Fact]
     public void AnIconsDetailLineCountsDown()
     {

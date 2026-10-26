@@ -193,7 +193,7 @@ public sealed partial class RazorMarkupTests
         Assert.Contains("EventRowLayout.HiddenForFight(alertSettings.HideDuringBossFights, bossFightUnderWay)", code);
         Assert.Contains("bossFightUnderWay = bossFight.Update(snapshot.Target, now);", code);
         Assert.Contains("Windows.HoldAlerts(NoticesHeld);", code);
-        Assert.Matches(@"(?m)^\s*<EventRow [^>]*Held=""NoticesHeld"" />", markup);
+        Assert.Matches(@"(?m)^\s*<EventRow [^>]*Held=""NoticesHeld""[^>]*/>", markup);
 
         // The row shows nothing and announces nothing while held, before its other branch.
         var strip = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Components", "EventRow.razor"));
@@ -424,12 +424,15 @@ public sealed partial class RazorMarkupTests
         Assert.Contains(@"<span class=""ev-time"">@EventText.IconTime(until - Now)</span>", row);
         Assert.Single(Regex.Matches(row, @"class=""ev-time"""));
         Assert.Contains(@"<span class=""ev-tip"" aria-hidden=""true"">", row);
-        Assert.Contains("private void Toggle(string id) => open = EventRowLayout.Toggle(open, id);", row);
+        // A click toggles the line and tells the page, which renders and so measures the new height at once.
+        Assert.Matches(@"private Task Toggle\(string id\)\s*\{\s*open = EventRowLayout\.Toggle\(open, id\);\s*return LinesChanged\.InvokeAsync\(\);\s*\}", row);
+        // Times in the tip and the lines are the player's own clock's.
+        Assert.Contains("var zone = TimeZoneInfo.Local;", row);
         // The detail line is keyed to its event's state and occurrence, so a new progress line starts afresh.
         Assert.Contains(@"@key=""@($""{shown.Rule.Id}-{shown.State}-{shown.Alert?.Start.UtcTicks}"")""", row);
 
         var pages = Path.Combine(app, "Pages");
-        Assert.Matches(@"(?m)^\s*<EventRow View=""Alerts\.Current"" Now=""Clock\.GetUtcNow\(\)"" Held=""NoticesHeld"" />",
+        Assert.Matches(@"(?m)^\s*<EventRow View=""Alerts\.Current"" Now=""Clock\.GetUtcNow\(\)"" Held=""NoticesHeld"" LinesChanged=""StateHasChanged"" />",
             File.ReadAllText(Path.Combine(pages, "MeterPage.razor")));
         var sources = Directory.EnumerateFiles(app, "*", SearchOption.AllDirectories)
             .Where(path => path.EndsWith(".cs", StringComparison.Ordinal) || path.EndsWith(".razor", StringComparison.Ordinal))
@@ -453,6 +456,9 @@ public sealed partial class RazorMarkupTests
         var tip = Block(alerts, ".ev-tip");
         Assert.Matches(@"(?m)^\s*position:\s*absolute;", tip);
         Assert.Matches(@"(?m)^\s*left:\s*0;", tip);
+        // Above the row: below it, the panel's 8 px bottom padding and overflow would cut the tip.
+        Assert.Matches(@"(?m)^\s*bottom:\s*calc\(100% \+ 4px\);", tip);
+        Assert.DoesNotMatch(@"(?m)^\s*top\s*:", tip);
         Assert.Matches(@"(?m)^\s*max-width:\s*100%;", tip);
         Assert.Matches(@"(?m)^\s*pointer-events:\s*none;", tip);
         Assert.Matches(@"(?m)^\s*visibility:\s*hidden;", tip);
