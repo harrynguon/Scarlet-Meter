@@ -2,6 +2,16 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-26 — v0.3.0 prepared
+
+**What:** `<Version>` is 0.3.0 (`src/Directory.Build.props`). `CHANGELOG.md`'s Unreleased lines are now `## [0.3.0] - 2026-10-26` (nine changes: #34 to #44), under a new, empty Unreleased, with the compare links moved on. `docs/release-notes/v0.3.0.md` has the download steps (updating from 0.2.0: move the `data` folder over), a few highlights and the risk and credit notes; the release workflow adds the 0.3.0 section after them, the first release to get it. No package or project file changed since v0.2.0, so the third-party notices need no rewrite (`ThirdPartyNoticesTests` pass); RATmeter stays at v1.11.5.341.
+
+**Why:** Harry: "let's publish this aas a release?"
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` Debug and Release 716/716. The first Debug run failed one test, `DemoModeTests.AFailingEventIsLoggedOnceAndTheFeedCarriesOn`, which timed out after 10 s waiting for upstream's history cleanup to report finishing (the machine was busy); it passed on the rerun, with the whole suite, in both configurations. A flake worth a look of its own: the wait is the test host's, not this change's. `Get-ChangelogSection.ps1 -Version 0.3.0` prints the nine changes; `Test-ChangelogSection.ps1` passes.
+
+**Next:** PR, standard audit (the version), Codex, CI, merge; tag `v0.3.0` on the merged commit; check the draft's zips (checksums, no account name, home path or e-mail address in their files); publish it as a pre-release.
+
 ## 2026-10-26 — No sliver of the next bar below the fifth
 
 **What:** when the bar area scrolls (more than five players), its bottom edge is cut off rather than faded: `.rows.scrolls`' mask is a hard stop 8 px above the list's bottom (its 6 px padding and the last whole row's 3 px gap, less the 1 px of the player's own ring, a `box-shadow` drawn outside the row), so nothing of the next bar peeks out below the fifth, under the player's own pinned bar included, while that bar's ring stays whole. The thin scrollbar is the sign that more follow. `RazorMarkupTests.TheBarAreaScrollsWhenItCannotShowEveryRow` pins the hard stop and its width from the padding, the gap and the ring (with effects on too); ARCHITECTURE and HANDOFF say so, and CHANGELOG's bar-area line under Unreleased says it ends at the fifth bar, with this PR's link.
