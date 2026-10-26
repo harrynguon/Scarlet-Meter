@@ -2,6 +2,14 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-26 — v0.3.0 released
+
+**What:** PR #45 merged as f22f4db (standard audit: approve with nits, fixed in 454336d; Codex found nothing on 1a48498 or 454336d; CI passed on both). `v0.3.0` tagged on it; the push went through as the repository's admin, which the "Release tags" ruleset allows and GitHub records as a bypass. The release workflow (run 40306761355) built the draft: `ScarletMeter-0.3.0-win-x64.zip`, `ScarletMeter-0.3.0-source.zip` and their `.sha256`, its notes ending with "What's changed in 0.3.0" from the changelog. Checked as DEVELOPMENT.md "Releases" asks: both checksums match; the program zip has the exe, the `licenses` folder (17 files) and the notices, the source zip RATmeter's `upstream/` (259 files); the 552 files of both zips, searched as bytes in UTF-8 and UTF-16, hold no home path, machine name or e-mail address of the player (the addresses in them are third-party licence authors, upstream's README contact and the tests' made-up ones). The account name appears only as Harry's first name in docs and code comments that quote requests, never in a path, as in v0.2.0's files and the public repository. Published as a pre-release on 2026-10-26 at 21:38 local time, the changelog's date: https://github.com/harrynguon/Scarlet-Meter/releases/tag/v0.3.0.
+
+**Why:** Harry: "let's publish this as a release?"
+
+**Next:** the test host's cleanup timeout in a PR of its own (HANDOFF.md, "After acceptance"); the in-game checks in HANDOFF; the next release when there is something to ship.
+
 ## 2026-10-26 — v0.3.0 prepared
 
 **What:** `<Version>` is 0.3.0 (`src/Directory.Build.props`). `CHANGELOG.md`'s Unreleased lines are now `## [0.3.0] - 2026-10-26` (nine changes: #34 to #44), under a new, empty Unreleased, with the compare links moved on. `docs/release-notes/v0.3.0.md` has the download steps (updating from 0.2.0: move the `data` folder over), a few highlights and the risk and credit notes; the release workflow adds the 0.3.0 section after them, the first release to get it. No package or project file changed since v0.2.0, so the third-party notices need no rewrite (`ThirdPartyNoticesTests` pass); RATmeter stays at v1.11.5.341.
