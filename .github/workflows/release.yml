@@ -30,7 +30,8 @@ jobs:
           persist-credentials: false
 
       # The tag must be "v" and the app's version (src/Directory.Build.props), on a commit already on main, with its
-      # notes written. The tag name reaches the script through the environment, never pasted into its text.
+      # notes written and its section in CHANGELOG.md (scripts/Get-ChangelogSection.ps1 throws without one). The tag
+      # name reaches the script through the environment, never pasted into its text.
       - name: The tag is on main and matches the app's version
         shell: pwsh
         env:
@@ -44,6 +45,7 @@ jobs:
           if (-not $version -or $env:TAG -cne "v$version") { throw "Tag $env:TAG does not match the app's version $version (src/Directory.Build.props)." }
           $notes = Join-Path $env:GITHUB_WORKSPACE "docs/release-notes/$env:TAG.md"
           if (-not (Test-Path -LiteralPath $notes -PathType Leaf)) { throw "No release notes at docs/release-notes/$env:TAG.md." }
+          $null = & (Join-Path $env:GITHUB_WORKSPACE 'scripts/Get-ChangelogSection.ps1') -Version $version
           "SCARLET_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "SCARLET_NOTES=$notes" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
@@ -81,7 +83,8 @@ jobs:
         run: '& "$env:GITHUB_WORKSPACE/scripts/Build.ps1" -Configuration Release'
 
       # The portable build and the complete source into one folder of the runner's temp directory, each zip checked
-      # and given its SHA-256, with the notes beside them for the draft job. The program zip: the exe, its marker,
+      # and given its SHA-256, with the notes beside them for the draft job, the version's CHANGELOG.md section added
+      # after them. The program zip: the exe, its marker,
       # the player's files and the licence texts and notices under a top "ScarletMeter" folder, and no data folder or
       # staging marker. The source zip: the checkout and RATmeter's submodule under one top folder.
       - name: Portable zip and source zip
@@ -121,7 +124,12 @@ jobs:
             [IO.File]::WriteAllText("$file.sha256", "$hash  $(Split-Path -Leaf $file)`n")
             Write-Host "$(Split-Path -Leaf $file): $([math]::Round((Get-Item -LiteralPath $file).Length / 1MB, 1)) MB, SHA-256 $hash"
           }
-          Copy-Item -LiteralPath $env:SCARLET_NOTES -Destination (Join-Path $out 'notes.md')
+          # The release's notes, then what changed in it: its CHANGELOG.md section, so every release lists its changes.
+          $changes = & (Join-Path $env:GITHUB_WORKSPACE 'scripts/Get-ChangelogSection.ps1') -Version $env:SCARLET_VERSION
+          $notesText = [IO.File]::ReadAllText($env:SCARLET_NOTES).TrimEnd()
+          $changelogUrl = "https://github.com/harrynguon/Scarlet-Meter/blob/v$env:SCARLET_VERSION/CHANGELOG.md"
+          [IO.File]::WriteAllText((Join-Path $out 'notes.md'),
+            "$notesText`n`n## What's changed in $env:SCARLET_VERSION`n`n$changes`n`nEvery release's changes: [CHANGELOG.md]($changelogUrl).`n")
           "SCARLET_OUT=$out" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Hand the release files to the draft job
