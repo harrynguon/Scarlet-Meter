@@ -13,9 +13,10 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 - Settings, About names the Artifact Corridor, the two-minute instance you enter from the Abyss. The meter keeps
   tracking there; it pauses again once you are back in the Abyss. ([#47](https://github.com/harrynguon/Scarlet-Meter/pull/47))
 - A character roster: every character you log in on with the meter running, with its Odyle energy, when basic
-  energy is full again, and Nightmare and Ascension entries left, estimated (≈) from what the game last said. Click
-  the Odyle energy beside the ping, or Settings, Appearance, Characters. The recharge times are not yet checked in the
-  game. ([#48](https://github.com/harrynguon/Scarlet-Meter/pull/48))
+  energy is full again, and Nightmare and Ascension entries left, estimated (≈) from what the game last said, and the
+  Artifact Corridors it entered since the last Abyss Siege. Click the Odyle energy beside the ping, or Settings,
+  Appearance, Characters. The recharge and siege times are not yet checked in the game.
+  ([#48](https://github.com/harrynguon/Scarlet-Meter/pull/48), [#49](https://github.com/harrynguon/Scarlet-Meter/pull/49))
 
 ## [0.3.0] - 2026-10-26
 
