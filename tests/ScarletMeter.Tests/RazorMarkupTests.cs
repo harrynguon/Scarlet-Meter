@@ -181,24 +181,24 @@ public sealed partial class RazorMarkupTests
         Assert.DoesNotMatch(@"font-weight", total);
     }
 
-    // The overlay holds its notices back by the player's "Hide during boss fights" switch, keeps the strip mounted
+    // The overlay holds its notices back by the player's "Hide during boss fights" switch, keeps the row mounted
     // and silent while they are held, and tells the window layer, whose restore for an event goes through the gate.
-    // Source-text guards: the strip's rendering and the WPF window layer have no test host here.
+    // Source-text guards: the row's rendering and the WPF window layer have no test host here.
     [Fact]
     public void TheOverlayHoldsItsNoticesByThePlayersSwitch()
     {
         var pages = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Pages");
         var code = File.ReadAllText(Path.Combine(pages, "MeterPage.razor.cs"));
         var markup = File.ReadAllText(Path.Combine(pages, "MeterPage.razor"));
-        Assert.Contains("AlertStripLayout.HiddenForFight(alertSettings.HideDuringBossFights, bossFightUnderWay)", code);
+        Assert.Contains("EventRowLayout.HiddenForFight(alertSettings.HideDuringBossFights, bossFightUnderWay)", code);
         Assert.Contains("bossFightUnderWay = bossFight.Update(snapshot.Target, now);", code);
         Assert.Contains("Windows.HoldAlerts(NoticesHeld);", code);
-        Assert.Matches(@"(?m)^\s*<AlertStrip [^>]*Held=""NoticesHeld"" />", markup);
+        Assert.Matches(@"(?m)^\s*<EventRow [^>]*Held=""NoticesHeld"" />", markup);
 
-        // The strip shows nothing and announces nothing while held, before either of its other branches.
-        var strip = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Components", "AlertStrip.razor"));
+        // The row shows nothing and announces nothing while held, before its other branch.
+        var strip = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Components", "EventRow.razor"));
         Assert.Contains(@"<span class=""sr-only"" role=""status"">@(Held ? string.Empty : Announcement)</span>", strip);
-        Assert.Matches(@"(?s)@if \(Held\)\s*\{\s*@\*[^*]*\*@\s*\}\s*else if \(View\.Alerts\.Count > 0\)", strip);
+        Assert.Matches(@"(?s)@if \(Held\)\s*\{\s*@\*[^*]*\*@\s*\}\s*else if \(EventRowLayout\.Icons\(View\) is \{ Count: > 0 \} icons\)", strip);
 
         // The window layer asks the gate before every restore for an event, and acts on the one that waited.
         var windows = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Windows", "MeterWindows.cs"));
@@ -238,7 +238,7 @@ public sealed partial class RazorMarkupTests
     // The overlay's panel is as tall as its content, and the window as tall as the panel (TheOverlayWindowGrowsToItsContent),
     // except while its edge is dragged (.sizing), when it fills the window so the bar area can follow the edge; while it
     // is measured it is as tall as its content whatever the window. The notices never scroll (Harry: "i dont like
-    // scrolling") and keep their own height: the strip never shrinks, the expanded strip has no cap, and the window
+    // scrolling") and keep their own height: the event row never shrinks, nothing in it has a cap, and the window
     // grows for them (Harry: "make sure the resizing only changes the size of the dps bar area. it doesn't affect the
     // event timer area"). The bar area is as many rows tall as the player dragged it and scrolls when needed
     // (TheBarAreaScrollsWhenItCannotShowEveryRow); and the picture covers the panel, laid out against it (Harry: against
@@ -271,11 +271,11 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?m)^\s*inset:\s*0;", layer); // the layer is the panel, so the picture covers the panel
         Assert.DoesNotMatch(@"\bfixed\b", Regex.Replace(layer, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline));
         Assert.DoesNotMatch(@"background-attachment", css);
-        // The strip never shrinks; the bar area gives way only to a short screen (it shrinks, down to its padding), and
-        // follows a resize; it is measured at its rows or none (the data-measuring rules come after the sizing one,
+        // The event row never shrinks; the bar area gives way only to a short screen (it shrinks, down to its padding),
+        // and follows a resize; it is measured at its rows or none (the data-measuring rules come after the sizing one,
         // which they must beat); and no rule in the overlay's styles makes anything scroll but the bar area that cannot
-        // show every row (.rows.scrolls): otherwise its overflow is clipped (a gliding row cannot show a scrollbar), the
-        // expanded strip has no cap.
+        // show every row (.rows.scrolls): otherwise its overflow is clipped (a gliding row cannot show a scrollbar), and
+        // nothing in the event row has a cap.
         var rows = Block(css, ".rows");
         Assert.Matches(@"(?m)^\s*flex:\s*0 1 auto;", rows);
         Assert.Matches(@"(?m)^\s*min-height:\s*0;", rows);
@@ -290,7 +290,7 @@ public sealed partial class RazorMarkupTests
         Assert.True(css.IndexOf(".overlay.sizing .rows {", StringComparison.Ordinal) < css.IndexOf(".overlay[data-measuring] .rows {", StringComparison.Ordinal));
         Assert.Matches(@"(?m)^\s*flex:\s*none;", Block(alerts, ".alerts"));
         Assert.DoesNotMatch(@"(?m)^\s*min-height:", Block(alerts, ".alerts"));
-        Assert.DoesNotMatch(@"(?m)^\s*max-height:", Block(alerts, ".alerts.expanded"));
+        Assert.DoesNotMatch(@"max-height\s*:", alerts);
         Assert.DoesNotMatch(@"overflow(-[xy])?:\s*(auto|scroll)", alerts);
         Assert.DoesNotMatch(@"position:\s*sticky", alerts);
         var overlayRules = Regex.Matches(css, @"(?m)^(?<selector>\.(overlay|rows|row|target|ov-)[^{]*)\{(?<body>[^}]*)\}");
@@ -302,8 +302,8 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?m)^\s*padding-bottom:\s*[1-9]\d*px;", overlay);
     }
 
-    // An upcoming event's notice uses its own washed-out gold (--soon), never the bright "you" gold (--me), which
-    // Harry found too loud in the strip; an open entry keeps its teal.
+    // An upcoming event uses its own washed-out gold (--soon), never the bright "you" gold (--me), which Harry found
+    // too loud beside the bars; an open entry keeps its teal. The icon and its detail line take the same colours.
     [Fact]
     public void UpcomingNoticesUseTheSoftGold()
     {
@@ -313,10 +313,11 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?m)^\s*--soon:\s*#dcc68c;", app);
         Assert.DoesNotContain("var(--me)", alerts, StringComparison.Ordinal);
         Assert.DoesNotContain("255, 183, 3", alerts, StringComparison.Ordinal);
-        // The strip's bar takes the same colours as the notice it names.
-        Assert.Matches(@"(?m)^\.alert\.soon \.alert-dot,\s*\.alert-bar\.soon \.alert-dot \{[^}]*background:\s*var\(--soon\);", alerts);
+        Assert.Matches(@"(?m)^\.ev\.soon \{[^}]*color:\s*var\(--soon\);", alerts);
+        Assert.Matches(@"(?m)^\.ev\.open \{[^}]*color:\s*var\(--good\);", alerts);
+        Assert.Matches(@"(?m)^\.alert\.soon \.alert-dot \{[^}]*background:\s*var\(--soon\);", alerts);
         Assert.Matches(@"(?m)^\.alert-progress \{[^}]*background:\s*var\(--soon\);", alerts);
-        Assert.Matches(@"(?m)^\.alert\.open \.alert-progress,\s*\.alert-bar\.open \.alert-progress \{[^}]*background:\s*var\(--good\);", alerts);
+        Assert.Matches(@"(?m)^\.alert\.open \.alert-progress \{[^}]*background:\s*var\(--good\);", alerts);
     }
 
     // The boss-timers window shows a third-party site, so it is kept apart from the meter: a plain WebView2 in its own
@@ -389,10 +390,10 @@ public sealed partial class RazorMarkupTests
         Assert.Contains("bossTimers?.Close();", windows);
     }
 
-    // Nothing in the notice strip blinks or loops (Harry: the pulsing dot was "too distracting"): the only animations
-    // are a notice's one-time entrance, the progress line's width transition and the bar's chevron turning.
+    // Nothing in the event row blinks or loops (Harry: the pulsing dot was "too distracting"): the only animations are
+    // the detail line's one-time entrance, its progress line's width transition and a tip's fade.
     [Fact]
-    public void TheNoticeStripNeverBlinks()
+    public void TheEventRowNeverBlinks()
     {
         var alerts = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "alerts.css"));
         Assert.DoesNotContain("infinite", alerts, StringComparison.Ordinal);
@@ -401,47 +402,63 @@ public sealed partial class RazorMarkupTests
         Assert.Equal(["alert-in"], Regex.Matches(alerts, @"@keyframes\s+([\w-]+)").Select(m => m.Groups[1].Value));
     }
 
-    // The notice strip is one bar that opens and closes (Harry asked for the whole section to fold away rather than
-    // always show two): a real button that says whether it is open, listing the notices only when open, and bound to
-    // the player's saved choice, so it stays as they left it.
+    // The world events are a row of icons (Harry: the list took too much height, 2026-10-26): one real button per
+    // alerted event, drawn from path data bound as an attribute (never raw HTML), saying whether its detail line is open
+    // and naming its event and what it is doing for screen readers; a tip for the eye only, on hover or keyboard focus,
+    // anchored to the row so it never leaves the window; a detail line under the row for each icon clicked open, the
+    // row's own state and never saved; and nothing left of the old strip or its saved open-or-closed choice.
     [Fact]
-    public void TheNoticeStripIsOneBarThatOpensAndCloses()
+    public void TheEventRowIsOneIconPerEventThatOpensItsLine()
     {
         var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
-        var strip = File.ReadAllText(Path.Combine(app, "Components", "AlertStrip.razor"));
-        Assert.Contains(@"<button type=""button"" class=""alert-bar @Kind(first)"" aria-expanded=""@(Expanded ? ""true"" : ""false"")""", strip);
-        Assert.Contains(@"@onclick=""Toggle""", strip);
-        Assert.Contains("private Task Toggle() => ExpandedChanged.InvokeAsync(!Expanded);", strip);
-        Assert.Contains("@foreach (var alert in AlertStripLayout.Shown(View.Alerts, Expanded))", strip);
-        Assert.Single(Regex.Matches(strip, @"@foreach\b"));
-        // Closed, the bar names the most urgent notice (the monitor's first) with its countdown, "+N" for the rest and
-        // its progress line, keyed to that notice so another's starts afresh (deep audit on PR #30: none was pinned).
-        Assert.Contains("var first = View.Alerts[0];", strip);
-        Assert.Matches(@"(?s)else\s*\{\s*<span class=""alert-name"">@first\.Rule\.Name</span>\s*<span class=""alert-when"">@When\(first\)</span>\s*"
-            + @"@if \(AlertStripLayout\.MoreCount\(View\.Alerts\) is var more && more > 0\)\s*\{\s*<span class=""alert-count"">\+@more</span>\s*\}\s*"
-            + @"(?:@\*.*?\*@\s*)?<span class=""alert-progress"" @key=""@\(\$""\{first\.Rule\.Id\}-\{first\.Kind\}-\{first\.Start\.UtcTicks\}""\)""\s*"
-            + @"style=""width:@Compact\.Percent\(Progress\(first, first\.Deadline - Now\)\)""></span>\s*\}", strip);
+        var row = File.ReadAllText(Path.Combine(app, "Components", "EventRow.razor"));
+        Assert.Contains("@foreach (var icon in icons)", row);
+        Assert.Contains("@foreach (var shown in EventRowLayout.Opened(icons, open))", row);
+        Assert.Equal(2, Regex.Matches(row, @"@foreach\b").Count);
+        Assert.Matches(@"<button type=""button"" class=""ev @icon\.State\.ToString\(\)\.ToLowerInvariant\(\)"" @key=""icon\.Rule\.Id""\s*"
+            + @"aria-expanded=""@\(IsOpen\(icon\) \? ""true"" : ""false""\)"" aria-label=""@\(\$""\{icon\.Rule\.Name\}, \{status\}""\)""\s*"
+            + @"@onclick=""\(\) => Toggle\(icon\.Rule\.Id\)"">", row);
+        Assert.Contains(@"<svg viewBox=""0 0 16 16"" aria-hidden=""true""><path d=""@EventGlyphs.For(icon.Rule.Id)"" /></svg>", row);
+        Assert.DoesNotContain("MarkupString", row, StringComparison.Ordinal);
+        // The icon's time is IconTime's (minutes and seconds; AlertTests), never another countdown's.
+        Assert.Contains(@"<span class=""ev-time"">@EventText.IconTime(until - Now)</span>", row);
+        Assert.Single(Regex.Matches(row, @"class=""ev-time"""));
+        Assert.Contains(@"<span class=""ev-tip"" aria-hidden=""true"">", row);
+        Assert.Contains("private void Toggle(string id) => open = EventRowLayout.Toggle(open, id);", row);
+        // The detail line is keyed to its event's state and occurrence, so a new progress line starts afresh.
+        Assert.Contains(@"@key=""@($""{shown.Rule.Id}-{shown.State}-{shown.Alert?.Start.UtcTicks}"")""", row);
 
         var pages = Path.Combine(app, "Pages");
-        Assert.Matches(@"<AlertStrip [^>]*Expanded=""alertSettings\.NoticesExpanded"" ExpandedChanged=""SetNoticesExpanded""",
+        Assert.Matches(@"(?m)^\s*<EventRow View=""Alerts\.Current"" Now=""Clock\.GetUtcNow\(\)"" Held=""NoticesHeld"" />",
             File.ReadAllText(Path.Combine(pages, "MeterPage.razor")));
-        Assert.Contains("Settings.Update(s => s with { Alerts = s.Alerts with { NoticesExpanded = expanded } })",
-            File.ReadAllText(Path.Combine(pages, "MeterPage.razor.cs")));
+        var sources = Directory.EnumerateFiles(app, "*", SearchOption.AllDirectories)
+            .Where(path => path.EndsWith(".cs", StringComparison.Ordinal) || path.EndsWith(".razor", StringComparison.Ordinal))
+            .Where(path => !Regex.IsMatch(path, @"[\\/](bin|obj)[\\/]"))
+            .ToList();
+        Assert.NotEmpty(sources);
+        Assert.All(sources, path => Assert.DoesNotMatch(@"\b(NoticesExpanded|AlertStrip\w*)\b", File.ReadAllText(path)));
 
         var alerts = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "alerts.css"));
-        Assert.Matches(@"(?m)^\.alerts\.expanded \.alert-chevron \{[^}]*transform:\s*rotate\(-135deg\);", alerts);
-        // As tall as a notice: a notice is 24 px inside its 1 px border (content-box), the bar 26 px with its border in.
         static string Block(string source, string selector) =>
             Regex.Match(source, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
-        var bar = Block(alerts, ".alert-bar");
-        var notice = Block(alerts, ".alert");
-        Assert.Matches(@"box-sizing:\s*border-box;", bar);
-        Assert.Matches(@"height:\s*26px;", bar);
-        Assert.Matches(@"(?m)^\s*height:\s*24px;", notice);
-        Assert.Matches(@"border:\s*1px solid", notice);
-        Assert.DoesNotMatch(@"box-sizing", notice);
+        Assert.DoesNotMatch(@"alert-bar|alert-chevron|alert-count|\.expanded", alerts);
+        // The icons wrap rather than run out of a narrow meter; the row, not the icon, anchors the tip.
+        Assert.Matches(@"(?m)^\s*position:\s*relative;", Block(alerts, ".ev-row"));
+        Assert.Matches(@"(?m)^\s*flex-wrap:\s*wrap;", Block(alerts, ".ev-row"));
+        Assert.DoesNotMatch(@"position\s*:", Block(alerts, ".ev"));
+        Assert.Matches(@"(?m)^\s*fill:\s*none;", Block(alerts, ".ev svg"));
+        Assert.Matches(@"(?m)^\s*stroke:\s*currentColor;", Block(alerts, ".ev svg"));
+        // The tip: from the row's left edge, never wider than the row, out of the pointer's way, hidden until an icon is
+        // hovered or focused, in lines that never wrap, so it fits above the row in the shortest meter.
+        var tip = Block(alerts, ".ev-tip");
+        Assert.Matches(@"(?m)^\s*position:\s*absolute;", tip);
+        Assert.Matches(@"(?m)^\s*left:\s*0;", tip);
+        Assert.Matches(@"(?m)^\s*max-width:\s*100%;", tip);
+        Assert.Matches(@"(?m)^\s*pointer-events:\s*none;", tip);
+        Assert.Matches(@"(?m)^\s*visibility:\s*hidden;", tip);
+        Assert.Matches(@"(?m)^\.ev:hover \.ev-tip,\s*\.ev:focus-visible \.ev-tip \{[^}]*visibility:\s*visible;", alerts);
+        Assert.Matches(@"(?m)^\.ev-tip-head,\s*\.ev-tip-where \{[^}]*white-space:\s*nowrap;[^}]*text-overflow:\s*ellipsis;", alerts);
     }
-
     // A row's text reads over any bar (Harry found the white names hard to read): every bit of it sits on a
     // crisp dark edge, the names are bold, and the death count is the meter's white-ish text, not an alarm red.
     [Fact]

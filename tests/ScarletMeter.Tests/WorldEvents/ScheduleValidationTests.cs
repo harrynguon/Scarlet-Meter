@@ -220,7 +220,7 @@ public sealed class ScheduleValidationTests
 
         Assert.True(EventCatalog.TryApplyOverrides(saved, out var rules, out _));
         Assert.Equal(EventCatalog.Ids, rules.Select(rule => rule.Id)); // catalog order, whatever the file's order
-        var kaira = rules[0];
+        var kaira = rules.Single(rule => rule.Id == EventIds.Kaira);
         Assert.Equal(("Watcher Kaira", "Abandoned Island · Chaotic Lower Reshanta", EventKind.Boss), (kaira.Name, kaira.Location, kaira.Kind));
         Assert.Equal([1, 4], kaira.Hours);
     }

@@ -5,7 +5,10 @@ namespace ScarletMeter.WorldEvents;
 /// <summary>
 /// The built-in schedule: nine entries, in display order, as two presets. <see cref="Global"/> is Scarlet's
 /// default. Neither is verified against Global Asia / Nezekan; see docs/ARCHITECTURE.md ("World events") for the
-/// sources and the evidence so far, and docs/SECURITY.md ("Provenance").
+/// sources and the evidence so far, and docs/SECURITY.md ("Provenance"). Two things differ from the fork, both the
+/// player's choice for the overlay's event row (Harry, 2026-10-26): the order (the festivals and rift first, then the
+/// siege, the bosses and the resets; the fork starts with Kaira) and the siege's name, Abyss Siege (the fork's
+/// Artifact Siege).
 /// </summary>
 public static class EventCatalog
 {
@@ -17,20 +20,20 @@ public static class EventCatalog
     /// </summary>
     public static IReadOnlyList<EventRule> Legacy { get; } =
     [
+        new(EventIds.Shugo, "Shugo Festival", "Shugo Pavilion · Jump Jump, Hidden Lugi, Goldrin", EventKind.Event, ScheduleBasis.Server,
+            null, EveryHour, 0, 15),
+        new(EventIds.Invasion, "Dimensional Invasion", "Borderlands", EventKind.Event, ScheduleBasis.Server,
+            null, EveryHour, 30, 15),
+        new(EventIds.Rift, "Spacetime Rift", "Contested zones & enemy territory", EventKind.Rift, ScheduleBasis.Utc,
+            null, [0, 3, 6, 9, 12, 15, 18, 21], 0, 10, ActiveMinutes: 60),
+        new(EventIds.Siege, "Abyss Siege", "Reshanta artifact outposts", EventKind.Event, ScheduleBasis.Server,
+            [1, 4, 6], [21], 0, 45),
         new(EventIds.Kaira, "Watcher Kaira", "Abandoned Island · Chaotic Lower Reshanta", EventKind.Boss, ScheduleBasis.Utc,
             null, [1, 4, 7, 10, 13, 16, 19, 22], 0, 30),
         new(EventIds.Nahma, "Guardian Lord Nahma", "Reshanta’s Root", EventKind.Boss, ScheduleBasis.Server,
             [0, 5], [21], 0, 45),
         new(EventIds.Executors, "Executors · Tamasa & Argo", "Reshanta’s Root & Siel’s Heart", EventKind.Boss, ScheduleBasis.Server,
             [1, 4, 6], [21], 30, 30),
-        new(EventIds.Rift, "Spacetime Rift", "Contested zones & enemy territory", EventKind.Rift, ScheduleBasis.Utc,
-            null, [0, 3, 6, 9, 12, 15, 18, 21], 0, 10, ActiveMinutes: 60),
-        new(EventIds.Siege, "Artifact Siege", "Reshanta artifact outposts", EventKind.Event, ScheduleBasis.Server,
-            [1, 4, 6], [21], 0, 45),
-        new(EventIds.Invasion, "Dimensional Invasion", "Borderlands", EventKind.Event, ScheduleBasis.Server,
-            null, EveryHour, 30, 15),
-        new(EventIds.Shugo, "Shugo Festival", "Shugo Pavilion · Jump Jump, Hidden Lugi, Goldrin", EventKind.Event, ScheduleBasis.Server,
-            null, EveryHour, 0, 15),
         new(EventIds.Daily, "Daily reset", "Daily quests, missions & entries", EventKind.Reset, ScheduleBasis.Server,
             null, [9], 0, 0),
         new(EventIds.Weekly, "Weekly reset", "Wednesday · Abyss rank tally", EventKind.Reset, ScheduleBasis.Server,

@@ -248,9 +248,9 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - What: Codex never finished reviewing three PRs; their three findings surfaced only when the review was requested again.
 - Guard: the same rule: a summary that never says Completed means no review happened; comment `@codex review`.
 
-**A check that proved nothing** (this session, twice).
-- What: a "fails with the bug put back" run passed because the test edit had not been applied (the editor refused an unread file), and a mutation did not compile.
-- Guard: a fail-first check counts only when the output names the new test as failed. Read the output, not the exit code.
+**A check that proved nothing** (this session, twice; again on 2026-10-26 for the event row).
+- What: a "fails with the bug put back" run passed because the test edit had not been applied (the editor refused an unread file), and a mutation did not compile. On the event row, a `sed` meant for one `return null;` also hit another method's, the mutated build failed, and the runner went on to test the previous build, reporting the mutation as surviving.
+- Guard: a fail-first check counts only when the output names the new test as failed. Read the output, not the exit code. The mutation runner now stops with "did not build, not run" when the mutated build reports an error, rather than testing the last good build; scope a `sed` mutation to its method (an address range) when the line it matches is not unique.
 
 **A wait loop matched the wrong commit** (#12).
 - What: it waited for `b62ae8f` while the commit was `b62ae8b`, so it ran to its time limit.
