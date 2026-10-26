@@ -122,6 +122,22 @@ public sealed class SettingsTests : IDisposable
         Assert.Equal(1.25, result.Settings.Appearance.RowScale);
     }
 
+    // A file from the build with the folding notice strip, which saved whether it was open (the event row took its
+    // place, 2026-10-26), still loads as it is: the old choice passed over, nothing reported, its other alert settings
+    // kept.
+    [Fact]
+    public void AFileWithTheOldNoticeStripsChoiceLoads()
+    {
+        var store = NewStore();
+        Directory.CreateDirectory(directory.FullPath); // TestDataDirectory names the folder; the test makes it
+        File.WriteAllText(store.FilePath, "{ \"version\": 1, \"alerts\": { \"noticesExpanded\": true, \"leadMinutes\": 30, \"events\": [\"rift\", \"shugo\"] } }");
+        var result = store.Load();
+        Assert.Equal(SettingsLoadStatus.Loaded, result.Status);
+        Assert.Null(result.Notice);
+        Assert.Equal(30, result.Settings.Alerts.LeadMinutes);
+        Assert.Equal(new[] { "shugo", "rift" }, result.Settings.Alerts.Events); // in catalog order
+    }
+
     [Fact]
     public void NullSectionsFromAFileTakeDefaults()
     {
@@ -257,14 +273,13 @@ public sealed class SettingsTests : IDisposable
         // Every AlertSettings member, since it has a hand-written Equals too.
         var alertProperties = typeof(AlertSettings).GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.Name != "EqualityContract").Select(p => p.Name).Order().ToList();
-        Assert.Equal(new[] { "Enabled", "Events", "HideDuringBossFights", "LeadMinutes", "NoticesExpanded", "RestoreMinimizedMeter", "ServerOffsetHours", "ShowNextEvent" }, alertProperties);
+        Assert.Equal(new[] { "Enabled", "Events", "HideDuringBossFights", "LeadMinutes", "RestoreMinimizedMeter", "ServerOffsetHours", "ShowNextEvent" }, alertProperties);
         var alerts = baseline.Alerts;
         Assert.Equal(alerts, alerts with { Events = alerts.Events.ToList() });
         Assert.NotEqual(alerts, alerts with { Enabled = !alerts.Enabled });
         Assert.NotEqual(alerts, alerts with { HideDuringBossFights = !alerts.HideDuringBossFights });
         Assert.NotEqual(alerts, alerts with { Events = alerts.Events.Skip(1).ToList() });
         Assert.NotEqual(alerts, alerts with { LeadMinutes = 7 });
-        Assert.NotEqual(alerts, alerts with { NoticesExpanded = !alerts.NoticesExpanded });
         Assert.NotEqual(alerts, alerts with { RestoreMinimizedMeter = !alerts.RestoreMinimizedMeter });
         Assert.NotEqual(alerts, alerts with { ServerOffsetHours = 8 });
         Assert.NotEqual(alerts, alerts with { ShowNextEvent = !alerts.ShowNextEvent });

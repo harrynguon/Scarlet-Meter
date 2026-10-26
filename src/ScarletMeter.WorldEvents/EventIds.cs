@@ -18,7 +18,7 @@ public static class EventIds
     /// <summary>Spacetime Rift.</summary>
     public const string Rift = "rift";
 
-    /// <summary>Artifact Siege.</summary>
+    /// <summary>Abyss Siege (the fork's Artifact Siege).</summary>
     public const string Siege = "siege";
 
     /// <summary>Dimensional Invasion.</summary>

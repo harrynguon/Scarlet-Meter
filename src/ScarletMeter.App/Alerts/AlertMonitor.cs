@@ -8,12 +8,21 @@ namespace ScarletMeter.App.Alerts;
 /// <param name="Alerts">Due notices, most urgent first (Soon before a start, Open while entry is possible).</param>
 /// <param name="Next">The next alerted event when "show the next event" is on and nothing is due, else null.</param>
 /// <param name="RefreshAt">When this view next changes, or null when no event is alerted at all.</param>
-public sealed record AlertView(IReadOnlyList<EventAlert> Alerts, UpcomingEvent? Next, DateTimeOffset? RefreshAt, TimeSpan Lead)
+/// <param name="Lead">How long before a start its Soon notice appears.</param>
+/// <param name="Events">The alerted events in catalog order: the overlay's event row, one icon each.</param>
+/// <param name="ServerOffset">The server clock the schedule was planned with, for an idle event's next start.</param>
+public sealed record AlertView(
+    IReadOnlyList<EventAlert> Alerts,
+    UpcomingEvent? Next,
+    DateTimeOffset? RefreshAt,
+    TimeSpan Lead,
+    IReadOnlyList<EventRule> Events,
+    TimeSpan ServerOffset)
 {
-    public static AlertView None { get; } = new([], null, null, AlertPlanner.DefaultLeadTime);
+    public static AlertView None { get; } = new([], null, null, AlertPlanner.DefaultLeadTime, [], EventCatalog.DefaultServerOffset);
 }
 
-/// <summary>An enabled event's next start, for the overlay's dim "next event" line.</summary>
+/// <summary>An enabled event's next start, for the dim time on the event row's next icon.</summary>
 public readonly record struct UpcomingEvent(EventRule Rule, DateTimeOffset Start);
 
 /// <summary>
@@ -83,20 +92,21 @@ public sealed class AlertMonitor : IDisposable
         var offset = TimeSpan.FromMinutes(Math.Round(alerts.ServerOffsetHours * 60));
         var lead = TimeSpan.FromMinutes(alerts.LeadMinutes);
         var plan = AlertPlanner.Plan(rules, enabled, now, offset, lead);
+        var shown = rules.Where(r => enabled.Contains(r.Id)).ToList();
 
         // Each rule's next start is its occurrence's Next: the first start after now, also while the current
         // occurrence is still running (Shugo after its entry closed, say), so such a rule is never skipped.
         UpcomingEvent? next = null;
         if (alerts.ShowNextEvent && plan.Alerts.Count == 0)
         {
-            next = EventSchedule.Timeline(rules.Where(r => enabled.Contains(r.Id)).ToList(), now, offset)
+            next = EventSchedule.Timeline(shown, now, offset)
                 .Select(o => new UpcomingEvent(o.Rule, o.Next))
                 .OrderBy(e => e.Start)
                 .ThenBy(e => e.Rule.Id, StringComparer.Ordinal)
                 .Cast<UpcomingEvent?>()
                 .FirstOrDefault();
         }
-        return new AlertView(plan.Alerts, next, plan.NextChange, lead);
+        return new AlertView(plan.Alerts, next, plan.NextChange, lead, shown, offset);
     }
 
     private void OnSettingsChanged(object? sender, MeterSettings changed) => Refresh();

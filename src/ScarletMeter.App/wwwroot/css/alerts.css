@@ -1,9 +1,8 @@
-/* World-event notices at the bottom of the overlay (Components/AlertStrip.razor), below the last DPS bar. Uses
-   app.css tokens. One bar that opens and closes: closed, the most urgent notice in one line; open, a "World events"
-   header over every due notice. The strip never scrolls and keeps its own height (flex: none): resizing the meter
-   sizes only the bar area above it, and the window grows when the strip opens (Windows/OverlayFit); once it is as tall
-   as the screen the bar area gives way and scrolls instead (app.css, .rows.scrolls). So a notice never covers a bar and
-   is never cut, and the bar is always there to fold the list away. */
+/* World events at the bottom of the overlay (Components/EventRow.razor), below the last DPS bar. Uses app.css tokens.
+   One row of icons, one per alerted event, and under it the detail lines of the icons the player clicked. The row never
+   scrolls and keeps its own height (flex: none): resizing the meter sizes only the bar area above it, and the window
+   grows when a detail line opens (Windows/OverlayFit); once it is as tall as the screen the bar area gives way and
+   scrolls instead (app.css, .rows.scrolls). So an icon never covers a bar and is never cut. */
 .alerts {
     display: flex;
     flex-direction: column;
@@ -12,7 +11,136 @@
     padding: 0 6px 6px;
 }
 
-/* flex: none keeps each notice its full height in the strip's column. */
+/* The icons wrap onto a second line rather than run out of a narrow meter. The row anchors the tips (position:
+   relative), so every tip starts at the row's left edge and stays inside the window, whichever icon it names. */
+.ev-row {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px;
+}
+
+/* An icon, a button: dim while its event is not due. 26 px wide when it shows no time, so nine fit the narrowest
+   meter (300 px). */
+.ev {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    box-sizing: border-box;
+    height: 24px;
+    min-width: 26px;
+    padding: 0 4px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: none;
+    color: rgba(235, 233, 242, 0.38);
+    font: inherit;
+    cursor: pointer;
+}
+
+/* Drawn like the header's icons: stroked in the icon's colour, never filled. */
+.ev svg {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.35;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.ev-time {
+    font-size: 11.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* Due: the washed-out gold (--soon, app.css) before a start, so the row stays calm beside the bars; teal (--good) while
+   entry is open. The next event's time stays dim. Nothing pulses: a pulse beside the bars was distracting in a fight. */
+.ev.soon {
+    color: var(--soon);
+    background: rgba(220, 198, 140, 0.1);
+    border-color: rgba(220, 198, 140, 0.32);
+}
+
+.ev.open {
+    color: var(--good);
+    background: rgba(78, 201, 176, 0.1);
+    border-color: rgba(78, 201, 176, 0.4);
+}
+
+.ev.next {
+    color: rgba(235, 233, 242, 0.55);
+}
+
+.ev:hover,
+.ev:focus-visible {
+    background-color: rgba(255, 255, 255, 0.08);
+    outline: none;
+}
+
+.ev.quiet:hover,
+.ev.quiet:focus-visible,
+.ev.next:hover,
+.ev.next:focus-visible {
+    color: rgba(235, 233, 242, 0.85);
+}
+
+/* An icon whose detail line is open. */
+.ev[aria-expanded="true"] {
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* An icon's tip: hidden until it is hovered or focused, then just above the row from its left edge, in two lines that
+   never wrap (a long name or place is cut short with an ellipsis), so it fits above the row in the shortest meter, the
+   header and totals with no bars. It shows after a short pause, so sweeping along the row does not flash every tip. */
+.ev-tip {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 4px);
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    max-width: 100%;
+    padding: 5px 9px;
+    border-radius: 6px;
+    background: #17171f;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+    color: var(--text);
+    font-size: 11.5px;
+    font-weight: 400;
+    line-height: 1.4;
+    text-align: left;
+    pointer-events: none;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 120ms ease-out, visibility 0s linear 120ms;
+}
+
+.ev:hover .ev-tip,
+.ev:focus-visible .ev-tip {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 120ms ease-out 250ms, visibility 0s linear 250ms;
+}
+
+.ev-tip-head,
+.ev-tip-where {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ev-tip-where {
+    color: var(--muted);
+}
+
+/* A detail line under the row. flex: none keeps each its full height in the column. */
 .alert {
     position: relative;
     flex: none;
@@ -38,21 +166,17 @@
     background: var(--muted);
 }
 
-/* An upcoming event's dot and progress line in the washed-out gold (--soon, app.css), so the strip stays calm beside
-   the bars; an open entry's are teal. The dot stays still: a pulse beside the bars was distracting in a fight. The
-   bar takes the most urgent notice's colours. */
-.alert.soon .alert-dot,
-.alert-bar.soon .alert-dot {
+/* A due start's dot and progress line in the washed-out gold, an open entry's in teal, like their icons. The dot
+   stays still. */
+.alert.soon .alert-dot {
     background: var(--soon);
 }
 
-.alert.open,
-.alert-bar.open {
+.alert.open {
     border-color: rgba(78, 201, 176, 0.35);
 }
 
-.alert.open .alert-dot,
-.alert-bar.open .alert-dot {
+.alert.open .alert-dot {
     background: var(--good);
     box-shadow: 0 0 6px var(--good);
 }
@@ -82,82 +206,15 @@
     transition: width 1s linear;
 }
 
-.alert.soon .alert-progress,
-.alert-bar.soon .alert-progress {
+.alert.soon .alert-progress {
     opacity: 0.65;
 }
 
-.alert.open .alert-progress,
-.alert-bar.open .alert-progress {
+.alert.open .alert-progress {
     background: var(--good);
 }
 
-.alert.next {
-    opacity: 0.7;
-    animation: none;
-}
-
-/* The strip's bar, a button: closed, the most urgent notice with its progress line, "+N" more and a chevron pointing
-   down; open, the "World events" header with the count, its chevron turned up. As tall as a notice, 26 px: a notice
-   is 24 px inside its 1 px border, and the bar, a button, measures its border in (border-box, which width: 100% also
-   needs). */
-.alert-bar {
-    position: relative;
-    overflow: hidden;
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    box-sizing: border-box;
-    width: 100%;
-    height: 26px;
-    padding: 0 10px;
-    border-radius: 6px;
-    background: rgba(11, 11, 15, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    color: var(--text);
-    font: inherit;
-    font-size: 12px;
-    text-align: left;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-    cursor: pointer;
-    animation: alert-in 260ms ease-out;
-}
-
-.alert-bar:hover,
-.alert-bar:focus-visible {
-    background: rgba(255, 255, 255, 0.08);
-    outline: none;
-}
-
-.alert-count {
-    flex: none;
-    padding: 0 6px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(235, 233, 242, 0.75);
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    line-height: 16px;
-}
-
-.alert-chevron {
-    flex: none;
-    width: 6px;
-    height: 6px;
-    margin: 0 2px 3px 2px;
-    border-right: 1.5px solid var(--muted);
-    border-bottom: 1.5px solid var(--muted);
-    transform: rotate(45deg);
-    transition: transform 160ms ease-out;
-}
-
-.alerts.expanded .alert-chevron {
-    margin-bottom: -3px;
-    transform: rotate(-135deg);
-}
-
-/* The "newer RATmeter release" line, as quiet as the next-event line. */
+/* The "newer RATmeter release" line, quiet beside the bars. */
 .update-note {
     display: flex;
     align-items: center;

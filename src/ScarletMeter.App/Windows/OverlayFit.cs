@@ -6,7 +6,7 @@ namespace ScarletMeter.App.Windows;
 /// The overlay window's height rules. The window is as tall as the page's content: the header, the target card in a
 /// fight, the totals, the bar area and the world-event notices. Nothing in it is sized by hand: the bar area has a row
 /// for each player shown, up to five, and scrolls past that (Pages/BarArea; Harry, 2026-10-26: "the player won't need
-/// to fiddle with resizing"), so the window grows when a fight's players come, the notices open or the target card
+/// to fiddle with resizing"), so the window grows when a fight's players come, an event's line opens or the target card
 /// appears, and shrinks a moment after they go. It grows downwards; near the bottom of the screen it moves up just
 /// enough to stay inside the monitor's work area, never above the work area's top (or the player's own top, if that is
 /// higher), and it is never made taller than the work area unless the player's own height already is. The bar area the
