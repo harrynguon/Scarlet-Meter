@@ -83,7 +83,7 @@
             case "Tracking":
                 <section>
                     <h2>Fights</h2>
-                    <ToggleSetting Label="Boss encounters only" Description="Ignore hits on mobs that are not bosses. Applies to new hits."
+                    <ToggleSetting Label="Boss encounters only" Description="Ignore hits on mobs that are not bosses; training dummies count as bosses. On by default. Applies to new hits."
                                    Value="@S.Fight.BossOnlyCapture" ValueChanged="@(v => Change(s => s with { Fight = s.Fight with { BossOnlyCapture = v } }))" />
                     <ToggleSetting Label="Combine summon damage" Description="Fold a summon's damage into its owner's skill breakdown."
                                    Value="@S.Fight.GroupSummonDamage" ValueChanged="@(v => Change(s => s with { Fight = s.Fight with { GroupSummonDamage = v } }))" />

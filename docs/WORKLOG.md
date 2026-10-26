@@ -2,6 +2,18 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-26 — Boss encounters only, on by default
+
+**What:** "Boss encounters only" (Settings, Tracking; `FightSettings.BossOnlyCapture`) is on by default, so a new install tracks boss fights (and training dummies, which upstream counts as bosses) and not every mob. A settings file that saved the switch keeps its value, on or off, since an older file's "off" may be the player's own choice; a file whose fight section never named it gets the new default. The setting's description says so. The engine's own `EngineSettings` default is unchanged: the app's settings are applied to it on load.
+
+**Why:** Harry: "ensure 'boss fights only' is set to on by default".
+
+**Checks (SDK 10.0.402):** `dotnet build` and `dotnet test` 641/641, with `SettingsTests.BossEncountersOnlyIsOnByDefaultAndASavedChoiceIsKept` new and three settings tests reworded from "turned on" to "turned off". Fail-first against a scratch copy, control clean: the old default fails the new test and the engine test; a normalizer that forces it on over a saved "off" fails it and three round-trip tests.
+
+**Not checked:** in game. A player whose settings file saved "off" (every file saved by an earlier build) keeps it off until they turn it on in Settings, Tracking.
+
+**Next:** PR, standard audit, Codex, CI; after #42.
+
 ## 2026-10-26 — A changelog, and each release lists what changed
 
 **What:** `CHANGELOG.md` at the root records what changed for players, release by release (Keep a Changelog: Added, Changed, Deprecated, Removed, Fixed, Security, each change with its PR's link), newest first: `## [Unreleased]` (Odyle energy #34/#36, the event icons #39, the self-sizing bar area #35/#37/#40, other players' dummy fights ignored #38), then 0.2.0 and 0.1.0 rebuilt from their release notes and merged PRs, then compare links. `scripts/Get-ChangelogSection.ps1` prints one version's section (absolute paths from its own location; throws for a missing section, a heading without a date, or one listing nothing). The release workflow runs it in its first check, so a tag without its section fails before building, and writes the draft's notes as the notes file followed by "What's changed in <version>" and the section, with a link to the changelog at that tag. CI runs it for the app's version (`src/Directory.Build.props`), so a version bump without its section fails on the PR. AGENTS.md gains "Changelog": every PR a player would notice adds its Unreleased line in the same PR, developer-only changes stay here; the scarlet-ship skill, DEVELOPMENT ("CI", "Releases"), README, docs/README and ARCHITECTURE ("Tests") say so. `ChangelogTests` guards the shape: Unreleased first and undated, releases newest first with dates, releases matching `docs/release-notes`, the app's version present once its notes exist, groups and PR links, a link per heading, and the workflows' use of the script.
