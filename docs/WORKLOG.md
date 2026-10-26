@@ -4,7 +4,7 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 ## 2026-10-26 — Boss encounters only, on by default
 
-**What:** "Boss encounters only" (Settings, Tracking; `FightSettings.BossOnlyCapture`) is on by default, so a new install tracks boss fights (and training dummies, which upstream counts as bosses) and not every mob. A settings file that saved the switch keeps its value, on or off, since an older file's "off" may be the player's own choice; a file whose fight section never named it gets the new default. The setting's description says so. The engine's own `EngineSettings` default is unchanged: the app's settings are applied to it on load.
+**What:** "Boss encounters only" (Settings, Tracking; `FightSettings.BossOnlyCapture`) is on by default, so a new install tracks boss fights (and training dummies, which upstream counts as bosses) and not every mob. A settings file that saved the switch keeps its value, on or off, since an older file's "off" may be the player's own choice; a file whose fight section never named it gets the new default. The setting's description says so, and CHANGELOG.md has its line under Unreleased. The engine's own `EngineSettings` default is unchanged: the app's settings are applied to it on load.
 
 **Why:** Harry: "ensure 'boss fights only' is set to on by default".
 
