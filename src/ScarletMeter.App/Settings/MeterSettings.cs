@@ -60,8 +60,8 @@ public sealed record AlertSettings
     public const double MinServerOffsetHours = -12;
     public const double MaxServerOffsetHours = 14;
 
-    /// <summary>Events alerted by default: the world events and bosses, not the daily and weekly resets.</summary>
-    public static IReadOnlyList<string> DefaultEvents { get; } = ["kaira", "nahma", "executors", "rift", "siege", "invasion", "shugo"];
+    /// <summary>Events alerted by default, in catalog order: the world events and bosses, not the daily and weekly resets.</summary>
+    public static IReadOnlyList<string> DefaultEvents { get; } = ["shugo", "invasion", "rift", "siege", "kaira", "nahma", "executors"];
 
     /// <summary>Show notices at all.</summary>
     public bool Enabled { get; init; } = true;
@@ -75,7 +75,7 @@ public sealed record AlertSettings
     /// <summary>The event ids with notices, in catalog order.</summary>
     public IReadOnlyList<string> Events { get; init; } = DefaultEvents;
 
-    /// <summary>When nothing is due, show the next alerted event as one dim line.</summary>
+    /// <summary>When nothing is due, the next alerted event's icon in the event row shows the time to its start, dimly.</summary>
     public bool ShowNextEvent { get; init; }
 
     /// <summary>
@@ -91,21 +91,18 @@ public sealed record AlertSettings
     /// </summary>
     public bool HideDuringBossFights { get; init; } = true;
 
-    /// <summary>
-    /// The overlay's notice strip open, every due notice listed under its bar; closed (the default), the bar shows the
-    /// most urgent one in a single line. The player's last choice, from the bar itself.
-    /// </summary>
-    public bool NoticesExpanded { get; init; }
+    // The overlay's old notice strip kept whether it was open here (noticesExpanded); the event row that replaced it
+    // keeps no such choice, and a file that still has it loads, the value ignored (SettingsTests).
 
     // Value equality including the event list.
     public bool Equals(AlertSettings? other) => other is not null
         && Enabled == other.Enabled && LeadMinutes == other.LeadMinutes && ServerOffsetHours.Equals(other.ServerOffsetHours)
         && ShowNextEvent == other.ShowNextEvent && RestoreMinimizedMeter == other.RestoreMinimizedMeter
-        && HideDuringBossFights == other.HideDuringBossFights && NoticesExpanded == other.NoticesExpanded
+        && HideDuringBossFights == other.HideDuringBossFights
         && Events.SequenceEqual(other.Events, StringComparer.Ordinal);
 
     public override int GetHashCode() =>
-        HashCode.Combine(Enabled, LeadMinutes, ServerOffsetHours, ShowNextEvent, RestoreMinimizedMeter, HideDuringBossFights, NoticesExpanded, Events.Count);
+        HashCode.Combine(Enabled, LeadMinutes, ServerOffsetHours, ShowNextEvent, RestoreMinimizedMeter, HideDuringBossFights, Events.Count);
 }
 
 /// <summary>Fight rules upstream applies to every hit; mirrored into the engine's EngineSettings.</summary>

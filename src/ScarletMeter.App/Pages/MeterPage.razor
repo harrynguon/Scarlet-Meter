@@ -143,6 +143,7 @@
         </div>
     }
     @* Always rendered, held empty while the notices stand aside for a boss fight (NoticesHeld), so its live region
-       survives the fight. Open or closed is the player's choice, kept in settings. *@
-    <AlertStrip View="Alerts.Current" Now="Clock.GetUtcNow()" Expanded="alertSettings.NoticesExpanded" ExpandedChanged="SetNoticesExpanded" Held="NoticesHeld" />
+       survives the fight. A detail line opened or closed renders this page at once, which measures the new height
+       for the window (OnAfterRenderAsync). *@
+    <EventRow View="Alerts.Current" Now="Clock.GetUtcNow()" Held="NoticesHeld" LinesChanged="StateHasChanged" />
 </div>

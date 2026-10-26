@@ -21,6 +21,19 @@ public static class EventText
     }
 
     /// <summary>
+    /// The event row's time on an icon: minutes and seconds under an hour, as the game's own timers read ("2:19"; Harry:
+    /// whole minutes rounded up read "3m" with 2:01 left, which misled); then "2h 05m" from an hour, and "6d 05h" from a
+    /// day (a next event can be a week away). Like <see cref="Countdown"/>, a part second is dropped.
+    /// </summary>
+    public static string IconTime(TimeSpan remaining)
+    {
+        if (remaining < TimeSpan.Zero) remaining = TimeSpan.Zero;
+        return remaining.TotalHours < 1 ? Countdown(remaining)
+            : remaining.TotalDays < 1 ? $"{(int)remaining.TotalHours}h {remaining.Minutes:00}m"
+            : $"{(int)remaining.TotalDays}d {remaining.Hours:00}h";
+    }
+
+    /// <summary>
     /// A rule's state for the settings list, in <paramref name="zone"/>: "next 21:05" (with the weekday when
     /// it is not today, "next Sun 21:00"), "portal open now", "entry open now", "running, entry closed", or
     /// "started 21:00" for a window with no entry (a boss may already be dead).
@@ -41,8 +54,11 @@ public static class EventText
     }
 
     /// <summary>An instant in the PC's local time ("21:05").</summary>
-    public static string LocalTime(DateTimeOffset instant) =>
-        instant.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture);
+    public static string LocalTime(DateTimeOffset instant) => LocalTime(instant, TimeZoneInfo.Local);
+
+    /// <summary>An instant in <paramref name="zone"/> ("21:05").</summary>
+    public static string LocalTime(DateTimeOffset instant, TimeZoneInfo zone) =>
+        TimeZoneInfo.ConvertTime(instant, zone).ToString("HH:mm", CultureInfo.InvariantCulture);
 
     /// <summary>When a rule recurs, for the settings list: "Every 3 h from 02:00 server time · portal 10 min".</summary>
     public static string Schedule(EventRule rule)

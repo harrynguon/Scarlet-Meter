@@ -6,11 +6,14 @@ namespace ScarletMeter.Tests;
 /// <summary>The built-in rules match the fork's schedule.mjs and presets.mjs, and rules are immutable values.</summary>
 public sealed class EventCatalogTests
 {
+    // Scarlet's order and one name differ from the fork's, both the player's choice for the overlay's event row (Harry,
+    // 2026-10-26): the festivals and the rift first, then the siege, the bosses and the resets (the fork starts with
+    // Kaira); and the siege is the Abyss Siege (the fork's Artifact Siege).
     [Fact]
-    public void TheCatalogHasNineEntriesInTheForksOrderAndDefaultsToGlobal()
+    public void TheCatalogHasNineEntriesInScarletsOrderAndDefaultsToGlobal()
     {
         Assert.Equal(
-            [EventIds.Kaira, EventIds.Nahma, EventIds.Executors, EventIds.Rift, EventIds.Siege, EventIds.Invasion, EventIds.Shugo, EventIds.Daily, EventIds.Weekly],
+            [EventIds.Shugo, EventIds.Invasion, EventIds.Rift, EventIds.Siege, EventIds.Kaira, EventIds.Nahma, EventIds.Executors, EventIds.Daily, EventIds.Weekly],
             EventCatalog.Ids);
         Assert.Equal(EventCatalog.Ids, EventCatalog.Legacy.Select(rule => rule.Id));
         Assert.Equal(EventCatalog.Ids, EventCatalog.Global.Select(rule => rule.Id));
@@ -18,7 +21,10 @@ public sealed class EventCatalogTests
         Assert.Equal(TimeSpan.FromHours(9), EventCatalog.DefaultServerOffset);
     }
 
-    /// <summary>presets.mjs at the fork's master, value for value (A2Tools event-timers at b11f345).</summary>
+    /// <summary>
+    /// presets.mjs at the fork's master, value for value (A2Tools event-timers at b11f345), listed in the fork's order;
+    /// Scarlet's catalog differs only in its order and the siege's name (above).
+    /// </summary>
     [Fact]
     public void GlobalPresetMatchesTheFork()
     {
@@ -35,7 +41,11 @@ public sealed class EventCatalogTests
             new(EventIds.Daily, "Daily reset", "Daily quests, missions & entries", EventKind.Reset, ScheduleBasis.Utc, null, [7], 0, 0),
             new(EventIds.Weekly, "Weekly reset", "Wednesday · Abyss rank tally", EventKind.Reset, ScheduleBasis.Utc, [3], [7], 0, 0),
         };
-        Assert.Equal(expected, EventCatalog.Global);
+        var order = EventCatalog.Ids.ToList();
+        var scarlet = expected
+            .Select(rule => rule.Id == EventIds.Siege ? rule with { Name = "Abyss Siege" } : rule)
+            .OrderBy(rule => order.IndexOf(rule.Id));
+        Assert.Equal(scarlet, EventCatalog.Global);
     }
 
     [Fact]

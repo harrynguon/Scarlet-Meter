@@ -36,8 +36,7 @@ public partial class MeterPage : IAsyncDisposable
     private bool bossFightUnderWay;
     private CombatSnapshot snapshot = CombatSnapshot.Empty;
     private AppearanceSettings appearance = new();
-    // The notices' switches: the header's bell (Enabled), whether they stand aside for a boss fight and whether the
-    // strip is open (NoticesExpanded).
+    // The notices' switches: the header's bell (Enabled) and whether they stand aside for a boss fight.
     private AlertSettings alertSettings = new();
     private int? ping;
     // The latest Odyle energy, read with each refresh; null until the game sends it.
@@ -117,7 +116,7 @@ public partial class MeterPage : IAsyncDisposable
     private string AvatarClass => HpBand.RingClass(phase, snapshot.Target);
 
     // The notices stand aside during a boss fight when "Hide during boss fights" is on.
-    private bool NoticesHeld => AlertStripLayout.HiddenForFight(alertSettings.HideDuringBossFights, bossFightUnderWay);
+    private bool NoticesHeld => EventRowLayout.HiddenForFight(alertSettings.HideDuringBossFights, bossFightUnderWay);
 
     private string StatusText => Engine.Capture switch
     {
@@ -300,9 +299,6 @@ public partial class MeterPage : IAsyncDisposable
 
     // The header's bell: world-event notices on or off, saved like the switch in Settings, Alerts.
     private void ToggleAlerts() => Settings.Update(s => s with { Alerts = s.Alerts with { Enabled = !s.Alerts.Enabled } });
-
-    // The notice strip's bar: open or closed, saved so it stays as the player left it.
-    private void SetNoticesExpanded(bool expanded) => Settings.Update(s => s with { Alerts = s.Alerts with { NoticesExpanded = expanded } });
 
     private void Reset()
     {

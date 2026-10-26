@@ -108,13 +108,13 @@ public sealed class AlertTests : IDisposable
             {
                 LeadMinutes = 0,
                 ServerOffsetHours = 9.004,
-                Events = ["shugo", "nonsense", "rift", "shugo"],
+                Events = ["rift", "nonsense", "shugo", "rift"],
             },
         };
         var (settings, repairs) = SettingsNormalizer.Normalize(input);
         Assert.Equal(AlertSettings.MinLeadMinutes, settings.Alerts.LeadMinutes);
         Assert.Equal(9.0, settings.Alerts.ServerOffsetHours); // whole minutes, as the schedule requires
-        Assert.Equal(new[] { "rift", "shugo" }, settings.Alerts.Events); // known ids, once, in catalog order
+        Assert.Equal(new[] { "shugo", "rift" }, settings.Alerts.Events); // known ids, once, in catalog order
         Assert.Contains(repairs, r => r.Contains("lead time"));
         Assert.Contains(repairs, r => r.Contains("Unknown world events"));
 
@@ -128,6 +128,8 @@ public sealed class AlertTests : IDisposable
         Assert.Equal(new AlertSettings { Events = ["rift"] }, new AlertSettings { Events = ["rift"] });
         Assert.NotEqual(new AlertSettings { Events = ["rift"] }, new AlertSettings { Events = ["shugo"] });
         Assert.Equal(new AlertSettings(), SettingsNormalizer.Normalize(null).Settings.Alerts);
+        // The defaults are already in catalog order, so normalizing them changes nothing.
+        Assert.Equal(EventCatalog.Ids.Where(AlertSettings.DefaultEvents.Contains), AlertSettings.DefaultEvents);
     }
 
     [Fact]
@@ -139,11 +141,11 @@ public sealed class AlertTests : IDisposable
 
     // When a boss fight is under way is BossFightHoldTests' subject; here, only that the setting decides.
     [Fact]
-    public void TheStripStandsAsideOnlyWhileABossFightIsUnderWay()
+    public void TheRowStandsAsideOnlyWhileABossFightIsUnderWay()
     {
-        Assert.True(AlertStripLayout.HiddenForFight(true, bossFightUnderWay: true));
-        Assert.False(AlertStripLayout.HiddenForFight(true, bossFightUnderWay: false));
-        Assert.False(AlertStripLayout.HiddenForFight(false, bossFightUnderWay: true)); // the setting off
+        Assert.True(EventRowLayout.HiddenForFight(true, bossFightUnderWay: true));
+        Assert.False(EventRowLayout.HiddenForFight(true, bossFightUnderWay: false));
+        Assert.False(EventRowLayout.HiddenForFight(false, bossFightUnderWay: true)); // the setting off
     }
 
     // "Bring the meter back before an event" waits while the notices stand aside for a boss fight, and then brings
@@ -192,48 +194,166 @@ public sealed class AlertTests : IDisposable
         Assert.Equal("07:00 UTC", EventText.Schedule(rules[EventIds.Daily]));
     }
 
-    // The strip is one bar (Harry asked for the whole section to fold away rather than always show two): closed, the
-    // bar alone names the most urgent notice and no rows show; open, every notice shows under it.
+    // One icon per alerted event in catalog order, the order Harry chose for the row (2026-10-26): the festivals and the
+    // rift, the siege, the bosses, then the resets.
     [Fact]
-    public void TheClosedBarShowsNoRowsAndTheOpenOneShowsEvery()
+    public void TheRowShowsEveryAlertedEventInCatalogOrder()
     {
-        var alerts = FourDue();
-        Assert.Empty(AlertStripLayout.Shown(alerts, expanded: false));
-        Assert.Equal(alerts, AlertStripLayout.Shown(alerts, expanded: true));
-        Assert.Empty(AlertStripLayout.Shown([], expanded: true));
+        var view = AlertMonitor.Compute(new AlertSettings(), At0056);
+        var icons = EventRowLayout.Icons(view);
+        Assert.Equal(new[] { EventIds.Shugo, EventIds.Invasion, EventIds.Rift, EventIds.Siege, EventIds.Kaira, EventIds.Nahma, EventIds.Executors },
+            icons.Select(i => i.Rule.Id));
+        // 00:56 UTC: Shugo and Kaira (server 10:00) start at 01:00, within the five-minute lead; the rest are quiet.
+        var hour = new DateTimeOffset(2026, 10, 24, 1, 0, 0, TimeSpan.Zero);
+        Assert.All(icons, icon => Assert.Equal(
+            icon.Rule.Id is EventIds.Shugo or EventIds.Kaira ? EventIconState.Soon : EventIconState.Quiet, icon.State));
+        Assert.All(icons.Where(i => i.State == EventIconState.Soon), i => Assert.Equal(hour, i.Until));
+        Assert.All(icons.Where(i => i.State == EventIconState.Quiet), i => Assert.Null(i.Until));
+        Assert.Equal(view.Alerts.Count, icons.Count(i => i.Alert is not null));
+
+        var everything = AlertMonitor.Compute(new AlertSettings { Events = [.. EventCatalog.Ids] }, At0056);
+        Assert.Equal(EventCatalog.Ids, EventRowLayout.Icons(everything).Select(i => i.Rule.Id));
+        Assert.Empty(EventRowLayout.Icons(AlertView.None));
+        Assert.Empty(EventRowLayout.Icons(AlertMonitor.Compute(new AlertSettings { Enabled = false }, At0056)));
     }
 
     [Fact]
-    public void TheClosedBarCountsTheNoticesItDoesNotName()
+    public void AnOpenEntryLightsUpUntilItCloses()
     {
-        var alerts = FourDue();
-        Assert.Equal(3, AlertStripLayout.MoreCount(alerts));
-        Assert.Equal(1, AlertStripLayout.MoreCount([.. alerts.Take(2)]));
-        Assert.Equal(0, AlertStripLayout.MoreCount([.. alerts.Take(1)])); // the only one: no "+0"
-        Assert.Equal(0, AlertStripLayout.MoreCount([]));
-        Assert.Equal(2, AlertStripLayout.AnnouncedCount);
+        // 01:01 UTC: Shugo's entry is open until 01:03; the rift (02:00) is quiet.
+        var icons = EventRowLayout.Icons(AlertMonitor.Compute(Only(EventIds.Shugo, EventIds.Rift), At0056.AddMinutes(5)));
+        Assert.Equal((EventIds.Shugo, EventIconState.Open), (icons[0].Rule.Id, icons[0].State));
+        Assert.Equal(new DateTimeOffset(2026, 10, 24, 1, 3, 0, TimeSpan.Zero), icons[0].Until);
+        Assert.Equal(AlertKind.Open, Assert.NotNull(icons[0].Alert).Kind);
+        Assert.Equal((EventIds.Rift, EventIconState.Quiet), (icons[1].Rule.Id, icons[1].State));
+    }
+
+    // "Show the next event": with nothing due, the next event's icon counts down to its start, dimly; never while
+    // something is due.
+    [Fact]
+    public void WithNothingDueTheNextEventsIconShowsItsTime()
+    {
+        var midnight = new DateTimeOffset(2026, 10, 24, 0, 0, 0, TimeSpan.Zero);
+        var asked = Only(EventIds.Rift, EventIds.Siege) with { ShowNextEvent = true };
+        var icons = EventRowLayout.Icons(AlertMonitor.Compute(asked, midnight));
+        Assert.Equal((EventIconState.Next, (DateTimeOffset?)new DateTimeOffset(2026, 10, 24, 2, 0, 0, TimeSpan.Zero)), (icons[0].State, icons[0].Until));
+        Assert.Equal((EventIconState.Quiet, (DateTimeOffset?)null), (icons[1].State, icons[1].Until)); // the siege, at 12:00
+        Assert.All(EventRowLayout.Icons(AlertMonitor.Compute(asked with { ShowNextEvent = false }, midnight)),
+            icon => Assert.Equal(EventIconState.Quiet, icon.State));
+        // Shugo due at 00:56: no icon shows the next event.
+        Assert.DoesNotContain(EventRowLayout.Icons(AlertMonitor.Compute(Only(EventIds.Shugo, EventIds.Rift) with { ShowNextEvent = true }, At0056)),
+            icon => icon.State == EventIconState.Next);
+    }
+
+    // Minutes and seconds under an hour, as the game's own timers read (Harry: "3m" with 2:01 left misled, since whole
+    // minutes were rounded up); hours and minutes, then days and hours, for a next event further off.
+    [Fact]
+    public void AnIconsTimeIsMinutesAndSeconds()
+    {
+        Assert.Equal("2:19", EventText.IconTime(new TimeSpan(0, 2, 19)));
+        Assert.Equal("2:01", EventText.IconTime(TimeSpan.FromSeconds(121.9))); // a part second is dropped
+        Assert.Equal("54:53", EventText.IconTime(new TimeSpan(0, 54, 53)));
+        Assert.Equal("0:01", EventText.IconTime(TimeSpan.FromSeconds(1)));
+        Assert.Equal("0:00", EventText.IconTime(TimeSpan.Zero));
+        Assert.Equal("0:00", EventText.IconTime(TimeSpan.FromSeconds(-3)));
+        Assert.Equal("59:59", EventText.IconTime(new TimeSpan(0, 59, 59)));
+        Assert.Equal("1h 00m", EventText.IconTime(TimeSpan.FromHours(1)));
+        Assert.Equal("2h 04m", EventText.IconTime(new TimeSpan(2, 4, 50)));
+        Assert.Equal("23h 59m", EventText.IconTime(new TimeSpan(23, 59, 59)));
+        Assert.Equal("1d 00h", EventText.IconTime(TimeSpan.FromHours(24)));
+        Assert.Equal("6d 05h", EventText.IconTime(new TimeSpan(6, 5, 10, 0)));
+    }
+
+    // The tip says what the event is doing in clock times; the icon itself shows the countdown.
+    [Fact]
+    public void AnIconsTipSaysWhatItsEventIsDoing()
+    {
+        string StatusAt(DateTimeOffset now, string id)
+        {
+            var icon = Assert.Single(EventRowLayout.Icons(AlertMonitor.Compute(Only(id), now)));
+            return EventRowLayout.Status(icon, now, EventCatalog.DefaultServerOffset, TimeZoneInfo.Utc);
+        }
+
+        Assert.Equal("starts 01:00", StatusAt(At0056, EventIds.Shugo));
+        Assert.Equal("entry open until 01:03", StatusAt(At0056.AddMinutes(5), EventIds.Shugo));
+        Assert.Equal("portal open until 02:10", StatusAt(new DateTimeOffset(2026, 10, 24, 2, 5, 0, TimeSpan.Zero), EventIds.Rift));
+        // Not due: the settings list's words, at the instant asked about.
+        Assert.Equal("next 01:30", StatusAt(At0056, EventIds.Invasion));
+        Assert.Equal("running, entry closed", StatusAt(At0056.AddMinutes(8), EventIds.Shugo)); // 01:04
+        Assert.Equal("next 12:00", StatusAt(At0056, EventIds.Siege));                         // server Sat 21:00
+        Assert.Equal("next Sun 12:00", StatusAt(At0056, EventIds.Nahma));                     // server Sun 21:00
+    }
+
+    // The row reads its tips and lines with the view's server offset, which must be the player's setting, not the
+    // preset's: at UTC+8 the siege's server Saturday 21:00 is 13:00 UTC, an hour after the preset's.
+    [Fact]
+    public void TheRowsTimesFollowThePlayersServerOffset()
+    {
+        var view = AlertMonitor.Compute(Only(EventIds.Siege) with { ServerOffsetHours = 8 }, At0056);
+        Assert.Equal(TimeSpan.FromHours(8), view.ServerOffset);
+        var siege = Assert.Single(EventRowLayout.Icons(view));
+        Assert.Equal("next 13:00", EventRowLayout.Status(siege, At0056, view.ServerOffset, TimeZoneInfo.Utc));
     }
 
     [Fact]
-    public void TheClosedBarsTooltipListsEveryNoticeWithItsClockTime()
+    public void AnIconsDetailLineCountsDown()
     {
-        var alerts = FourDue();
-        string Line(EventAlert a, string verb) => $"{a.Rule.Name} · {a.Rule.Location} · {verb} {EventText.LocalTime(a.Deadline)}";
-        Assert.Equal(Line(alerts[0], "closes"), AlertStripLayout.Describe(alerts[0]));
-        Assert.Equal(Line(alerts[1], "starts"), AlertStripLayout.Describe(alerts[1]));
-        Assert.Equal(string.Join("\n", Line(alerts[0], "closes"), Line(alerts[1], "starts"), Line(alerts[2], "starts"), Line(alerts[3], "starts")),
-            AlertStripLayout.List(alerts));
-        Assert.Equal(string.Empty, AlertStripLayout.List([]));
-        Assert.Equal("Fold the world events into one line", AlertStripLayout.CollapseHint);
+        var offset = EventCatalog.DefaultServerOffset;
+        var lead = TimeSpan.FromMinutes(5);
+        EventIcon IconAt(DateTimeOffset now, string id) => Assert.Single(EventRowLayout.Icons(AlertMonitor.Compute(Only(id), now)));
+
+        var soon = IconAt(At0056, EventIds.Shugo);
+        Assert.Equal("in 4:00", EventRowLayout.When(soon, At0056, offset, TimeZoneInfo.Utc));
+        Assert.Equal(20, Assert.NotNull(EventRowLayout.Progress(soon, At0056, lead)), 6); // a fifth of the lead time gone
+        Assert.Equal(100, Assert.NotNull(EventRowLayout.Progress(soon, At0056.AddMinutes(6), lead))); // never past full
+
+        var at0101 = At0056.AddMinutes(5);
+        var open = IconAt(at0101, EventIds.Shugo);
+        Assert.Equal("Entry open · 2:00 left", EventRowLayout.When(open, at0101, offset, TimeZoneInfo.Utc));
+        Assert.Equal(200.0 / 3, Assert.NotNull(EventRowLayout.Progress(open, at0101, lead)), 6); // two thirds of the entry left
+        Assert.Equal(0, Assert.NotNull(EventRowLayout.Progress(open, at0101.AddMinutes(3), lead))); // never below empty
+
+        var idle = IconAt(At0056, EventIds.Invasion);
+        Assert.Equal("next 01:30 · in 34:00", EventRowLayout.When(idle, At0056, offset, TimeZoneInfo.Utc));
+        Assert.Null(EventRowLayout.Progress(idle, At0056, lead));
+        var at0104 = At0056.AddMinutes(8); // Shugo's entry closed at 01:03; it runs until 01:07
+        Assert.Equal("running, entry closed", EventRowLayout.When(IconAt(at0104, EventIds.Shugo), at0104, offset, TimeZoneInfo.Utc));
     }
 
-    // Open or closed is the player's choice, closed by default and kept in settings (the overlay's binding is guarded
-    // in RazorMarkupTests).
+    // Clicking an icon opens its detail line beside any already open (Harry asked for several at once); clicking it
+    // again closes only its own.
     [Fact]
-    public void TheStripStartsClosed()
+    public void AClickOpensAnEventsLineBesideTheOthersAndASecondClosesIt()
     {
-        Assert.False(new AlertSettings().NoticesExpanded);
-        Assert.NotEqual(new AlertSettings(), new AlertSettings { NoticesExpanded = true });
+        IReadOnlySet<string> none = new HashSet<string>();
+        var shugo = EventRowLayout.Toggle(none, EventIds.Shugo);
+        Assert.Equal(new[] { EventIds.Shugo }, shugo);
+        Assert.Empty(none); // the set passed in is left as it was
+        var both = EventRowLayout.Toggle(shugo, EventIds.Rift);
+        Assert.Equal(new[] { EventIds.Rift, EventIds.Shugo }, both.Order(StringComparer.Ordinal));
+        Assert.Equal(new[] { EventIds.Rift }, EventRowLayout.Toggle(both, EventIds.Shugo));
+        Assert.Empty(EventRowLayout.Toggle(shugo, EventIds.Shugo));
+
+        // In the row's order whatever the clicks' order; an event that left the row (switched off) has no line.
+        var icons = EventRowLayout.Icons(AlertMonitor.Compute(Only(EventIds.Shugo, EventIds.Rift), At0056));
+        var clicked = EventRowLayout.Toggle(EventRowLayout.Toggle(EventRowLayout.Toggle(none, EventIds.Rift), EventIds.Weekly), EventIds.Shugo);
+        Assert.Equal(new[] { EventIds.Shugo, EventIds.Rift }, EventRowLayout.Opened(icons, clicked).Select(icon => icon.Rule.Id));
+        Assert.Empty(EventRowLayout.Opened(icons, none));
+        Assert.Equal(2, EventRowLayout.AnnouncedCount);
+    }
+
+    // Every event has a drawing of its own (Harry: the siege's castle read as the weekly calendar, Shugo's cat as a
+    // monster, and the rift is the game's vortex), and each is path data only, since the markup binds it as an attribute.
+    [Fact]
+    public void EveryEventHasItsOwnDrawing()
+    {
+        Assert.All(EventCatalog.Ids, id => Assert.True(EventGlyphs.Has(id), id));
+        var paths = EventCatalog.Ids.Select(EventGlyphs.For).ToList();
+        Assert.Equal(paths.Count, paths.Distinct(StringComparer.Ordinal).Count());
+        Assert.DoesNotContain(EventGlyphs.Fallback, paths);
+        Assert.All(paths.Append(EventGlyphs.Fallback), path => Assert.Matches(@"^M[MmLlHhVvCcSsQqTtAaZz0-9 .\-]+$", path));
+        Assert.Equal(EventGlyphs.Fallback, EventGlyphs.For("nonsense"));
+        Assert.False(EventGlyphs.Has("nonsense"));
     }
 
     [Fact]
@@ -356,24 +476,6 @@ public sealed class AlertTests : IDisposable
     }
 
     public void Dispose() => directory.Dispose();
-
-    // Four due notices at 01:01, most urgent first: Shugo's entry open (01:00 to 01:03), then the rift, Nahma and
-    // Kaira about to start. Built directly, so the strip's rules are tested apart from the schedule.
-    private static IReadOnlyList<EventAlert> FourDue()
-    {
-        var rules = EventCatalog.Default.ToDictionary(r => r.Id);
-        var hour = new DateTimeOffset(2026, 10, 24, 1, 0, 0, TimeSpan.Zero);
-        var now = hour.AddMinutes(1);
-        EventAlert Soon(string id, int minute) =>
-            new(rules[id], AlertKind.Soon, hour.AddMinutes(minute), hour.AddMinutes(minute), hour.AddMinutes(minute) - now);
-        return
-        [
-            new EventAlert(rules[EventIds.Shugo], AlertKind.Open, hour, hour.AddMinutes(3), hour.AddMinutes(3) - now),
-            Soon(EventIds.Rift, 4),
-            Soon(EventIds.Nahma, 20),
-            Soon(EventIds.Kaira, 35),
-        ];
-    }
 
     // A clock whose single timer fires only when the test says so, and whose next read can be made to fail.
     private sealed class FakeClock(DateTimeOffset start) : TimeProvider
