@@ -79,4 +79,28 @@ public interface ICombatEngine : IDisposable
 
     /// <summary>The Odyle energy changed. Raised on a capture (or demo feed) thread, never on the UI thread.</summary>
     event EventHandler<OdyleEnergy>? OdyleEnergyUpdated;
+
+    /// <summary>
+    /// The id of the map the game last loaded (an id from the game's Map table; the Abyss's lower layer is 20), or null
+    /// while it is not known. The game names the map on every zone load, a teleport inside an instance naming the
+    /// instance again, but the load right after a server change (into or out of a dungeon or the Abyss) can be lost
+    /// to upstream's reassembly, so the map is forgotten when the game moves to a new connection and is null until a
+    /// load is read on it; a meter started mid-session has none until then either. Kept across Stop and Reset. The
+    /// Abyss pause follows it (<see cref="PausedInAbyss"/>).
+    /// </summary>
+    int? MapId { get; }
+
+    /// <summary>
+    /// The map changed, or became unknown (null); a load of the same map again raises nothing. Raised on a capture
+    /// thread, never on the UI thread.
+    /// </summary>
+    event EventHandler<int?>? MapChanged;
+
+    /// <summary>
+    /// True while the meter is paused because the player is in the Abyss (<see cref="MapId"/> is one of its maps) and
+    /// <see cref="EngineSettings.PauseInAbyss"/> is on. Meanwhile hits are dropped and nothing is kept or saved:
+    /// <see cref="GetSnapshot"/> is empty and <see cref="GetPlayerDetails"/> null. It ends when the map changes or
+    /// becomes unknown (leaving the Abyss is a server change), or the setting is turned off.
+    /// </summary>
+    bool PausedInAbyss { get; }
 }

@@ -25,7 +25,10 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     private readonly CombatSessionManager sessions;
     private readonly ICombatHistoryStore history;
     private readonly SavedHistoryReader savedHistory;
+    private readonly RecordTap records;
     private readonly OdyleEnergyTap odyle;
+    private readonly MapLoadTap maps;
+    private readonly AbyssPause pause;
     private readonly ILogger<UpstreamCombatEngine> logger;
     private volatile bool savedHistoryDamaged; // set while upstream's store cannot read the saved list
     private bool disposed;
@@ -36,7 +39,10 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         CombatSessionManager sessions,
         ICombatHistoryStore history,
         IDbContextFactory<CombatHistoryDbContext> historyDatabase,
+        RecordTap records,
         OdyleEnergyTap odyle,
+        MapLoadTap maps,
+        AbyssPause pause,
         ILogger<UpstreamCombatEngine> logger)
     {
         this.pipeline = pipeline;
@@ -44,7 +50,10 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         this.sessions = sessions;
         this.history = history;
         savedHistory = new SavedHistoryReader(historyDatabase);
+        this.records = records;
         this.odyle = odyle;
+        this.maps = maps;
+        this.pause = pause;
         this.logger = logger;
     }
 
@@ -64,6 +73,16 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         add => odyle.Updated += value;
         remove => odyle.Updated -= value;
     }
+
+    public int? MapId => maps.Current;
+
+    public event EventHandler<int?>? MapChanged
+    {
+        add => maps.Changed += value;
+        remove => maps.Changed -= value;
+    }
+
+    public bool PausedInAbyss => pause.Paused;
 
     public CaptureState Capture => new(capture.IsCapturing, capture.DeviceName);
 
@@ -107,6 +126,9 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
 
     public CombatSnapshot GetSnapshot()
     {
+        // Paused for the Abyss: nothing shows (and the rows of a crowd's boss fight are never built).
+        if (pause.Paused) return CombatSnapshot.Empty;
+
         // Each upstream getter takes the session manager's lock on its own, so a snapshot is a composition of
         // three consistent reads taken a few microseconds apart, which is what upstream's own UI does.
         var mob = sessions.GetActiveTargetInfo();
@@ -127,7 +149,8 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         // between the first check and the last (it ended, or the party switched targets), the parts could mix two
         // fights, so the read is taken again, and given up (null) if it keeps straddling: the caller polls again.
         // The check is by identity, so a switch away and back between the two checks goes unnoticed (documented on
-        // ICombatEngine). The session's start is set once, so reading it unlocked is safe.
+        // ICombatEngine). The session's start is set once, so reading it unlocked is safe. Paused for the Abyss: none.
+        if (pause.Paused) return null;
         for (var attempt = 1; attempt <= DetailsReadAttempts; attempt++)
         {
             var session = sessions.GetActiveTargetSession();
@@ -267,6 +290,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
             logger.LogError(ex, "Error while shutting down the combat engine.");
         }
         (pipeline as IDisposable)?.Dispose();
-        odyle.Dispose();
+        records.Dispose();
+        pause.Dispose();
     }
 }

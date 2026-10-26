@@ -1,3 +1,5 @@
+using ScarletMeter.Engine.Records;
+
 namespace ScarletMeter.Engine.Odyle;
 
 /// <summary>The energy read from a record and its entry's key, which a list defines for the updates after it.</summary>
@@ -56,10 +58,7 @@ internal static class OdyleEnergyRecords
     /// </summary>
     public static OdyleEnergyReading? ReadEntry(ReadOnlySpan<byte> record, uint? energyKey)
     {
-        if (!TryReadVarInt(record, 0, out _, out var at)) return null;
-        if (record.Length < at + 2) return null;
-        var opcode = (ushort)(record[at] | (record[at + 1] << 8));
-        var body = record[(at + 2)..];
+        if (!GameRecords.TryOpen(record, out var opcode, out var body)) return null;
         return opcode switch
         {
             ListOpcode => InList(body),
@@ -67,10 +66,6 @@ internal static class OdyleEnergyRecords
             _ => null,
         };
     }
-
-    /// <summary>The two opcode bytes of a record, or null when it is too short to have them.</summary>
-    public static ushort? OpcodeOf(ReadOnlySpan<byte> record) =>
-        TryReadVarInt(record, 0, out _, out var at) && record.Length >= at + 2 ? (ushort)(record[at] | (record[at + 1] << 8)) : null;
 
     // The list: the slot-1 entry that the list's second entry follows with slot 2 and the same key. Other data comes
     // before the list, so the entry is found by its shape, not by an offset. The data before it can hold a look-alike
@@ -146,28 +141,11 @@ internal static class OdyleEnergyRecords
         var values = kind switch { FirstValueKind or SecondValueKind => 1, BothValuesKind => 2, _ => 0 };
         if (values == 0) return false;
         var slot = body[at + 1];
-        if (!TryReadVarInt(body, at + 2, out var key, out next)) return false;
-        if (!TryReadVarInt(body, next, out var first, out next)) return false;
+        if (!GameRecords.TryReadVarInt(body, at + 2, out var key, out next)) return false;
+        if (!GameRecords.TryReadVarInt(body, next, out var first, out next)) return false;
         uint second = 0;
-        if (values == 2 && !TryReadVarInt(body, next, out second, out next)) return false;
+        if (values == 2 && !GameRecords.TryReadVarInt(body, next, out second, out next)) return false;
         entry = new Entry(kind, slot, key, first, second);
         return true;
-    }
-
-    // A little-endian base-128 varint of at most five bytes, as upstream's PacketReader reads them. One that does not
-    // fit 32 bits is refused rather than wrapped, so it can never pass for a small value.
-    private static bool TryReadVarInt(ReadOnlySpan<byte> data, int at, out uint value, out int next)
-    {
-        value = 0;
-        next = at;
-        for (var shift = 0; shift < 35; shift += 7)
-        {
-            if (next < 0 || next >= data.Length) return false;
-            var b = data[next++];
-            if (shift == 28 && (b & 0x70) != 0) return false;
-            value |= (uint)(b & 0x7F) << shift;
-            if ((b & 0x80) == 0) return true;
-        }
-        return false;
     }
 }

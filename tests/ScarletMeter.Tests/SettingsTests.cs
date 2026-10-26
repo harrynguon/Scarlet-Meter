@@ -165,6 +165,20 @@ public sealed class SettingsTests : IDisposable
         Assert.True(result.Settings.Fight.BossOnlyCapture);
     }
 
+    // A file from before the Abyss pause loads with it on (the default Harry asked for), keeping the fight rules it has.
+    [Fact]
+    public void AFileFromBeforeTheAbyssPauseLoadsWithItOn()
+    {
+        File.WriteAllText(Path.Combine(directory.FullPath, "settings.json"),
+            """{ "version": 1, "fight": { "bossOnlyCapture": true, "groupSummonDamage": false }, "appearance": {}, "overlay": { "toggleHotkey": "F9" }, "windows": {} }""");
+        var result = NewStore().Load();
+        Assert.Equal(SettingsLoadStatus.Loaded, result.Status);
+        Assert.True(result.Settings.Fight.PauseInAbyss);
+        Assert.True(result.Settings.Fight.BossOnlyCapture);
+        Assert.False(result.Settings.Fight.GroupSummonDamage);
+        Assert.True(new FightSettings().PauseInAbyss);
+    }
+
     // Every on/off setting in every section survives a save and a load when flipped from its default, so a switch
     // that is never written ([JsonIgnore], no setter) fails here, not in the player's hands (LESSONS, "Switches that
     // were never saved").
@@ -517,12 +531,13 @@ public sealed class SettingsTests : IDisposable
         var raised = 0;
         service.Changed += (_, _) => raised++;
 
-        service.Update(s => s with { Fight = s.Fight with { BossOnlyCapture = true, GroupSummonDamage = false, HistoryRetentionDays = 12_000 } });
+        service.Update(s => s with { Fight = s.Fight with { BossOnlyCapture = true, GroupSummonDamage = false, HistoryRetentionDays = 12_000, PauseInAbyss = false } });
         service.Update(s => s); // no change: no event, no save
 
         Assert.Equal(1, raised);
         Assert.True(engineSettings.BossOnlyCapture);
         Assert.False(engineSettings.GroupSummonDamage);
+        Assert.False(engineSettings.PauseInAbyss);
         Assert.Equal(FightSettings.MaxRetentionDays, engineSettings.HistoryRetentionDays);
 
         service.Flush();

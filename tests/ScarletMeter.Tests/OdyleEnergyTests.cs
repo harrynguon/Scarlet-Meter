@@ -1,10 +1,8 @@
-using System.Buffers.Binary;
 using AionDpsMeter.Services.PacketCapture;
 using AionDpsMeter.Services.PacketProcessing;
 using AionDpsMeter.Services.Services.Entity;
 using AionDpsMeter.Services.Services.Session;
 using AionDpsMeter.Services.Services.Session.Persistence;
-using K4os.Compression.LZ4;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -12,14 +10,15 @@ using ScarletMeter.Engine;
 using ScarletMeter.Engine.Odyle;
 using ScarletMeter.Engine.Upstream;
 using ScarletMeter.Engine.Upstream.Demo;
+using static ScarletMeter.Tests.SyntheticRecords;
 
 namespace ScarletMeter.Tests;
 
 /// <summary>
 /// Odyle energy: the game's two records as A2Tools documented them (OdyleEnergyRecords; #63 and its fixes 2723bff and
 /// 29e7193: the entry's three kinds and updates that start 00), read from upstream's real
-/// stream reassembly beside its pipeline, plain or inside an LZ4 bundle (OdyleEnergyTap), and the demo's records.
-/// Every byte here is synthetic, written by hand or by OdyleEnergyRecordWriter; none was captured.
+/// stream reassembly beside its pipeline, plain or inside an LZ4 bundle (RecordTap feeding OdyleEnergyTap), and the
+/// demo's records. Every byte here is synthetic, written by hand or by OdyleEnergyRecordWriter; none was captured.
 /// </summary>
 public sealed class OdyleEnergyTests
 {
@@ -149,8 +148,7 @@ public sealed class OdyleEnergyTests
     [Fact]
     public void TheTapReadsUpdatesByTheLastListsKey()
     {
-        var stream = new TcpStreamBuffer(NullLogger<TcpStreamBuffer>.Instance);
-        using var tap = new OdyleEnergyTap(stream, openBundle: null, NullLogger<OdyleEnergyTap>.Instance);
+        var tap = new OdyleEnergyTap(NullLogger<OdyleEnergyTap>.Instance);
         var otherKey = Frame(0x610C, "01 04 01 93 21 02");
         tap.Observe(otherKey);
         Assert.Equal(new OdyleEnergy(2, 0), tap.Current);
@@ -162,7 +160,7 @@ public sealed class OdyleEnergyTests
         Assert.Equal(new OdyleEnergy(20, 880), tap.Current);
 
         // Only a list defines the key: an update before any list does not, so it cannot lock out the energy's.
-        using var fresh = new OdyleEnergyTap(stream, openBundle: null, NullLogger<OdyleEnergyTap>.Instance);
+        var fresh = new OdyleEnergyTap(NullLogger<OdyleEnergyTap>.Instance);
         fresh.Observe(otherKey);
         fresh.Observe(OdyleEnergyRecordWriter.Update(Sample, Key));
         Assert.Equal(Sample, fresh.Current);
@@ -259,7 +257,7 @@ public sealed class OdyleEnergyTests
     public void TheBundleOpenerBindsToThePinnedUpstream()
     {
         using var host = new TestEngineHost(CaptureMode.None);
-        var open = OdyleEnergyTap.BindBundleOpener(host.Services.GetRequiredService<PacketProcessor>());
+        var open = RecordTap.BindBundleOpener(host.Services.GetRequiredService<PacketProcessor>());
         Assert.NotNull(open);
         var inner = OdyleEnergyRecordWriter.Update(Sample, Key);
         var records = open(Bundle(inner));
@@ -302,12 +300,13 @@ public sealed class OdyleEnergyTests
     public void AReadingFailureIsContainedAndLoggedOnce()
     {
         var stream = new TcpStreamBuffer(NullLogger<TcpStreamBuffer>.Instance);
-        var log = new ListLogger();
-        using var tap = new OdyleEnergyTap(stream, _ => throw new InvalidOperationException("A failing bundle opener."), log);
+        var log = new RecordingLogger<RecordTap>();
+        var odyle = new OdyleEnergyTap(NullLogger<OdyleEnergyTap>.Instance);
+        using var tap = new RecordTap(stream, _ => throw new InvalidOperationException("A failing bundle opener."), [odyle], log);
         Synchronise(stream);
         var broken = Bundle(OdyleEnergyRecordWriter.Update(new(1, 2), Key));
         stream.AddData("synthetic", [.. broken, .. broken, .. OdyleEnergyRecordWriter.Update(Sample, Key)], 0);
-        Assert.Equal(Sample, tap.Current);
+        Assert.Equal(Sample, odyle.Current);
         Assert.Single(log.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("failed", StringComparison.Ordinal));
         Assert.Single(log.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("works again", StringComparison.Ordinal));
     }
@@ -317,9 +316,8 @@ public sealed class OdyleEnergyTests
     [Fact]
     public void TheTapLogsWhereAChangeCameFromButNotTheValue()
     {
-        var stream = new TcpStreamBuffer(NullLogger<TcpStreamBuffer>.Instance);
-        var log = new ListLogger();
-        using var tap = new OdyleEnergyTap(stream, openBundle: null, log);
+        var log = new RecordingLogger<OdyleEnergyTap>();
+        var tap = new OdyleEnergyTap(log);
         tap.Observe(OdyleEnergyRecordWriter.List(new(777, 1999), Key));
         tap.Observe(OdyleEnergyRecordWriter.Update(new(767, 1999), Key));
         tap.Observe(OdyleEnergyRecordWriter.Update(new(767, 1999), Key));
@@ -339,12 +337,13 @@ public sealed class OdyleEnergyTests
     public void ADisposedTapStopsListening()
     {
         var stream = new TcpStreamBuffer(NullLogger<TcpStreamBuffer>.Instance);
-        var tap = new OdyleEnergyTap(stream, openBundle: null, NullLogger<OdyleEnergyTap>.Instance);
+        var odyle = new OdyleEnergyTap(NullLogger<OdyleEnergyTap>.Instance);
+        var tap = new RecordTap(stream, openBundle: null, [odyle], NullLogger<RecordTap>.Instance);
         tap.Dispose();
         tap.Dispose(); // twice is fine
         Synchronise(stream);
         stream.AddData("synthetic", OdyleEnergyRecordWriter.Update(Sample, Key), 0);
-        Assert.Null(tap.Current);
+        Assert.Null(odyle.Current);
     }
 
     // The demo hands the tap a login list when it begins and an update as each later fight starts and spends some.
@@ -395,56 +394,4 @@ public sealed class OdyleEnergyTests
             Assert.Equal(energy, OdyleEnergyRecords.Read(OdyleEnergyRecordWriter.List(energy, Key)));
         }
     }
-
-    // The messages a tap logs, for the tests that count them.
-    private sealed class ListLogger : ILogger<OdyleEnergyTap>
-    {
-        public List<(LogLevel Level, string Message)> Entries { get; } = [];
-
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-
-        public bool IsEnabled(LogLevel logLevel) => true;
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
-            Entries.Add((logLevel, formatter(state, exception)));
-    }
-
-    // Brings upstream's reassembly of the "synthetic" stream into step, as live traffic eventually does. Its
-    // PacketAccumulator (v1.11.5.341) looks for its keep-alive (0e 00 36…) from the end of the bytes it holds, not the
-    // start, so it finds one only among bytes left from an earlier chunk: a chunk ending in a keep-alive, then a
-    // shorter one, synchronises it, and the records after that are read. Should upstream search from the start, the
-    // same two chunks synchronise it at once.
-    private static void Synchronise(TcpStreamBuffer stream)
-    {
-        byte[] keepAlive = [0x0E, 0x00, 0x36, 0, 0, 0, 0, 0, 0, 0, 0];
-        stream.AddData("synthetic", [.. new byte[20], .. keepAlive], 0);
-        stream.AddData("synthetic", keepAlive, 0);
-    }
-
-    // An LZ4 bundle as upstream's PacketProcessor reads one: length, ff ff, the decompressed size (u32, little-endian),
-    // then the compressed records.
-    private static byte[] Bundle(byte[] records)
-    {
-        var compressed = new byte[LZ4Codec.MaximumOutputSize(records.Length)];
-        var length = LZ4Codec.Encode(records, compressed);
-        var size = new byte[4];
-        BinaryPrimitives.WriteInt32LittleEndian(size, records.Length);
-        return Frame(0xFFFF, Convert.ToHexString([.. size, .. compressed.AsSpan(0, length)]));
-    }
-
-    // A record from its opcode and body, framed as OdyleEnergyRecordWriter frames them.
-    private static byte[] Frame(ushort opcode, string body)
-    {
-        var bytes = Hex(body);
-        var header = new List<byte>();
-        for (var value = (uint)(2 + bytes.Length + 4); ; value >>= 7)
-        {
-            var b = (byte)(value & 0x7F);
-            if (value >> 7 == 0) { header.Add(b); break; }
-            header.Add((byte)(b | 0x80));
-        }
-        return [.. header, (byte)(opcode & 0xFF), (byte)(opcode >> 8), .. bytes];
-    }
-
-    private static byte[] Hex(string hex) => Convert.FromHexString(hex.Replace(" ", string.Empty, StringComparison.Ordinal));
 }

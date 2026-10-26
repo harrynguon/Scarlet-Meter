@@ -28,6 +28,8 @@ Upstream: https://github.com/Kuroukihime/AIon2-Dps-Meter at the release tag reco
 
 `src/ScarletMeter.App/DeferredWindowClose.cs` and `tests/ScarletMeter.Tests/DeferredWindowCloseTests.cs` are ported from the harrynguon/AIon2-Dps-Meter fork (GPLv3), where they are fork-owned files.
 
+The layouts of two game records upstream does not decode are ported from taengu/A2Tools-DPS-Meter (GPL-3.0, its repository licence), with the commits in THIRD-PARTY-NOTICES.md: Odyle energy (`src/ScarletMeter.Engine/Odyle/OdyleEnergyRecords.cs`, PR #63 and two later fixes) and the map loaded (`src/ScarletMeter.Engine/Maps/MapLoadRecords.cs`, b1fcd53, unchanged up to 6abf5e7; read on 2026-10-26 through GitHub's API, which GitHub's robots.txt points automated readers to). No captured bytes were taken from its samples; the tests' records are synthetic. The meter logs each map the game loads by its id alone, never a name, a position or the record's bytes. The map names Settings, About shows beside the id are data only: the dungeons' from A2Tools, the open world's and the Abyss's from SkeeveAN/Aion-DPS-Meter (MIT) with the ids yykk62/AetherDPS (GPL-3.0) gives them, each pinned in THIRD-PARTY-NOTICES.md ("Data").
+
 World events (`src/ScarletMeter.WorldEvents`, `tests/ScarletMeter.Tests/WorldEvents/`):
 
 - The schedule engine (rules, validation, override merging, recurrence) and its test cases are ported from the harrynguon/AIon2-Dps-Meter fork's World Companion (GPLv3; `AionDpsMeter.Companion/wwwroot/schedule.mjs`, `presets.mjs` and `state.mjs`, `tests/companion.test.mjs` and `tests/companion-state.test.mjs`, at 4feb72baf86c8f5e4eaf8e03684401f1249de910), where they were written for the fork. The alert planner is new here.

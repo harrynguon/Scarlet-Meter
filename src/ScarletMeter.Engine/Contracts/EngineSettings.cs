@@ -10,6 +10,7 @@ public sealed class EngineSettings
     private bool groupSummonDamage = true;
     private bool oneMinuteDummyMode;
     private int historyRetentionDays = 30;
+    private bool pauseInAbyss = true;
 
     /// <summary>Ignore hits on mobs that are not bosses.</summary>
     public bool BossOnlyCapture { get => bossOnlyCapture; set => Set(ref bossOnlyCapture, value); }
@@ -26,6 +27,12 @@ public sealed class EngineSettings
         get => historyRetentionDays;
         set => Set(ref historyRetentionDays, Math.Clamp(value, 1, 9999));
     }
+
+    /// <summary>
+    /// Pause the meter while the player is in the Abyss: hits are dropped, nothing is kept or saved, and nothing shows
+    /// (<see cref="ICombatEngine.PausedInAbyss"/>). On by default.
+    /// </summary>
+    public bool PauseInAbyss { get => pauseInAbyss; set => Set(ref pauseInAbyss, value); }
 
     /// <summary>Raised after a property changes value.</summary>
     public event EventHandler? Changed;

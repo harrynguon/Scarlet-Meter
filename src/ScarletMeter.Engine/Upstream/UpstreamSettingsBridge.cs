@@ -13,20 +13,24 @@ namespace ScarletMeter.Engine.Upstream;
 internal sealed class UpstreamSettingsBridge : IAppSettingsService
 {
     private readonly EngineSettings settings;
+    private readonly PauseState pause;
     private readonly Dictionary<string, WindowBounds> windowBounds = [];
     private OverlaySettings buffOverlay = new();
     private OverlaySettings skillCdOverlay = new();
 
-    public UpstreamSettingsBridge(EngineSettings settings)
+    public UpstreamSettingsBridge(EngineSettings settings, PauseState pause)
     {
         this.settings = settings;
+        this.pause = pause;
         settings.Changed += (_, _) => SettingsChanged(this, EventArgs.Empty);
     }
 
     public event EventHandler SettingsChanged = delegate { };
 
-    // Fight rules upstream consults while tracking a fight.
-    public bool BossOnlyCapture { get => settings.BossOnlyCapture; set => settings.BossOnlyCapture = value; }
+    // Fight rules upstream consults while tracking a fight. Boss-only also holds while the meter is paused (AbyssPause):
+    // upstream reads it on every hit, so the crowd's hits on players and mobs are dropped before upstream keeps them; the
+    // player's own setting is left as it was.
+    public bool BossOnlyCapture { get => settings.BossOnlyCapture || pause.Paused; set => settings.BossOnlyCapture = value; }
     public bool GroupSummonDamage { get => settings.GroupSummonDamage; set => settings.GroupSummonDamage = value; }
     public bool OneMinuteDummyMode { get => settings.OneMinuteDummyMode; set => settings.OneMinuteDummyMode = value; }
     public int HistoryRetantionPeriod { get => settings.HistoryRetentionDays; set => settings.HistoryRetentionDays = value; }

@@ -57,8 +57,16 @@ public static class ScarletEngineServiceCollectionExtensions
         services.AddSingleton<CombatSessionManager>();
         services.AddPacketProcessingRouting();
         services.AddSingleton<IPacketService, PacketPipelineService>();
-        // Odyle energy, which upstream does not decode: read beside the pipeline from the same reassembled stream.
+        // Records upstream does not decode (Odyle energy, the map loaded): read beside the pipeline from the same
+        // reassembled stream by one tap, which opens each LZ4 bundle once for all its readers.
         services.AddSingleton<OdyleEnergyTap>();
+        services.AddSingleton<MapLoadTap>();
+        services.AddSingleton<IRecordReader>(provider => provider.GetRequiredService<OdyleEnergyTap>());
+        services.AddSingleton<IRecordReader>(provider => provider.GetRequiredService<MapLoadTap>());
+        services.AddSingleton<RecordTap>();
+        // The Abyss pause: the settings bridge reads its state on every hit, so the state is its own object.
+        services.AddSingleton<PauseState>();
+        services.AddSingleton<AbyssPause>();
 
         services.AddSingleton<ICombatEngine, UpstreamCombatEngine>();
         return services;
