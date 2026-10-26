@@ -2,6 +2,24 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-26 — Boss encounters only, on by default
+
+**What:** "Boss encounters only" (Settings, Tracking; `FightSettings.BossOnlyCapture`) is on by default, so a new install tracks boss fights (and training dummies, which upstream counts as bosses) and not every mob. A settings file that saved the switch keeps its value, on or off, since an older file's "off" may be the player's own choice; a file whose fight section never named it gets the new default. The setting's description says so, and CHANGELOG.md has its line under Unreleased. The engine's own `EngineSettings` default is unchanged: the app's settings are applied to it on load.
+
+**Why:** Harry: "ensure 'boss fights only' is set to on by default".
+
+**Checks (SDK 10.0.402):** `dotnet build` and `dotnet test` 641/641, with `SettingsTests.BossEncountersOnlyIsOnByDefaultAndASavedChoiceIsKept` new and three settings tests reworded from "turned on" to "turned off". Fail-first against a scratch copy, control clean: the old default fails the new test and the engine test; a normalizer that forces it on over a saved "off" fails it and three round-trip tests.
+
+**Not checked:** in game. A player whose settings file saved "off" (every file saved by an earlier build) keeps it off until they turn it on in Settings, Tracking.
+
+**Codex on 2ecbad4:** one P1, the missing CHANGELOG line: added in 75564f7 (answered on the thread).
+
+**Audit (scarlet-auditor, standard, on 75564f7): approve with nits**, all applied. (1) The Codex thread: answered, and a fresh review asked for. (2) Upstream's boss test is the mob code alone (`Mob.IsBoss`; its HP-threshold fallback is commented out), so with the switch on a boss the meter never saw appear (started mid-fight: no spawn record, code 0) or one its list lacks (new after a game patch) records nothing: confirmed in upstream's code, not in game. The setting's description and the README say so and to turn it off for such a boss, ARCHITECTURE names it as a fix to offer upstream, and HANDOFF has an item to check it in game. (3) Two HANDOFF checks that need an add's hits now say to turn the switch off for them. (4) The CHANGELOG line says an existing player keeps it as they had it, off unless they turned it on. (5) `BossEncountersOnlyIsOnByDefaultAndASavedChoiceIsKept` also checks that a saved "off" reaches the engine on load. The audit found no conflict in behaviour with #42's Abyss pause (its bridge combines the player's value with the pause and never writes the player's), only text conflicts to resolve when #42 merges first.
+
+**After the fixes (e90bc00):** Codex's fresh review: no findings; its earlier P1 answered on the thread. CI passed on both runs.
+
+**Next:** merge (Harry's go-ahead, 2026-10-26: "sort out all PRs and all that into main"), ahead of #42, which was still in review.
+
 ## 2026-10-26 — A changelog, and each release lists what changed
 
 **What:** `CHANGELOG.md` at the root records what changed for players, release by release (Keep a Changelog: Added, Changed, Deprecated, Removed, Fixed, Security, each change with its PR's link), newest first: `## [Unreleased]` (Odyle energy #34/#36, the event icons #39, the self-sizing bar area #35/#37/#40, other players' dummy fights ignored #38), then 0.2.0 and 0.1.0 rebuilt from their release notes and merged PRs, then compare links. `scripts/Get-ChangelogSection.ps1` prints one version's section (absolute paths from its own location; throws for a missing section, a heading without a date, or one listing nothing). The release workflow runs it in its first check, so a tag without its section fails before building, and writes the draft's notes as the notes file followed by "What's changed in <version>" and the section, with a link to the changelog at that tag. CI runs it for the app's version (`src/Directory.Build.props`), so a version bump without its section fails on the PR. AGENTS.md gains "Changelog": every PR a player would notice adds its Unreleased line in the same PR, developer-only changes stay here; the scarlet-ship skill, DEVELOPMENT ("CI", "Releases"), README, docs/README and ARCHITECTURE ("Tests") say so. `ChangelogTests` guards the shape: Unreleased first and undated, releases newest first with dates, releases matching `docs/release-notes`, the app's version present once its notes exist, groups and PR links, a link per heading, and the workflows' use of the script.

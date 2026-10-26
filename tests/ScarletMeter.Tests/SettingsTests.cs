@@ -165,6 +165,28 @@ public sealed class SettingsTests : IDisposable
         Assert.True(result.Settings.Fight.BossOnlyCapture);
     }
 
+    // "Boss encounters only" is on by default (Harry, 2026-10-26), for a new install and for a file whose fight section
+    // never named it; a file that saved it off keeps it off, since that may be the player's own choice (AGENTS.md:
+    // "Preserve user customizations when updating defaults").
+    [Fact]
+    public void BossEncountersOnlyIsOnByDefaultAndASavedChoiceIsKept()
+    {
+        Assert.True(new FightSettings().BossOnlyCapture);
+        Assert.True(SettingsNormalizer.Normalize(null).Settings.Fight.BossOnlyCapture);
+        Assert.True(SettingsNormalizer.Normalize(new MeterSettings { Fight = null! }).Settings.Fight.BossOnlyCapture);
+
+        File.WriteAllText(Path.Combine(directory.FullPath, "settings.json"), """{ "version": 1, "fight": { "groupSummonDamage": true } }""");
+        Assert.True(NewStore().Load().Settings.Fight.BossOnlyCapture);
+        File.WriteAllText(Path.Combine(directory.FullPath, "settings.json"), """{ "version": 1, "fight": { "bossOnlyCapture": false } }""");
+        var kept = NewStore().Load();
+        Assert.Equal(SettingsLoadStatus.Loaded, kept.Status);
+        Assert.False(kept.Settings.Fight.BossOnlyCapture);
+        // And it reaches the engine on load (audit on PR #43), whose own default is the other way.
+        var engineSettings = new EngineSettings { BossOnlyCapture = true };
+        using var service = new SettingsService(NewStore(), engineSettings, NullLogger<SettingsService>.Instance);
+        Assert.False(engineSettings.BossOnlyCapture);
+    }
+
     // Every on/off setting in every section survives a save and a load when flipped from its default, so a switch
     // that is never written ([JsonIgnore], no setter) fails here, not in the player's hands (LESSONS, "Switches that
     // were never saved").
@@ -267,7 +289,7 @@ public sealed class SettingsTests : IDisposable
         var same = baseline with { Windows = new Dictionary<string, WindowPlacement> { [WindowKeys.Overlay] = new(1, 2, 300, 200) } };
         Assert.Equal(baseline, same);
         Assert.NotEqual(baseline, baseline with { Version = 2 });
-        Assert.NotEqual(baseline, baseline with { Fight = baseline.Fight with { BossOnlyCapture = true } });
+        Assert.NotEqual(baseline, baseline with { Fight = baseline.Fight with { BossOnlyCapture = !baseline.Fight.BossOnlyCapture } });
         Assert.NotEqual(baseline, baseline with { Appearance = baseline.Appearance with { RowScale = 1.2 } });
         Assert.NotEqual(baseline, baseline with { Overlay = baseline.Overlay with { ToggleHotkey = "F10" } });
         // Every AlertSettings member, since it has a hand-written Equals too.
@@ -320,7 +342,7 @@ public sealed class SettingsTests : IDisposable
 
         var first = new MeterSettings { Appearance = new AppearanceSettings { HideNicknames = true } };
         store.Save(first);
-        var second = first with { Fight = new FightSettings { BossOnlyCapture = true } };
+        var second = first with { Fight = new FightSettings { BossOnlyCapture = false } };
         store.Save(second);
 
         var loaded = store.Load();
@@ -517,11 +539,12 @@ public sealed class SettingsTests : IDisposable
         var raised = 0;
         service.Changed += (_, _) => raised++;
 
-        service.Update(s => s with { Fight = s.Fight with { BossOnlyCapture = true, GroupSummonDamage = false, HistoryRetentionDays = 12_000 } });
+        Assert.True(engineSettings.BossOnlyCapture); // the default, applied on load
+        service.Update(s => s with { Fight = s.Fight with { BossOnlyCapture = false, GroupSummonDamage = false, HistoryRetentionDays = 12_000 } });
         service.Update(s => s); // no change: no event, no save
 
         Assert.Equal(1, raised);
-        Assert.True(engineSettings.BossOnlyCapture);
+        Assert.False(engineSettings.BossOnlyCapture);
         Assert.False(engineSettings.GroupSummonDamage);
         Assert.Equal(FightSettings.MaxRetentionDays, engineSettings.HistoryRetentionDays);
 

@@ -16,6 +16,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ### Changed
 
+- "Boss encounters only" (Settings, Tracking) is on by default, so a new install tracks boss fights and training
+  dummies, not every mob. If you already use the meter, it stays as you had it (off unless you turned it on). ([#43](https://github.com/harrynguon/Scarlet-Meter/pull/43))
 - World events are one row of icons at the bottom of the meter instead of a list: one for each event you are alerted
   to, lit gold with the minutes and seconds to its start ("2:19") once it is within your warning time, and teal while
   its entry or portal is open. Hover over an icon to see what it is, where and when; click icons to open a line for
