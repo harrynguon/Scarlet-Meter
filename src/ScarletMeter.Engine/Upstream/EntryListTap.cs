@@ -21,8 +21,11 @@ namespace ScarletMeter.Engine.Upstream;
 /// wait for the next self record, the character known until then being possibly the one before a switch. An update
 /// while a character is known is theirs; one before any self record (a meter started mid-session) waits with the counts.
 /// A self record naming another character with no list between (a list lost to upstream's reassembly at a server
-/// change) drops the counts, which were the last character's. Counts are the character's, so a move to a new
-/// connection keeps them.</para>
+/// change) drops the counts, which were the last character's. A move to a new connection keeps the counts but leaves
+/// the character unconfirmed: a switch moves the game to a new connection too, and its first records, the list and the
+/// self record among them, can be lost (see <see cref="RecordTap"/>), so the updates after it are held until a self
+/// record names the character again, and reported then if it is the same one (deep audit on #48). A self record without
+/// a real name (a tutorial character's placeholder, <see cref="SelfRecords"/>) names no one.</para>
 /// <para>Runs on the capture thread, inside upstream's PacketAccumulator callback (see <see cref="RecordTap"/>, which
 /// contains anything that escapes), where upstream also writes its tracker, or on the demo feed's thread, whose records
 /// come through <see cref="Observe"/>. Nothing logged names a character or a count: only which record a change came
@@ -42,6 +45,8 @@ internal sealed class EntryListTap : IRecordReader
     private OdyleEnergy? odyle;
     private CharacterIdentity? owner;
     private bool awaitingOwner;
+    // The game moved to a new connection since the character was named: updates wait for a self record (see remarks).
+    private bool ownerUnconfirmed;
     // A self record upstream had no name for is logged once until one is named. Touched only on the reading thread:
     // the capture thread, or the demo feed's, never both (a meter runs one or the other).
     private bool unnamedSelfLogged;
@@ -92,9 +97,18 @@ internal sealed class EntryListTap : IRecordReader
         else TakeEntries(record);
     }
 
-    /// <summary>Nothing to forget: the counts are the character's, so they stay the same on a new connection.</summary>
+    /// <summary>
+    /// Keeps the counts, which are the character's, but holds their reports until a self record names the character
+    /// again: the move may be a switch whose list and self record were lost.
+    /// </summary>
     public void ConnectionStarted()
     {
+        lock (gate)
+        {
+            if (owner is null || awaitingOwner || ownerUnconfirmed) return;
+            ownerUnconfirmed = true;
+        }
+        logger.LogInformation("The game moved to a new connection; entry counts are held until the game names the character again.");
     }
 
     /// <summary>Reads one record when it is one of the tap's: the demo feed's way in (its records are never bundled), and tests'.</summary>
@@ -130,7 +144,7 @@ internal sealed class EntryListTap : IRecordReader
                 odyleChanged = odyleNow != odyle;
                 odyle = odyleNow;
             }
-            if (!awaitingOwner && owner is not null && read.Counts.Count > 0) progress = Snapshot(owner);
+            if (!awaitingOwner && !ownerUnconfirmed && owner is not null && read.Counts.Count > 0) progress = Snapshot(owner);
         }
         if (read.IsWholeList) logger.LogInformation("Entry list read ({Count} counts); waiting for the game to name the character.", read.Counts.Count);
         if (odyleChanged)
@@ -146,9 +160,8 @@ internal sealed class EntryListTap : IRecordReader
     // waiting for it are reported; another character with no list between drops the last one's.
     private void TakeSelfRecord(ReadOnlySpan<byte> record)
     {
-        if (!GameRecords.TryOpen(record, out _, out var body) || !GameRecords.TryReadVarInt(body, 0, out var id, out _)) return;
-        if (id is 0 or > int.MaxValue) return;
-        if (identify((int)id) is not { } character)
+        if (!SelfRecords.TryRead(record, out var entityId, out var unnamed)) return;
+        if (unnamed || identify(entityId) is not { } character)
         {
             if (!unnamedSelfLogged) logger.LogInformation("The game's own character record came, but upstream has no name for it; entry counts wait for the next one.");
             unnamedSelfLogged = true;
@@ -172,6 +185,7 @@ internal sealed class EntryListTap : IRecordReader
             }
             owner = character;
             awaitingOwner = false;
+            ownerUnconfirmed = false;
             progress = Snapshot(character);
         }
         if (dropped) logger.LogInformation("The game named another character with no entry list between; the last character's counts, Odyle energy included, were dropped.");

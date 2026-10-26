@@ -17,7 +17,28 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Unresolved:** everything in HANDOFF "Next: the character roster": the ids, the order of a login's records (list, then the self record), the self record at server changes, and every recharge time come from A2Tools and are not seen in Harry's game. Abyss corridors and Kinah are later PRs, as asked.
 
-**Next:** PR, deep audit (saved data, parsing, the capture thread), Codex, CI; then Harry's in-game checks.
+**Review (PR #48):** the deep audit asked for changes. Findings and what was done:
+- **Major**: a switch whose list and self record upstream lost would have put the new character's counts on the last one. A new connection now leaves the character unconfirmed and holds reports until a self record names it again (LESSONS).
+- **Minor**: a kept count dated after now (a clock set back) would never be replaced; now any read replaces it, and `LastSeen` is the report's time.
+- **Minor**: a tutorial character's placeholder name (`$` and a code, upstream dropping the `$`) became a character; now it names no one (`Entries/SelfRecords`, A2Tools' rule).
+- **Minor**: no test covered a backup that cannot be opened with no main file; one now does for the roster (settings maps that branch to its own read-only notice whatever the helper says).
+- **Nits**: an unknown cap name made the whole roster unreadable, so caps are now read by `Storage/LenientEnumConverter` and reset by the normalizer; the save wrote under the lock the capture thread's reports take, so it now writes a copy outside it, and `Dispose` stops taking changes before its last save; this entry lacked a blank line and the review record.
+- **Accepted**: the settings refactor logs "could not keep settings.json.bak aside" before "settings.json could not be read" in eight unreadable-file cases (main had it after). The audit ran main's `SettingsStore` and this one over 121 file states: status, saving, notice, settings and the files on disk were the same in every one.
+- **Residual**: the owner rule assumes a login's list comes before its self record, as A2Tools saw (HANDOFF).
+
+Codex reviewed 039ab5f with one P1: the changelog had no roster line. It was added in c04dc45, right after the PR was opened, as AGENTS.md asks; answered on the thread.
+
+**Checks after the review:** `scripts/Build.ps1` Debug 747/747. Ten more mutations, each caught by its named test, with controls before (84 tests) and after (130) passing:
+- the new connection leaving the character unconfirmed;
+- the updates held meanwhile;
+- a self record confirming the character;
+- a placeholder naming no one, its length rule, and no name flag;
+- a count dated after now;
+- a number, and an unknown name, as no cap;
+- a backup that cannot be opened switching saving off.
+
+**Next:** Codex on the new head, CI, Harry's go-ahead to merge; then Harry's in-game checks.
+
 ## 2026-10-27 — The Artifact Corridor named, and not paused
 
 **What:** `Maps/MapNames` names map 503001 "Artifact Corridor", so Settings, About shows "Artifact Corridor (map 503001)" there instead of "Map 503001 (no name known)". `Maps/AbyssMaps` is unchanged: the corridor is not one of the Abyss's maps for the pause, now said in its comment and pinned by a test.

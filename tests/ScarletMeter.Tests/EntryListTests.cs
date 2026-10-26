@@ -366,16 +366,81 @@ public sealed class EntryListTests
         Assert.Null(UpstreamMapping.ToIdentity(null));
     }
 
-    // The counts are the character's, so the game moving to a new connection (a server change) keeps them.
+    // A new connection (a server change, or a switch whose list and self record upstream lost) keeps the counts but holds
+    // their reports until a self record names the character again: the same one gets them, another drops them, so a
+    // switch never puts one character's counts on another (deep audit on #48).
     [Fact]
-    public void TheCountsAreTheCharactersAcrossANewConnection()
+    public void ANewConnectionHoldsReportsUntilTheCharacterIsNamedAgain()
     {
-        var tap = NewTap(new() { [7] = Alpha }, new FakeTimeProvider(Start));
+        var tap = NewTap(new() { [7] = Alpha, [9] = Beta }, new FakeTimeProvider(Start));
         tap.Observe(EntryListRecordWriter.List([Odyle]));
         tap.Observe(SelfRecord(7));
+        List<CharacterProgress> raised = [];
+        tap.ProgressObserved += (_, progress) => raised.Add(progress);
+
         tap.ConnectionStarted();
-        Assert.Equal(new OdyleEnergy(30, 880), tap.Odyle);
+        tap.Observe(EntryListRecordWriter.Update([new(EntryIds.OdyleEnergy, 20, 880)]));
+        Assert.Empty(raised);
+        Assert.Equal(new OdyleEnergy(20, 880), tap.Odyle); // the overlay shows it at once
         Assert.Same(Alpha, tap.Character);
+        tap.Observe(SelfRecord(7));
+        Assert.Equal(20, Assert.Single(raised).Entries[EntryIds.OdyleEnergy].First);
+        tap.Observe(EntryListRecordWriter.Update([new(EntryIds.OdyleEnergy, 10, 880)]));
+        Assert.Equal(2, raised.Count); // confirmed again: updates are raised at once
+
+        tap.ConnectionStarted();
+        tap.Observe(EntryListRecordWriter.Update([new(EntryIds.OdyleEnergy, 120, 0)]));
+        tap.Observe(SelfRecord(9));
+        Assert.Same(Beta, raised[^1].Character);
+        Assert.Empty(raised[^1].Entries);
+        Assert.Null(tap.Odyle);
+        Assert.DoesNotContain(raised, progress => progress.Character == Alpha && progress.Entries.TryGetValue(EntryIds.OdyleEnergy, out var energy) && energy.First == 120);
+    }
+
+    // A self record without a real name names no one: no name flag, or a tutorial character's placeholder ("$" and a
+    // code, which upstream's decoding turns into a plain name by dropping the "$"; A2Tools' is_placeholder_name).
+    [Fact]
+    public void ARecordWithoutARealNameNamesNoOne()
+    {
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 36 05 41 6C 70 68 61"), out var entity, out var unnamed));
+        Assert.Equal((7, true), (entity, unnamed));
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc03", 0, 0, 0), out _, out unnamed));
+        Assert.True(unnamed);
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc0", 0, 0, 0), out _, out unnamed));
+        Assert.False(unnamed); // too short for a placeholder
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc0-3", 0, 0, 0), out _, out unnamed));
+        Assert.False(unnamed);
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "Synthia", 0, 0, 0), out _, out unnamed));
+        Assert.False(unnamed);
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00"), out entity, out unnamed)); // cut before the name: upstream decides
+        Assert.Equal((7, false), (entity, unnamed));
+        Assert.False(SelfRecords.TryRead(Frame(0x3633, "00 00 00 00 00 37"), out _, out _));
+
+        var tap = NewTap(new() { [7] = Alpha }, new FakeTimeProvider(Start));
+        List<CharacterProgress> raised = [];
+        tap.ProgressObserved += (_, progress) => raised.Add(progress);
+        tap.Observe(EntryListRecordWriter.List([Odyle]));
+        tap.Observe(EntryListRecordWriter.SelfRecord(7, "$Kc03nyeQHr4", 0, 0, 0));
+        Assert.Empty(raised);
+        tap.Observe(SelfRecord(7));
+        Assert.Same(Alpha, Assert.Single(raised).Character);
+    }
+
+    // Through upstream: its PlayerInfoProcessor makes "Kc03nyeQHr4" of a tutorial character's "$Kc03nyeQHr4", so the tap
+    // must not take it as a character.
+    [Fact]
+    public void UpstreamsNameForATutorialCharacterIsNotACharacter()
+    {
+        using var host = new TestEngineHost(CaptureMode.None);
+        var engine = host.Services.GetRequiredService<ICombatEngine>();
+        var stream = host.Services.GetRequiredService<TcpStreamBuffer>();
+        List<CharacterProgress> raised = [];
+        engine.ProgressObserved += (_, progress) => raised.Add(progress);
+        Synchronise(stream);
+        stream.AddData("synthetic", [.. EntryListRecordWriter.List([Odyle]), .. EntryListRecordWriter.SelfRecord(4321, "$Kc03nyeQHr4", ServerMap.Servers.First().Key, 0, 0)], 0);
+        Assert.Equal("Kc03nyeQHr4", host.Services.GetRequiredService<EntityTracker>().GetPlayerEntity(4321)?.Name);
+        Assert.Empty(raised);
+        Assert.Null(engine.Character);
     }
 
     // What is logged says which record a change came from and what happened, never a name, a server or a count.

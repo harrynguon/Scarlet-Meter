@@ -246,6 +246,47 @@ public sealed class RosterTests : IDisposable
         Assert.Empty(Directory.GetFiles(directory.FullPath, "roster.unreadable-*.json"));
     }
 
+    // With no roster file, a backup another program holds open cannot be read or protected, so saving is off: the next
+    // save's File.Replace would overwrite it.
+    [Fact]
+    public void WithoutTheFileABackupThatCannotBeOpenedIsNeverOverwritten()
+    {
+        var store = NewStore();
+        File.WriteAllText(store.BackupPath, "{ \"version\": 1, \"characters\": [] }");
+        using (new FileStream(store.BackupPath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            var loaded = store.Load(Monday);
+            Assert.Equal(StoredFileStatus.ReadOnly, loaded.Status);
+            Assert.False(loaded.CanSave);
+            Assert.Contains("could not be opened", loaded.Notice, StringComparison.Ordinal);
+        }
+    }
+
+    // A cap this build does not know (a later build's) or a number is reset to automatic and said, not taken as a damaged
+    // file that is set aside and the roster started over (deep audit on #48).
+    [Theory]
+    [InlineData("\"lifetime\"")]
+    [InlineData("2")]
+    [InlineData("\"-1\"")]
+    public void AnUnknownCapIsRepairedNotTakenAsDamage(string cap)
+    {
+        var store = NewStore();
+        File.WriteAllText(store.FilePath, "{ \"version\": 1, \"characters\": [ { \"name\": \"Alpha\", \"server\": \"SIE\", \"lastSeen\": \"2026-10-26T01:00:00+00:00\", \"odyleCap\": " + cap + " } ] }");
+        var loaded = store.Load(Monday);
+        Assert.Equal(StoredFileStatus.Loaded, loaded.Status);
+        Assert.Equal(OdyleCapChoice.Automatic, Assert.Single(loaded.File.Characters).OdyleCap);
+        Assert.Contains("repaired", loaded.Notice, StringComparison.Ordinal);
+        Assert.Empty(Directory.GetFiles(directory.FullPath, "roster.unreadable-*.json"));
+        Assert.Equal(OdyleCapChoice.Standard, Assert.Single(RosterLoad("\"STANDARD\"").File.Characters).OdyleCap); // names ignore case
+    }
+
+    private RosterLoadResult RosterLoad(string cap)
+    {
+        var store = NewStore();
+        File.WriteAllText(store.FilePath, "{ \"version\": 1, \"characters\": [ { \"name\": \"Alpha\", \"server\": \"SIE\", \"lastSeen\": \"2026-10-26T01:00:00+00:00\", \"odyleCap\": " + cap + " } ] }");
+        return store.Load(Monday);
+    }
+
     // A file saved with a byte-order mark (Windows PowerShell, older Notepad) still loads.
     [Fact]
     public void ARosterSavedWithAByteOrderMarkLoads()
@@ -366,7 +407,7 @@ public sealed class RosterTests : IDisposable
     [Fact]
     public void AnOlderReportNeverUndoesANewerOne()
     {
-        var clock = new FakeTimeProvider(Monday);
+        var clock = new FakeTimeProvider(Monday.AddMinutes(10)); // both reads in the past, as the tap's always are
         using var service = new RosterService(new FakeEngine(), NewStore(), clock, NullLogger<RosterService>.Instance);
         service.Take(Progress(AlphaIdentity, (EntryIds.OdyleEnergy, 300, 0, Monday.AddMinutes(5))));
         service.Take(Progress(AlphaIdentity with { ClassId = 0, ClassName = "", CombatPower = 0 },
@@ -376,6 +417,19 @@ public sealed class RosterTests : IDisposable
         Assert.Equal(Seen(2, 0, Monday), alpha.Ascension);
         Assert.Equal((16, "Spiritmaster", 41_000), (alpha.ClassId, alpha.ClassName, alpha.CombatPower));
         Assert.False(alpha.MembershipSeen);
+    }
+
+    // A kept count dated after now (a clock set back since) is replaced by the next read, or nothing would ever replace it.
+    [Fact]
+    public void ACountDatedAfterNowIsReplacedByTheNextRead()
+    {
+        var clock = new FakeTimeProvider(Monday);
+        using var service = new RosterService(new FakeEngine(), NewStore(), clock, NullLogger<RosterService>.Instance);
+        service.Take(Progress(AlphaIdentity, (EntryIds.OdyleEnergy, 100, 0, Monday.AddHours(12))));
+        service.Take(Progress(AlphaIdentity, (EntryIds.OdyleEnergy, 400, 0, Monday)));
+        var alpha = Assert.Single(service.Characters);
+        Assert.Equal(Seen(400, 0, Monday), alpha.Odyle);
+        Assert.Equal(Monday, alpha.LastSeen);
     }
 
     // The player's choices: a removal (the character comes back when played) and the cap; both saved.

@@ -20,6 +20,9 @@ public sealed class RosterService : IDisposable
     private readonly TimeProvider clock;
     private readonly ILogger<RosterService> logger;
     private readonly Lock gate = new();
+    // Orders the writes of the file (the save timer, disposal), apart from the gate the capture thread takes, so a slow
+    // disk never holds up a report. saveFailing is touched only under it.
+    private readonly Lock saveGate = new();
     private readonly Dictionary<RosterKey, RosterCharacter> characters = [];
     private RosterKey? current;
     private ITimer? saveTimer;
@@ -87,10 +90,10 @@ public sealed class RosterService : IDisposable
                 ClassId = who.ClassId > 0 ? who.ClassId : character.ClassId,
                 ClassName = who.ClassName.Length > 0 ? who.ClassName : character.ClassName,
                 CombatPower = who.CombatPower > 0 ? who.CombatPower : character.CombatPower,
-                LastSeen = now > character.LastSeen ? now : character.LastSeen,
-                Odyle = Later(character.Odyle, progress.Entries, EntryIds.OdyleEnergy),
-                Nightmare = Later(character.Nightmare, progress.Entries, EntryIds.Nightmare),
-                Ascension = Later(character.Ascension, progress.Entries, EntryIds.AscensionTrial),
+                LastSeen = now,
+                Odyle = Later(character.Odyle, progress.Entries, EntryIds.OdyleEnergy, now),
+                Nightmare = Later(character.Nightmare, progress.Entries, EntryIds.Nightmare, now),
+                Ascension = Later(character.Ascension, progress.Entries, EntryIds.AscensionTrial, now),
             };
             if (character.Odyle is { First: > RosterRules.StandardCap }) character = character with { MembershipSeen = true };
             characters[key] = character;
@@ -124,11 +127,13 @@ public sealed class RosterService : IDisposable
         RaiseChanged();
     }
 
-    // The count from the report when it was read later than the one kept; the one kept otherwise.
-    private static RosterCount? Later(RosterCount? kept, IReadOnlyDictionary<uint, EntryCount> entries, uint id)
+    // The count from the report when it was read later than the one kept; the one kept otherwise. A kept count dated after
+    // now (a clock set back since) does not count as later than anything, or no read would ever replace it (deep audit
+    // on #48).
+    private static RosterCount? Later(RosterCount? kept, IReadOnlyDictionary<uint, EntryCount> entries, uint id, DateTimeOffset now)
     {
         if (!entries.TryGetValue(id, out var read)) return kept;
-        if (kept is not null && read.SeenAt <= kept.SeenAt) return kept;
+        if (kept is not null && kept.SeenAt <= now && read.SeenAt <= kept.SeenAt) return kept;
         return new RosterCount(read.First, read.Second, read.SeenAt);
     }
 
@@ -143,21 +148,30 @@ public sealed class RosterService : IDisposable
         saveTimer = clock.CreateTimer(_ => SaveNow(), null, SaveDelay, Timeout.InfiniteTimeSpan);
     }
 
-    /// <summary>Saves the roster if it changed since the last save. A failure is logged once until a save works.</summary>
+    /// <summary>
+    /// Saves the roster if it changed since the last save: a copy taken under the gate, written outside it. A failure is
+    /// logged once until a save works, and leaves the roster to save again with the next change.
+    /// </summary>
     public void SaveNow()
     {
-        lock (gate)
+        lock (saveGate)
         {
-            if (!dirty) return; // never set while saving is off (MarkChanged)
+            RosterFile roster;
+            lock (gate)
+            {
+                if (!dirty) return; // never set while saving is off (MarkChanged)
+                roster = new RosterFile { Characters = [.. characters.Values.OrderBy(c => c.Server, StringComparer.Ordinal).ThenBy(c => c.Name, StringComparer.Ordinal)] };
+                dirty = false;
+            }
             try
             {
-                store.Save(new RosterFile { Characters = [.. characters.Values.OrderBy(c => c.Server, StringComparer.Ordinal).ThenBy(c => c.Name, StringComparer.Ordinal)] });
-                dirty = false;
+                store.Save(roster);
                 if (saveFailing) logger.LogInformation("Saving the character roster works again.");
                 saveFailing = false;
             }
             catch (Exception ex)
             {
+                lock (gate) dirty = true;
                 if (!saveFailing) logger.LogWarning(ex, "The character roster could not be saved; trying again with the next change.");
                 saveFailing = true;
             }
@@ -177,11 +191,9 @@ public sealed class RosterService : IDisposable
         }
     }
 
-    /// <summary>Stops following the engine and saves what changed.</summary>
+    /// <summary>Stops taking changes, stops following the engine and saves what changed. Safe to call twice.</summary>
     public void Dispose()
     {
-        engine.ProgressObserved -= OnProgress;
-        SaveNow();
         lock (gate)
         {
             if (disposed) return;
@@ -189,5 +201,7 @@ public sealed class RosterService : IDisposable
             saveTimer?.Dispose();
             saveTimer = null;
         }
+        engine.ProgressObserved -= OnProgress;
+        SaveNow();
     }
 }

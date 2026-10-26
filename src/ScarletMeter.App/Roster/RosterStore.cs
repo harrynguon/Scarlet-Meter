@@ -29,7 +29,8 @@ public sealed class RosterStore
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
+        // An unknown cap (a later build's) reads as unknown and is reset by the normalizer, not taken as a damaged file.
+        Converters = { new LenientEnumConverter<OdyleCapChoice>() },
     };
 
     private readonly ProtectedJsonFile<RosterFile> file;
