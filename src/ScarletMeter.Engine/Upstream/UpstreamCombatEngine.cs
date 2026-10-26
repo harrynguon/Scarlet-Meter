@@ -247,7 +247,8 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
             };
             var page = sessions.GetHistoryPage(upstreamQuery);
             // Unless a running fight is a training-dummy fight the player is not in, which the list leaves out as the
-            // overlay and the saved history do: the page is then put together again without it.
+            // overlay and the saved history do, or the meter is paused for the Abyss, when it lists no running fight:
+            // the page is then put together again without them.
             var running = RunningFights(upstreamQuery, page.TotalCount);
             if (running.Any(fight => fight.LeftOut)) return PageWithout(running, valid);
             return new HistoryPage(
@@ -286,11 +287,13 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
             .ToList();
     }
 
-    // Whether the list leaves out a running fight: a training-dummy fight the player is not in. Only a dummy's fight
-    // is snapshotted to find its players, since a snapshot copies every hit under the session lock. The session's
-    // target is set once, so reading it unlocked is safe.
+    // Whether the list leaves out a running fight: every one while paused for the Abyss (deep audit on PR #42: a crowd's
+    // world-boss fight showed in History until the next sweep), else a training-dummy fight the player is not in. Only a
+    // dummy's fight is snapshotted to find its players, since a snapshot copies every hit under the session lock. The
+    // session's target is set once, so reading it unlocked is safe.
     private bool LeavesOut(HistorySessionListItem item)
     {
+        if (pause.Paused) return true;
         var live = sessions.GetTargetHistory(item.TargetId).FirstOrDefault(fight => fight.SessionId == item.SessionId);
         if (live is null || !live.TargetInfo.IsDummy) return false;
         var fight = sessions.GetHistorySession(item.SessionId);
@@ -343,9 +346,9 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
             // performance choice, so that loading a large fight cannot stall the capture thread. A fight is saved
             // only once it has left upstream's live sessions, so only a running fight is left for the session
             // manager, which then snapshots it; one the history list leaves out (a training-dummy fight the player
-            // is not in) is not found either.
+            // is not in, or any running fight while paused for the Abyss, never snapshotted then) is not found either.
             var snapshot = history.GetSession(fightId);
-            if (snapshot is null)
+            if (snapshot is null && !pause.Paused)
             {
                 snapshot = sessions.GetHistorySession(fightId);
                 if (snapshot is not null && !dummies.Keeps(snapshot)) snapshot = null;
@@ -403,6 +406,10 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         try
         {
             pipeline.Stop();
+            // Paused for the Abyss, the open fight is the Abyss's, which is never saved (Codex and the deep audit on
+            // PR #42: the boss hits since the last sweep were saved at exit): it is dropped first. Capture has stopped,
+            // so no map change can end or start the pause meanwhile.
+            if (pause.Paused) sessions.Reset();
             // Upstream persists completed boss fights; close the open ones so a normal exit loses nothing.
             sessions.CompleteAndPersistActiveSessions();
             history.FlushPendingSaves();

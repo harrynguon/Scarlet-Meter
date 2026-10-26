@@ -11,9 +11,12 @@ namespace ScarletMeter.Engine.Upstream;
 /// <list type="bullet">
 /// <item>upstream's own boss-only filter is forced on (<see cref="UpstreamSettingsBridge"/> reads <see cref="PauseState"/>),
 /// which drops every hit on players and mobs before upstream keeps it;</item>
-/// <item>the fight is cleared on entering and every <see cref="SweepInterval"/>, which drops the boss hits that filter
-/// lets through (a world boss with hundreds of players on it), so nothing piles up; upstream's reset never completes a
-/// fight, so nothing is saved to history either;</item>
+/// <item>on entering, the fight from before (a boss just killed in a dungeon, say) is completed and saved first, as at
+/// exit, since upstream saves a fight only at a later hit, a new try or exit and its reset saves nothing (deep audit on
+/// PR #42: going straight to the Abyss after a kill lost it); then, and every <see cref="SweepInterval"/>, the fight is
+/// reset, which drops the boss hits the filter lets through (a world boss with hundreds of players on it) without
+/// saving them, so nothing piles up and no Abyss fight reaches the history; leaving resets it once more, and the
+/// engine drops it before its exit save when the meter closes while paused;</item>
 /// <item>the engine shows nothing (an empty snapshot, no details), and the overlay says so.</item>
 /// </list>
 /// Capture keeps running: leaving the Abyss is a server change, at which the map is forgotten
@@ -23,9 +26,12 @@ namespace ScarletMeter.Engine.Upstream;
 /// </summary>
 /// <remarks>
 /// The map changes on the capture thread, the setting on the UI thread and the sweep on a timer thread, so the pause's
-/// state changes under a lock; upstream's reset takes upstream's own session lock. Nothing escapes: an exception from a
-/// timer callback would end the process, and one thrown back into a map or settings change would reach the capture
-/// thread or the settings window.
+/// state changes, and the fight is saved or reset, under one lock (the gate), so a sweep under way cannot reset the next
+/// place's first moments after the pause ends (deep audit on PR #42). Upstream's save and reset take upstream's own
+/// session lock inside the gate; nothing takes them the other way round, since upstream's boss-only filter reads the
+/// pause through <see cref="PauseState"/>'s volatile flag, never the gate. Nothing escapes: an exception from a timer
+/// callback would end the process, and one thrown back into a map or settings change would reach the capture thread or
+/// the settings window.
 /// </remarks>
 internal sealed class AbyssPause : IDisposable
 {
@@ -72,8 +78,8 @@ internal sealed class AbyssPause : IDisposable
         lock (gate)
         {
             if (disposed || !state.Paused) return;
+            Clear(saveFirst: false);
         }
-        Clear();
     }
 
     private void OnMapChanged(object? sender, int? mapId) => Update();
@@ -82,31 +88,43 @@ internal sealed class AbyssPause : IDisposable
 
     /// <summary>
     /// Pauses or resumes to match the setting and the last map read; on either change the fight is cleared, so the
-    /// Abyss starts from nothing and so does the place after it. Both are read under the gate, so a map change and a
-    /// settings change at once cannot leave the state matching an older read of either; after disposal (a map change on
-    /// the capture thread can race it) it does nothing, so the disposed timer is never touched. Internal for tests.
+    /// Abyss starts from nothing and so does the place after it, and on pausing the fight from before is saved first.
+    /// Both are read under the gate, so a map change and a settings change at once cannot leave the state matching an
+    /// older read of either; after disposal (a map change on the capture thread can race it) it does nothing, so the
+    /// disposed timer is never touched. Internal for tests.
     /// </summary>
     internal void Update()
     {
-        int? map;
-        bool pause;
         lock (gate)
         {
-            map = maps.Current;
-            pause = settings.PauseInAbyss && map is { } id && AbyssMaps.Contains(id);
+            var map = maps.Current;
+            var pause = settings.PauseInAbyss && map is { } id && AbyssMaps.Contains(id);
             if (disposed || pause == state.Paused) return;
             state.Paused = pause;
             var period = pause ? sweepInterval : Timeout.InfiniteTimeSpan;
             sweep.Change(period, period);
+            if (pause) logger.LogInformation("Meter paused: in the Abyss (map {MapId}).", map);
+            else logger.LogInformation("Meter tracking again.");
+            Clear(saveFirst: pause);
         }
-        if (pause) logger.LogInformation("Meter paused: in the Abyss (map {MapId}).", map);
-        else logger.LogInformation("Meter tracking again.");
-        Clear();
     }
 
-    // Drops every target's fight (upstream's reset: nothing is completed or saved), letting nothing escape.
-    private void Clear()
+    // Drops every target's fight (upstream's reset: nothing is completed or saved); with saveFirst, the open fights are
+    // completed and saved before, as at exit (upstream saves only boss fights). Each step lets nothing escape, and a
+    // failed save still resets.
+    private void Clear(bool saveFirst)
     {
+        if (saveFirst)
+        {
+            try
+            {
+                sessions.CompleteAndPersistActiveSessions();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Saving the fight before the Abyss pause failed.");
+            }
+        }
         try
         {
             sessions.Reset();

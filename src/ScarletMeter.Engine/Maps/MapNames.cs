@@ -10,8 +10,8 @@ namespace ScarletMeter.Engine.Maps;
 /// <item>The open world and the Abyss: the names SkeeveAN/Aion-DPS-Meter gives each map of the game's field-boss list
 /// (by its internal name, World_L_A and so on), with the ids yykk62/AetherDPS gives those internal names. The
 /// field-boss list's id for Verteron, 1010, is also what the map-loaded record sends there (A2Tools' capture), and
-/// A2Tools' own records put the Abyss's bosses and artifacts on 20 and 22; that the map-loaded record sends 20 and 22
-/// in the Abyss is not yet seen in the game.</item>
+/// A2Tools' own records put the Abyss's bosses and artifacts on 20 and 22; the map-loaded record sent 20 on entering
+/// the Abyss in Harry's game (2026-10-26), and 22 is not yet seen there.</item>
 /// <item>Dungeons: taengu/A2Tools-DPS-Meter's list (an instance's map id is its dungeon id), with its difficulty in
 /// brackets where the list gives one.</item>
 /// </list>
