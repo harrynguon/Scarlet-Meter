@@ -12,7 +12,11 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Not checked:** the release workflow and the CI step run only on GitHub (the CI step on this PR; the release steps at the next tag). PR #38 (training dummies) merged first, so its Unreleased line is added here, with main merged in (the WORKLOG's two new entries kept, newest first).
 
-**Next:** PR, standard audit (workflows changed), Codex, CI.
+**After the merge of main (#38):** `scripts/Build.ps1` Debug and Release 640/640; CI on 3e0571c passed (its new step: "CHANGELOG.md has 0.2.0, 9 changes"); Codex reviewed 3e0571c with no findings.
+
+**Audit (scarlet-auditor, standard, on 3e0571c): approve with nits**, all applied. (1) 0.1.0 was dated by GitHub's UTC publish time (2026-10-24) where the WORKLOG and HANDOFF use the local day (2026-10-25): now 2026-10-25, and DEVELOPMENT says the dates are the local day. (2) `ChangelogTests` passed a bullet placed before a section's first group, and did not tie a link's `#N` to its `/pull/N`: a section must now start with a group, and a mismatched number fails. (3) The script let a reference link inside a section end it early, without a refusal, and its refusals had been run only by hand: only the closing block of links ends the last section now, the heading's date must be a real date and a trailing space is ignored, and `scripts/Test-ChangelogSection.ps1` (nine cases, CI runs it under pwsh) covers it; against the script as it was, it fails four cases (the inner reference, the trailing space, the impossible date, and the old wording for a dateless heading). `ChangelogTests` also checks that the release workflow's refusal comes before its build. Fail-first, control clean: a bullet before a section's first group, a link to another PR's number, the refusal moved after the build, and CI without the script cases each fail `ChangelogTests`; `scripts/Build.ps1` 640/640. (4) This entry now records the post-merge checks. (5) The release workflow's rewrapped comment is reflowed. The audit found the release workflow's security unchanged (permissions per job, no text evaluated by a shell, the draft job only receiving files) and the changelog's statements accurate against the tags and PRs.
+
+**Next:** push, `@codex review`, CI, then merge with Harry's go-ahead.
 
 ## 2026-10-26 — Other players' training-dummy fights ignored
 

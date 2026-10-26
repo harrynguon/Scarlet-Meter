@@ -77,8 +77,15 @@ public sealed class ChangelogTests
             // A change is a bullet with its continuation lines, up to the next bullet, group, blank line or the end.
             var changes = Regex.Matches(body, @"(?ms)^- .*?(?=^- |^###|^\s*$|\z)").Select(m => m.Value).ToList();
             if (name != "Unreleased") Assert.NotEmpty(changes);
-            Assert.All(changes, change => Assert.Matches(PullLink, change));
-            if (changes.Count > 0) Assert.Matches(@"(?m)^### ", body);
+            Assert.All(changes, change =>
+            {
+                Assert.Matches(PullLink, change);
+                // Each link's number is its pull request's: "[#39](.../pull/39)", never "[#39](.../pull/38)".
+                Assert.DoesNotMatch(@"\[#(\d+)\]\(https://github\.com/harrynguon/Scarlet-Meter/pull/(?!\1\))\d+\)", change);
+            });
+            // A section's first line is a group, so no change sits outside one (audit on PR #41: a bullet before the
+            // first group passed while any group followed it).
+            if (body.Trim().Length > 0) Assert.StartsWith("### ", body.TrimStart());
         }
     }
 
@@ -97,7 +104,7 @@ public sealed class ChangelogTests
     }
 
     // The release workflow refuses a tag whose version has no section and adds the section to the release's notes;
-    // CI runs the same script for the app's version.
+    // CI runs the same script for the app's version, and its cases on throwaway changelogs (Test-ChangelogSection.ps1).
     [Fact]
     public void TheWorkflowsReadTheChangelog()
     {
@@ -109,6 +116,10 @@ public sealed class ChangelogTests
         Assert.DoesNotContain("Copy-Item -LiteralPath $env:SCARLET_NOTES", release);
         var ci = File.ReadAllText(Path.Combine(workflows, "ci.yml"));
         Assert.Contains("& \"${{ github.workspace }}/scripts/Get-ChangelogSection.ps1\" -Version $version", ci);
+        Assert.Contains("run: '& \"${{ github.workspace }}/scripts/Test-ChangelogSection.ps1\"'", ci);
+        // The refusal runs in the tag's first check, before anything is built.
+        Assert.True(release.IndexOf("Get-ChangelogSection.ps1') -Version $version", StringComparison.Ordinal)
+            < release.IndexOf("scripts/Build.ps1", StringComparison.Ordinal), "the changelog is checked before the build");
     }
 
     private static string Changelog() => File.ReadAllText(Path.Combine(RepositoryRoot(), "CHANGELOG.md")).Replace("\r\n", "\n");

@@ -84,9 +84,9 @@ jobs:
 
       # The portable build and the complete source into one folder of the runner's temp directory, each zip checked
       # and given its SHA-256, with the notes beside them for the draft job, the version's CHANGELOG.md section added
-      # after them. The program zip: the exe, its marker,
-      # the player's files and the licence texts and notices under a top "ScarletMeter" folder, and no data folder or
-      # staging marker. The source zip: the checkout and RATmeter's submodule under one top folder.
+      # after them. The program zip: the exe, its marker, the player's files and the licence texts and notices under a
+      # top "ScarletMeter" folder, and no data folder or staging marker. The source zip: the checkout and RATmeter's
+      # submodule under one top folder.
       - name: Portable zip and source zip
         shell: pwsh
         run: |

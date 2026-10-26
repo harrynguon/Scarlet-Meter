@@ -65,7 +65,7 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
   ([#33](https://github.com/harrynguon/Scarlet-Meter/pull/33))
 - Spiritmaster is named as in the game. ([#27](https://github.com/harrynguon/Scarlet-Meter/pull/27))
 
-## [0.1.0] - 2026-10-24
+## [0.1.0] - 2026-10-25
 
 ### Added
 
