@@ -55,19 +55,18 @@ public sealed partial class RazorMarkupTests
     }
 
     // The window is as tall as the page's content: after each render the page measures it with the bar area at its rows
-    // and with none, and the window fits the first (Windows/OverlayPlacement, OverlayFit), growing at once and
-    // shrinking a moment later, and is cut, so the bar area gives way and scrolls, when the screen is too short.
-    // Dragging its edge sizes only the bar area (Harry: "make sure the resizing only changes the size of the dps bar
-    // area"): while the drag lasts the page lets the bars follow the edge and the window is held between no rows and
-    // ten, and where it ends becomes the bar area's rows, saved; a move is no resize. An earlier build's window height
-    // becomes rows once. The player's top is saved, never mid-drag. Source-text guards: the WPF window and the WebView
-    // have no test host here; OverlayFitTests and OverlayPlacementTests cover the placement rules.
+    // and the window fits it (Windows/OverlayPlacement, OverlayFit), growing at once and shrinking a moment later, and is
+    // cut, so the bar area gives way and scrolls, when the screen is too short. The bar area's rows follow the players
+    // shown, up to five (Pages/BarArea; Harry: the player "won't need to fiddle with resizing"), so nothing sizes the
+    // height by hand: the top and bottom edges are no resize handles, nothing is saved as rows, and the end of any move
+    // or sizing takes the content's height back at once. The player's top is saved, never mid-drag. Source-text guards:
+    // the WPF window and the WebView have no test host here; OverlayFitTests and OverlayPlacementTests cover the rules.
     [Fact]
     public void TheOverlayWindowGrowsToItsContent()
     {
         var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
         var page = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
-        Assert.Contains("await JS.InvokeAsync<OverlayHeights?>(\"scarletOverlay.heights\"", page);
+        Assert.Contains("await JS.InvokeAsync<double?>(\"scarletOverlay.contentHeight\"", page);
         // The fit and the "cut" question are guarded: an exception out of OnAfterRenderAsync would end the process.
         var start = page.IndexOf("protected override async Task OnAfterRenderAsync", StringComparison.Ordinal);
         var end = page.IndexOf("private void OnAlertsChanged", StringComparison.Ordinal);
@@ -75,34 +74,37 @@ public sealed partial class RazorMarkupTests
         var afterRender = page[start..end];
         // Which heights reach the window is OverlayFit.IsNewHeight's (tested there: the first, NaN before it, included),
         // never a comparison written out here (Codex review on PR #28).
-        Assert.Matches(@"try\s*\{(?:\s*//[^\n]*)*\s*var step = OverlayFit\.RowStep\(appearance\.RowScale\);\s*if \(OverlayFit\.IsNewHeight\(reportedContent, heights\.Content\) \|\| OverlayFit\.IsNewHeight\(reportedEmpty, heights\.Empty\)\s*\|\| OverlayFit\.IsNewHeight\(reportedStep, step\)\)\s*\{\s*Windows\.FitOverlayToContent\(heights\.Content, heights\.Empty, step\);\s*reportedContent = heights\.Content;\s*reportedEmpty = heights\.Empty;\s*reportedStep = step;", afterRender);
+        Assert.Matches(@"try\s*\{\s*if \(OverlayFit\.IsNewHeight\(reportedContent, height\)\)\s*\{\s*Windows\.FitOverlayToContent\(height\);\s*reportedContent = height;", afterRender);
         Assert.DoesNotContain("Math.Abs(height - reported", page);
-        // The window says whether it cuts the content and whether its edge is being dragged; a change renders again,
-        // and so does a fit the window made on its own or a resize starting or ending, so the page follows at once.
-        Assert.Matches(@"var cut = Windows\.OverlayCutsContent\(heights\.Content\);\s*var sizing = Windows\.OverlayResizing;[^}]*if \(cut == contentCut && sizing == resizing\) return;\s*contentCut = cut;\s*resizing = sizing;\s*StateHasChanged\(\);", afterRender);
+        // The window says whether it cuts the content; a change renders again, and so does a fit the window made on its
+        // own, so the page follows at once.
+        Assert.Matches(@"var cut = Windows\.OverlayCutsContent\(height\);[^}]*if \(cut == contentCut\) return;\s*contentCut = cut;\s*StateHasChanged\(\);", afterRender);
         Assert.Matches(@"\}\s*catch \(Exception ex\)\s*\{\s*if \(!fitFailing\)", afterRender);
-        Assert.Contains("(resizing ? \" sizing\" : \"\")", page);
-        Assert.Contains("private string RowsClass => (BarRows > 0 && Visible.Count() > BarRows) || contentCut || resizing ? \"scrolls\" : string.Empty;", page);
-        // At no rows the bar area holds no rows unless its edge is being dragged (audit on PR #37: a sliver showed).
-        Assert.Contains("private IEnumerable<PlayerRow> Shown => BarRows == 0 && !resizing ? [] : Visible;", page);
-        Assert.Contains("@foreach (var player in Shown)", File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor")));
-        Assert.Contains("private int BarRows => appearance.BarRows ?? AppearanceSettings.DefaultBarRows;", page);
-        Assert.Contains("--bar-rows:{BarRows};", page);
+        // The rows follow the players shown (BarArea, tested in OverlayFitTests), every one of them in the list, with
+        // every snapshot, dropping to fewer only after a pause (BarRowsHold, tested in BarRowsHoldTests); a reset forgets
+        // them at once.
+        Assert.Contains("barRows = rowsHold.Update(BarArea.Rows(Visible.Count()), now);", page);
+        Assert.Matches(@"rowsHold\.Clear\(\);\s*barRows = 0;", page);
+        Assert.Contains("private string RowsClass => BarArea.Scrolls(Visible.Count(), contentCut) ? \"scrolls\" : string.Empty;", page);
+        Assert.Contains("@foreach (var player in Visible)", File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor")));
+        Assert.Contains("--bar-rows:{barRows};", page);
+        Assert.DoesNotMatch(@"\bresizing\b|\bsizing\b|BarRows\b", page);
         Assert.Contains("Windows.OverlayFitted += OnOverlayFitted;", page);
         Assert.Contains("Windows.OverlayFitted -= OnOverlayFitted;", page);
         Assert.Contains("private void OnOverlayFitted(object? sender, EventArgs e) => _ = RenderAsync();", page);
         var windows = File.ReadAllText(Path.Combine(app, "Windows", "MeterWindows.cs"));
+        Assert.Contains("public void FitOverlayToContent(double contentHeight)", windows);
         Assert.Contains("public bool OverlayCutsContent(double contentHeight) => !closing && overlay?.CutsContent(contentHeight) == true;", windows);
-        Assert.Contains("public bool OverlayResizing => !closing && overlay?.Resizing == true;", windows);
+        Assert.DoesNotContain("OverlayResizing", windows);
         Assert.Contains("overlay.Fitted += (_, _) => OverlayFitted?.Invoke(this, EventArgs.Empty);", windows);
         Assert.Contains("public bool CutsContent(double height) => IsLoaded && ActualHeight < Math.Ceiling(height) - 0.5;",
             File.ReadAllText(Path.Combine(app, "Windows", "OverlayWindow.cs")));
 
-        // The panel's border box while it is as tall as its content whatever the window, with the bar area at its rows,
-        // then at none; the measuring attribute always removed.
+        // The panel's border box while it is as tall as its content whatever the window, the bar area at its rows; the
+        // measuring attribute always removed.
         var script = File.ReadAllText(Path.Combine(app, "wwwroot", "js", "overlay-size.js"));
-        Assert.Contains("heights()", script);
-        Assert.Matches(@"panel\.setAttribute\('data-measuring', 'content'\);\s*const content = panel\.getBoundingClientRect\(\)\.height;\s*panel\.setAttribute\('data-measuring', 'empty'\);\s*const empty = panel\.getBoundingClientRect\(\)\.height;\s*return \{ content, empty \};", script);
+        Assert.Contains("contentHeight()", script);
+        Assert.Matches(@"panel\.setAttribute\('data-measuring', ''\);\s*return panel\.getBoundingClientRect\(\)\.height;", script);
         Assert.Matches(@"finally \{\s*panel\.removeAttribute\('data-measuring'\);", script);
 
         var overlay = File.ReadAllText(Path.Combine(app, "Windows", "OverlayWindow.cs"));
@@ -110,26 +112,16 @@ public sealed partial class RazorMarkupTests
         Assert.Contains("if (sizingOrMoving || !IsLoaded || WindowState != WindowState.Normal", overlay);
         Assert.Contains("applying = true;", overlay);
         Assert.Contains("if (applying || sizingOrMoving", overlay);
-        // While a drag or resize lasts the height is held between no rows and ten, and let go at its end. Only a drag of
-        // an edge (WM_SIZING) is a resize; its end becomes the bar area's rows, which the window takes at once.
-        Assert.Matches(@"msg == NativeMethods\.WmEnterSizeMove\)\s*\{\s*sizingOrMoving = true;\s*dragEdge = 0;\s*heightAtStart = ActualHeight;\s*\}", overlay);
-        Assert.Matches(@"msg == NativeMethods\.WmSizing && sizingOrMoving\)\s*\{\s*dragEdge = wParam\.ToInt32\(\);\s*if \(!resizing && OverlayFit\.IsHeightEdge\(dragEdge\)\)\s*\{[^}]*resizing = true;\s*Fitted\?\.Invoke\(this, EventArgs\.Empty\);\s*\}\s*HoldDraggedEdge\(dragEdge, lParam\);\s*handled = true;\s*return 1;", overlay);
-        // The dragged rectangle is held by its dragged edge before Windows moves the window: WPF's MaxHeight alone kept
-        // the top and moved the bottom, so a drag of the top edge past the most carried the window up (Harry).
-        Assert.Contains("var (least, most) = OverlayFit.DragLimits(emptyHeight, rowStep, ScreenPlacement.WorkAreaOf(this).Height);", overlay);
-        Assert.Contains("var (top, bottom) = OverlayFit.HoldDraggedEdge(rect.Top, rect.Bottom, edge, least * scale, most * scale);", overlay);
-        // Not with WPF's MinHeight and MaxHeight, which also shrank a window waiting to shrink when a header drag began.
+        // Only the sides resize; nothing sizes the height by hand, holds a dragged edge or saves rows.
+        Assert.Contains("ResizeBorderThickness = new Thickness(6, 0, 6, 0),", overlay);
+        Assert.DoesNotMatch(@"ResizeBorderThickness = new Thickness\(\d+\)", overlay);
+        Assert.DoesNotContain("WmSizing", overlay);
         Assert.DoesNotContain("MaxHeight =", overlay);
-        Assert.Contains("Marshal.StructureToPtr(rect, rectPointer, fDeleteOld: false);", overlay);
-        // Only a change of height by the top or bottom edge sets the rows (OverlayFit.ResizedRows); the window takes them at
-        // once, keeping its bottom when dragged by the top; a move, a side or a cancelled resize leaves them.
-        Assert.Matches(@"if \(wasResizing && OverlayFit\.ResizedRows\(dragEdge, heightAtStart, ActualHeight, emptyHeight, rowStep\) is \{ \} rows\)\s*\{(?:\s*//[^\n]*)*\s*contentHeight = emptyHeight \+ rows \* rowStep;\s*var settled = Math\.Ceiling\(contentHeight\);\s*overlayPlacement\.PlayerPlaced\(OverlayFit\.TopAfterResize\(dragEdge, Top, ActualHeight, settled\), settled\);\s*SetBarRows\(rows\);", overlay);
-        Assert.Matches(@"else\s*\{(?:\s*//[^\n]*)*\s*overlayPlacement\.PlayerPlaced\(Top, ActualHeight\);\s*\}\s*Refit\(shrinkNow: wasResizing\);", overlay);
-        Assert.Contains("placementRestored = RestorePlacement();", overlay);
-        Assert.Contains("settings.Update(s => s with { Appearance = s.Appearance with { BarRows = rows } });", overlay);
-        // With no rows saved, the first report starts them (OverlayFit.CarriedRows: an earlier build's restored height as
-        // rows, a first start the default) and the window fits at once (audit on PR #37: at the default it never refitted).
-        Assert.Matches(@"if \(IsLoaded && OverlayFit\.CarriedRows\(settings\.Current\.Appearance\.BarRows, placementRestored, ActualHeight, empty, step\) is \{ \} rows\)\s*\{\s*contentHeight = empty \+ rows \* step;\s*SetBarRows\(rows\);\s*Refit\(shrinkNow: true\);\s*return;", overlay);
+        Assert.DoesNotContain("settings.Update", overlay);
+        Assert.DoesNotContain("WmSizing", File.ReadAllText(Path.Combine(app, "Windows", "NativeMethods.cs")));
+        // The end of a move or of any sizing (from the keyboard, say) takes the content's height back at once.
+        Assert.Matches(@"msg == NativeMethods\.WmEnterSizeMove\)\s*\{\s*sizingOrMoving = true;\s*\}", overlay);
+        Assert.Matches(@"sizingOrMoving = false;\s*overlayPlacement\.PlayerPlaced\(Top, ActualHeight\);(?:\s*//[^\n]*)*\s*Refit\(shrinkNow: true\);", overlay);
         Assert.Contains("overlayPlacement.MovedTo(Top);", overlay);
         Assert.Contains("SavePlacementSoon();", overlay);
         Assert.Contains("if (changed) Fitted?.Invoke(this, EventArgs.Empty);", overlay);
@@ -235,12 +227,10 @@ public sealed partial class RazorMarkupTests
         Assert.DoesNotMatch(@"(?m)^[^{}]*\.tab-body\b[^{}]*\{[^}]*padding(?:-top|-block(?:-start)?)?:(?!\s*0[\s;])", rules);
     }
 
-    // The overlay's panel is as tall as its content, and the window as tall as the panel (TheOverlayWindowGrowsToItsContent),
-    // except while its edge is dragged (.sizing), when it fills the window so the bar area can follow the edge; while it
-    // is measured it is as tall as its content whatever the window. The notices never scroll (Harry: "i dont like
-    // scrolling") and keep their own height: the event row never shrinks, nothing in it has a cap, and the window
-    // grows for them (Harry: "make sure the resizing only changes the size of the dps bar area. it doesn't affect the
-    // event timer area"). The bar area is as many rows tall as the player dragged it and scrolls when needed
+    // The overlay's panel is as tall as its content, and the window as tall as the panel (TheOverlayWindowGrowsToItsContent);
+    // while it is measured it is as tall as its content whatever the window. The notices never scroll (Harry: "i dont
+    // like scrolling") and keep their own height: the event row never shrinks, nothing in it has a cap, and the window
+    // grows for them. The bar area has a row per player shown, up to five, and scrolls when needed
     // (TheBarAreaScrollsWhenItCannotShowEveryRow); and the picture covers the panel, laid out against it (Harry: against
     // the window, when the window was taller than the panel, it "no longer fits in the background").
     [Fact]
@@ -257,37 +247,31 @@ public sealed partial class RazorMarkupTests
         // The panel's percentages are of #app, which must itself be the window's height.
         Assert.Matches(@"(?m)^\s*height:\s*100%;", Block(css, "#app"));
         Assert.Matches(@"(?m)^\s*height:\s*100%;", Block(css, "html, body"));
-        // Filling the window only while sized; measured as tall as its content, after it (so it wins); no other rule
-        // for the panel itself (.overlay.fx, .overlay[...]; not its descendants) gives it a height.
-        Assert.Matches(@"(?m)^\s*height:\s*100%;", Block(css, ".overlay.sizing"));
+        // Measured as tall as its content; no other rule for the panel itself (.overlay.fx, .overlay[...]; not its
+        // descendants) gives it a height, and nothing fills the window with it any more (the old resize's .sizing).
         var measuring = Block(css, ".overlay[data-measuring]");
         Assert.Matches(@"(?m)^\s*height:\s*auto;", measuring);
         Assert.Matches(@"(?m)^\s*max-height:\s*none;", measuring);
-        Assert.True(css.IndexOf(".overlay.sizing {", StringComparison.Ordinal) < css.IndexOf(".overlay[data-measuring] {", StringComparison.Ordinal));
-        var others = css.Replace(".overlay::before {", ".before-layer {").Replace(".overlay[data-measuring] {", ".measuring-panel {").Replace(".overlay.sizing {", ".sizing-panel {");
+        Assert.DoesNotContain(".sizing", css, StringComparison.Ordinal);
+        var others = css.Replace(".overlay::before {", ".before-layer {").Replace(".overlay[data-measuring] {", ".measuring-panel {");
         Assert.DoesNotMatch(@"(?m)^\.overlay[.:\[][^\s{,]*\s*\{[^}]*(?<![-\w])height\s*:", others);
         var layer = Block(css, ".overlay::before");
         Assert.Matches(@"var\(--panel-image, none\) center / cover no-repeat;", layer);
         Assert.Matches(@"(?m)^\s*inset:\s*0;", layer); // the layer is the panel, so the picture covers the panel
         Assert.DoesNotMatch(@"\bfixed\b", Regex.Replace(layer, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline));
         Assert.DoesNotMatch(@"background-attachment", css);
-        // The event row never shrinks; the bar area gives way only to a short screen (it shrinks, down to its padding),
-        // and follows a resize; it is measured at its rows or none (the data-measuring rules come after the sizing one,
-        // which they must beat); and no rule in the overlay's styles makes anything scroll but the bar area that cannot
+        // The event row never shrinks; the bar area gives way only to a short screen (it shrinks, down to its padding); it
+        // is measured at its rows; and no rule in the overlay's styles makes anything scroll but the bar area that cannot
         // show every row (.rows.scrolls): otherwise its overflow is clipped (a gliding row cannot show a scrollbar), and
         // nothing in the event row has a cap.
         var rows = Block(css, ".rows");
         Assert.Matches(@"(?m)^\s*flex:\s*0 1 auto;", rows);
         Assert.Matches(@"(?m)^\s*min-height:\s*0;", rows);
         Assert.Matches(@"(?m)^\s*overflow:\s*clip;", rows);
-        var sized = Block(css, ".overlay.sizing .rows");
-        Assert.Matches(@"(?m)^\s*height:\s*auto;", sized);
-        Assert.Matches(@"(?m)^\s*flex:\s*1 1 auto;", sized);
         var measured = Block(css, ".overlay[data-measuring] .rows");
         Assert.Matches(@"(?m)^\s*flex:\s*none;", measured);
         Assert.Equal(Regex.Match(rows, @"(?m)^\s*height:\s*(?<h>[^;]+);").Groups["h"].Value, Regex.Match(measured, @"(?m)^\s*height:\s*(?<h>[^;]+);").Groups["h"].Value);
-        Assert.Matches(@"(?m)^\s*height:\s*0;", Block(css, @".overlay[data-measuring=""empty""] .rows"));
-        Assert.True(css.IndexOf(".overlay.sizing .rows {", StringComparison.Ordinal) < css.IndexOf(".overlay[data-measuring] .rows {", StringComparison.Ordinal));
+        Assert.DoesNotContain("data-measuring=\"empty\"", css, StringComparison.Ordinal);
         Assert.Matches(@"(?m)^\s*flex:\s*none;", Block(alerts, ".alerts"));
         Assert.DoesNotMatch(@"(?m)^\s*min-height:", Block(alerts, ".alerts"));
         Assert.DoesNotMatch(@"max-height\s*:", alerts);
@@ -577,11 +561,10 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"margin-left:\s*auto;", Block(css, ".ping")); // without the energy, the ping still ends the line
     }
 
-    // The bar area is as many rows tall as the player dragged it (AppearanceSettings.BarRows, 0 to ten, a row being its
-    // own height and gap in the rows' zoomed pixels; Harry: "max height of 10 players worth"), the default until the
-    // window has set it matching the stylesheet's fallback. It scrolls once it cannot show every row (more players than
-    // its rows, the screen too short, a resize under way; Harry: in big raids the meter was "just too long
-    // vertically"), the next row's top faded in the padding; the notices below never scroll
+    // The bar area has a row per player shown, up to five (Pages/BarArea, a row being its own height and gap in the rows'
+    // zoomed pixels; Harry, 2026-10-26: "it automatically expands up to five dps bar players worth of area"), none
+    // before the page sets it. It scrolls once it cannot show every row (more players than its rows, or the screen too
+    // short; Harry: in big raids the meter was "just too long vertically"), the next row's top faded in the padding; the notices below never scroll
     // (TheOverlayPanelFitsItsContent). "Rows before scrolling" is gone. The player's own row stays in view, pinned at
     // either edge in a whole row's place, with a backdrop of the panel's colour only while pinned (always, without
     // scroll-state queries); the list does no scroll anchoring, and the glide script measures rows in the list's view
@@ -607,12 +590,11 @@ public sealed partial class RazorMarkupTests
             Regex.Match(body, @"(?m)^\s*" + property + @":\s*([\d.]+)px;").Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
         var row = Block(css, ".row");
         var step = Px(row, "height") + Px(row, "margin-bottom");
-        // The window's row step is the row's own height and gap.
-        Assert.Equal(ScarletMeter.App.Windows.OverlayFit.RowPixels, step);
-        Assert.Equal(10, ScarletMeter.App.Windows.OverlayFit.MostRows);
+        // A row's step in the bar area's height is the row's own height and gap; none before the page sets the rows.
+        Assert.Equal(29, step);
         var area = Regex.Match(Block(css, ".rows"), @"(?m)^\s*height:\s*calc\(var\(--bar-rows, (?<rows>\d+)\) \* (?<step>[\d.]+)px\);");
         Assert.True(area.Success, "the bar area is a number of rows tall");
-        Assert.Equal(ScarletMeter.App.Settings.AppearanceSettings.DefaultBarRows, int.Parse(area.Groups["rows"].Value, System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal(0, int.Parse(area.Groups["rows"].Value, System.Globalization.CultureInfo.InvariantCulture));
         Assert.Equal(step, double.Parse(area.Groups["step"].Value, System.Globalization.CultureInfo.InvariantCulture));
         var scrolls = Block(css, ".rows.scrolls");
         Assert.Matches(@"(?m)^\s*overflow-y:\s*auto;", scrolls);

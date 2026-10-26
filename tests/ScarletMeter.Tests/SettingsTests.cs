@@ -91,32 +91,24 @@ public sealed class SettingsTests : IDisposable
         }
     }
 
-    // The bar area's rows keep to 0..10, each repair reported; unset (null, until the window takes them from an
-    // earlier build's height) stays unset, as does a value inside the range, its edges included.
-    [Theory]
-    [InlineData(-3, 0, true)]
-    [InlineData(25, AppearanceSettings.MaxBarRows, true)]
-    [InlineData(0, 0, false)]
-    [InlineData(AppearanceSettings.MaxBarRows, AppearanceSettings.MaxBarRows, false)]
-    [InlineData(4, 4, false)]
-    public void TheBarAreaKeepsToItsRows(int saved, int kept, bool repaired)
-    {
-        var (settings, repairs) = SettingsNormalizer.Normalize(new MeterSettings { Appearance = new AppearanceSettings { BarRows = saved } });
-        Assert.Equal(kept, settings.Appearance.BarRows);
-        Assert.Equal(repaired, repairs.Any(r => r.StartsWith("The bar area", StringComparison.Ordinal)));
-    }
-
+    // The bar area's rows follow the players shown (Pages/BarArea), so nothing about them is saved any more; a file
+    // from the build whose bar area the player sized by dragging (#37, barRows) loads as it is, the old value passed
+    // over, nothing reported, the rest of its appearance kept, and a save leaves it out.
     [Fact]
-    public void TheBarAreaIsUnsetUntilTheWindowSetsIt()
+    public void AFileWithTheDraggedBarAreasRowsLoads()
     {
-        Assert.Null(new AppearanceSettings().BarRows);
-        var (settings, repairs) = SettingsNormalizer.Normalize(new MeterSettings());
-        Assert.Null(settings.Appearance.BarRows);
-        Assert.Empty(repairs);
-        Assert.InRange(AppearanceSettings.DefaultBarRows, 0, AppearanceSettings.MaxBarRows);
+        Assert.Null(typeof(AppearanceSettings).GetProperty("BarRows"));
+        var store = NewStore();
+        Directory.CreateDirectory(directory.FullPath); // TestDataDirectory names the folder; the test makes it
+        File.WriteAllText(store.FilePath, "{ \"version\": 1, \"appearance\": { \"barRows\": 3, \"rowScale\": 1.25 } }");
+        var result = store.Load();
+        Assert.Equal(SettingsLoadStatus.Loaded, result.Status);
+        Assert.Null(result.Notice);
+        Assert.Equal(1.25, result.Settings.Appearance.RowScale);
+        store.Save(result.Settings);
+        Assert.DoesNotContain("barRows", File.ReadAllText(store.FilePath), StringComparison.Ordinal);
     }
-
-    // A file from the build that had "Rows before scrolling" (#35; dragging the bar area took its place) still loads
+    // A file from the build that had "Rows before scrolling" (#35; the bar area's own rows took its place) still loads
     // as it is, the old value passed over, nothing reported, and the rest of its appearance kept.
     [Fact]
     public void AFileWithTheOldRowsBeforeScrollingLoads()

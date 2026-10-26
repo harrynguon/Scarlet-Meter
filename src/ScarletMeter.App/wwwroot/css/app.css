@@ -75,13 +75,11 @@ button {
    picture both layers are the panel's colour, so nothing changes.
    The panel is as tall as its content, and the window as tall as the panel (js/overlay-size.js measures it,
    Windows/OverlayFit fits the window): the header, the target card in a fight, the totals, the bar area and the
-   notices. The bar area is the one part the player sizes, in rows, by dragging the meter's bottom edge (.rows; Harry:
-   "make sure the resizing only changes the size of the dps bar area"); the notices keep their own height and never
-   scroll, so the window grows when they open. While the edge is dragged (.sizing) the panel fills the window and the
-   bar area follows it; max-height keeps the panel inside the window when the screen is too short for it, when the
-   bar area gives way (Pages/MeterPage.razor.cs, "scrolls"). While it is measured (data-measuring) it is as tall as
-   its content whatever the window. Its bottom padding adds 8 px under the notices, or under the bar area without
-   them. */
+   notices. Nothing in it is sized by hand: the bar area grows with the players shown, up to five rows, and scrolls past
+   that (.rows; Pages/BarArea); the notices keep their own height and never scroll, so the window grows when they
+   open. max-height keeps the panel inside the window when the screen is too short for it, when the bar area gives way
+   (Pages/MeterPage.razor.cs, "scrolls"). While it is measured (data-measuring) it is as tall as its content whatever
+   the window. Its bottom padding adds 8 px under the notices, or under the bar area without them. */
 .overlay {
     position: relative;
     isolation: isolate;
@@ -93,10 +91,6 @@ button {
     border-radius: var(--radius);
     border: 1px solid var(--line);
     overflow: hidden;
-}
-
-.overlay.sizing {
-    height: 100%;
 }
 
 .overlay[data-measuring] {
@@ -398,9 +392,9 @@ button {
 .ping.bad i:nth-child(1) { background: var(--bad); }
 
 /* The bar area. Positioned, so a row's offsetTop (js/overlay-fx.js) is measured from the list, not the panel above it.
-   It is as many rows tall as the player dragged it (--bar-rows, 0 to Windows/OverlayFit.MostRows; each row 29 px, its
-   26 px and 3 px gap, in the list's zoomed pixels, so it follows the row size), its padding around them: fewer players
-   leave the rest of it empty, and the notices below stay where they are. It gives way (shrinks, down to its padding)
+   It is as many rows tall as players are shown, up to five (--bar-rows, Pages/BarArea; each row 29 px, its 26 px and
+   3 px gap, in the list's zoomed pixels, so it follows the row size), its padding around them: none between fights
+   until a fight's players come, and more than five scroll. It gives way (shrinks, down to its padding)
    when the panel is taller than the window: the screen too short for it, or for the moment before the window grows. Its overflow is clipped unless it scrolls (.rows.scrolls), so a
    row gliding into place (a transform) cannot show a scrollbar for a moment. --row-edge is the crisp dark edge every
    bit of a row's text sits on, a tight outline shadow, so white text stays readable over the brightest class bars
@@ -411,22 +405,15 @@ button {
     margin: 0;
     padding: 2px 6px 6px;
     overflow: clip;
-    height: calc(var(--bar-rows, 8) * 29px);
+    height: calc(var(--bar-rows, 0) * 29px);
     flex: 0 1 auto;
     min-height: 0;
     zoom: var(--row-scale, 1);
     --row-edge: 0 0 1px rgba(0, 0, 0, 0.95), 0 1px 1px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 0.6);
 }
 
-/* While the meter's edge is dragged, the bar area takes what the window leaves it, so it follows the edge; where the
-   drag ends becomes its rows (Windows/OverlayWindow). */
-.overlay.sizing .rows {
-    height: auto;
-    flex: 1 1 auto;
-}
-
-/* The bar area cannot show every row (Pages/MeterPage.razor.cs, "scrolls": more players than its rows, the screen too
-   short, or a resize under way; Harry: in big raids the meter was "just too long vertically"): the list scrolls, with
+/* The bar area cannot show every row (Pages/MeterPage.razor.cs, "scrolls": more players than its rows, or the screen
+   too short; Harry: in big raids the meter was "just too long vertically"): the list scrolls, with
    a thin scrollbar, and its bottom 9 px fade out (the last row's gap and the list's bottom padding, where the next
    row's top shows, as a sign that more follow; scrolled to the end, only the gap is in it). No scroll anchoring: when
    rows swap at the view's edge, Chromium would otherwise move the scroll position by a row to keep the row it anchored
@@ -442,15 +429,10 @@ button {
 .rows.scrolls::-webkit-scrollbar { width: 6px; }
 .rows.scrolls::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 3px; }
 
-/* Measured (js/overlay-size.js) with the bar area at its rows ("content"), or at none ("empty": the list's padding
-   stays, as in the empty meter), whatever a resize is doing. After .overlay.sizing .rows, so they win. */
+/* Measured (js/overlay-size.js) with the bar area at its rows, even while it gives way to a short screen. */
 .overlay[data-measuring] .rows {
-    height: calc(var(--bar-rows, 8) * 29px);
+    height: calc(var(--bar-rows, 0) * 29px);
     flex: none;
-}
-
-.overlay[data-measuring="empty"] .rows {
-    height: 0;
 }
 
 /* In a scrolling list the player's own row never scrolls out of sight: it stops at the top edge, or at the bottom
