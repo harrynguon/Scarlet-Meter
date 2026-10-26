@@ -4,6 +4,10 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**Cutting the bar area at its last whole row first clipped the player's own ring** (2026-10-26, seen in a headless render before commit).
+- What: hiding the sliver of the next bar below the fifth, the first hard cut took the full 9 px of padding and gap, which also took the bottom line of the player's own gold ring: a `box-shadow` spread 1 px outside the row, so outside the row's box that the cut was measured from.
+- Why: the cut was worked out from the row boxes' geometry, and a ring drawn outside a box is not part of it.
+- Guard: the cut is 8 px, and `RazorMarkupTests.TheBarAreaScrollsWhenItCannotShowEveryRow` derives it from the padding, the gap and the ring's spread (with effects on as well) and checks the ring is narrower than the gap. When clipping or masking near a ringed, outlined or shadowed element, zoom into a render of its edge before trusting the box arithmetic.
 **Entering the Abyss would have thrown away a boss fight that had not been saved yet** (deep audit on #42, fixed before merge).
 - What: the Abyss pause reset upstream's fight on entering (`CombatSessionManager.Reset`) to start from nothing. Upstream saves a finished fight only at a later hit (its idle check), a new try or exit, and its reset saves nothing, so a boss killed just before going to the Abyss never reached History. Closing the meter while paused did the opposite: the exit's save kept the Abyss's last boss hits (Codex).
 - Why: the reset was treated as dropping only what was on screen; nobody asked where upstream saves a fight, and the tests asserted the clear without a fight open from before it, or an exit while paused.

@@ -2,6 +2,18 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-26 — No sliver of the next bar below the fifth
+
+**What:** when the bar area scrolls (more than five players), its bottom edge is cut off rather than faded: `.rows.scrolls`' mask is a hard stop 8 px above the list's bottom (its 6 px padding and the last whole row's 3 px gap, less the 1 px of the player's own ring, a `box-shadow` drawn outside the row), so nothing of the next bar peeks out below the fifth, under the player's own pinned bar included, while that bar's ring stays whole. The thin scrollbar is the sign that more follow. `RazorMarkupTests.TheBarAreaScrollsWhenItCannotShowEveryRow` pins the hard stop and its width from the padding, the gap and the ring (with effects on too); ARCHITECTURE and HANDOFF say so, and CHANGELOG's bar-area line under Unreleased says it ends at the last whole bar.
+
+**Why:** Harry, with two in-game screenshots of a raid: "when dps bars surpasses five players, you can get a glimpse of the actual 5th/6th(?) player behind my player ... is this intentional? ... or would it be cleaner to hide this mini section of their dps bar". It was #35's scroll hint (the bottom 9 px faded, the next row's top showing), but with the player's own bar pinned in the last row's place it showed another player's numbers under it; asked, Harry chose to hide it and keep the scrollbar as the hint.
+
+**Checks (SDK 10.0.402):** `dotnet build` and `dotnet test` 716/716. Headless Edge, the stylesheet of main against this branch, twenty synthetic players, the player 4th and 9th (pinned): main shows the next bar's top below the fifth in both; the branch shows nothing below it. The first cut, 9 px, clipped the bottom line of the pinned bar's gold ring (seen zoomed in the render); 8 px keeps it, the next bar still 2 px below the cut (LESSONS). Fail-first against a scratch copy, control clean: the fade put back, a 9 px cut (clipping the ring) and a 5 px one (showing the next bar) each fail the test.
+
+**Not checked:** in game (the row size other than 1 scales the cut with the rows, by the list's zoom; not seen).
+
+**Next:** PR, standard audit, Codex, CI, merge (Harry's go-ahead), then the portable copy.
+
 ## 2026-10-26 — Map probe and the Abyss pause
 
 **What:** the engine reads the game's map-loaded record (`21 36`) and keeps the id of the map last loaded: `ICombatEngine.MapId` (null until a load) and `MapChanged`, kept across `Stop` and `Reset`. Each change is logged once at Information as "Map loaded: <id>", the number alone, and Settings, About shows it in a quiet "Map id" line (the id, or "None yet"; later "Map", with the name, below). Nothing acts on it. The record's layout is A2Tools' (`parse_map_load_packet`, taengu/A2Tools-DPS-Meter b1fcd53, 2026-10-05, read at today's head 6abf5e7, v2.0.79): `<length varint> 21 36 <u32> <map id u32> …`, both little-endian; `Maps/MapLoadRecords` reads the id only, and refuses 0 and ids past `int.MaxValue` (Scarlet's check). To read it beside upstream's pipeline without opening every LZ4 bundle a third time, the Odyle tap's listening is split out: `Upstream/RecordTap` subscribes to upstream's reassembly once, opens each bundle once and hands each record to every `IRecordReader` that takes its opcode; `OdyleEnergyTap` and the new `MapLoadTap` are its readers, and `Records/GameRecords` holds the framing and varint reader `OdyleEnergyRecords` had to itself. A reader that throws no longer stops the record reaching the others, nor the rest of a bundle. The tests' record helpers moved to `SyntheticRecords` and a shared `RecordingLogger`.

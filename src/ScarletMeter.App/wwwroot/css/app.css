@@ -414,8 +414,11 @@ button {
 
 /* The bar area cannot show every row (Pages/MeterPage.razor.cs, "scrolls": more players than its rows, or the screen
    too short; Harry: in big raids the meter was "just too long vertically"): the list scrolls, with
-   a thin scrollbar, and its bottom 9 px fade out (the last row's gap and the list's bottom padding, where the next
-   row's top shows, as a sign that more follow; scrolled to the end, only the gap is in it). No scroll anchoring: when
+   a thin scrollbar, the sign that more follow. Its bottom 8 px are cut off, not faded: the list's bottom padding and
+   the last whole row's 3 px gap less the 1 px of the player's own ring (.row.me's box-shadow, drawn outside the row),
+   so that ring stays whole while the next row, which starts 3 px below, never shows. A fade let the next row's top
+   peek out, under the player's own row too when that is pinned in the last row's place, which read as a glitch
+   (Harry, 2026-10-26: "would it be cleaner to hide this mini section of their dps bar"). No scroll anchoring: when
    rows swap at the view's edge, Chromium would otherwise move the scroll position by a row to keep the row it anchored
    on in place, so the view would drift by a rank with each swap (js/overlay-fx.js measures in the view's coordinates
    either way; audit on PR #35). */
@@ -423,7 +426,7 @@ button {
     overflow-x: hidden;
     overflow-y: auto;
     overflow-anchor: none;
-    mask-image: linear-gradient(to bottom, #000 calc(100% - 9px), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 8px), transparent calc(100% - 8px));
 }
 
 .rows.scrolls::-webkit-scrollbar { width: 6px; }
@@ -436,7 +439,7 @@ button {
 }
 
 /* In a scrolling list the player's own row never scrolls out of sight: it stops at the top edge, or at the bottom
-   in the last whole row's place (3 px above the padding, which is the fade), over whichever row is there. Only
+   in the last whole row's place (3 px above the padding, at the cut), over whichever row is there. Only
    while it is stuck (a scroll-state query on the row itself) does a backdrop of the panel's colour (--bg) cover the
    row beneath; it is opaque whatever the background opacity, so the row beneath never shows through, and at a low
    background opacity the stuck row reads as a solid bar on the see-through panel. Unstuck it looks like every other

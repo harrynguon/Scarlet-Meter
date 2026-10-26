@@ -598,7 +598,7 @@ public sealed partial class RazorMarkupTests
     // The bar area has a row per player shown, up to five (Pages/BarArea, a row being its own height and gap in the rows'
     // zoomed pixels; Harry, 2026-10-26: "it automatically expands up to five dps bar players worth of area"), none
     // before the page sets it. It scrolls once it cannot show every row (more players than its rows, or the screen too
-    // short; Harry: in big raids the meter was "just too long vertically"), the next row's top faded in the padding; the notices below never scroll
+    // short; Harry: in big raids the meter was "just too long vertically"), cut off below the last whole row; the notices below never scroll
     // (TheOverlayPanelFitsItsContent). "Rows before scrolling" is gone. The player's own row stays in view, pinned at
     // either edge in a whole row's place, with a backdrop of the panel's colour only while pinned (always, without
     // scroll-state queries); the list does no scroll anchoring, and the glide script measures rows in the list's view
@@ -635,19 +635,30 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?m)^\s*overflow-x:\s*hidden;", scrolls);
         // No scroll anchoring, which shifted the view by a row with each swap at its edge (audit on PR #35).
         Assert.Matches(@"(?m)^\s*overflow-anchor:\s*none;", scrolls);
-        // The fade is the last row's gap and the list's bottom padding: wider would fade the last row at the list's
-        // end, narrower would show the next row's top unfaded (audit on PR #35).
-        var fade = Regex.Match(scrolls, @"(?m)^\s*mask-image:\s*linear-gradient\(to bottom, #000 calc\(100% - (?<px>\d+)px\), transparent\);");
-        Assert.True(fade.Success, "the list's bottom edge fades");
+        // The cut is hard (opaque and transparent at the same stop), so nothing of the next row peeks out below the
+        // last whole row, the pinned own row included (Harry: a fade let it show). It is the list's bottom padding and
+        // the last row's gap less the own row's ring (drawn 1 px outside the row): wider would clip that ring or the
+        // last row at the list's end (the first cut clipped the ring, seen in a headless render), as wide as the gap or
+        // narrower would show the next row's top (audit on PR #35).
+        var cut = Regex.Match(scrolls, @"(?m)^\s*mask-image:\s*linear-gradient\(to bottom, #000 calc\(100% - (?<px>\d+)px\), transparent calc\(100% - (?<to>\d+)px\)\);");
+        Assert.True(cut.Success, "the list's bottom edge is cut off");
+        Assert.Equal(cut.Groups["px"].Value, cut.Groups["to"].Value);
         var padding = Regex.Match(Block(css, ".rows"), @"(?m)^\s*padding:\s*[\d.]+px [\d.]+px (?<bottom>[\d.]+)px;");
         Assert.True(padding.Success, "the list's padding gives its bottom");
-        Assert.Equal(Px(row, "margin-bottom") + double.Parse(padding.Groups["bottom"].Value, System.Globalization.CultureInfo.InvariantCulture),
-            double.Parse(fade.Groups["px"].Value, System.Globalization.CultureInfo.InvariantCulture));
+        var ring = Regex.Match(Block(css, ".row.me"), @"box-shadow:\s*0 0 0 (?<w>[\d.]+)px");
+        Assert.True(ring.Success, "the own row's ring is a box-shadow spread outside it");
+        var ringWidth = double.Parse(ring.Groups["w"].Value, System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Matches(@"box-shadow:\s*0 0 0 " + Regex.Escape(ring.Groups["w"].Value) + "px", Block(css, ".fx .row.me")); // the same width with effects on
+        var gap = Px(row, "margin-bottom");
+        var bottomPadding = double.Parse(padding.Groups["bottom"].Value, System.Globalization.CultureInfo.InvariantCulture);
+        var cutPx = double.Parse(cut.Groups["px"].Value, System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal(gap + bottomPadding - ringWidth, cutPx);
+        Assert.True(ringWidth < gap, "the ring is narrower than the gap, so the cut stays below the next row's top");
 
         var mine = Block(css, ".rows.scrolls > .row.me");
         Assert.Matches(@"(?m)^\s*position:\s*sticky;", mine);
         Assert.Matches(@"(?m)^\s*top:\s*0;", mine);
-        Assert.Equal(Px(row, "margin-bottom"), Px(mine, "bottom")); // in the last whole row's place, above the fade
+        Assert.Equal(Px(row, "margin-bottom"), Px(mine, "bottom")); // in the last whole row's place, above the cut
         Assert.Matches(@"(?m)^\s*container-type:\s*scroll-state;", mine);
         Assert.DoesNotMatch(@"background", Block(css, ".rows.scrolls > .row.me::before"));
         // The backdrop is the panel's colour token, while stuck, and always where scroll-state queries are missing.
