@@ -14,7 +14,9 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Audit (independent reviewer, standard pass, on 5d3ff9f): approve with nits**, all three applied. It traced the pause in the code (`MapLoadTap` raises a change for any new id on the connection, `AbyssPause.Update` re-decides under its gate: 20 → 503001 tracks again, 503001 → 20 saves the open fight and pauses), checked the counts (seven below 600000, 60 dungeons, 67), the changelog line and that nothing personal is in the diff, commits or PR text, and ran `MapProbeTests`, `AbyssPauseTests` and `ChangelogTests` (79/79). (1) ARCHITECTURE's test list still described the whole table without the corridor: updated. (2) In ARCHITECTURE's "Abyss pause", the corridor's sentence left "It ends when…" reading as the corridor: the pause's end now comes first and names the pause, and the corridor's sentence says the same connection is what Harry's game showed, a new connection with a lost map record being the documented safe side. (3) The behaviour was pinned only at `AbyssMaps.Contains`: `AbyssPauseTests.TheArtifactCorridorTracksAndTheAbyssPausesAgainAfterIt` now loads 20, 503001 and 20 on one connection through upstream's reassembly (paused, tracking with the map 503001, paused again); it passes, and with 503001 added to `AbyssMaps` (a mutation, restored) it and `TheAbyssIsMaps20And22` fail by name. `AbyssPauseTests` 16/16.
 
-**Next:** Codex's review of the head (its first review was still running on aa63241) and CI; merge with Harry's go-ahead.
+**Codex:** on aa63241 one P1, "Add the player-visible map name to Unreleased": valid for that commit, already done in 5d3ff9f (the line was added once the PR had its number, as AGENTS.md's Changelog rule says); answered on the thread. On 4b79d5d, after `@codex review`: completed, no findings (a thumbs-up). CI passed on 5d3ff9f (both runs).
+
+**Next:** CI and Codex on this commit, then the squash merge pinned to it (Harry, 2026-10-27: "merge #47 ... once CI passes on the head and Codex's fresh review has no new findings").
 
 ## 2026-10-26 — v0.3.0 released
 
