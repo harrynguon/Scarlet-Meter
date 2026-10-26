@@ -118,8 +118,9 @@ and adds it up per player and per fight.
 - **No installer, no .NET install, no administrator rights** (with Npcap set up as above).
 - A **global hotkey** to hide and show it, an always-on-top chromeless overlay you can drag and make wider or narrower, and window
   positions remembered across restarts.
-- **Fight options**: boss fights only (on by default), summons folded into their owner, a one-minute cap on training
-  dummies.
+- **Fight options**: boss fights only (on by default; a boss the meter did not see appear, if you start it mid-fight,
+  or one too new for RATmeter's list is not counted while it is on), summons folded into their owner, a one-minute
+  cap on training dummies.
 
 <p align="center"><img src="docs/images/settings-alerts.png" alt="Settings, Alerts tab" width="500"/></p>
 

@@ -181,6 +181,10 @@ public sealed class SettingsTests : IDisposable
         var kept = NewStore().Load();
         Assert.Equal(SettingsLoadStatus.Loaded, kept.Status);
         Assert.False(kept.Settings.Fight.BossOnlyCapture);
+        // And it reaches the engine on load (audit on PR #43), whose own default is the other way.
+        var engineSettings = new EngineSettings { BossOnlyCapture = true };
+        using var service = new SettingsService(NewStore(), engineSettings, NullLogger<SettingsService>.Instance);
+        Assert.False(engineSettings.BossOnlyCapture);
     }
 
     // Every on/off setting in every section survives a save and a load when flipped from its default, so a switch

@@ -12,7 +12,11 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Not checked:** in game. A player whose settings file saved "off" (every file saved by an earlier build) keeps it off until they turn it on in Settings, Tracking.
 
-**Next:** PR, standard audit, Codex, CI; after #42.
+**Codex on 2ecbad4:** one P1, the missing CHANGELOG line: added in 75564f7 (answered on the thread).
+
+**Audit (scarlet-auditor, standard, on 75564f7): approve with nits**, all applied. (1) The Codex thread: answered, and a fresh review asked for. (2) Upstream's boss test is the mob code alone (`Mob.IsBoss`; its HP-threshold fallback is commented out), so with the switch on a boss the meter never saw appear (started mid-fight: no spawn record, code 0) or one its list lacks (new after a game patch) records nothing: confirmed in upstream's code, not in game. The setting's description and the README say so and to turn it off for such a boss, ARCHITECTURE names it as a fix to offer upstream, and HANDOFF has an item to check it in game. (3) Two HANDOFF checks that need an add's hits now say to turn the switch off for them. (4) The CHANGELOG line says an existing player keeps it as they had it, off unless they turned it on. (5) `BossEncountersOnlyIsOnByDefaultAndASavedChoiceIsKept` also checks that a saved "off" reaches the engine on load. The audit found no conflict in behaviour with #42's Abyss pause (its bridge combines the player's value with the pause and never writes the player's), only text conflicts to resolve when #42 merges first.
+
+**Next:** CI and Codex on the fixes; merge after #42.
 
 ## 2026-10-26 — A changelog, and each release lists what changed
 
