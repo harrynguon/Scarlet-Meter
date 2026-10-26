@@ -2,6 +2,18 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-27 — The Artifact Corridor named, and not paused
+
+**What:** `Maps/MapNames` names map 503001 "Artifact Corridor", so Settings, About shows "Artifact Corridor (map 503001)" there instead of "Map 503001 (no name known)". `Maps/AbyssMaps` is unchanged: the corridor is not one of the Abyss's maps for the pause, now said in its comment and pinned by a test.
+
+**Why:** the meter's log in Harry's game on 2026-10-26 had "Map loaded: 503001" at 23:47:26 (+11:00), between "Map loaded: 20" at 23:47:02 and again at 23:49:49, on the same connection. Asked, Harry said it is "an 'artifact corridor'. you spend 2 mins killing mobs inside there for abyss points", and then: "add \"Artifact Corridor\" as map 503001's name ... Don't pause the meter there." The pause is for the Abyss's crowds; the corridor is small and short, its load ends the pause, and the load of 20 on the way out starts it again. No source lists the id or the name, so the table's comment, ARCHITECTURE ("Map probe", "Abyss pause"), THIRD-PARTY-NOTICES ("Data") and SECURITY ("Provenance") say this one comes from the player's own game.
+
+**Checks (private SDK 10.0.402, worktree `smwt\corridor` on branch `artifact-corridor` from main 460805e):** fail-first: with the tests changed and the table not yet, `MapProbeTests.KnownMapsHaveTheirNames(503001, "Artifact Corridor")` and `TheNameTableHoldsTheSourcesWhole` (now seven maps below 600000 and 67 in all) failed by name, 74 tests run; with the name, 74/74. `AbyssPauseTests.TheAbyssIsMaps20And22` gains 503001 as not the Abyss: it passes as it must, and with 503001 added to `AbyssMaps` (a mutation, restored) it failed by name. `scripts/Build.ps1` 718/718 in Debug and in Release (main's 717 plus the new case); Release's five compiler warnings are all in upstream's code.
+
+**Not checked:** a build with the name in the game (HANDOFF's Abyss item says what to look at).
+
+**Next:** the PR's audit, Codex and CI; merge with Harry's go-ahead.
+
 ## 2026-10-26 — v0.3.0 released
 
 **What:** PR #45 merged as f22f4db (standard audit: approve with nits, fixed in 454336d; Codex found nothing on 1a48498 or 454336d; CI passed on both). `v0.3.0` tagged on it; the push went through as the repository's admin, which the "Release tags" ruleset allows and GitHub records as a bypass. The release workflow (run 40306761355) built the draft: `ScarletMeter-0.3.0-win-x64.zip`, `ScarletMeter-0.3.0-source.zip` and their `.sha256`, its notes ending with "What's changed in 0.3.0" from the changelog. Checked as DEVELOPMENT.md "Releases" asks: both checksums match; the program zip has the exe, the `licenses` folder (17 files) and the notices, the source zip RATmeter's `upstream/` (259 files); the 552 files of both zips, searched as bytes in UTF-8 and UTF-16, hold no home path, machine name or e-mail address of the player (the addresses in them are third-party licence authors, upstream's README contact and the tests' made-up ones). The account name appears only as Harry's first name in docs and code comments that quote requests, never in a path, as in v0.2.0's files and the public repository. Published as a pre-release on 2026-10-26 at 21:38 local time, the changelog's date: https://github.com/harrynguon/Scarlet-Meter/releases/tag/v0.3.0.

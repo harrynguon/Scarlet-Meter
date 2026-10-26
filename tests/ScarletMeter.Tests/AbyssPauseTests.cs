@@ -23,11 +23,13 @@ public sealed class AbyssPauseTests
     private static readonly DateTime FightStart = new(2026, 10, 26, 17, 0, 0, DateTimeKind.Local);
 
     // 20 (seen in the game) and 22 (from three sources) are the Abyss; 21 (AetherDPS's alone), the open world, a
-    // dungeon and impossible ids are not.
+    // dungeon and impossible ids are not, nor the Artifact Corridor (503001), an instance of two minutes entered from the
+    // Abyss, where the meter tracks (Harry, 2026-10-27: "Don't pause the meter there").
     [Theory]
     [InlineData(20, true)]
     [InlineData(22, true)]
     [InlineData(21, false)]
+    [InlineData(503001, false)]
     [InlineData(1010, false)]
     [InlineData(600021, false)]
     [InlineData(0, false)]

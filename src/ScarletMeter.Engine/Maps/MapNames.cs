@@ -4,8 +4,8 @@ namespace ScarletMeter.Engine.Maps;
 
 /// <summary>
 /// English names of the game's maps by the id its map-loaded record sends (<see cref="ICombatEngine.MapId"/>), for the
-/// player to read; nothing acts on them. Two parts, from other projects' published data (THIRD-PARTY-NOTICES.md,
-/// "Data"); AION 2's names belong to NCSOFT:
+/// player to read; nothing acts on them. Two parts from other projects' published data (THIRD-PARTY-NOTICES.md,
+/// "Data"), and one map seen in the game; AION 2's names belong to NCSOFT:
 /// <list type="bullet">
 /// <item>The open world and the Abyss: the names SkeeveAN/Aion-DPS-Meter gives each map of the game's field-boss list
 /// (by its internal name, World_L_A and so on), with the ids yykk62/AetherDPS gives those internal names. The
@@ -14,8 +14,11 @@ namespace ScarletMeter.Engine.Maps;
 /// the Abyss in Harry's game (2026-10-26), and 22 is not yet seen there.</item>
 /// <item>Dungeons: taengu/A2Tools-DPS-Meter's list (an instance's map id is its dungeon id), with its difficulty in
 /// brackets where the list gives one.</item>
+/// <item>The Artifact Corridor, 503001: a two-minute instance entered from the Abyss, where mobs give Abyss points. Its
+/// id is the one the map-loaded record sent in Harry's game (2026-10-26, 23:47:26 +11:00, between two loads of the
+/// Abyss's 20 on the same connection), its name Harry's for it; no source lists it.</item>
 /// </list>
-/// Cities and most of the open world are in neither, so they have no name here.
+/// Cities and most of the open world are in none of them, so they have no name here.
 /// </summary>
 public static class MapNames
 {
@@ -28,6 +31,8 @@ public static class MapNames
         [1111] = "Morheim",
         [20] = "Chaotic Lower Reshanta",
         [22] = "Chaotic Middle Reshanta",
+        // Seen in Harry's game, named by Harry: entered from the Abyss, and not the Abyss for its pause (AbyssMaps).
+        [503001] = "Artifact Corridor",
         // Dungeons (A2Tools' list; "the Hall of Illusion" capitalised).
         [600001] = "Krao Cave (Normal)",
         [600002] = "Krao Cave (Exploration)",

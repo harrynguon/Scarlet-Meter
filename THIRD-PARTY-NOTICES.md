@@ -58,7 +58,8 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   the open world's and the Abyss's names from SkeeveAN/Aion-DPS-Meter's `Client/assets/aion2/bosses/field_bosses.json`
   at 23ec79e997b9a0c9e5eb1f322a08337fa6e2803e (last changed in f8d80684419d0ad58ddd0954ec7c3e17b6e52860), MIT,
   Copyright (c) 2026 SkeeveTV (`licenses/MIT.txt`), with the map ids yykk62/AetherDPS's `tools/build-field-bosses.py`
-  gives them at 65edf72f08e08942cf3ecb832c9a222f05cd8b62, GNU GPL v3. Names and ids only, no code.
+  gives them at 65edf72f08e08942cf3ecb832c9a222f05cd8b62, GNU GPL v3. Names and ids only, no code. One name, the
+  Artifact Corridor (503001), comes from the player's own game, not from a source.
 - **Legacy schedule defaults**: adapted from Byanski/aion2timeroverlay at 2a5727ecdf5487e9becb6b3a756819f9d14ff564
   (https://github.com/Byanski/aion2timeroverlay), whose `package.json` declares MIT (author Byanski); the snapshot
   has no separate licence text.
