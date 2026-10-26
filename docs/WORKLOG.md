@@ -16,7 +16,9 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Audit (scarlet-auditor, standard, on 3e0571c): approve with nits**, all applied. (1) 0.1.0 was dated by GitHub's UTC publish time (2026-10-24) where the WORKLOG and HANDOFF use the local day (2026-10-25): now 2026-10-25, and DEVELOPMENT says the dates are the local day. (2) `ChangelogTests` passed a bullet placed before a section's first group, and did not tie a link's `#N` to its `/pull/N`: a section must now start with a group, and a mismatched number fails. (3) The script let a reference link inside a section end it early, without a refusal, and its refusals had been run only by hand: only the closing block of links ends the last section now, the heading's date must be a real date and a trailing space is ignored, and `scripts/Test-ChangelogSection.ps1` (nine cases, CI runs it under pwsh) covers it; against the script as it was, it fails four cases (the inner reference, the trailing space, the impossible date, and the old wording for a dateless heading). `ChangelogTests` also checks that the release workflow's refusal comes before its build. Fail-first, control clean: a bullet before a section's first group, a link to another PR's number, the refusal moved after the build, and CI without the script cases each fail `ChangelogTests`; `scripts/Build.ps1` 640/640. (4) This entry now records the post-merge checks. (5) The release workflow's rewrapped comment is reflowed. The audit found the release workflow's security unchanged (permissions per job, no text evaluated by a shell, the draft job only receiving files) and the changelog's statements accurate against the tags and PRs.
 
-**Next:** push, `@codex review`, CI, then merge with Harry's go-ahead.
+**After the fixes (12f77db):** Codex's fresh review (requested with `@codex review`): no findings, no inline comments or reviews. CI passed on both runs (push and pull request), its new steps printing "CHANGELOG.md has 0.2.0, 9 changes" and, under pwsh, "All changelog cases passed"; tests 640/640.
+
+**Next:** merge with Harry's go-ahead.
 
 ## 2026-10-26 — Other players' training-dummy fights ignored
 
