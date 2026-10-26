@@ -13,6 +13,11 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 - Odyle energy beside the ping, as the game shows it: basic energy, then charged in brackets. "Show Odyle energy"
   in Settings, Appearance turns it off.
   ([#34](https://github.com/harrynguon/Scarlet-Meter/pull/34), [#36](https://github.com/harrynguon/Scarlet-Meter/pull/36))
+- The meter pauses in the Abyss, whose crowds slow it down: it tracks and keeps nothing there, and its header reads
+  "In the Abyss · meter paused". It tracks again once you leave. "Pause in the Abyss" in Settings, Tracking turns it
+  off. ([#42](https://github.com/harrynguon/Scarlet-Meter/pull/42))
+- Settings, About shows the map you are on: its name, where known, and its id.
+  ([#42](https://github.com/harrynguon/Scarlet-Meter/pull/42))
 
 ### Changed
 

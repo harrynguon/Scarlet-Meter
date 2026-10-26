@@ -107,7 +107,8 @@ public partial class MeterPage : IAsyncDisposable
     // The notices stand aside during a boss fight when "Hide during boss fights" is on.
     private bool NoticesHeld => EventRowLayout.HiddenForFight(alertSettings.HideDuringBossFights, bossFightUnderWay);
 
-    private string StatusText => Engine.Capture switch
+    // The header with no fight to show: paused for the Abyss (the engine shows nothing there), else capture's state.
+    private string StatusText => Engine.PausedInAbyss ? "In the Abyss · meter paused" : Engine.Capture switch
     {
         { IsCapturing: false } => "Capture is off",
         { AdapterName: null } => "Waiting for the game's connection...",

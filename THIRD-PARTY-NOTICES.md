@@ -28,8 +28,11 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
 - **A2Tools DPS Meter** (the layout of the game's Odyle energy records and how to find the energy in them,
   `ScarletMeter.Engine/Odyle/OdyleEnergyRecords`), https://github.com/taengu/A2Tools-DPS-Meter pull request #63, merged
   as 94dda50fe5c324bb02fae72d25d0533cb0ef12cd, and its fixes 2723bff70cb7154442f32ca4e4c484d4cf4f62d6 (the
-  one-value entry) and 29e7193a193c24980ce9ad1bd16aa56d2a3196e1 (charged-only entries, updates that start 00), GNU
-  GPL v3: its Rust parsing ported to C#. No captured bytes were taken; Scarlet's tests use synthetic records.
+  one-value entry) and 29e7193a193c24980ce9ad1bd16aa56d2a3196e1 (charged-only entries, updates that start 00); and the
+  layout of the game's map-loaded record (`ScarletMeter.Engine/Maps/MapLoadRecords`), from `parse_map_load_packet` in
+  `src-tauri/src/capture/stream_processor.rs`, added in b1fcd53fd676ad78224f4c89c543d744b0ac3766 and unchanged up to
+  6abf5e7e28ddae93e04e870087d2ae457f752681 (v2.0.79, read on 2026-10-26); GNU GPL v3: its Rust parsing ported to C#.
+  No captured bytes were taken; Scarlet's tests use synthetic records.
 - **.NET** (the runtime bundled in the self-contained `ScarletMeter.exe`, with WPF), Copyright (c) .NET Foundation
   and Contributors, MIT. Its licence and third-party notices are in the release zip's `licenses/runtime/`, and
   WPF's in `licenses/dotnet-wpf/`; for .NET 10 they are also at
@@ -49,6 +52,13 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
 - **World event schedules (Global preset)**: times and window lengths follow taengu/A2Tools-Plugins event-timers
   data at b11f345c93494a2b6a77142002dc26a656b610d2 (https://github.com/taengu/A2Tools-Plugins), GNU GPL v3:
   schedule parameters only, no code.
+- **Map names** (`ScarletMeter.Engine/Maps/MapNames`, shown in Settings, About): the dungeons' names and
+  difficulties from taengu/A2Tools-DPS-Meter's `src/data/i18n/dungeons/en.json` at
+  6abf5e7e28ddae93e04e870087d2ae457f752681 (last changed in f942a54b68c5a5481cf7d4d2ad59a4c00de191fb), GNU GPL v3;
+  the open world's and the Abyss's names from SkeeveAN/Aion-DPS-Meter's `Client/assets/aion2/bosses/field_bosses.json`
+  at 23ec79e997b9a0c9e5eb1f322a08337fa6e2803e (last changed in f8d80684419d0ad58ddd0954ec7c3e17b6e52860), MIT,
+  Copyright (c) 2026 SkeeveTV (`licenses/MIT.txt`), with the map ids yykk62/AetherDPS's `tools/build-field-bosses.py`
+  gives them at 65edf72f08e08942cf3ecb832c9a222f05cd8b62, GNU GPL v3. Names and ids only, no code.
 - **Legacy schedule defaults**: adapted from Byanski/aion2timeroverlay at 2a5727ecdf5487e9becb6b3a756819f9d14ff564
   (https://github.com/Byanski/aion2timeroverlay), whose `package.json` declares MIT (author Byanski); the snapshot
   has no separate licence text.

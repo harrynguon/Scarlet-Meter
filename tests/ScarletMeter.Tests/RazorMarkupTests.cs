@@ -534,6 +534,40 @@ public sealed partial class RazorMarkupTests
         Assert.True(Px(Block(css, ".row"), "height") - size >= 6, "the icon leaves room above and below it in the row");
     }
 
+    // In the Abyss the header says the meter is paused (Harry: "like where it says 'Combat' when you're in combat"), in
+    // the place "No active target" takes, before any capture state; the engine's snapshot is empty then, so that is
+    // what shows. Settings, Tracking has the switch, bound to the fight rule the engine follows.
+    [Fact]
+    public void TheHeaderSaysWhenTheMeterIsPausedInTheAbyss()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
+        Assert.Matches(@"StatusText => Engine\.PausedInAbyss \? ""In the Abyss · meter paused"" : Engine\.Capture switch", code);
+        var markup = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
+        Assert.Matches(@"(?s)@if \(snapshot\.Target is \{ \} fighting\).*else\s*\{\s*<span class=""target-name muted"">@StatusText</span>", markup);
+
+        var settings = File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor"));
+        var tracking = Regex.Match(settings, @"(?s)case ""Tracking"":(?<body>.*?)break;").Groups["body"].Value;
+        Assert.Matches(@"<ToggleSetting Label=""Pause in the Abyss""[^>]*Value=""@S\.Fight\.PauseInAbyss"" ValueChanged=""@\(v => Change\(s => s with \{ Fight = s\.Fight with \{ PauseInAbyss = v \} \}\)\)"" />", tracking);
+    }
+
+    // Settings, About shows the map the game last loaded (the map probe), its name and id as MapText writes them, and
+    // keeps it current while the tab is open: the page follows MapChanged onto the renderer's dispatcher and lets go of
+    // it when it goes, so a closed settings window leaves no handler on the engine.
+    [Fact]
+    public void TheAboutTabShowsTheMapAndFollowsIt()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        var markup = File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor"));
+        var about = Regex.Match(markup, @"(?s)case ""About"":(?<body>.*?)break;").Groups["body"].Value;
+        Assert.Matches(@"<span class=""label"">Map</span>\s*<span class=""desc"">@MapText\.Status\(Engine\.MapId\)</span>", about);
+
+        var code = File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor.cs"));
+        Assert.Matches(@"Engine\.MapChanged \+= OnMapChanged;", code);
+        Assert.Matches(@"(?s)public void Dispose\(\).*Engine\.MapChanged -= OnMapChanged;", code);
+        Assert.Matches(@"OnMapChanged\(object\? sender, int\? mapId\)\s*\{\s*if \(current == ""About""\) _ = InvokeAsync\(StateHasChanged\);", code);
+    }
+
     // Odyle energy sits left of the ping (Harry: "place it to the left of the ping display") once the game has sent it
     // and while "Show Odyle energy" is on, as basic then charged; the two sit together at the line's end. The page
     // reads the value on its refresh loop, on the renderer's dispatcher, not from the capture thread's event.

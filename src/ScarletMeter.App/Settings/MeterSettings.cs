@@ -125,6 +125,12 @@ public sealed record FightSettings
 
     /// <summary>Days of boss-fight history to keep.</summary>
     public int HistoryRetentionDays { get; init; } = 30;
+
+    /// <summary>
+    /// Pause the meter in the Abyss, whose crowds slow it down: nothing is tracked, kept or saved there, and the
+    /// overlay says so (ICombatEngine.PausedInAbyss). On by default; a settings file from before it loads with it on.
+    /// </summary>
+    public bool PauseInAbyss { get; init; } = true;
 }
 
 /// <summary>How the overlay looks. Applied live.</summary>

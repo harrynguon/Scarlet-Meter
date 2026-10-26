@@ -165,6 +165,20 @@ public sealed class SettingsTests : IDisposable
         Assert.True(result.Settings.Fight.BossOnlyCapture);
     }
 
+    // A file from before the Abyss pause loads with it on (the default Harry asked for), keeping the fight rules it has.
+    [Fact]
+    public void AFileFromBeforeTheAbyssPauseLoadsWithItOn()
+    {
+        File.WriteAllText(Path.Combine(directory.FullPath, "settings.json"),
+            """{ "version": 1, "fight": { "bossOnlyCapture": true, "groupSummonDamage": false }, "appearance": {}, "overlay": { "toggleHotkey": "F9" }, "windows": {} }""");
+        var result = NewStore().Load();
+        Assert.Equal(SettingsLoadStatus.Loaded, result.Status);
+        Assert.True(result.Settings.Fight.PauseInAbyss);
+        Assert.True(result.Settings.Fight.BossOnlyCapture);
+        Assert.False(result.Settings.Fight.GroupSummonDamage);
+        Assert.True(new FightSettings().PauseInAbyss);
+    }
+
     // "Boss encounters only" is on by default (Harry, 2026-10-26), for a new install and for a file whose fight section
     // never named it; a file that saved it off keeps it off, since that may be the player's own choice (AGENTS.md:
     // "Preserve user customizations when updating defaults").
@@ -540,12 +554,13 @@ public sealed class SettingsTests : IDisposable
         service.Changed += (_, _) => raised++;
 
         Assert.True(engineSettings.BossOnlyCapture); // the default, applied on load
-        service.Update(s => s with { Fight = s.Fight with { BossOnlyCapture = false, GroupSummonDamage = false, HistoryRetentionDays = 12_000 } });
+        service.Update(s => s with { Fight = s.Fight with { BossOnlyCapture = false, GroupSummonDamage = false, HistoryRetentionDays = 12_000, PauseInAbyss = false } });
         service.Update(s => s); // no change: no event, no save
 
         Assert.Equal(1, raised);
         Assert.False(engineSettings.BossOnlyCapture);
         Assert.False(engineSettings.GroupSummonDamage);
+        Assert.False(engineSettings.PauseInAbyss);
         Assert.Equal(FightSettings.MaxRetentionDays, engineSettings.HistoryRetentionDays);
 
         service.Flush();

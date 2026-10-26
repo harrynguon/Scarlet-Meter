@@ -121,6 +121,10 @@ and adds it up per player and per fight.
 - **Fight options**: boss fights only (on by default; a boss the meter did not see appear, if you start it mid-fight,
   or one too new for RATmeter's list is not counted while it is on), summons folded into their owner, a one-minute
   cap on training dummies.
+- **Pauses in the Abyss**: hundreds of players fighting at once slow any meter down, so in the Abyss Scarlet Meter
+  tracks and keeps nothing and its header reads "In the Abyss · meter paused"; it tracks again once you leave. On by
+  default; switch it off in Settings, Tracking. Settings, About shows the map you are on (its name, where known, and
+  its id).
 
 <p align="center"><img src="docs/images/settings-alerts.png" alt="Settings, Alerts tab" width="500"/></p>
 
@@ -137,6 +141,7 @@ opacity, a background picture, class colours, hidden names and a show/hide hotke
 | Picture opacity separate from the meter's | Yes | No |
 | World-event and field-boss alerts | Yes | No |
 | Odyle energy beside the ping | Yes | No |
+| Pauses itself in the Abyss | Yes | No |
 | Ignores other players' training-dummy fights | Yes | No |
 | Demo mode with made-up fights | Yes | No |
 | Buff and skill-cooldown overlays | No | Yes |

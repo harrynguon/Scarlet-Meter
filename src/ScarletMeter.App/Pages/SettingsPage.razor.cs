@@ -14,7 +14,8 @@ namespace ScarletMeter.App.Pages;
 /// <summary>
 /// The settings window. Every control writes through <see cref="SettingsService.Update"/>, so values are
 /// validated, applied live and saved; the page re-renders when settings change anywhere (a window move,
-/// another control) and, on the Alerts tab, whenever the world-event monitor wakes (at least once a minute).
+/// another control), on the Alerts tab whenever the world-event monitor wakes (at least once a minute), and on the
+/// About tab when a release check ends or the game loads another map.
 /// </summary>
 public partial class SettingsPage : IDisposable
 {
@@ -38,6 +39,8 @@ public partial class SettingsPage : IDisposable
 
     [Inject] private EngineOptions Options { get; set; } = default!;
 
+    [Inject] private ICombatEngine Engine { get; set; } = default!;
+
     [Inject] private ILogger<SettingsPage> Logger { get; set; } = default!;
 
     private MeterSettings S => Settings.Current;
@@ -56,6 +59,7 @@ public partial class SettingsPage : IDisposable
         Settings.SaveStatusChanged += OnSaveStatusChanged;
         Alerts.Changed += OnAlertsChanged;
         Updates.Changed += OnUpdatesChanged;
+        Engine.MapChanged += OnMapChanged;
     }
 
     private void Change(Func<MeterSettings, MeterSettings> change) => Settings.Update(change);
@@ -156,6 +160,12 @@ public partial class SettingsPage : IDisposable
         if (current == "About") _ = InvokeAsync(StateHasChanged);
     }
 
+    // A new map re-renders the About tab while it is shown; raised on the capture thread.
+    private void OnMapChanged(object? sender, int? mapId)
+    {
+        if (current == "About") _ = InvokeAsync(StateHasChanged);
+    }
+
     // Keeps the Alerts tab's "next" times current; other tabs show nothing that moves.
     private void OnAlertsChanged(object? sender, EventArgs e)
     {
@@ -169,5 +179,6 @@ public partial class SettingsPage : IDisposable
         Settings.SaveStatusChanged -= OnSaveStatusChanged;
         Alerts.Changed -= OnAlertsChanged;
         Updates.Changed -= OnUpdatesChanged;
+        Engine.MapChanged -= OnMapChanged;
     }
 }

@@ -114,5 +114,6 @@ public sealed class SettingsService : IDisposable
         engineSettings.GroupSummonDamage = fight.GroupSummonDamage;
         engineSettings.OneMinuteDummyMode = fight.OneMinuteDummyMode;
         engineSettings.HistoryRetentionDays = fight.HistoryRetentionDays;
+        engineSettings.PauseInAbyss = fight.PauseInAbyss;
     }
 }

@@ -89,6 +89,8 @@
                                    Value="@S.Fight.GroupSummonDamage" ValueChanged="@(v => Change(s => s with { Fight = s.Fight with { GroupSummonDamage = v } }))" />
                     <ToggleSetting Label="Cap dummy parses at one minute" Description="Stop counting hits on a training dummy a minute after the first hit."
                                    Value="@S.Fight.OneMinuteDummyMode" ValueChanged="@(v => Change(s => s with { Fight = s.Fight with { OneMinuteDummyMode = v } }))" />
+                    <ToggleSetting Label="Pause in the Abyss" Description="Its crowds slow the meter down, so while you are in the Abyss it tracks nothing, keeps nothing and says so. It tracks again once you leave."
+                                   Value="@S.Fight.PauseInAbyss" ValueChanged="@(v => Change(s => s with { Fight = s.Fight with { PauseInAbyss = v } }))" />
                 </section>
                 <section>
                     <h2>History</h2>
@@ -169,6 +171,12 @@
                             <span class="desc mono">@DataDirectory</span>
                         </span>
                         <button type="button" class="btn" @onclick="Windows.OpenDataFolder">Open</button>
+                    </div>
+                    <div class="setting">
+                        <span class="text">
+                            <span class="label">Map</span>
+                            <span class="desc">@MapText.Status(Engine.MapId)</span>
+                        </span>
                     </div>
                 </section>
                 <section>
