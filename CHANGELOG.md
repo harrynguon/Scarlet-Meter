@@ -8,6 +8,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-26
+
 ### Added
 
 - Odyle energy beside the ping, as the game shows it: basic energy, then charged in brackets. "Show Odyle energy"
@@ -95,6 +97,7 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 - A portable copy: unzip it anywhere and run it, settings, history and logs beside the exe.
   ([#15](https://github.com/harrynguon/Scarlet-Meter/pull/15), [#19](https://github.com/harrynguon/Scarlet-Meter/pull/19))
 
-[Unreleased]: https://github.com/harrynguon/Scarlet-Meter/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/harrynguon/Scarlet-Meter/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/harrynguon/Scarlet-Meter/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/harrynguon/Scarlet-Meter/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/harrynguon/Scarlet-Meter/releases/tag/v0.1.0
