@@ -638,8 +638,8 @@ public sealed partial class RazorMarkupTests
         // The cut is hard (opaque and transparent at the same stop), so nothing of the next row peeks out below the
         // last whole row, the pinned own row included (Harry: a fade let it show). It is the list's bottom padding and
         // the last row's gap less the own row's ring (drawn 1 px outside the row): wider would clip that ring or the
-        // last row at the list's end (the first cut clipped the ring, seen in a headless render), as wide as the gap or
-        // narrower would show the next row's top (audit on PR #35).
+        // last row at the list's end (the first cut clipped the ring, seen in a headless render), as wide as the bottom
+        // padding or narrower would show the next row's top (audit on PR #35; corrected in the audit on #44).
         var cut = Regex.Match(scrolls, @"(?m)^\s*mask-image:\s*linear-gradient\(to bottom, #000 calc\(100% - (?<px>\d+)px\), transparent calc\(100% - (?<to>\d+)px\)\);");
         Assert.True(cut.Success, "the list's bottom edge is cut off");
         Assert.Equal(cut.Groups["px"].Value, cut.Groups["to"].Value);
@@ -648,7 +648,14 @@ public sealed partial class RazorMarkupTests
         var ring = Regex.Match(Block(css, ".row.me"), @"box-shadow:\s*0 0 0 (?<w>[\d.]+)px");
         Assert.True(ring.Success, "the own row's ring is a box-shadow spread outside it");
         var ringWidth = double.Parse(ring.Groups["w"].Value, System.Globalization.CultureInfo.InvariantCulture);
-        Assert.Matches(@"box-shadow:\s*0 0 0 " + Regex.Escape(ring.Groups["w"].Value) + "px", Block(css, ".fx .row.me")); // the same width with effects on
+        // Every rule that rings the own row, with effects on and in every theme, rings it at that width (audit on #44:
+        // the guard read only two of them), so the cut keeps each whole.
+        var ringRules = Regex.Matches(Regex.Replace(css, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline),
+                @"(?m)^(?<selector>[^{}\r\n]*\.row\.me\b[^{}\r\n]*)\{(?<body>[^}]*)\}")
+            .Where(rule => Regex.IsMatch(rule.Groups["body"].Value, @"box-shadow:\s*0 0 0 "))
+            .ToList();
+        Assert.True(ringRules.Count >= 3, "the plain ring, the effects' glow and a theme's");
+        Assert.All(ringRules, rule => Assert.Matches(@"box-shadow:\s*0 0 0 " + Regex.Escape(ring.Groups["w"].Value) + "px", rule.Groups["body"].Value));
         var gap = Px(row, "margin-bottom");
         var bottomPadding = double.Parse(padding.Groups["bottom"].Value, System.Globalization.CultureInfo.InvariantCulture);
         var cutPx = double.Parse(cut.Groups["px"].Value, System.Globalization.CultureInfo.InvariantCulture);

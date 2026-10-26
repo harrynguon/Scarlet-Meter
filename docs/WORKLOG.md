@@ -12,7 +12,9 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Not checked:** in game (the row size other than 1 scales the cut with the rows, by the list's zoom; not seen).
 
-**Next:** PR, standard audit, Codex, CI, merge (Harry's go-ahead), then the portable copy.
+**Audit (scarlet-auditor, standard, on 6691224): approve with nits**, all applied. It checked the geometry against the code and rendered the branch headless at row sizes 0.75, 1 and 1.5, display scales 1, 1.25 and 1.5, effects on and off, the own row pinned and ranked 3rd, and scrolled to the end: the ring whole and nothing of the next row below the fifth; main's stylesheet reproduced Harry's sliver. (1) The docs claimed nothing peeks out below the last whole row at any scroll: only at a whole-row position (scrolled mid-row, or on a screen too short for five rows, a part row shows, cut off sharply), and nothing ever under the pinned own row; the stylesheet's comment and ARCHITECTURE say so now. (2) The test's comment put the limit at the gap; it is the bottom padding. (3) LESSONS' newest entries ran into each other in Markdown: blank lines restored. (4) The ring check read two of the own row's three ring rules: it reads every rule that rings `.row.me` now, and a theme's ring made 2 px fails it. Not taken: the top edge's counterpart (1 px of the row beneath can show above the own row pinned at the top after a mid-row scroll), which predates this PR. CI passed on 965878c and 6691224; Codex's first review was still running.
+
+**Next:** Codex on the fixes, CI, merge (Harry's go-ahead), then the portable copy.
 
 ## 2026-10-26 — Map probe and the Abyss pause
 

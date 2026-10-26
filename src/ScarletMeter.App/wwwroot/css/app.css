@@ -416,9 +416,11 @@ button {
    too short; Harry: in big raids the meter was "just too long vertically"): the list scrolls, with
    a thin scrollbar, the sign that more follow. Its bottom 8 px are cut off, not faded: the list's bottom padding and
    the last whole row's 3 px gap less the 1 px of the player's own ring (.row.me's box-shadow, drawn outside the row),
-   so that ring stays whole while the next row, which starts 3 px below, never shows. A fade let the next row's top
-   peek out, under the player's own row too when that is pinned in the last row's place, which read as a glitch
-   (Harry, 2026-10-26: "would it be cleaner to hide this mini section of their dps bar"). No scroll anchoring: when
+   so that ring stays whole while, at a whole-row scroll position, the next row (3 px below) does not show; nothing
+   shows under the player's own row pinned in the last row's place, whatever the scroll. Scrolled mid-row, or on a
+   screen too short for five rows, a part row can still show above the cut, cut off sharply. A fade let the next row's
+   top peek out, under the pinned own row too, which read as a glitch (Harry, 2026-10-26: "would it be cleaner to hide
+   this mini section of their dps bar"). No scroll anchoring: when
    rows swap at the view's edge, Chromium would otherwise move the scroll position by a row to keep the row it anchored
    on in place, so the view would drift by a rank with each swap (js/overlay-fx.js measures in the view's coordinates
    either way; audit on PR #35). */
