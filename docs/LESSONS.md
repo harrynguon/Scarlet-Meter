@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**Other players' training-dummy fights filled the overlay and History** (Harry, 2026-10-26: "if i afk there then it'll pollute the dps logs with randoms").
+- What: standing by a training dummy other players were hitting, the meter showed their fight and saved it to History. Upstream counts every dummy as a boss (so its fights are saved), and once the user's own last hit is five seconds old its `ActiveTargetResolver` makes the target with the most recent hits the active fight, whoever dealt them.
+- Why: the engine took upstream's choice of "the fight" and its boss list as given. The demo and every test had one party on one target, so nobody asked what upstream does beside players who are not in the party.
+- Guard: `DummyFightRule` (pure), applied by `DummyFightFilter` to the overlay, the details and the history list and by `DummyFightHistoryStore` to saves (ARCHITECTURE "Training dummies"); `DummyFightTests` put a stranger beside the user through the real graph, and 19 mutations each failed their test by name. When the meter shows or saves upstream's idea of the current fight, test it with someone outside the party hitting something nearby.
+
 **The overlay's saved place was dropped again, at no rows** (deep audit on #37, fixed before merge).
 - What: with the window hugging its content, it saved its shown height, which at no rows and no notice due is 77 px, below the 96 px floor `SettingsNormalizer` keeps a saved size to, so the whole placement was dropped and the meter came back centred: the same failure as "A small overlay lost its saved position" below.
 - Why: the floor was set for a window the player sized; when the window became as short as its content, nothing re-checked the smallest content against it, and the earlier guard tested only the player's smallest size.
@@ -160,6 +165,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - Guard: `SettingsTests.AFileSavedWithAByteOrderMarkLoads`. Seed test files the way people actually write them.
 
 ## In the process
+
+**A mutation run that ran no test passed its controls** (2026-10-26, the dummy-fight change; caught before any result was used).
+- What: the fail-first script ran the test executable with `--filter-class`, the testing platform's option, but the executable is xunit's own runner (`-class`): it refused the option and ran nothing. Every mutation came out "missed" and both controls "passed", since nothing failed.
+- Why: the controls checked only that no test failed, which a run of no tests also satisfies; the test count was printed but not checked.
+- Guard: the script's verdict needs a test count above zero ("no tests ran" otherwise) and cross-checks the failures it names with the summary's count. A control proves the guard only when it also shows the tests ran.
+
+**A line-ending check read LF files as CRLF** (2026-10-26, the dummy-fight change; caught before commit).
+- What: the editor writes new files with LF while the repository's working files are CRLF. `grep -c $'\r$'` in Git Bash reported every line of the five new files as CRLF; only `od -c` showed plain LF.
+- Why: the count looked right (one per line) and matched what was expected, so it was not questioned.
+- Guard: count carriage returns as bytes (`tr -cd '\r' < file | wc -c` beside `tr -cd '\n'`, or PowerShell's `ReadAllBytes`), and convert new files with PowerShell (`ReadAllText`, `\r\n`, `WriteAllText` without a BOM), not Git Bash's `sed -i`, which writes LF.
 
 **A helper that rewrote test lines dropped five new assertions** (2026-10-26, caught by a fail-first run before commit).
 - What: replacing a test's lines by number with a PowerShell function, the multi-line replacements were written as `` Line 85 'a' + "`r`n" + 'b' ``, which PowerShell parses as separate arguments: only the first piece was written, and the rest (the no-rows guard among them) silently went missing. The build and every test passed.

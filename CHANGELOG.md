@@ -30,6 +30,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
   a boss and its adds does not resize the meter. With more players the top five show and the rest scroll, your own bar
   pinned in view. Only the meter's width can be resized now.
   ([#35](https://github.com/harrynguon/Scarlet-Meter/pull/35), [#37](https://github.com/harrynguon/Scarlet-Meter/pull/37), [#40](https://github.com/harrynguon/Scarlet-Meter/pull/40))
+- Other players' fights on a training dummy are ignored, neither shown nor saved to History, unless you hit that
+  dummy too (then everyone on it counts, as in any fight). Until the meter has seen your character (your own bar's
+  ring is the sign), every dummy fight counts as before. ([#38](https://github.com/harrynguon/Scarlet-Meter/pull/38))
 
 ## [0.2.0] - 2026-10-25
 
