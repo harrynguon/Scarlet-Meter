@@ -94,6 +94,9 @@ and adds it up per player and per fight.
 - **Player details**: click anyone for their skill-by-skill damage (with crit, back-attack and other rates), buffs
   and uptime, a damage graph and the combat log.
 - **History** of saved boss fights, searchable, kept for as long as you choose.
+- **Characters**: every character you log in on with the meter running, with its Odyle energy, when basic energy is
+  full again, and Nightmare and Ascension entries left, estimated (≈) from what the game last said. Click the Odyle
+  energy, or Settings, Appearance, Characters. The recharge times are not yet checked in the game.
 
 **World events**
 
@@ -141,6 +144,7 @@ opacity, a background picture, class colours, hidden names and a show/hide hotke
 | Picture opacity separate from the meter's | Yes | No |
 | World-event and field-boss alerts | Yes | No |
 | Odyle energy beside the ping | Yes | No |
+| Every character's Odyle energy and entries at a glance | Yes | No |
 | Pauses itself in the Abyss | Yes | No |
 | Ignores other players' training-dummy fights | Yes | No |
 | Demo mode with made-up fights | Yes | No |
@@ -172,6 +176,7 @@ All in the `data` folder beside `ScarletMeter.exe`, so you can back it up, move 
 | Logs, one file a day, the 14 newest kept | `data\logs\scarlet-<date>.log` |
 | Settings, and the previous save | `data\settings.json`, `data\settings.json.bak` |
 | Saved boss fights | `data\combat-history.db` (demo fights: `data\demo-history.db`) |
+| Your characters (Odyle energy, entries left), and the previous save | `data\roster.json`, `data\roster.json.bak` (demo: `data\demo-roster.json`) |
 | Your background picture | `data\backgrounds\` |
 | The meter's browser cache (WebView2) | `data\webview2\` |
 | The boss-timers window's own browser data (the site's cookies and choices) | `data\webview2-timers\` |

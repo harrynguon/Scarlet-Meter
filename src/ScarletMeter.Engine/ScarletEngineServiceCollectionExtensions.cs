@@ -8,6 +8,7 @@ using AionDpsMeter.Services.Services.Session.Persistence;
 using AionDpsMeter.Services.Services.Settings;
 using AionDpsMeter.Services.Services.Timed;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using ScarletMeter.Engine.Upstream;
 using ScarletMeter.Engine.Upstream.Demo;
@@ -29,6 +30,8 @@ public static class ScarletEngineServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(options);
 
         services.AddLogging();
+        // The clock the entry counts are stamped with; a host (or a test) may register its own first.
+        services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton(options);
         services.AddSingleton(settings ?? new EngineSettings());
         services.AddSingleton<IAppSettingsService, UpstreamSettingsBridge>();
@@ -62,11 +65,11 @@ public static class ScarletEngineServiceCollectionExtensions
         services.AddSingleton<CombatSessionManager>();
         services.AddPacketProcessingRouting();
         services.AddSingleton<IPacketService, PacketPipelineService>();
-        // Records upstream does not decode (Odyle energy, the map loaded): read beside the pipeline from the same
-        // reassembled stream by one tap, which opens each LZ4 bundle once for all its readers.
-        services.AddSingleton<OdyleEnergyTap>();
+        // Records upstream does not decode (the entry counts with Odyle energy, the map loaded): read beside the
+        // pipeline from the same reassembled stream by one tap, which opens each LZ4 bundle once for all its readers.
+        services.AddSingleton<EntryListTap>();
         services.AddSingleton<MapLoadTap>();
-        services.AddSingleton<IRecordReader>(provider => provider.GetRequiredService<OdyleEnergyTap>());
+        services.AddSingleton<IRecordReader>(provider => provider.GetRequiredService<EntryListTap>());
         services.AddSingleton<IRecordReader>(provider => provider.GetRequiredService<MapLoadTap>());
         services.AddSingleton<RecordTap>();
         // The Abyss pause: the settings bridge reads its state on every hit, so the state is its own object.

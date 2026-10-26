@@ -25,10 +25,16 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   Copyright (c) 2026 Kuroukihime, GNU GPL v3. Included unmodified as the `upstream/` submodule at a release tag.
 - **harrynguon/AIon2-Dps-Meter** (the World Companion's schedule engine, `DeferredWindowClose`), a fork of RATmeter,
   https://github.com/harrynguon/AIon2-Dps-Meter, GNU GPL v3.
-- **A2Tools DPS Meter** (the layout of the game's Odyle energy records and how to find the energy in them,
-  `ScarletMeter.Engine/Odyle/OdyleEnergyRecords`), https://github.com/taengu/A2Tools-DPS-Meter pull request #63, merged
-  as 94dda50fe5c324bb02fae72d25d0533cb0ef12cd, and its fixes 2723bff70cb7154442f32ca4e4c484d4cf4f62d6 (the
-  one-value entry) and 29e7193a193c24980ce9ad1bd16aa56d2a3196e1 (charged-only entries, updates that start 00); and the
+- **A2Tools DPS Meter** (the layout of the game's list of entry counts, Odyle energy among them, and how to find it,
+  `ScarletMeter.Engine/Entries/EntryListRecords`; and whose the counts are, the character the next self record names,
+  `ScarletMeter.Engine/Upstream/EntryListTap`), https://github.com/taengu/A2Tools-DPS-Meter: the Odyle entry from pull
+  request #63, merged as 94dda50fe5c324bb02fae72d25d0533cb0ef12cd, and its fixes
+  2723bff70cb7154442f32ca4e4c484d4cf4f62d6 (the one-value entry) and 29e7193a193c24980ce9ad1bd16aa56d2a3196e1
+  (charged-only entries, updates that start 00); the whole list by entry id (`content_entry_at` and the list and update
+  readers in `src-tauri/src/capture/stream_processor.rs`, the owner rule in `src-tauri/src/combat/data_storage.rs`) from
+  b79969aa35cc8d4cd402b63de07ce1733dbe7807, 2149936b642a6c9328622166937d59030888a5e4 (a login's list that does not
+  read, updates that must read whole) and caa7ed4a1947f6cfed8f609595b07b43c1787575 (time entries), unchanged in those
+  readers up to b93353150ffef43bff1276f4fc609b2fd6e6e38f (read on 2026-10-27); and the
   layout of the game's map-loaded record (`ScarletMeter.Engine/Maps/MapLoadRecords`), from `parse_map_load_packet` in
   `src-tauri/src/capture/stream_processor.rs`, added in b1fcd53fd676ad78224f4c89c543d744b0ac3766 and unchanged up to
   6abf5e7e28ddae93e04e870087d2ae457f752681 (v2.0.79, read on 2026-10-26); GNU GPL v3: its Rust parsing ported to C#.
@@ -52,6 +58,11 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
 - **World event schedules (Global preset)**: times and window lengths follow taengu/A2Tools-Plugins event-timers
   data at b11f345c93494a2b6a77142002dc26a656b610d2 (https://github.com/taengu/A2Tools-Plugins), GNU GPL v3:
   schedule parameters only, no code.
+- **Character roster rules** (`ScarletMeter.App/Roster/RosterRules`): basic Odyle energy's refill (+15 every three
+  hours on the hours that meet the daily reset, the 560 and 840 caps), the entry ids of Nightmare and Ascension Trial
+  and their caps and recharges, from the Roster / Content Overview plugin by Nullception in taengu/A2Tools-Plugins,
+  `plugins/alt-roster` (`logic.js` and `plugin.js`) at 7a4720bf6af8adfe1fe03359540da007e9566c71
+  (https://github.com/taengu/A2Tools-Plugins), GNU GPL v3: the rules only, written anew in C#.
 - **Map names** (`ScarletMeter.Engine/Maps/MapNames`, shown in Settings, About): the dungeons' names and
   difficulties from taengu/A2Tools-DPS-Meter's `src/data/i18n/dungeons/en.json` at
   6abf5e7e28ddae93e04e870087d2ae457f752681 (last changed in f942a54b68c5a5481cf7d4d2ad59a4c00de191fb), GNU GPL v3;

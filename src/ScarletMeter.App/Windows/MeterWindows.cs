@@ -19,6 +19,9 @@ public interface IMeterWindows
     /// <summary>Opens the history window, or brings it forward.</summary>
     void OpenHistory();
 
+    /// <summary>Opens the character roster (Odyle energy and entries of every character seen), or brings it forward.</summary>
+    void OpenRoster();
+
     /// <summary>Shows a player in the details window: from the live fight, or from a saved fight when <paramref name="fightId"/> is given.</summary>
     void OpenPlayerDetails(long playerId, Guid? fightId = null);
 
@@ -91,6 +94,7 @@ public sealed class MeterWindows : IMeterWindows
     public static readonly ToolWindowSpec Settings = new(WindowKeys.Settings, typeof(SettingsPage), "Scarlet Meter · Settings", 540, 660, 420, 360);
     public static readonly ToolWindowSpec History = new(WindowKeys.History, typeof(FightHistoryPage), "Scarlet Meter · History", 860, 620, 560, 360);
     public static readonly ToolWindowSpec PlayerDetails = new(WindowKeys.PlayerDetails, typeof(PlayerDetailsPage), "Scarlet Meter · Player details", 980, 600, 620, 360);
+    public static readonly ToolWindowSpec Roster = new(WindowKeys.Roster, typeof(RosterPage), "Scarlet Meter · Characters", 860, 480, 560, 280);
 
     private readonly IServiceProvider services;
     private readonly SettingsService settings;
@@ -153,6 +157,8 @@ public sealed class MeterWindows : IMeterWindows
     public void OpenSettings() => Open(Settings);
 
     public void OpenHistory() => Open(History);
+
+    public void OpenRoster() => Open(Roster);
 
     public void OpenPlayerDetails(long playerId, Guid? fightId = null)
     {

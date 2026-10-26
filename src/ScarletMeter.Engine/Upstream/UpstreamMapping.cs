@@ -23,6 +23,16 @@ internal static class UpstreamMapping
         s.CriticalRate, s.PlayerDeaths);
 
     /// <summary>
+    /// A tracked player as the character the game named as the user's, or null when upstream has not marked it as the
+    /// user or has no name for it. The class id is read as upstream's PlayerSession reads it, its name is Global's.
+    /// </summary>
+    public static CharacterIdentity? ToIdentity(Player? player) =>
+        player is { IsIdentified: true, IsUser: true } && !string.IsNullOrWhiteSpace(player.Name)
+            ? new CharacterIdentity(player.Name, player.ServerName ?? string.Empty, (int)(player.CharacterClass?.Id ?? 0),
+                GlobalNames.Of(player.CharacterClass?.Name), Math.Max(0, player.CombatPower))
+            : null;
+
+    /// <summary>
     /// One player's details from the parts upstream computes. <paramref name="hitsNewestFirst"/> is the player's
     /// whole hit list, newest first, as upstream returns it; only the newest <see cref="PlayerDetails.CombatLogLimit"/>
     /// become the log.

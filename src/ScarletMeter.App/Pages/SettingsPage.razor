@@ -66,6 +66,14 @@
                                    Value="@S.Appearance.ShowCombatPower" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { ShowCombatPower = v } }))" />
                     <ToggleSetting Label="Show Odyle energy" Description="Beside the ping: basic energy, then charged in brackets. The game sends it at login, after a server transfer and when it changes, so after starting the meter mid-session it appears with the next of those."
                                    Value="@S.Appearance.ShowOdyleEnergy" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { ShowOdyleEnergy = v } }))" />
+                    @* The roster also opens from the overlay's Odyle energy; this way works with it hidden or not sent yet. *@
+                    <div class="setting">
+                        <span class="text">
+                            <span class="label">Characters</span>
+                            <span class="desc">Every character you log in on with the meter running: Odyle energy, when it is full again, and Nightmare and Ascension entries left.</span>
+                        </span>
+                        <button type="button" class="btn" @onclick="Windows.OpenRoster">Open</button>
+                    </div>
                     <ToggleSetting Label="Bar effects" Description="A shine on the bars, each class's animated effect (fire and ice, poison, arrows...), and rows that glide when someone overtakes. Off for plain bars; Windows' reduce-motion setting also stops the motion."
                                    Value="@S.Appearance.BarEffects" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { BarEffects = v } }))" />
                     @if (S.Appearance.BarEffects)

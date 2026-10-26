@@ -6,8 +6,8 @@ using ScarletMeter.Engine.Maps;
 namespace ScarletMeter.Tests;
 
 /// <summary>
-/// Synthetic game records and the stream they travel in, for the tests of the records upstream does not decode (Odyle
-/// energy, the map loaded): framing, LZ4 bundles and bringing upstream's reassembly into step. Never captured bytes.
+/// Synthetic game records and the stream they travel in, for the tests of the records upstream does not decode (the
+/// entry list with Odyle energy, the map loaded): framing, LZ4 bundles and bringing upstream's reassembly into step. Never captured bytes.
 /// </summary>
 internal static class SyntheticRecords
 {
@@ -34,7 +34,7 @@ internal static class SyntheticRecords
         return Frame(0xFFFF, Convert.ToHexString([.. size, .. compressed.AsSpan(0, length)]));
     }
 
-    // A record from its opcode and body, framed as OdyleEnergyRecordWriter frames them: the length varint counts what
+    // A record from its opcode and body, framed as EntryListRecordWriter frames them: the length varint counts what
     // follows it plus 4, as upstream's stream reassembly does.
     public static byte[] Frame(ushort opcode, string body)
     {

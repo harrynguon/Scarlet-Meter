@@ -243,9 +243,10 @@ public static class WindowKeys
     public const string History = "history";
     public const string PlayerDetails = "details";
     public const string BossTimers = "timers";
+    public const string Roster = "roster";
 
     public static IReadOnlySet<string> All { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
-        Overlay, Settings, History, PlayerDetails, BossTimers,
+        Overlay, Settings, History, PlayerDetails, BossTimers, Roster,
     };
 }

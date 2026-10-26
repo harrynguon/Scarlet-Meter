@@ -29,7 +29,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     private readonly ICombatHistoryStore history;
     private readonly SavedHistoryReader savedHistory;
     private readonly RecordTap records;
-    private readonly OdyleEnergyTap odyle;
+    private readonly EntryListTap entries;
     private readonly MapLoadTap maps;
     private readonly AbyssPause pause;
     private readonly DummyFightFilter dummies;
@@ -47,7 +47,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         ICombatHistoryStore history,
         IDbContextFactory<CombatHistoryDbContext> historyDatabase,
         RecordTap records,
-        OdyleEnergyTap odyle,
+        EntryListTap entries,
         MapLoadTap maps,
         AbyssPause pause,
         DummyFightFilter dummies,
@@ -59,7 +59,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         this.history = history;
         savedHistory = new SavedHistoryReader(historyDatabase);
         this.records = records;
-        this.odyle = odyle;
+        this.entries = entries;
         this.maps = maps;
         this.pause = pause;
         this.dummies = dummies;
@@ -78,12 +78,20 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         remove => sessions.PingUpdated -= value;
     }
 
-    public OdyleEnergy? OdyleEnergy => odyle.Current;
+    public OdyleEnergy? OdyleEnergy => entries.Odyle;
 
     public event EventHandler<OdyleEnergy>? OdyleEnergyUpdated
     {
-        add => odyle.Updated += value;
-        remove => odyle.Updated -= value;
+        add => entries.OdyleUpdated += value;
+        remove => entries.OdyleUpdated -= value;
+    }
+
+    public CharacterIdentity? Character => entries.Character;
+
+    public event EventHandler<CharacterProgress>? ProgressObserved
+    {
+        add => entries.ProgressObserved += value;
+        remove => entries.ProgressObserved -= value;
     }
 
     public int? MapId => maps.Current;

@@ -82,12 +82,28 @@ public interface ICombatEngine : IDisposable
     /// <summary>
     /// The player's Odyle energy as the game last sent it, or null until it sends one: it does at login, after a
     /// server transfer and when the value changes (a raid, a recharge item), not on a teleport, so a meter started
-    /// mid-session has none until then. Kept across Stop and Reset.
+    /// mid-session has none until then. A login's list without it, or the game naming another character with no list
+    /// between, makes it null again. Kept across Stop and Reset.
     /// </summary>
     OdyleEnergy? OdyleEnergy { get; }
 
-    /// <summary>The Odyle energy changed. Raised on a capture (or demo feed) thread, never on the UI thread.</summary>
+    /// <summary>The Odyle energy changed to a value. Raised on a capture (or demo feed) thread, never on the UI thread.</summary>
     event EventHandler<OdyleEnergy>? OdyleEnergyUpdated;
+
+    /// <summary>
+    /// The character the game last named as the player's, from the character's own record that upstream reads at
+    /// login (and on loads after it), or null until one is named. Kept across Stop and Reset.
+    /// </summary>
+    CharacterIdentity? Character { get; }
+
+    /// <summary>
+    /// The player's entry counts (Odyle energy, Nightmare, Ascension Trial and the rest, by the game's entry id; see
+    /// <see cref="EntryIds"/>) with whose they are. A login's list comes before the record naming the character, so its
+    /// counts are raised once that record names them, and every update after that is raised as it comes, always with
+    /// every count read since the list. Counts whose character is never named are never raised. Raised on a capture (or
+    /// demo feed) thread, never on the UI thread.
+    /// </summary>
+    event EventHandler<CharacterProgress>? ProgressObserved;
 
     /// <summary>
     /// The id of the map the game last loaded (an id from the game's Map table; the Abyss's lower layer is 20), or null
