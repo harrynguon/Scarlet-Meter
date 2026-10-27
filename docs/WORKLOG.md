@@ -2,6 +2,15 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-27 — Merged branches are deleted without asking
+
+**What:** the scarlet-ship skill's merge step now clears away the remote branch, the worktree and the local branch once a PR has merged, without asking, and says how (a worktree with work in it is still the player's to decide); its stacked-PR note says GitHub deletes the base branch and retargets the next PR, which is then rebased onto `main`. The repository's "Automatically delete head branches" setting was turned on (`delete_branch_on_merge`).
+
+**Why:** Harry: "from now on please automatically delete branches which have been merged into main via PR, and delete my local copy too. this'll save on disk space and overall organisation". 45 merged branches and 19 worktrees had piled up and were cleared the same day.
+
+**Checks:** docs only (the skill and this entry); no build. The setting read back as on through GitHub's API.
+
+**Next:** none.
 ## 2026-10-27 — Corridors out of what your side holds, and a note per character
 
 **What:** the roster's corridors show as runs out of the corridors the character's side can enter ("1/2"), and each character has a note of the player's own under its name (ARCHITECTURE.md "Abyss artifacts", "Character roster"). `Abyss/AbyssArtifactRecords` reads who holds each Abyss artifact from the Abyss map's record (`07 e3`) and the one on entering the Abyss (`05 e3`), ported from A2Tools' `abyss_artifacts.rs` (6837e55, unchanged up to c3fcce3; GPL v3) and read only when every byte falls into place; `Upstream/AbyssArtifactTap` raises each reading as `ICombatEngine.ArtifactsObserved`. The entry tap reads the server id after the name in the player's own record (`CharacterIdentity.ServerId`, taken when upstream named the character's server by it), since the short names repeat across the two sides and the side is the id's thousands. The roster keeps the lower layer's three holders per server with the holding's start and reset (`RosterFile.Artifacts`), held across a server change like a corridor entry, and counts the corridors open as A2Tools' Roster plugin does (one per artifact the side holds, one nobody holds closed, one not named open); not known (out of 3, in italics) without a server id, a reading on that server, or once its reset or the next scheduled siege has passed. Notes are cleaned from the page and the file alike (`RosterNormalizer.CleanNote`: control characters and other spaces as spaces, invalid UTF-16 replaced, at most 100 UTF-16 units without splitting a character) and saved with the roster.
