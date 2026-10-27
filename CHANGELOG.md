@@ -19,7 +19,7 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
   note of your own under each name. Click the Odyle energy beside the ping, or Settings, Appearance, Characters. The
   recharge and siege times, the Kina and the artifacts are not yet checked in the game.
   ([#48](https://github.com/harrynguon/Scarlet-Meter/pull/48), [#49](https://github.com/harrynguon/Scarlet-Meter/pull/49),
-  [#50](https://github.com/harrynguon/Scarlet-Meter/pull/50))
+  [#50](https://github.com/harrynguon/Scarlet-Meter/pull/50), [#51](https://github.com/harrynguon/Scarlet-Meter/pull/51))
 
 ## [0.3.0] - 2026-10-26
 
