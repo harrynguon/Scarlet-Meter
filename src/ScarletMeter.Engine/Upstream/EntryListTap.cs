@@ -1,3 +1,4 @@
+using AionDpsMeter.Core.Data;
 using AionDpsMeter.Services.PacketProcessing.Routing;
 using AionDpsMeter.Services.Services.Entity;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,8 @@ namespace ScarletMeter.Engine.Upstream;
 /// (<c>0b 61</c>, at login and after a server transfer), its updates (<c>0c 61</c>) and the player's own character
 /// record (<c>33 36</c>), and it reads the first two with <see cref="EntryListRecords"/>. The character comes from
 /// upstream, which reads that record itself (PlayerInfoProcessor) and marks the player as the user: the tap only takes
-/// the record's entity id and asks upstream's tracker who it is. Upstream's pipeline is subscribed to the stream before
+/// the record's entity id and asks upstream's tracker who it is, and adds the server id after the name, which upstream
+/// keeps only as a short name that both sides share on some servers. Upstream's pipeline is subscribed to the stream before
 /// the tap (the engine resolves it first), so upstream has read the record, and the whole bundle around it, by then.
 /// </summary>
 /// <remarks>
@@ -202,14 +204,15 @@ internal sealed class EntryListTap : IRecordReader
     // waiting for it are reported; another character with no list between drops the last one's.
     private void TakeSelfRecord(ReadOnlySpan<byte> record)
     {
-        if (!SelfRecords.TryRead(record, out var entityId, out var unnamed)) return;
-        if (unnamed || identify(entityId) is not { } character)
+        if (!SelfRecords.TryRead(record, out var entityId, out var unnamed, out var serverId)) return;
+        if (unnamed || identify(entityId) is not { } named)
         {
             if (!unnamedSelfLogged) logger.LogInformation("The game's own character record came, but upstream has no name for it; entry counts wait for the next one.");
             unnamedSelfLogged = true;
             return;
         }
         unnamedSelfLogged = false;
+        var character = WithServerId(named, serverId);
         var now = clock.GetUtcNow();
         CharacterProgress progress;
         var dropped = false;
@@ -239,6 +242,13 @@ internal sealed class EntryListTap : IRecordReader
         if (matched) logger.LogInformation("The entry counts were matched to the character the game named.");
         Raise(() => ProgressObserved?.Invoke(this, progress), "An entry count subscriber failed.");
     }
+
+    // The character with the record's server id, when upstream knows that id and gave the character its short name: upstream
+    // read the same two bytes for the name, so a mismatch means the identity came from another record, and no id is taken.
+    private static CharacterIdentity WithServerId(CharacterIdentity character, int serverId) =>
+        serverId > 0 && ServerMap.IsValidId(serverId) && ServerMap.GetName(serverId) == character.Server
+            ? character with { ServerId = serverId }
+            : character;
 
     // An inventory record: its Kina slots are kept (a listing replaces them all) and reported with the counts when whose
     // they are is known.

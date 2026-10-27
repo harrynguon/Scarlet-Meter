@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**A note box with a sensible width pushed the roster's last columns out of its window** (2026-10-27, seen in a headless render before commit).
+- What: a 160 px, then 130 px, least width for the new note box under each name pushed the Last played column and the remove button past the roster's 920 px window: the table had no room to spare, since #50 had already widened the window for the Kina column.
+- Why: a column's least width was chosen for the note's sake, without measuring what the rest of the table needed at the window's width.
+- Guard: the box takes the name column's width and no more (a long note scrolls in it, and pointing at it shows it whole: `RosterPage.NoteTitle`), and the roster's renders at its window's width are part of any change to its columns. Before giving a table column a least width, render the table at its window's width with the widest likely values.
+
 **A Kina change just before a switch would have gone to the next character** (Codex and the deep audit on #50, fixed before merge).
 - What: the roster's reader kept the inventory's Kina across a login's list when it had been read within ten seconds before it, meaning to keep the new login's listing wherever it falls. But the time it kept was that of any inventory record, changes included, so a Kina change of character A just before switching to B (whose listing was missing) was reported as B's, saved, and counted twice in the totals. The same audit found a moved item counted twice (slots summed) and a listing with no recent self record given to whoever was named.
 - Why: the rule was designed around one record (the listing) but keyed on a time every inventory record set; the tests sent only listings around a login, never a change before a switch.
@@ -195,6 +200,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - Guard: `SettingsTests.AFileSavedWithAByteOrderMarkLoads`. Seed test files the way people actually write them.
 
 ## In the process
+
+**Save tests passed with a change's save removed** (2026-10-27, the roster's notes; caught by a fail-first run before commit).
+- What: with `MarkChanged` taken out of `RosterService.SetNote`, the note test still passed: earlier changes in the same test (a report, a corridor run) had marked the roster changed, so the note was saved with them. The same run found that a restart's loading of the artifact holders, a control character at a note's end and two listings of one artifact were each in no test.
+- Why: the test checked the saved file at the end of a sequence, not that this change alone leads to a save.
+- Guard: each kind of change has a test where it is the only change before the save (`RosterTests.ANoteIsKeptThroughReportsAndSaved`, its second part), and each mutation the run missed now fails a test. When testing that something is saved, make it the only change since the last save.
 
 **A mutation runner's restore kept the file's old time, so the next build kept the mutation** (2026-10-27, the character roster; caught by a control).
 - What: the scratch runner restored each mutated file with `Copy-Item`, which keeps the original's write time. That time was older than the mutated build's output, so MSBuild took the project as up to date and kept the mutation compiled in: the run's last engine mutation (`ToIdentity` without its user check) stayed in the engine for every run after it. Those runs mutated only the app and ran only its tests, so their catches stood, but the next run's control failed on `EntryListTests.UpstreamsUserIsTheCharacter`.

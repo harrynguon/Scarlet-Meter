@@ -22,12 +22,12 @@ public enum RosterSort
 }
 
 /// <summary>
-/// One character as the page shows it at an instant: its estimates, when its energy is full, and its Artifact Corridor
-/// entries since the last Abyss Siege.
+/// One character as the page shows it at an instant: its estimates, when its energy is full, its Artifact Corridor
+/// entries since the last Abyss Siege, and how many corridors its side can enter (null while not known).
 /// </summary>
 public sealed record RosterRow(
     RosterCharacter Character, bool IsCurrent, int Cap, Estimate? Odyle, DateTimeOffset? FullAt, Estimate? Nightmare, Estimate? Ascension,
-    int Corridors)
+    int Corridors, int? CorridorsOpen = null)
 {
     public RosterKey Key => Character.Key;
 }
@@ -36,7 +36,8 @@ public sealed record RosterRow(
 /// The character roster: every character the meter has seen the player log in on, with Odyle energy, when basic energy
 /// is full again, and Nightmare and Ascension Trial entries left, each as the game last said plus the recharges since
 /// (<see cref="RosterRules"/>, marked ≈), the Artifact Corridors entered since the last Abyss Siege, as the meter saw
-/// them, and the Kina it holds, as its inventory last said, with the totals across characters. Re-reads the roster when it changes and every half minute, for the estimates.
+/// them, out of those its side can enter, the Kina it holds, as its inventory last said, with the totals across
+/// characters, and the player's note on it. Re-reads the roster when it changes and every half minute, for the estimates.
 /// </summary>
 public partial class RosterPage : IDisposable
 {
@@ -65,8 +66,13 @@ public partial class RosterPage : IDisposable
         _ = RefreshLoopAsync();
     }
 
-    /// <summary>The rows at <paramref name="now"/>, in the chosen order. Pure apart from its arguments: tests call it.</summary>
-    public static IReadOnlyList<RosterRow> Rows(IEnumerable<RosterCharacter> characters, RosterKey? current, DateTimeOffset now, RechargeCalendar calendar, RosterSort sort)
+    /// <summary>
+    /// The rows at <paramref name="now"/>, in the chosen order, with the artifact holders by server id for the corridors
+    /// each character's side can enter. Pure apart from its arguments: tests call it.
+    /// </summary>
+    public static IReadOnlyList<RosterRow> Rows(
+        IEnumerable<RosterCharacter> characters, RosterKey? current, DateTimeOffset now, RechargeCalendar calendar, RosterSort sort,
+        IReadOnlyDictionary<int, RosterArtifacts>? artifacts = null)
     {
         var rows = characters.Select(character =>
         {
@@ -79,7 +85,8 @@ public partial class RosterPage : IDisposable
                 character.Odyle is { } seen ? RosterRules.OdyleFullAt(seen, cap, calendar) : null,
                 character.Nightmare is { } nightmare ? RosterRules.ContentNow(RosterRules.Nightmare, nightmare, now, calendar) : null,
                 character.Ascension is { } ascension ? RosterRules.ContentNow(RosterRules.Ascension, ascension, now, calendar) : null,
-                RosterRules.CorridorRunsSinceSiege(character.CorridorRuns, now, calendar));
+                RosterRules.CorridorRunsSinceSiege(character.CorridorRuns, now, calendar),
+                RosterRules.CorridorsOpen(character.ServerId, artifacts?.GetValueOrDefault(character.ServerId), now, calendar));
         });
         return sort switch
         {
@@ -101,6 +108,18 @@ public partial class RosterPage : IDisposable
         rows.Count(row => row.Character.Kina is null or { Kina: null, Bound: null }));
 
     private DateTimeOffset Now => Clock.GetUtcNow();
+
+    /// <summary>What the corridors cell says when pointed at: the runs out of what, and where that comes from.</summary>
+    public static string CorridorsTitle(RosterRow row) => row.CorridorsOpen switch
+    {
+        null => $"Artifact Corridors entered since the last Abyss Siege, out of {RosterRules.CorridorsPerSiege}: which artifacts your side holds is not known on this server since the siege. Open the Abyss map in the game on this character to read it.",
+        0 => "Your side holds none of the corridors' artifacts until the next Abyss Siege, as the game last said on this server.",
+        { } open => $"Artifact Corridors entered since the last Abyss Siege, out of the {open} whose artifact your side holds, as the game last said on this server.",
+    };
+
+    /// <summary>What the note box says when pointed at: the note whole (a long one is cut in its box), or how to write one.</summary>
+    public static string NoteTitle(RosterCharacter character) =>
+        character.Note.Length > 0 ? character.Note : "Your note on this character, kept on this PC; Enter or leaving the box saves it";
 
     private RechargeCalendar Calendar => RechargeCalendar.Default(TimeSpan.FromMinutes(Math.Round(Settings.Current.Alerts.ServerOffsetHours * 60)));
 
@@ -130,6 +149,9 @@ public partial class RosterPage : IDisposable
     {
         if (Enum.TryParse<OdyleCapChoice>(e.Value?.ToString(), out var choice) && Enum.IsDefined(choice)) Roster.SetOdyleCap(key, choice);
     }
+
+    // The note is cleaned and kept by the service; the box shows what was kept at the next render.
+    private void OnNoteChanged(RosterKey key, ChangeEventArgs e) => Roster.SetNote(key, e.Value?.ToString());
 
     private void OnRosterChanged(object? sender, EventArgs e) => _ = InvokeAsync(StateHasChanged);
 

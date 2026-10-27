@@ -4,12 +4,13 @@
     one being played marked. Odyle energy is basic (+charged) and "Full" when basic energy reaches its cap; Nightmare and
     Ascension Trial are entries left (+extra from items). A value marked ≈ is the game's last word plus the recharges
     since (Roster/RosterRules), which logging in on the character corrects. Corridors are the Artifact Corridor entries the
-    meter saw since the last Abyss Siege.
+    meter saw since the last Abyss Siege, out of those the character's side can enter (its artifacts held, as the game
+    last said on its server). Under each name is the player's own note, saved when Enter is pressed or the box is left.
 *@
 @{
     var now = Now;
     var calendar = Calendar;
-    var rows = Rows(Roster.Characters, Roster.Current, now, calendar, sort);
+    var rows = Rows(Roster.Characters, Roster.Current, now, calendar, sort, Roster.Artifacts);
     var nextRefill = calendar.NextOdyleRefill(now);
     var lastSiege = calendar.LastSiege(now);
     var nextSiege = calendar.NextSiege(now);
@@ -69,7 +70,7 @@
                         <th class="left" title="When basic energy reaches its cap, if none is spent">Full</th>
                         <th title="Entries left (+extra from recharge items); +@RosterRules.Nightmare.Add a day, up to @RosterRules.Nightmare.Cap">Nightmare</th>
                         <th title="Entries left (+extra from recharge items); +@RosterRules.Ascension.Add a week, up to @RosterRules.Ascension.Cap">Ascension</th>
-                        <th title="Artifact Corridors entered since the last Abyss Siege, as the meter saw them; up to @RosterRules.CorridorsPerSiege between sieges, as your side's artifacts allow">Corridors</th>
+                        <th title="Artifact Corridors entered since the last Abyss Siege, as the meter saw them, out of those whose artifact your side holds (up to @RosterRules.CorridorsPerSiege), as the game said when you last opened the Abyss map or entered the Abyss; out of @RosterRules.CorridorsPerSiege in italics while that is not known">Corridors</th>
                         <th title="Kina, and Kina (Bound) below it (Engraved Kina, as the game's Korean and Japanese names have it), as the character's inventory last said: at login and at each change">Kina</th>
                         <th class="left">Last played</th>
                         <th></th>
@@ -84,6 +85,8 @@
                             <td class="left">
                                 <div class="who-name">@Name(character) @if (row.IsCurrent) { <span class="badge you">Playing</span> }</div>
                                 <div class="who-sub muted">@RosterText.ServerAndClass(character)</div>
+                                <input class="roster-note" type="text" maxlength="@RosterNormalizer.MaxNoteLength" placeholder="add a note" aria-label="Note"
+                                       title="@NoteTitle(character)" value="@character.Note" @onchange="e => OnNoteChanged(row.Key, e)" />
                             </td>
                             <td>
                                 @if (row.Odyle is { } odyle)
@@ -113,14 +116,14 @@
                             </td>
                             <td>@ContentCell(row.Nightmare, character.Nightmare)</td>
                             <td>@ContentCell(row.Ascension, character.Ascension)</td>
-                            <td class="@(row.Corridors == 0 ? "muted" : "")">@row.Corridors</td>
+                            <td title="@CorridorsTitle(row)">@CorridorsCell(row)</td>
                             <td>
                                 <div>@KinaCell(character.Kina?.Kina)</div>
                                 <div class="roster-bound">bound @KinaCell(character.Kina?.Bound)</div>
                             </td>
                             <td class="left muted">@RosterText.At(character.LastSeen, now)</td>
                             <td>
-                                <button type="button" class="btn small @(IsArmed(row.Key) ? "danger" : "")" title="Remove from the roster; the character comes back when you play it" @onclick="() => ClickRemove(row.Key)">@(IsArmed(row.Key) ? "Remove?" : "×")</button>
+                                <button type="button" class="btn small @(IsArmed(row.Key) ? "danger" : "")" title="Remove from the roster, its note with it; the character comes back when you play it" @onclick="() => ClickRemove(row.Key)">@(IsArmed(row.Key) ? "Remove?" : "×")</button>
                             </td>
                         </tr>
                     }
@@ -129,7 +132,7 @@
         }
     </div>
     <footer class="roster-foot muted">
-        ≈ marks an estimate: basic Odyle energy +15 every three hours from the daily reset, Nightmare +@RosterRules.Nightmare.Add at each daily reset, Ascension Trial +@RosterRules.Ascension.Add at the weekly reset, none yet checked in the game. Logging in on a character corrects them. Corridors are the Artifact Corridor entries the meter saw since the last Abyss Siege, not estimated: one is missed when the meter is closed, when it misses the corridor's loading, or when the game does not name your character again within @((int)RosterService.CorridorConfirmWindow.TotalMinutes) minutes of a server change. Kina is as each character's inventory last said, at login and at each change, so it is as of the last time you played them.
+        ≈ marks an estimate: basic Odyle energy +15 every three hours from the daily reset, Nightmare +@RosterRules.Nightmare.Add at each daily reset, Ascension Trial +@RosterRules.Ascension.Add at the weekly reset, none yet checked in the game. Logging in on a character corrects them. Corridors are the Artifact Corridor entries the meter saw since the last Abyss Siege, not estimated: one is missed when the meter is closed, when it misses the corridor's loading, or when the game does not name your character again within @((int)RosterService.CorridorConfirmWindow.TotalMinutes) minutes of a server change. They are out of the corridors whose artifact your side holds, as the game said when you last opened the Abyss map or entered the Abyss on that server since the siege; out of @RosterRules.CorridorsPerSiege, in italics, until then. Kina is as each character's inventory last said, at login and at each change, so it is as of the last time you played them.
         @if (!Roster.CanSave)
         {
             <span> Changes are not saved this run.</span>
@@ -138,6 +141,25 @@
 </div>
 
 @code {
+    // The runs since the siege out of the corridors the side can enter: the bound in italics while that is not known, a
+    // dash when the side holds none and none were run.
+    private static RenderFragment CorridorsCell(RosterRow row) => builder =>
+    {
+        if (row is { CorridorsOpen: 0, Corridors: 0 })
+        {
+            builder.AddMarkupContent(0, "<span class=\"muted\">—</span>");
+            return;
+        }
+        builder.OpenElement(1, "span");
+        builder.AddAttribute(2, "class", row.Corridors == 0 ? "muted" : string.Empty);
+        builder.AddContent(3, row.Corridors);
+        builder.CloseElement();
+        builder.OpenElement(4, "span");
+        builder.AddAttribute(5, "class", row.CorridorsOpen is null ? "muted roster-open-unknown" : "muted");
+        builder.AddContent(6, "/" + (row.CorridorsOpen ?? RosterRules.CorridorsPerSiege));
+        builder.CloseElement();
+    };
+
     // A Kina amount, or "?" before the inventory has said.
     private static RenderFragment KinaCell(long? amount) => builder =>
     {

@@ -398,24 +398,47 @@ public sealed class EntryListTests
         Assert.DoesNotContain(raised, progress => progress.Character == Alpha && progress.Entries.TryGetValue(EntryIds.OdyleEnergy, out var energy) && energy.First == 120);
     }
 
+    // The server id after the name goes with the character when upstream knows it and named the character's server by it:
+    // SIE is both 1001 and 2002, so only the id tells the side. An id upstream does not know, or one whose short name is not
+    // the character's (the identity read from another record), is not taken.
+    [Fact]
+    public void TheServerIdGoesWithTheCharacterWhenUpstreamAgrees()
+    {
+        var tap = NewTap(new() { [7] = Alpha }, new FakeTimeProvider(Start));
+        List<CharacterProgress> raised = [];
+        tap.ProgressObserved += (_, progress) => raised.Add(progress);
+        tap.Observe(EntryListRecordWriter.SelfRecord(7, "Alpha", 2002, 16, 41_000));
+        Assert.Equal(Alpha with { ServerId = 2002 }, tap.Character);
+        Assert.Equal(2002, raised[^1].Character.ServerId);
+        tap.Observe(EntryListRecordWriter.SelfRecord(7, "Alpha", 1001, 16, 41_000));
+        Assert.Equal(Alpha with { ServerId = 1001 }, tap.Character);
+        tap.Observe(EntryListRecordWriter.SelfRecord(7, "Alpha", 1002, 16, 41_000)); // NEZ, not the server upstream named
+        Assert.Equal(Alpha, tap.Character);
+        tap.Observe(EntryListRecordWriter.SelfRecord(7, "Alpha", 2999, 16, 41_000)); // not a server upstream knows
+        Assert.Equal(Alpha, tap.Character);
+        Assert.Equal(4, raised.Count);
+    }
+
     // A self record without a real name names no one: no name flag, or a tutorial character's placeholder ("$" and a
     // code, which upstream's decoding turns into a plain name by dropping the "$"; A2Tools' is_placeholder_name).
     [Fact]
     public void ARecordWithoutARealNameNamesNoOne()
     {
-        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 36 05 41 6C 70 68 61"), out var entity, out var unnamed));
-        Assert.Equal((7, true), (entity, unnamed));
-        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc03", 0, 0, 0), out _, out unnamed));
-        Assert.True(unnamed);
-        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc0", 0, 0, 0), out _, out unnamed));
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 36 05 41 6C 70 68 61 E9 03"), out var entity, out var unnamed, out var serverId));
+        Assert.Equal((7, true, 0), (entity, unnamed, serverId));
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc03", 1001, 0, 0), out _, out unnamed, out serverId));
+        Assert.Equal((true, 0), (unnamed, serverId)); // no real name, so no server either
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc0", 0, 0, 0), out _, out unnamed, out _));
         Assert.False(unnamed); // too short for a placeholder
-        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc0-3", 0, 0, 0), out _, out unnamed));
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc0-3", 0, 0, 0), out _, out unnamed, out _));
         Assert.False(unnamed);
-        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "Synthia", 0, 0, 0), out _, out unnamed));
-        Assert.False(unnamed);
-        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00"), out entity, out unnamed)); // cut before the name: upstream decides
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "Synthia", 2002, 0, 0), out _, out unnamed, out serverId));
+        Assert.Equal((false, 2002), (unnamed, serverId));
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 6C 70 68 61 E9"), out _, out unnamed, out serverId));
+        Assert.Equal((false, 0), (unnamed, serverId)); // cut inside the server id
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00"), out entity, out unnamed, out _)); // cut before the name: upstream decides
         Assert.Equal((7, false), (entity, unnamed));
-        Assert.False(SelfRecords.TryRead(Frame(0x3633, "00 00 00 00 00 37"), out _, out _));
+        Assert.False(SelfRecords.TryRead(Frame(0x3633, "00 00 00 00 00 37"), out _, out _, out _));
 
         var tap = NewTap(new() { [7] = Alpha }, new FakeTimeProvider(Start));
         List<CharacterProgress> raised = [];
@@ -544,7 +567,7 @@ public sealed class EntryListTests
         else stream.AddData("synthetic", [.. list, .. self], 0);
 
         var progress = Assert.Single(raised);
-        Assert.Equal(new CharacterIdentity("Synthia", server.Value, 0, string.Empty, 1_234_567), progress.Character);
+        Assert.Equal(new CharacterIdentity("Synthia", server.Value, 0, string.Empty, 1_234_567, server.Key), progress.Character);
         Assert.Equal(progress.Character, engine.Character);
         Assert.Equal(11, progress.Entries[EntryIds.Nightmare].First);
     }

@@ -37,8 +37,11 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   readers up to b93353150ffef43bff1276f4fc609b2fd6e6e38f (read on 2026-10-27); and the
   layout of the game's map-loaded record (`ScarletMeter.Engine/Maps/MapLoadRecords`), from `parse_map_load_packet` in
   `src-tauri/src/capture/stream_processor.rs`, added in b1fcd53fd676ad78224f4c89c543d744b0ac3766 and unchanged up to
-  6abf5e7e28ddae93e04e870087d2ae457f752681 (v2.0.79, read on 2026-10-26); GNU GPL v3: its Rust parsing ported to C#.
-  No captured bytes were taken; Scarlet's tests use synthetic records.
+  6abf5e7e28ddae93e04e870087d2ae457f752681 (v2.0.79, read on 2026-10-26); and the layout of the Abyss map's record and
+  the one on entering the Abyss, who holds each artifact (`ScarletMeter.Engine/Abyss/AbyssArtifactRecords`), from
+  `src-tauri/src/capture/abyss_artifacts.rs`, added in 6837e554919141e130adf08e57ccfb534714e1c0 and unchanged up to
+  c3fcce31da487fb5146c653a38640e477536bd68 (read on 2026-10-27), with its side of a server by the id's thousands;
+  GNU GPL v3: its Rust parsing ported to C#. No captured bytes were taken; Scarlet's tests use synthetic records.
 - **SkeeveAN/Aion-DPS-Meter** (the layout of the game's inventory records and how to find an entry in them by its anchor,
   `ScarletMeter.Engine/Entries/InventoryRecords`), https://github.com/SkeeveAN/Aion-DPS-Meter, `Client/Aion2/Aion2Stock.cs`
   as of 010e994c5 (its only commit, unchanged up to 729cb910494a1a0a7b837b8914c98921ce512fd4, read on 2026-10-27),
@@ -66,8 +69,9 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   schedule parameters only, no code.
 - **Character roster rules** (`ScarletMeter.App/Roster/RosterRules`): basic Odyle energy's refill (+15 every three
   hours on the hours that meet the daily reset, the 560 and 840 caps), the entry ids of Nightmare and Ascension Trial
-  and their caps and recharges, from the Roster / Content Overview plugin by Nullception in taengu/A2Tools-Plugins,
-  `plugins/alt-roster` (`logic.js` and `plugin.js`) at 7a4720bf6af8adfe1fe03359540da007e9566c71
+  and their caps and recharges, and which Artifact Corridors a side can run (one per lower-layer artifact it holds, one
+  nobody holds closed to both, one not named open), from the Roster / Content Overview plugin by Nullception in
+  taengu/A2Tools-Plugins, `plugins/alt-roster` (`logic.js` and `plugin.js`) at 7a4720bf6af8adfe1fe03359540da007e9566c71
   (https://github.com/taengu/A2Tools-Plugins), GNU GPL v3: the rules only, written anew in C#.
 - **Map names** (`ScarletMeter.Engine/Maps/MapNames`, shown in Settings, About): the dungeons' names and
   difficulties from taengu/A2Tools-DPS-Meter's `src/data/i18n/dungeons/en.json` at

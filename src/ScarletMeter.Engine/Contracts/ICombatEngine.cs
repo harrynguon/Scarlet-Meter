@@ -125,6 +125,13 @@ public interface ICombatEngine : IDisposable
     event EventHandler<int?>? MapChanged;
 
     /// <summary>
+    /// Who holds the Abyss's artifacts, each time the game says it: when the player opens the Abyss map (both layers) or
+    /// enters the Abyss (the layer entered). It is the world's on the server it was read on; the record does not say which
+    /// server, so a subscriber puts it on <see cref="Character"/>'s. Raised on a capture thread, never on the UI thread.
+    /// </summary>
+    event EventHandler<AbyssArtifacts>? ArtifactsObserved;
+
+    /// <summary>
     /// True while the meter is paused because the player is in the Abyss (<see cref="MapId"/> is one of its maps) and
     /// <see cref="EngineSettings.PauseInAbyss"/> is on. Meanwhile hits are dropped and nothing is kept or saved:
     /// <see cref="GetSnapshot"/> is empty and <see cref="GetPlayerDetails"/> null. It ends when the map changes or

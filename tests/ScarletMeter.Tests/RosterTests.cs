@@ -204,6 +204,7 @@ public sealed class RosterTests : IDisposable
         OdyleCap = OdyleCapChoice.Membership,
         MembershipSeen = true,
         Kina = new RosterKina(1_234_567, 33_940, at),
+        Note = "Main · healer",
     };
 
     [Fact]
@@ -378,10 +379,13 @@ public sealed class RosterTests : IDisposable
     {
         public event EventHandler<CharacterProgress>? ProgressObserved;
         public event EventHandler<int?>? MapChanged;
+        public event EventHandler<AbyssArtifacts>? ArtifactsObserved;
         public int Subscribers => ProgressObserved?.GetInvocationList().Length ?? 0;
         public int MapSubscribers => MapChanged?.GetInvocationList().Length ?? 0;
         public void Raise(CharacterProgress progress) => ProgressObserved?.Invoke(this, progress);
         public void RaiseMap(int? mapId) => MapChanged?.Invoke(this, mapId);
+        public void RaiseArtifacts(AbyssArtifacts artifacts) => ArtifactsObserved?.Invoke(this, artifacts);
+        public int ArtifactSubscribers => ArtifactsObserved?.GetInvocationList().Length ?? 0;
         public CharacterIdentity? Character { get; set; }
         public OdyleEnergy? OdyleEnergy => null;
         public int? MapId => null;
@@ -807,5 +811,279 @@ public sealed class RosterTests : IDisposable
         ];
         Assert.Equal((2_100L, 2_900L, 2), RosterPage.KinaTotals(RosterPage.Rows(characters, null, Monday, Calendar, RosterSort.Name)));
         Assert.Equal((0L, 0L, 0), RosterPage.KinaTotals([]));
+    }
+
+    // ---------- Notes ----------
+
+    // A note is the player's own line: spaces at either end trimmed, control characters and other spaces as plain spaces,
+    // text that is not valid UTF-16 as U+FFFD, and cut at the limit without splitting a character.
+    [Fact]
+    public void ANoteIsCleaned()
+    {
+        Assert.Equal(string.Empty, RosterNormalizer.CleanNote(null));
+        Assert.Equal(string.Empty, RosterNormalizer.CleanNote(" \r\n\t "));
+        Assert.Equal("main  healer", RosterNormalizer.CleanNote("  main\r\nhealer\t "));
+        Assert.Equal("a b", RosterNormalizer.CleanNote("a\u0007b"));
+        Assert.Equal("note", RosterNormalizer.CleanNote("\u0007note\u001B")); // a control character at an end goes too
+        Assert.Equal("a b", RosterNormalizer.CleanNote("a　b"));
+        Assert.Equal("x�y", RosterNormalizer.CleanNote("x\uD800y"));
+        Assert.Equal("Siel's Wings · 2/3 ☆", RosterNormalizer.CleanNote("Siel's Wings · 2/3 ☆"));
+        var short1 = new string('a', RosterNormalizer.MaxNoteLength - 1);
+        Assert.Equal(short1, RosterNormalizer.CleanNote(short1 + "\U0001F600")); // the pair would pass the limit: it goes whole
+        Assert.Equal(short1 + "b", RosterNormalizer.CleanNote(short1 + "b\U0001F600"));
+        Assert.Equal(RosterNormalizer.MaxNoteLength, RosterNormalizer.CleanNote(new string('n', 5_000)).Length);
+        Assert.Equal(short1, RosterNormalizer.CleanNote(short1 + " next words")); // a cut that ends on a space
+
+        // Pointing at the box shows the note whole (a long one is cut in its box), or how to write one.
+        Assert.Equal("main", RosterPage.NoteTitle(new RosterCharacter { Name = "A", Note = "main" }));
+        Assert.Contains("Enter", RosterPage.NoteTitle(new RosterCharacter { Name = "A" }), StringComparison.Ordinal);
+    }
+
+    // The player sets a note: cleaned, kept through later reports and corridor runs, saved; unchanged, or on a character
+    // not in the roster, it changes nothing.
+    [Fact]
+    public void ANoteIsKeptThroughReportsAndSaved()
+    {
+        var clock = new FakeTimeProvider(Monday);
+        var store = NewStore();
+        var changes = 0;
+        using (var service = new RosterService(new FakeEngine { Character = AlphaIdentity }, store, clock, NullLogger<RosterService>.Instance))
+        {
+            service.Take(Progress(AlphaIdentity));
+            service.Changed += (_, _) => changes++;
+            service.SetNote(new RosterKey("SIE", "Alpha"), "  main\n");
+            service.SetNote(new RosterKey("SIE", "Alpha"), "main ");
+            service.SetNote(new RosterKey("SIE", "Nobody"), "x");
+            Assert.Equal(1, changes);
+            Assert.Single(service.Characters);
+
+            clock.Advance(TimeSpan.FromMinutes(1));
+            service.Take(Progress(AlphaIdentity, (EntryIds.OdyleEnergy, 100, 0, clock.GetUtcNow())));
+            service.TakeMap(20);
+            service.TakeMap(MapNames.ArtifactCorridor);
+            Assert.Equal("main", service.Characters.Single().Note);
+        }
+        Assert.Equal("main", Assert.Single(store.Load(clock.GetUtcNow()).File.Characters).Note);
+
+        // A note alone is a change to save.
+        using (var service = new RosterService(new FakeEngine(), store, clock, NullLogger<RosterService>.Instance))
+            service.SetNote(new RosterKey("SIE", "Alpha"), "alt");
+        Assert.Equal("alt", Assert.Single(store.Load(clock.GetUtcNow()).File.Characters).Note);
+    }
+
+    // A saved note is cleaned as one from the page, and said repaired without quoting it (the repairs are logged); none
+    // saved (null) is empty and needs nothing.
+    [Fact]
+    public void ASavedNoteIsCleaned()
+    {
+        var saved = new RosterCharacter { Name = "Alpha", Server = "SIE", LastSeen = Monday, Note = "Alt\u0007 " + new string('n', 300) };
+        var (file, repairs) = RosterNormalizer.Normalize(new RosterFile { Characters = [saved] }, Monday);
+        var note = Assert.Single(file.Characters).Note;
+        Assert.StartsWith("Alt  nnn", note, StringComparison.Ordinal);
+        Assert.Equal(RosterNormalizer.MaxNoteLength, note.Length);
+        Assert.Equal(["Server, class, combat power, cap, note or the order of corridor entries repaired on 1 character."], repairs);
+
+        var (none, nothing) = RosterNormalizer.Normalize(new RosterFile { Characters = [saved with { Note = null! }] }, Monday);
+        Assert.Equal(string.Empty, Assert.Single(none.Characters).Note);
+        Assert.Empty(nothing);
+    }
+
+    // ---------- Corridors open: the Abyss's artifacts ----------
+
+    private static readonly DateTimeOffset Saturday = new(2026, 10, 24, 12, 0, 0, TimeSpan.Zero); // a siege on the schedule
+
+    private static RosterArtifacts Holders(int serverId, DateTimeOffset seenAt, DateTimeOffset? until, params ArtifactHolder[] holders) =>
+        new() { ServerId = serverId, Holders = holders, Since = until is null ? null : Saturday.AddMinutes(10), Until = until, SeenAt = seenAt };
+
+    private static AbyssArtifacts Reading(DateTimeOffset seenAt, params (int Id, ArtifactHolder Holder)[] artifacts) => new(
+        [new ArtifactWar(2001, null, null), new ArtifactWar(AbyssArtifacts.LowerLayer, Saturday.AddMinutes(10), Monday.AddHours(10))],
+        [.. artifacts.Select(a => new AbyssArtifact(a.Id, a.Holder))], seenAt);
+
+    // A side can run the corridors whose artifact it holds: one nobody holds is closed to both, one the game did not name
+    // counts as open (A2Tools' rule). Not known without a side, without holders read on that server, or once they are past.
+    [Fact]
+    public void TheCorridorsOpenAreTheArtifactsYourSideHolds()
+    {
+        var now = Monday; // Monday 02:30 UTC; the holding resets at 12:00
+        var held = Holders(1001, Saturday.AddHours(1), Monday.AddHours(10), ArtifactHolder.Elyos, ArtifactHolder.Asmodian, ArtifactHolder.Elyos);
+        Assert.Equal(2, RosterRules.CorridorsOpen(1001, held, now, Calendar));
+        Assert.Equal(1, RosterRules.CorridorsOpen(2002, held with { ServerId = 2002 }, now, Calendar));
+        var mixed = held with { Holders = [ArtifactHolder.Nobody, ArtifactHolder.Unknown, ArtifactHolder.Asmodian] };
+        Assert.Equal(1, RosterRules.CorridorsOpen(1001, mixed, now, Calendar));
+        Assert.Equal(0, RosterRules.CorridorsOpen(1001, held with { Holders = [ArtifactHolder.Asmodian, ArtifactHolder.Asmodian, ArtifactHolder.Nobody] }, now, Calendar));
+
+        Assert.Null(RosterRules.CorridorsOpen(0, held, now, Calendar)); // the side not known
+        Assert.Null(RosterRules.CorridorsOpen(1001, null, now, Calendar));
+        Assert.Null(RosterRules.CorridorsOpen(1003, held, now, Calendar)); // another server's
+        Assert.Null(RosterRules.CorridorsOpen(1001, held, Monday.AddHours(10), Calendar)); // its reset has come
+
+        // Without a reset the meter can use, the schedule stands in: current until a siege after it was read.
+        var noReset = held with { Until = null };
+        Assert.Equal(2, RosterRules.CorridorsOpen(1001, noReset, now, Calendar));
+        Assert.Null(RosterRules.CorridorsOpen(1001, noReset with { SeenAt = Saturday.AddHours(-1) }, now, Calendar));
+        var tooFar = held with { Until = held.SeenAt + RosterRules.LongestHolding + TimeSpan.FromMinutes(1) };
+        Assert.Null(RosterRules.CorridorsOpen(1001, tooFar with { SeenAt = Saturday.AddHours(-1), Until = Saturday.AddDays(9) }, now, Calendar));
+        Assert.Equal(2, RosterRules.CorridorsOpen(1001, tooFar, now, Calendar));
+        Assert.Equal(2, RosterRules.CorridorsOpen(1001, held with { Until = held.SeenAt }, now, Calendar)); // a reset not after it was read
+    }
+
+    // Holders read while a character is played are kept for its server, with the lower layer's war; a later reading
+    // replaces them, an older one does not, the upper layer's alone says nothing. They are saved and loaded with the roster.
+    [Fact]
+    public void TheHoldersAreKeptForTheServerOfTheCharacterPlayed()
+    {
+        var clock = new FakeTimeProvider(Monday);
+        var store = NewStore();
+        var engine = new FakeEngine { Character = AlphaIdentity with { ServerId = 1001 } };
+        var changes = 0;
+        using (var service = new RosterService(engine, store, clock, NullLogger<RosterService>.Instance))
+        {
+            service.Start();
+            Assert.Equal(1, engine.ArtifactSubscribers);
+            service.Changed += (_, _) => changes++;
+            engine.RaiseArtifacts(Reading(Monday.AddMinutes(-5), (2001, ArtifactHolder.Nobody), (1001, ArtifactHolder.Elyos), (1002, ArtifactHolder.Asmodian), (1003, ArtifactHolder.Elyos)));
+            var kept = service.Artifacts[1001];
+            Assert.Equal([ArtifactHolder.Elyos, ArtifactHolder.Asmodian, ArtifactHolder.Elyos], kept.Holders);
+            Assert.Equal((Saturday.AddMinutes(10), Monday.AddHours(10), Monday.AddMinutes(-5)), (kept.Since, kept.Until, kept.SeenAt));
+
+            service.TakeArtifacts(Reading(Monday.AddMinutes(-9), (1001, ArtifactHolder.Asmodian))); // older
+            service.TakeArtifacts(Reading(Monday, (2001, ArtifactHolder.Elyos))); // the upper layer alone
+            Assert.Equal(kept, service.Artifacts[1001]);
+            service.TakeArtifacts(Reading(Monday, (1002, ArtifactHolder.Elyos))); // later: an artifact not said is unknown
+            Assert.Equal([ArtifactHolder.Unknown, ArtifactHolder.Elyos, ArtifactHolder.Unknown], service.Artifacts[1001].Holders);
+            Assert.Equal(2, changes);
+        }
+        var loaded = store.Load(Monday).File;
+        Assert.Equal([ArtifactHolder.Unknown, ArtifactHolder.Elyos, ArtifactHolder.Unknown], Assert.Single(loaded.Artifacts).Holders);
+        Assert.Equal(1001, Assert.Single(loaded.Artifacts).ServerId);
+        Assert.Contains("\"elyos\"", File.ReadAllText(store.FilePath), StringComparison.Ordinal);
+        Assert.Equal(0, engine.ArtifactSubscribers);
+        using var again = new RosterService(new FakeEngine(), store, clock, NullLogger<RosterService>.Instance);
+        Assert.Equal(Assert.Single(loaded.Artifacts), again.Artifacts[1001]); // the next run starts with them
+    }
+
+    // Holders read with no server to put them on are not kept: before any character is named, or for a character whose
+    // server id is not known.
+    [Fact]
+    public void HoldersWithNoServerAreNotKept()
+    {
+        var log = new RecordingLogger<RosterService>();
+        var engine = new FakeEngine();
+        using var service = new RosterService(engine, NewStore(), new FakeTimeProvider(Monday), log);
+        service.TakeArtifacts(Reading(Monday, (1001, ArtifactHolder.Elyos)));
+        engine.Character = AlphaIdentity;
+        service.TakeArtifacts(Reading(Monday, (1001, ArtifactHolder.Elyos)));
+        Assert.Empty(service.Artifacts);
+        Assert.Contains(log.Entries, e => e.Message.Contains("before the game named any character", StringComparison.Ordinal));
+        Assert.Contains(log.Entries, e => e.Message.Contains("server of the character being played is not known", StringComparison.Ordinal));
+    }
+
+    // Entering the Abyss is a server change, after which the engine is not sure who is playing until the game names the
+    // character again: holders read meanwhile are held for the character the roster knew, as a corridor entry is, and
+    // kept for its server when the game names that same character within ten minutes; dropped for another, or too late.
+    [Fact]
+    public void HoldersReadWhileTheCharacterIsNotSureAreHeldForTheSameCharacter()
+    {
+        var clock = new FakeTimeProvider(Monday);
+        var log = new RecordingLogger<RosterService>();
+        using var service = new RosterService(new FakeEngine(), NewStore(), clock, log);
+        var alpha = AlphaIdentity with { ServerId = 1001 };
+        var beta = AlphaIdentity with { Name = "Beta", ServerId = 2002 };
+        service.Take(Progress(alpha));
+
+        service.TakeArtifacts(Reading(Monday, (1001, ArtifactHolder.Elyos)));
+        Assert.Empty(service.Artifacts);
+        clock.Advance(TimeSpan.FromMinutes(1));
+        service.Take(Progress(alpha));
+        Assert.Equal(Monday, service.Artifacts[1001].SeenAt); // at the reading's time
+
+        service.TakeArtifacts(Reading(clock.GetUtcNow(), (1001, ArtifactHolder.Asmodian)));
+        service.Take(Progress(beta));
+        Assert.Equal(ArtifactHolder.Elyos, service.Artifacts[1001].Holders[0]);
+        Assert.False(service.Artifacts.ContainsKey(2002));
+
+        service.TakeArtifacts(Reading(clock.GetUtcNow(), (1001, ArtifactHolder.Asmodian))); // held for Beta
+        clock.Advance(RosterService.CorridorConfirmWindow + TimeSpan.FromSeconds(1));
+        service.Take(Progress(beta));
+        Assert.False(service.Artifacts.ContainsKey(2002));
+
+        Assert.Contains(log.Entries, e => e.Message.Contains("held until the game names them again", StringComparison.Ordinal));
+        Assert.Single(log.Entries, e => e.Message.StartsWith("Held Abyss artifact holders kept", StringComparison.Ordinal));
+        Assert.Equal(2, log.Entries.Count(e => e.Message.StartsWith("Held Abyss artifact holders dropped", StringComparison.Ordinal)));
+        Assert.All(log.Entries, e => Assert.DoesNotContain("Alpha", e.Message, StringComparison.Ordinal));
+    }
+
+    // A report gives the character its server id; one without (not known this time) keeps the kept one.
+    [Fact]
+    public void TheServerIdIsKeptFromTheReports()
+    {
+        using var service = new RosterService(new FakeEngine(), NewStore(), new FakeTimeProvider(Monday), NullLogger<RosterService>.Instance);
+        service.Take(Progress(AlphaIdentity with { ServerId = 2002 }));
+        service.Take(Progress(AlphaIdentity));
+        Assert.Equal(2002, Assert.Single(service.Characters).ServerId);
+    }
+
+    // The rows put each character's runs out of the corridors its side can enter, from the holders on its server.
+    [Fact]
+    public void TheRowsSayHowManyCorridorsAreOpen()
+    {
+        RosterCharacter[] characters =
+        [
+            new() { Name = "Alpha", Server = "SIE", ServerId = 1001, LastSeen = Monday },
+            new() { Name = "Beta", Server = "SIE", ServerId = 2002, LastSeen = Monday },
+            new() { Name = "Gamma", Server = "SIE", LastSeen = Monday },
+            new() { Name = "Delta", Server = "TRI", ServerId = 2003, LastSeen = Monday },
+        ];
+        var holders = new Dictionary<int, RosterArtifacts>
+        {
+            [1001] = Holders(1001, Saturday.AddHours(1), Monday.AddHours(10), ArtifactHolder.Elyos, ArtifactHolder.Asmodian, ArtifactHolder.Elyos),
+            [2002] = Holders(2002, Saturday.AddHours(1), Monday.AddHours(10), ArtifactHolder.Elyos, ArtifactHolder.Nobody, ArtifactHolder.Elyos),
+        };
+        var rows = RosterPage.Rows(characters, null, Monday, Calendar, RosterSort.Name, holders);
+        Assert.Equal([2, 0, null, null], rows.Select(r => r.CorridorsOpen));
+        Assert.Equal(3, rows.Select(RosterPage.CorridorsTitle).Distinct().Count());
+        Assert.Contains("out of 3", RosterPage.CorridorsTitle(rows[2]), StringComparison.Ordinal);
+        Assert.Contains("the 2 whose artifact", RosterPage.CorridorsTitle(rows[0]), StringComparison.Ordinal);
+    }
+
+    // Saved holders are checked: a server without a side, the wrong number of holders or an unusable date drops them; a
+    // holder this build cannot name is unknown, and a start or reset out of range goes (the schedule stands in). One per
+    // server, the one read last. A character's server id without a side is reset. Nothing said names a server.
+    [Fact]
+    public void SavedHoldersAreChecked()
+    {
+        var store = NewStore();
+        File.WriteAllText(store.FilePath, """
+            { "version": 1,
+              "characters": [ { "name": "Alpha", "server": "SIE", "serverId": 5, "lastSeen": "2026-10-26T01:00:00+00:00" } ],
+              "artifacts": [
+                { "serverId": 1001, "holders": [ "asmodian", "asmodian", "asmodian" ], "seenAt": "2026-10-24T01:00:00+00:00" },
+                { "serverId": 1001, "holders": [ "elyos", "dragon", "nobody" ], "until": "2027-03-01T00:00:00+00:00", "seenAt": "2026-10-25T01:00:00+00:00" },
+                { "serverId": 2002, "holders": [ "elyos", "elyos" ], "seenAt": "2026-10-25T01:00:00+00:00" },
+                { "serverId": 7, "holders": [ "elyos", "elyos", "elyos" ], "seenAt": "2026-10-25T01:00:00+00:00" },
+                { "serverId": 2003, "holders": [ "elyos", "elyos", "elyos" ], "seenAt": "2019-10-25T01:00:00+00:00" },
+                { "serverId": 2004, "holders": [ "elyos", "nobody", "asmodian" ], "since": "2026-10-24T12:10:00+00:00", "until": "2026-10-26T12:00:00+00:00", "seenAt": "2026-10-25T01:00:00+00:00" }
+              ] }
+            """);
+        var loaded = store.Load(Monday);
+        Assert.Equal(0, Assert.Single(loaded.File.Characters).ServerId);
+        Assert.Equal([1001, 2004], loaded.File.Artifacts.Select(a => a.ServerId));
+        var first = loaded.File.Artifacts[0];
+        Assert.Equal([ArtifactHolder.Elyos, ArtifactHolder.Unknown, ArtifactHolder.Nobody], first.Holders);
+        Assert.Null(first.Until);
+        Assert.Equal(new DateTimeOffset(2026, 10, 26, 12, 0, 0, TimeSpan.Zero), loaded.File.Artifacts[1].Until);
+        Assert.Contains("4 unusable Abyss artifact records dropped.", loaded.Notice, StringComparison.Ordinal);
+        Assert.Contains("Abyss artifact holders or times repaired on 1 server.", loaded.Notice, StringComparison.Ordinal);
+        Assert.Contains("Server, class", loaded.Notice, StringComparison.Ordinal);
+        Assert.DoesNotContain("1001", loaded.Notice, StringComparison.Ordinal);
+        Assert.Empty(RosterNormalizer.Normalize(loaded.File, Monday).Repairs); // clean once repaired
+
+        // Equal when every value is, the holders one by one (a record compares a list by reference).
+        var copy = first with { Holders = [.. first.Holders] };
+        Assert.Equal(first, copy);
+        Assert.Equal(first.GetHashCode(), copy.GetHashCode());
+        Assert.NotEqual(first, copy with { Holders = [ArtifactHolder.Elyos, ArtifactHolder.Elyos, ArtifactHolder.Nobody] });
+        Assert.NotEqual(first, copy with { SeenAt = copy.SeenAt.AddMinutes(1) });
+        Assert.NotEqual(first, copy with { Since = Saturday });
     }
 }

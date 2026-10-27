@@ -31,6 +31,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     private readonly RecordTap records;
     private readonly EntryListTap entries;
     private readonly MapLoadTap maps;
+    private readonly AbyssArtifactTap artifacts;
     private readonly AbyssPause pause;
     private readonly DummyFightFilter dummies;
     private readonly ILogger<UpstreamCombatEngine> logger;
@@ -49,6 +50,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         RecordTap records,
         EntryListTap entries,
         MapLoadTap maps,
+        AbyssArtifactTap artifacts,
         AbyssPause pause,
         DummyFightFilter dummies,
         ILogger<UpstreamCombatEngine> logger)
@@ -61,6 +63,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         this.records = records;
         this.entries = entries;
         this.maps = maps;
+        this.artifacts = artifacts;
         this.pause = pause;
         this.dummies = dummies;
         this.logger = logger;
@@ -100,6 +103,12 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     {
         add => maps.Changed += value;
         remove => maps.Changed -= value;
+    }
+
+    public event EventHandler<AbyssArtifacts>? ArtifactsObserved
+    {
+        add => artifacts.Observed += value;
+        remove => artifacts.Observed -= value;
     }
 
     public bool PausedInAbyss => pause.Paused;

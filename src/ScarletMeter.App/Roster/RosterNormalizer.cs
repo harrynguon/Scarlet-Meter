@@ -1,3 +1,6 @@
+using System.Text;
+using ScarletMeter.Engine;
+
 namespace ScarletMeter.App.Roster;
 
 /// <summary>
@@ -30,6 +33,15 @@ public static class RosterNormalizer
 
     /// <summary>The most Kina kept: the inventory record's quantity has its top three bytes zero, so below 2^40.</summary>
     public const long MaxKina = 1L << 40;
+
+    /// <summary>The longest note kept, in UTF-16 units: a short line under the character's name.</summary>
+    public const int MaxNoteLength = 100;
+
+    /// <summary>The most servers whose Abyss artifact holders are kept; past it, the ones read longest ago go (the game has 42).</summary>
+    public const int MaxServers = 64;
+
+    /// <summary>How far after now a holding's reset may lie: past it, it is not one the game sent (sieges come every few days).</summary>
+    public static readonly TimeSpan ResetSlack = TimeSpan.FromDays(8);
 
     /// <summary>The earliest date taken: before AION 2's release anything is not the game's.</summary>
     public static readonly DateTimeOffset Earliest = new(2025, 1, 1, 0, 0, 0, TimeSpan.Zero);
@@ -67,8 +79,40 @@ public static class RosterNormalizer
         if (over > 0) repairs.Add($"{Characters(over)} seen longest ago dropped, past the {MaxCharacters} kept.");
         if (countsDropped > 0) repairs.Add($"{countsDropped} unusable {(countsDropped == 1 ? "count or corridor entry" : "counts or corridor entries")} dropped.");
         if (runsTrimmed > 0) repairs.Add($"{runsTrimmed} corridor {(runsTrimmed == 1 ? "entry" : "entries")} listed twice or past the {RosterRules.CorridorRunsKept} kept dropped.");
-        if (repaired > 0) repairs.Add($"Class, combat power, cap or the order of corridor entries repaired on {Characters(repaired)}.");
-        return (new RosterFile { Version = RosterFile.CurrentVersion, Characters = newest }, repairs);
+        if (repaired > 0) repairs.Add($"Server, class, combat power, cap, note or the order of corridor entries repaired on {Characters(repaired)}.");
+
+        var (artifacts, artifactsDropped, artifactsRepaired) = CleanArtifacts(file?.Artifacts, now);
+        if (artifactsDropped > 0) repairs.Add($"{artifactsDropped} unusable Abyss artifact {(artifactsDropped == 1 ? "record" : "records")} dropped.");
+        if (artifactsRepaired > 0) repairs.Add($"Abyss artifact holders or times repaired on {artifactsRepaired} {(artifactsRepaired == 1 ? "server" : "servers")}.");
+        return (new RosterFile { Version = RosterFile.CurrentVersion, Characters = newest, Artifacts = artifacts }, repairs);
+    }
+
+    // The Abyss artifact holders as they can be used: on a server with a side, a holder for each lower-layer artifact and a
+    // usable date; one per server, the one read last; the most recently read kept. A holder this build cannot name is
+    // unknown, and a start or reset out of range is dropped (the schedule stands in).
+    private static (List<RosterArtifacts> Kept, int Dropped, int Repaired) CleanArtifacts(IReadOnlyList<RosterArtifacts>? saved, DateTimeOffset now)
+    {
+        var dropped = 0;
+        var repaired = 0;
+        List<RosterArtifacts> usable = [];
+        foreach (var entry in saved ?? [])
+        {
+            if (entry is null || AbyssArtifacts.SideOf(entry.ServerId) == ArtifactHolder.Unknown
+                || entry.Holders is not { Count: AbyssArtifacts.Corridors } holders || !IsUsableDate(entry.SeenAt, now))
+            {
+                dropped++;
+                continue;
+            }
+            List<ArtifactHolder> named = [.. holders.Select(holder => Enum.IsDefined(holder) ? holder : ArtifactHolder.Unknown)];
+            var since = entry.Since is { } start && IsUsableDate(start, now) ? entry.Since : null;
+            var until = entry.Until is { } reset && reset >= Earliest && reset <= now + ResetSlack ? entry.Until : null;
+            if (!named.SequenceEqual(holders) || since != entry.Since || until != entry.Until) repaired++;
+            usable.Add(entry with { Holders = named, Since = since, Until = until });
+        }
+        var unique = usable.GroupBy(entry => entry.ServerId).Select(g => g.OrderByDescending(entry => entry.SeenAt).First()).ToList();
+        var kept = unique.OrderByDescending(entry => entry.SeenAt).Take(MaxServers).OrderBy(entry => entry.ServerId).ToList();
+        dropped += usable.Count - kept.Count;
+        return (kept, dropped, repaired);
     }
 
     private static string Characters(int count) => count == 1 ? "1 character" : $"{count} characters";
@@ -103,15 +147,18 @@ public static class RosterNormalizer
             lastSeen = latest;
         }
 
+        var serverId = AbyssArtifacts.SideOf(character.ServerId) != ArtifactHolder.Unknown ? character.ServerId : 0;
         var classId = character.ClassId is >= 0 and <= 99 ? character.ClassId : 0;
         var className = IsUsableText(character.ClassName, MaxClassNameLength, allowEmpty: true) ? character.ClassName : string.Empty;
         var combatPower = character.CombatPower is >= 0 and <= MaxCombatPower ? character.CombatPower : 0;
         var cap = Enum.IsDefined(character.OdyleCap) ? character.OdyleCap : OdyleCapChoice.Automatic;
-        if (classId != character.ClassId || className != character.ClassName || combatPower != character.CombatPower || cap != character.OdyleCap
-            || (runs.Count == usable.Count && !runs.SequenceEqual(usable))) repaired++;
+        var note = CleanNote(character.Note);
+        if (serverId != character.ServerId || classId != character.ClassId || className != character.ClassName || combatPower != character.CombatPower || cap != character.OdyleCap
+            || note != (character.Note ?? string.Empty) || (runs.Count == usable.Count && !runs.SequenceEqual(usable))) repaired++;
 
         return character with
         {
+            ServerId = serverId,
             ClassId = classId,
             ClassName = className,
             CombatPower = combatPower,
@@ -122,7 +169,26 @@ public static class RosterNormalizer
             Ascension = ascension,
             CorridorRuns = runs,
             Kina = kina,
+            Note = note,
         };
+    }
+
+    /// <summary>
+    /// A note as the roster keeps it, from the page or a loaded file: spaces at either end trimmed, a control character
+    /// (a line break among them) or any other space as a plain space, text that is not valid UTF-16 as U+FFFD, and cut
+    /// at <see cref="MaxNoteLength"/> without splitting a character. Null is empty. Pure.
+    /// </summary>
+    public static string CleanNote(string? note)
+    {
+        if (string.IsNullOrEmpty(note)) return string.Empty;
+        var clean = new StringBuilder(MaxNoteLength);
+        foreach (var rune in note.AsSpan().Trim().EnumerateRunes())
+        {
+            var kept = Rune.IsControl(rune) || Rune.IsWhiteSpace(rune) ? new Rune(' ') : rune;
+            if (clean.Length + kept.Utf16SequenceLength > MaxNoteLength) break;
+            clean.Append(kept.ToString());
+        }
+        return clean.ToString().Trim();
     }
 
     // A count kept as it is, or null (counted) when a value or its date is out of range.

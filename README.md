@@ -96,9 +96,10 @@ and adds it up per player and per fight.
 - **History** of saved boss fights, searchable, kept for as long as you choose.
 - **Characters**: every character you log in on with the meter running, with its Odyle energy, when basic energy is
   full again, and Nightmare and Ascension entries left, estimated (≈) from what the game last said, the Artifact
-  Corridors it entered since the last Abyss Siege, as the meter saw them, and its Kina and Kina (Bound) as of the last
-  time you played it, with the totals across characters. Click the Odyle energy, or Settings, Appearance, Characters.
-  The recharge and siege times and the Kina are not yet checked in the game.
+  Corridors it entered since the last Abyss Siege, as the meter saw them, out of those whose artifact your side holds
+  (read when you open the Abyss map or enter the Abyss), and its Kina and Kina (Bound) as of the last time you played
+  it, with the totals across characters, and a note of your own under each name. Click the Odyle energy, or Settings,
+  Appearance, Characters. The recharge and siege times, the Kina and the artifacts are not yet checked in the game.
 
 **World events**
 
@@ -178,7 +179,7 @@ All in the `data` folder beside `ScarletMeter.exe`, so you can back it up, move 
 | Logs, one file a day, the 14 newest kept | `data\logs\scarlet-<date>.log` |
 | Settings, and the previous save | `data\settings.json`, `data\settings.json.bak` |
 | Saved boss fights | `data\combat-history.db` (demo fights: `data\demo-history.db`) |
-| Your characters (Odyle energy, entries left), and the previous save | `data\roster.json`, `data\roster.json.bak` (demo: `data\demo-roster.json`) |
+| Your characters (Odyle energy, entries left, Kina, your notes) and the Abyss's artifact holders, and the previous save | `data\roster.json`, `data\roster.json.bak` (demo: `data\demo-roster.json`) |
 | Your background picture | `data\backgrounds\` |
 | The meter's browser cache (WebView2) | `data\webview2\` |
 | The boss-timers window's own browser data (the site's cookies and choices) | `data\webview2-timers\` |

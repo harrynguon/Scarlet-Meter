@@ -1,3 +1,4 @@
+using ScarletMeter.Engine;
 using ScarletMeter.WorldEvents;
 
 namespace ScarletMeter.App.Roster;
@@ -143,16 +144,39 @@ public static class RosterRules
     public const int CorridorRunsKept = 12;
 
     /// <summary>
-    /// The most corridors a side runs between two sieges, one per artifact it holds (A2Tools' Roster plugin: "up to 3");
-    /// how many a side holds now is not read, so the page shows the runs alone, with this as the bound.
+    /// The most corridors a side runs between two sieges, one per lower-layer artifact it holds (A2Tools' Roster plugin:
+    /// "up to 3"); how many it holds now is <see cref="CorridorsOpen"/>.
     /// </summary>
-    public const int CorridorsPerSiege = 3;
+    public const int CorridorsPerSiege = AbyssArtifacts.Corridors;
+
+    /// <summary>
+    /// The longest a holding the game reports is taken to last, from when it was read to its reset: sieges come three
+    /// times a week, so a reset further off is not one the meter can use, and the schedule stands in.
+    /// </summary>
+    public static readonly TimeSpan LongestHolding = TimeSpan.FromDays(7);
 
     /// <summary>The Artifact Corridor entries since the last Abyss Siege at <paramref name="now"/>.</summary>
     public static int CorridorRunsSinceSiege(IReadOnlyList<DateTimeOffset> runs, DateTimeOffset now, RechargeCalendar calendar)
     {
         var since = calendar.LastSiege(now);
         return runs.Count(run => run > since);
+    }
+
+    /// <summary>
+    /// How many Artifact Corridors the side of a character on <paramref name="serverId"/> can enter until the next siege:
+    /// the lower-layer artifacts its side holds, as A2Tools' Roster plugin counts them (plugin.js at 7a4720b): one nobody
+    /// holds closes its corridor to both sides, one the game did not name counts as open. Null while that is not known:
+    /// the side not known (no server id), no holders read on that server, or the holders read are past: their reset has
+    /// come, or, without a reset the meter can use (<see cref="LongestHolding"/>), a siege on the schedule since they were read.
+    /// </summary>
+    public static int? CorridorsOpen(int serverId, RosterArtifacts? artifacts, DateTimeOffset now, RechargeCalendar calendar)
+    {
+        var side = AbyssArtifacts.SideOf(serverId);
+        if (side == ArtifactHolder.Unknown || artifacts is null || artifacts.ServerId != serverId) return null;
+        var current = artifacts.Until is { } until && until > artifacts.SeenAt && until - artifacts.SeenAt <= LongestHolding
+            ? now < until
+            : artifacts.SeenAt >= calendar.LastSiege(now);
+        return current ? artifacts.Holders.Count(holder => holder == side || holder == ArtifactHolder.Unknown) : null;
     }
 
     /// <summary>The cap the character's basic energy refills to: the player's choice, or 840 once more than 560 was seen.</summary>

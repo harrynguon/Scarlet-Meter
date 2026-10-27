@@ -1,13 +1,15 @@
 using System.Buffers.Binary;
 using AionDpsMeter.Services.PacketCapture;
 using K4os.Compression.LZ4;
+using ScarletMeter.Engine.Abyss;
 using ScarletMeter.Engine.Maps;
 
 namespace ScarletMeter.Tests;
 
 /// <summary>
 /// Synthetic game records and the stream they travel in, for the tests of the records upstream does not decode (the
-/// entry list with Odyle energy, the map loaded): framing, LZ4 bundles and bringing upstream's reassembly into step. Never captured bytes.
+/// entry list with Odyle energy, the map loaded, the Abyss's artifact holders): framing, LZ4 bundles and bringing
+/// upstream's reassembly into step. Never captured bytes.
 /// </summary>
 internal static class SyntheticRecords
 {
@@ -61,4 +63,43 @@ internal static class SyntheticRecords
     }
 
     public static byte[] Hex(string hex) => Convert.FromHexString(hex.Replace(" ", string.Empty, StringComparison.Ordinal));
+
+    // An artifact war in A2Tools' documented shape: a made-up byte, the event id, two made-up bytes, the holding's start
+    // (Unix ms) and, when given, its reset.
+    public static byte[] ArtifactWar(int eventId, long sinceMs, long? untilMs)
+    {
+        var bytes = new byte[15 + (untilMs is null ? 0 : 8)];
+        bytes[0] = 0x01;
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(1), (uint)eventId);
+        bytes[5] = 0x02;
+        bytes[6] = 0x03;
+        BinaryPrimitives.WriteInt64LittleEndian(bytes.AsSpan(7), sinceMs);
+        if (untilMs is { } until) BinaryPrimitives.WriteInt64LittleEndian(bytes.AsSpan(15), until);
+        return bytes;
+    }
+
+    // Artifacts in A2Tools' documented shape: their count, then each one's id, a made-up u32, the holder's byte and eight
+    // made-up bytes.
+    public static byte[] ArtifactList(params (int Id, byte Holder)[] artifacts)
+    {
+        var bytes = new byte[1 + artifacts.Length * 17];
+        bytes[0] = (byte)artifacts.Length;
+        for (var n = 0; n < artifacts.Length; n++)
+        {
+            var at = bytes.AsSpan(1 + n * 17);
+            BinaryPrimitives.WriteUInt32LittleEndian(at, (uint)artifacts[n].Id);
+            BinaryPrimitives.WriteUInt32LittleEndian(at[4..], 0x5A5A);
+            at[8] = artifacts[n].Holder;
+            at[9..17].Fill(0x3C);
+        }
+        return bytes;
+    }
+
+    // The Abyss map's record (07 e3): two zero bytes, the number of wars, the wars, then the artifacts.
+    public static byte[] AbyssMap(byte[][] wars, byte[] artifacts) =>
+        Frame(AbyssArtifactRecords.MapOpcode, Convert.ToHexString([0x00, 0x00, (byte)wars.Length, .. wars.SelectMany(war => war), .. artifacts]));
+
+    // The record on entering the Abyss (05 e3): one war, then the artifacts.
+    public static byte[] AbyssEntry(byte[] war, byte[] artifacts) =>
+        Frame(AbyssArtifactRecords.EntryOpcode, Convert.ToHexString([.. war, .. artifacts]));
 }
