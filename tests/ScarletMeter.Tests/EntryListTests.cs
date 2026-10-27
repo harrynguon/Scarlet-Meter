@@ -443,7 +443,7 @@ public sealed class EntryListTests
     [InlineData(33u, 18)]
     [InlineData(36u, 18)]
     [InlineData(37u, 0)]
-    [InlineData(0x0100001Eu, 0)]
+    [InlineData(0x0100001Fu, 0)]
     [InlineData(uint.MaxValue, 0)]
     public void TheClassCodesAreFourToAClass(uint code, int classId) => Assert.Equal(classId, SelfRecords.ClassIdOf(code));
 
@@ -462,39 +462,40 @@ public sealed class EntryListTests
         Assert.Equal(name, UpstreamMapping.ClassNameOf(SelfRecords.ClassIdOf(code)));
 
     // The class code is the u32 right after the server id, read only after a real name and only when all four bytes are
-    // there; the bytes are written out here, so the layout is pinned apart from the writer.
+    // there; the bytes are written out here, made up (none of A2Tools' captured bytes), so the layout is pinned apart from
+    // the writer.
     [Fact]
     public void TheRecordHoldsTheClassCodeAfterTheServerId()
     {
-        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 6C 70 68 61 E9 03 1E 00 00 00 01 1C"), out var read));
-        Assert.Equal((1001, 30u), (read.ServerId, read.ClassCode));
-        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 6C 70 68 61 E9 03 1E 00 00"), out read));
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 6C 70 68 61 E9 03 1F 00 00 00 02 21"), out var read));
+        Assert.Equal((1001, 31u), (read.ServerId, read.ClassCode));
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 6C 70 68 61 E9 03 1F 00 00"), out read));
         Assert.Equal((1001, 0u), (read.ServerId, read.ClassCode)); // cut inside the class code
-        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 6C 70 68 61 E9 03 1E 00 00 01"), out read));
-        Assert.Equal(0x0100001Eu, read.ClassCode); // read whole, little-endian: no class
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 6C 70 68 61 E9 03 1F 00 00 01"), out read));
+        Assert.Equal(0x0100001Fu, read.ClassCode); // read whole, little-endian: no class
         Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc03", 1001, 30, 0), out read));
         Assert.Equal(0u, read.ClassCode); // no real name, so no class either
         Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "Synthia", 2002, 22, 0), out read));
         Assert.Equal(22u, read.ClassCode);
     }
 
-    // After the class code, a byte, the level (u32) and the gear score twice (u32 each), as A2Tools reads them (a Cleric
-    // of level 28 with gear score 383, and level 45 with 2,040, in its fixtures' layout; the bytes written out here are
-    // made up): the level only after a code that is a class and only from 1 to 99, the gear score only with a level, when
-    // both copies agree and it is from 1 to 100,000.
+    // After the class code, a byte, the level (u32) and the gear score twice (u32 each), as A2Tools reads them; the bytes
+    // written out here are made up in that layout (class 31, level 33, gear score 517; level 52, 1,234), none of its
+    // captured bytes (deep audit on #56: the first rows had been its fixture's): the level only after a code that is a class
+    // and only from 1 to 99, the gear score only with a level, when both copies agree and it is from 1 to 100,000.
     [Theory]
-    [InlineData("1E 00 00 00 01 1C 00 00 00 7F 01 00 00 7F 01 00 00", 28, 383)]
-    [InlineData("1E 00 00 00 01 2D 00 00 00 F8 07 00 00 F8 07 00 00", 45, 2040)]
-    [InlineData("25 00 00 00 01 1C 00 00 00 7F 01 00 00 7F 01 00 00", 0, 0)] // 37 is no class: nothing after it read
-    [InlineData("1E 00 00 00 01 00 00 00 00 7F 01 00 00 7F 01 00 00", 0, 0)] // level 0
-    [InlineData("1E 00 00 00 01 64 00 00 00 7F 01 00 00 7F 01 00 00", 0, 0)] // level 100
-    [InlineData("1E 00 00 00 01 63 00 00 00 7F 01 00 00 7F 01 00 00", 99, 383)] // level 99
-    [InlineData("1E 00 00 00 01 1C 00 00 00 7F 01 00 00 80 01 00 00", 28, 0)] // the copies disagree
-    [InlineData("1E 00 00 00 01 1C 00 00 00 A1 86 01 00 A1 86 01 00", 28, 0)] // 100,001
-    [InlineData("1E 00 00 00 01 1C 00 00 00 A0 86 01 00 A0 86 01 00", 28, 100_000)]
-    [InlineData("1E 00 00 00 01 1C 00 00 00 00 00 00 00 00 00 00 00", 28, 0)] // gear score 0
-    [InlineData("1E 00 00 00 01 1C 00 00 00 7F 01 00 00 7F 01 00", 28, 0)] // cut inside the second copy
-    [InlineData("1E 00 00 00 01 1C 00 00", 0, 0)] // cut inside the level
+    [InlineData("1F 00 00 00 02 21 00 00 00 05 02 00 00 05 02 00 00", 33, 517)]
+    [InlineData("1F 00 00 00 02 34 00 00 00 D2 04 00 00 D2 04 00 00", 52, 1234)]
+    [InlineData("25 00 00 00 02 21 00 00 00 05 02 00 00 05 02 00 00", 0, 0)] // 37 is no class: nothing after it read
+    [InlineData("1F 00 00 00 02 00 00 00 00 05 02 00 00 05 02 00 00", 0, 0)] // level 0
+    [InlineData("1F 00 00 00 02 64 00 00 00 05 02 00 00 05 02 00 00", 0, 0)] // level 100
+    [InlineData("1F 00 00 00 02 63 00 00 00 05 02 00 00 05 02 00 00", 99, 517)] // level 99
+    [InlineData("1F 00 00 00 02 21 00 00 00 05 02 00 00 06 02 00 00", 33, 0)] // the copies disagree
+    [InlineData("1F 00 00 00 02 21 00 00 00 A1 86 01 00 A1 86 01 00", 33, 0)] // 100,001
+    [InlineData("1F 00 00 00 02 21 00 00 00 A0 86 01 00 A0 86 01 00", 33, 100_000)]
+    [InlineData("1F 00 00 00 02 21 00 00 00 00 00 00 00 00 00 00 00", 33, 0)] // gear score 0
+    [InlineData("1F 00 00 00 02 21 00 00 00 05 02 00 00 05 02 00", 33, 0)] // cut inside the second copy
+    [InlineData("1F 00 00 00 02 21 00 00", 0, 0)] // cut inside the level
     public void TheRecordHoldsTheLevelAndGearScoreAfterTheClass(string profile, int level, int gearScore)
     {
         Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 6C 70 68 61 E9 03 " + profile), out var read));

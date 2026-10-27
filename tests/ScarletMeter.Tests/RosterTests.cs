@@ -894,6 +894,23 @@ public sealed class RosterTests : IDisposable
         Assert.Equal("alt", Assert.Single(store.Load(clock.GetUtcNow()).File.Characters).Note);
     }
 
+    // A level or gear score past its bound, the character's only fault, is reset and said repaired (deep audit on #56: the
+    // repair went uncounted with the condition removed); one within its bounds needs nothing.
+    [Theory]
+    [InlineData(100, 0, true)]
+    [InlineData(0, 100_001, true)]
+    [InlineData(-1, 0, true)]
+    [InlineData(99, 100_000, false)]
+    public void ALevelOrGearScorePastItsBoundIsSaidRepaired(int level, int gearScore, bool repaired)
+    {
+        var saved = new RosterCharacter { Name = "Alpha", Server = "SIE", LastSeen = Monday, Level = level, GearScore = gearScore };
+        var (file, repairs) = RosterNormalizer.Normalize(new RosterFile { Characters = [saved] }, Monday);
+        var character = Assert.Single(file.Characters);
+        Assert.Equal(repaired ? (0, 0) : (level, gearScore), (character.Level, character.GearScore));
+        if (repaired) Assert.Equal(["Server, class, combat power, level, gear score, cap, note or the order of corridor entries repaired on 1 character."], repairs);
+        else Assert.Empty(repairs);
+    }
+
     // A saved note is cleaned as one from the page, and said repaired without quoting it (the repairs are logged); none
     // saved (null) is empty and needs nothing.
     [Fact]
@@ -904,7 +921,7 @@ public sealed class RosterTests : IDisposable
         var note = Assert.Single(file.Characters).Note;
         Assert.StartsWith("Alt  nnn", note, StringComparison.Ordinal);
         Assert.Equal(RosterNormalizer.MaxNoteLength, note.Length);
-        Assert.Equal(["Server, class, combat power, cap, note or the order of corridor entries repaired on 1 character."], repairs);
+        Assert.Equal(["Server, class, combat power, level, gear score, cap, note or the order of corridor entries repaired on 1 character."], repairs);
 
         var (none, nothing) = RosterNormalizer.Normalize(new RosterFile { Characters = [saved with { Note = null! }] }, Monday);
         Assert.Equal(string.Empty, Assert.Single(none.Characters).Note);

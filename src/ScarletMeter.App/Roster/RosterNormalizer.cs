@@ -85,7 +85,7 @@ public static class RosterNormalizer
         if (over > 0) repairs.Add($"{Characters(over)} seen longest ago dropped, past the {MaxCharacters} kept.");
         if (countsDropped > 0) repairs.Add($"{countsDropped} unusable {(countsDropped == 1 ? "count or corridor entry" : "counts or corridor entries")} dropped.");
         if (runsTrimmed > 0) repairs.Add($"{runsTrimmed} corridor {(runsTrimmed == 1 ? "entry" : "entries")} listed twice or past the {RosterRules.CorridorRunsKept} kept dropped.");
-        if (repaired > 0) repairs.Add($"Server, class, combat power, cap, note or the order of corridor entries repaired on {Characters(repaired)}.");
+        if (repaired > 0) repairs.Add($"Server, class, combat power, level, gear score, cap, note or the order of corridor entries repaired on {Characters(repaired)}.");
 
         var (artifacts, artifactsDropped, artifactsTrimmed, artifactsRepaired) = CleanArtifacts(file?.Artifacts, now);
         if (artifactsDropped > 0) repairs.Add($"{artifactsDropped} unusable Abyss artifact {(artifactsDropped == 1 ? "record" : "records")} dropped.");

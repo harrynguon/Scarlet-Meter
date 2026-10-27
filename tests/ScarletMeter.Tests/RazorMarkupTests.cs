@@ -619,8 +619,9 @@ public sealed partial class RazorMarkupTests
 
     // Each roster row shows the level on its class line and a Power column after the character, combat power with the
     // gear score under it, each with its icon (Harry, 2026-10-27). The room for it comes from the basic energy cap moving
-    // under when it is full (its own line, display: block), as Harry also asked, and a pixel less at each side of a cell:
-    // without them the table outgrew the window's 920 px in a headless render. The class icon is a little larger than other
+    // under when it is full (its own line, display: block), as Harry also asked, two pixels less at each side of a cell and
+    // headers without letter spacing: without them a full row outgrew the window's client width (904 px at its default 920,
+    // 896 once the list scrolls) in headless renders (deep audit on #56). The class icon is a little larger than other
     // tables' (22 px).
     [Fact]
     public void TheRosterShowsLevelAndPowerAndKeepsTheCapUnderFull()
@@ -642,8 +643,9 @@ public sealed partial class RazorMarkupTests
         Assert.DoesNotMatch(@"margin-left:\s*[1-9]", Block(views, ".roster-cap"));
         Assert.Matches(@"width:\s*22px;\s*height:\s*22px;", Block(views, ".roster-table .class-icon"));
         Assert.Matches(@"width:\s*28px;", Block(views, ".roster-table .icon-cell"));
-        // The row's 24 px back from the cells' sides, without which the icons tipped Harry's roster past 920 px.
-        Assert.Matches(@"padding-left:\s*5px;\s*padding-right:\s*5px;", Block(views, ".roster-table th, .roster-table td"));
+        // The row's room back from the cells' sides and the headers' spacing.
+        Assert.Matches(@"padding-left:\s*4px;\s*padding-right:\s*4px;", Block(views, ".roster-table th, .roster-table td"));
+        Assert.Matches(@"letter-spacing:\s*0;", Block(views, ".roster-table th"));
         Assert.Matches(@"justify-content:\s*flex-end;", Block(views, ".roster-power"));
         Assert.Matches(@"width:\s*12px;", Block(views, ".cp-icon"));
         Assert.Matches(@"width:\s*11px;", Block(views, ".gs-icon"));

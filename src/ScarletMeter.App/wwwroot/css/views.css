@@ -410,9 +410,13 @@ tr.child td {
 .roster-table .icon-cell { width: 28px; }
 .roster-table .class-icon { width: 22px; height: 22px; }
 
-/* A pixel less at each side of a cell than other tables: with the Power column's icons, a headless render at the
-   window's 920 px with Harry's own values was half a pixel too wide (a horizontal scrollbar); this gives the row 24 px. */
-.roster-table th, .roster-table td { padding-left: 5px; padding-right: 5px; }
+/* Room for the Power column: two pixels less at each side of a cell than other tables (the row gains 48 px), and headers
+   without their letter spacing (the Nightmare, Ascension and Corridors columns are as wide as their headers). Measured in
+   headless renders at the window's client width, 904 px at its default 920 and 896 once the list scrolls, with a full
+   made-up row (a 12-letter name and the Playing badge, 109,396 combat power, ≈ 840 (+2,000), 2,450,000 Kina): it fits with
+   23 px to spare, where before this column the table was already 20 px too wide (deep audit on #56). */
+.roster-table th, .roster-table td { padding-left: 4px; padding-right: 4px; }
+.roster-table th { letter-spacing: 0; }
 
 /* A name in a row reads at the table's size, not the details header's. */
 .roster-table .who-name { font-size: 13px; }
