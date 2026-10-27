@@ -144,7 +144,7 @@ public partial class RosterPage : IDisposable
     public static string NoteTitle(RosterCharacter character) =>
         character.Note.Length > 0 ? character.Note : "Your note on this character, kept on this PC; Enter or leaving the box saves it";
 
-    private RechargeCalendar Calendar => RechargeCalendar.Default(TimeSpan.FromMinutes(Math.Round(Settings.Current.Alerts.ServerOffsetHours * 60)));
+    private RechargeCalendar Calendar => RechargeCalendar.ForServerOffsetHours(Settings.Current.Alerts.ServerOffsetHours);
 
     private string Name(RosterCharacter character) =>
         Settings.Current.Appearance.HideNicknames ? NicknameMask.Mask(character.Name) : character.Name;

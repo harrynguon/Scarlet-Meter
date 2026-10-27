@@ -6,6 +6,7 @@ using Microsoft.JSInterop;
 using ScarletMeter.App.Alerts;
 using ScarletMeter.App.Combat;
 using ScarletMeter.App.Formatting;
+using ScarletMeter.App.Roster;
 using ScarletMeter.App.Settings;
 using ScarletMeter.App.Updates;
 using ScarletMeter.App.Windows;
@@ -43,10 +44,14 @@ public partial class MeterPage : IAsyncDisposable
     // The notices' switches: the header's bell (Enabled) and whether they stand aside for a boss fight.
     private AlertSettings alertSettings = new();
     private int? ping;
-    // The latest Odyle energy, read with each refresh; null until the game sends it.
+    // The Odyle energy and Shugo Festival keys shown, read with each refresh (ReadEnergy): the game's latest, or until it
+    // has sent them this run the roster's last known, estimated (odyleLastKnown, shugoLastKnown); null when neither is there.
     private OdyleEnergy? odyle;
-    // The latest Shugo Festival keys, read with the Odyle energy; null until the game sends them.
     private ShugoKeys? shugo;
+    private bool odyleLastKnown;
+    private bool shugoLastKnown;
+    // The calendar those estimates use, made again only when the server offset in Settings changes.
+    private readonly RechargeCalendarCache calendars = new();
     private Task? refreshLoop;
     private bool refreshFailing;
     // The content height last sent to the window (OnAfterRenderAsync).
@@ -77,6 +82,10 @@ public partial class MeterPage : IAsyncDisposable
     // The "newer RATmeter release" line above the alert strip.
     [Inject]
     private UpdateNotice Updates { get; set; } = default!;
+
+    // The last known Odyle energy and Shugo keys, until the game sends its own this run.
+    [Inject]
+    private RosterService Roster { get; set; } = default!;
 
     // Reads the panel's height after each render (js/overlay-size.js).
     [Inject]
@@ -133,8 +142,7 @@ public partial class MeterPage : IAsyncDisposable
     {
         appearance = Settings.Current.Appearance;
         alertSettings = Settings.Current.Alerts;
-        odyle = Engine.OdyleEnergy;
-        shugo = Engine.ShugoKeys;
+        ReadEnergy(Clock.GetUtcNow());
         Settings.Changed += OnSettingsChanged;
         Engine.PingUpdated += OnPingUpdated;
         Alerts.Changed += OnAlertsChanged;
@@ -220,11 +228,8 @@ public partial class MeterPage : IAsyncDisposable
                 try
                 {
                     snapshot = Engine.GetSnapshot();
-                    // Read on this loop, which runs on the renderer's dispatcher, rather than set from the capture
-                    // thread's event: the two numbers are read together under the engine's lock, never torn.
-                    odyle = Engine.OdyleEnergy;
-                    shugo = Engine.ShugoKeys;
                     var now = Clock.GetUtcNow();
+                    ReadEnergy(now);
                     killIn = killTimer.Update(snapshot.Target, now);
                     phase = fightState.Update(snapshot.Target, now);
                     bossFightUnderWay = bossFight.Update(snapshot.Target, now);
@@ -252,6 +257,25 @@ public partial class MeterPage : IAsyncDisposable
             // Disposing.
         }
     }
+
+    // The Odyle energy and Shugo keys to show: the game's, read on the refresh loop (on the renderer's dispatcher, rather
+    // than set from the capture thread's event: each pair of numbers is read together under the engine's lock, never
+    // torn), or while the game has not sent them this run, the roster's last known for the character played, estimated
+    // (LastKnownValues; Harry, 2026-10-28), shown with ≈ until the game's own replace them.
+    private void ReadEnergy(DateTimeOffset now)
+    {
+        var shown = LastKnownValues.Shown(Engine.OdyleEnergy, Engine.ShugoKeys, () => Roster.LastKnown, now, calendars.For(alertSettings.ServerOffsetHours));
+        (odyle, odyleLastKnown, shugo, shugoLastKnown) = (shown.Odyle, shown.OdyleLastKnown, shown.Shugo, shown.ShugoLastKnown);
+    }
+
+    // What the Odyle energy and the Shugo keys say when pointed at: the game's own, or the last known, estimated.
+    private string OdyleTitle => odyleLastKnown
+        ? "Odyle energy, estimated (≈): basic (+charged) as the game last said for the character played last, with basic's refills since. The game's own replaces it at your next login or when it changes. Click for your characters."
+        : "Odyle energy: basic (+charged). Click for your characters.";
+
+    private string ShugoTitle => shugoLastKnown
+        ? "Shugo Festival keys, estimated (≈): left, shared by your characters on this server (+extra from recharge items), as the game last said on this server, with the daily keys since. The game's own replace them at your next login or when they change."
+        : "Shugo Festival keys: left, shared by your characters on this server (+extra from recharge items)";
 
     private void OnSettingsChanged(object? sender, MeterSettings changed)
     {

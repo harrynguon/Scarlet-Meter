@@ -1254,4 +1254,163 @@ public sealed class RosterTests : IDisposable
         Assert.NotEqual(first, copy with { Until = Monday });
         Assert.NotEqual(first, copy with { ServerId = 1002 });
     }
+
+    // ---------- The overlay's last known Odyle energy and Shugo keys (Harry, 2026-10-28) ----------
+
+    // The Shugo Festival keys are the server's: each report's are kept for the server of the character named (the report's
+    // server id, or else the one the roster knows for it), a later reading on that server by any of its characters
+    // replacing them and an earlier one never; none without a server id. They are saved and read back. Made-up Global ids.
+    [Fact]
+    public void TheShugoKeysAreKeptForTheServerOfTheCharacterNamed()
+    {
+        var clock = new FakeTimeProvider(Monday.AddHours(2));
+        var store = NewStore();
+        using (var service = new RosterService(new FakeEngine(), store, clock, NullLogger<RosterService>.Instance))
+        {
+            var alpha = AlphaIdentity with { Server = string.Empty, ServerId = 1503 };
+            service.Take(Progress(alpha, (EntryIds.ShugoFestivalKeys, 12, 3, Monday)));
+            Assert.Equal(new RosterShugoKeys(1503, 12, 3, Monday), service.ShugoKeys[1503]);
+            var beta = new CharacterIdentity("Beta", string.Empty, 11, "Gladiator", 38_000, ServerId: 1503);
+            service.Take(Progress(beta, (EntryIds.ShugoFestivalKeys, 9, 0, Monday.AddHours(1)))); // another character on it
+            Assert.Equal(new RosterShugoKeys(1503, 9, 0, Monday.AddHours(1)), service.ShugoKeys[1503]);
+            service.Take(Progress(alpha, (EntryIds.ShugoFestivalKeys, 12, 3, Monday))); // read earlier: not taken
+            Assert.Equal(9, service.ShugoKeys[1503].Keys);
+            service.Take(Progress(alpha with { ServerId = 0 }, (EntryIds.ShugoFestivalKeys, 6, 0, Monday.AddHours(2)))); // the roster knows Alpha's
+            Assert.Equal(6, service.ShugoKeys[1503].Keys);
+            service.Take(Progress(new CharacterIdentity("Gamma", string.Empty, 0, string.Empty, 0), (EntryIds.ShugoFestivalKeys, 1, 0, Monday.AddHours(2))));
+            Assert.Single(service.ShugoKeys); // Gamma's server is not known
+            service.SaveNow();
+        }
+        Assert.Equal([new RosterShugoKeys(1503, 6, 0, Monday.AddHours(2))], store.Load(Monday.AddHours(2)).File.ShugoKeys);
+
+        // Keys saved while the PC's clock was ahead (dated after now) do not count as later than anything, or no reading
+        // would replace them until the clock caught up (deep audit on #60).
+        var aheadStore = NewStore(demo: true);
+        aheadStore.Save(new RosterFile { ShugoKeys = [new RosterShugoKeys(1503, 20, 0, Monday.AddHours(12))] });
+        using var ahead = new RosterService(new FakeEngine(), aheadStore, clock, NullLogger<RosterService>.Instance);
+        ahead.Take(Progress(AlphaIdentity with { Server = string.Empty, ServerId = 1503 }, (EntryIds.ShugoFestivalKeys, 4, 0, Monday)));
+        Assert.Equal(new RosterShugoKeys(1503, 4, 0, Monday), ahead.ShugoKeys[1503]);
+    }
+
+    // The overlay's last known values are for the character the game named last this run, or else the one played last
+    // (the meter started while it was in the game), with the keys saved for its server; none for a character whose server
+    // is not known, nothing once the character named is removed (another's would read as its: deep audit on #60), and
+    // nothing with an empty roster.
+    [Fact]
+    public void TheLastKnownIsTheCharacterNamedOrElseTheOnePlayedLast()
+    {
+        var store = NewStore();
+        store.Save(new RosterFile
+        {
+            Characters =
+            [
+                new() { Name = "Alpha", Server = string.Empty, ServerId = 1503, LastSeen = Monday, Odyle = Seen(500, 100, Monday) },
+                new() { Name = "Beta", Server = string.Empty, ServerId = 2101, LastSeen = Monday.AddHours(1), Odyle = Seen(300, 0, Monday.AddHours(1)) },
+                new() { Name = "Gamma", Server = string.Empty, LastSeen = Monday.AddMinutes(30) },
+            ],
+            ShugoKeys = [new RosterShugoKeys(1503, 12, 3, Monday), new RosterShugoKeys(2101, 20, 0, Monday)],
+        });
+        var clock = new FakeTimeProvider(Monday.AddHours(2));
+        using var service = new RosterService(new FakeEngine(), store, clock, NullLogger<RosterService>.Instance);
+        var last = service.LastKnown!;
+        Assert.Equal(("Beta", 20), (last.Character.Name, last.Shugo!.Keys)); // played last
+        service.Take(Progress(new CharacterIdentity("Alpha", string.Empty, 0, string.Empty, 0)));
+        last = service.LastKnown!;
+        Assert.Equal(("Alpha", 12), (last.Character.Name, last.Shugo!.Keys)); // named this run
+        service.Take(Progress(new CharacterIdentity("Gamma", string.Empty, 0, string.Empty, 0)));
+        Assert.Null(service.LastKnown!.Shugo); // its server is not known
+        service.Remove(new RosterKey(string.Empty, "Gamma"));
+        Assert.Null(service.LastKnown); // the one named is gone: none, rather than another character's
+        using var empty = new RosterService(new FakeEngine(), NewStore(demo: true), clock, NullLogger<RosterService>.Instance);
+        Assert.Null(empty.LastKnown);
+    }
+
+    // Saved Shugo keys are checked as the artifact holders are: on a server with a side, counts within the entry list's
+    // bound and a usable date; one per server, the one read last. Nothing said names a server.
+    [Fact]
+    public void SavedShugoKeysAreChecked()
+    {
+        var store = NewStore();
+        File.WriteAllText(store.FilePath, """
+            { "version": 1, "characters": [],
+              "shugoKeys": [
+                { "serverId": 1503, "keys": 12, "extra": 3, "seenAt": "2026-10-24T01:00:00+00:00" },
+                { "serverId": 1503, "keys": 15, "extra": 0, "seenAt": "2026-10-25T01:00:00+00:00" },
+                { "serverId": 2101, "keys": 21, "extra": 1000000, "seenAt": "2026-10-25T01:00:00+00:00" },
+                { "serverId": 7, "keys": 3, "extra": 0, "seenAt": "2026-10-25T01:00:00+00:00" },
+                { "serverId": 2102, "keys": -1, "extra": 0, "seenAt": "2026-10-25T01:00:00+00:00" },
+                { "serverId": 2103, "keys": 1000001, "extra": 0, "seenAt": "2026-10-25T01:00:00+00:00" },
+                { "serverId": 2104, "keys": 3, "extra": 0, "seenAt": "2019-10-25T01:00:00+00:00" },
+                null
+              ] }
+            """);
+        var loaded = store.Load(Monday);
+        Assert.Equal(
+            [new RosterShugoKeys(1503, 15, 0, new DateTimeOffset(2026, 10, 25, 1, 0, 0, TimeSpan.Zero)), new RosterShugoKeys(2101, 21, 1_000_000, new DateTimeOffset(2026, 10, 25, 1, 0, 0, TimeSpan.Zero))],
+            loaded.File.ShugoKeys);
+        Assert.Contains("5 unusable Shugo Festival key records dropped.", loaded.Notice, StringComparison.Ordinal);
+        Assert.Contains("1 Shugo Festival key record listed twice or past the 64 kept dropped.", loaded.Notice, StringComparison.Ordinal);
+        Assert.DoesNotContain("1503", loaded.Notice, StringComparison.Ordinal);
+        Assert.Empty(RosterNormalizer.Normalize(loaded.File, Monday).Repairs); // clean once repaired
+
+        // No more than 64 servers' keys, the ones read most recently (deep audit on #60).
+        var many = Enumerable.Range(1, 65).Select(i => new RosterShugoKeys(i <= 23 ? 1300 + i : 2300 + i - 23, 3, 0, Monday.AddMinutes(-i))).ToList();
+        var (trimmed, repairs) = RosterNormalizer.Normalize(new RosterFile { ShugoKeys = many }, Monday);
+        Assert.Equal(RosterNormalizer.MaxServers, trimmed.ShugoKeys.Count);
+        Assert.DoesNotContain(trimmed.ShugoKeys, keys => keys.SeenAt == Monday.AddMinutes(-65)); // the oldest goes
+        Assert.Contains("1 Shugo Festival key record listed twice or past the 64 kept dropped.", repairs);
+    }
+
+    // The overlay's last known values are the roster's estimates: basic energy refilled up to the character's cap (840 by
+    // default), charged as it was; the keys +3 at each daily reset up to 21, the extra as it was; none without a reading.
+    [Fact]
+    public void TheLastKnownValuesAreTheRostersEstimates()
+    {
+        var alpha = new RosterCharacter { Name = "Alpha", Odyle = Seen(500, 1200, Monday) };
+        Assert.Equal(new OdyleEnergy(620, 1200), LastKnownValues.Odyle(alpha, Monday.AddDays(1), Calendar)); // eight refills
+        Assert.Equal(new OdyleEnergy(560, 1200), LastKnownValues.Odyle(alpha with { OdyleCap = OdyleCapChoice.Standard }, Monday.AddDays(5), Calendar));
+        Assert.Equal(new OdyleEnergy(840, 1200), LastKnownValues.Odyle(alpha, Monday.AddDays(5), Calendar));
+        Assert.Equal(new OdyleEnergy(500, 1200), LastKnownValues.Odyle(alpha, Monday, Calendar)); // as the game said
+        Assert.Null(LastKnownValues.Odyle(alpha with { Odyle = null }, Monday, Calendar));
+
+        var keys = new RosterShugoKeys(1503, 12, 3, Monday);
+        Assert.Equal(new ShugoKeys(12, 3), LastKnownValues.Shugo(keys, Monday, Calendar));
+        Assert.Equal(new ShugoKeys(15, 3), LastKnownValues.Shugo(keys, Monday.AddDays(1), Calendar)); // one daily reset
+        Assert.Equal(new ShugoKeys(21, 3), LastKnownValues.Shugo(keys, Monday.AddDays(5), Calendar)); // up to 21
+        Assert.Equal(new ShugoKeys(25, 3), LastKnownValues.Shugo(keys with { Keys = 25 }, Monday.AddDays(5), Calendar)); // more is kept
+        Assert.Null(LastKnownValues.Shugo(null, Monday, Calendar));
+    }
+
+    // What the overlay shows: the game's values where it has sent them, each on its own, the roster never asked when it
+    // has sent both; for one it has not, the roster's last known, estimated and flagged; nothing flagged without either
+    // (deep audit on #60: the page's choice was tested only as source text).
+    [Fact]
+    public void TheOverlayShowsTheGamesValuesFirstAndTheLastKnownForTheRest()
+    {
+        var game = (Odyle: new OdyleEnergy(700, 50), Shugo: new ShugoKeys(9, 0));
+        var last = new RosterLastKnown(new RosterCharacter { Name = "Alpha", Odyle = Seen(500, 1200, Monday) }, new RosterShugoKeys(1503, 12, 3, Monday));
+        var later = Monday.AddDays(1);
+        RosterLastKnown Unasked() => throw new InvalidOperationException("the roster was asked though the game had sent both");
+
+        Assert.Equal(new OverlayEnergy(game.Odyle, false, game.Shugo, false), LastKnownValues.Shown(game.Odyle, game.Shugo, Unasked, later, Calendar));
+        Assert.Equal(new OverlayEnergy(new OdyleEnergy(620, 1200), true, game.Shugo, false), LastKnownValues.Shown(null, game.Shugo, () => last, later, Calendar));
+        Assert.Equal(new OverlayEnergy(game.Odyle, false, new ShugoKeys(15, 3), true), LastKnownValues.Shown(game.Odyle, null, () => last, later, Calendar));
+        Assert.Equal(new OverlayEnergy(null, false, null, false), LastKnownValues.Shown(null, null, () => null, later, Calendar));
+        Assert.Equal(new OverlayEnergy(null, false, null, false), // a character with no reading of either
+            LastKnownValues.Shown(null, null, () => new RosterLastKnown(new RosterCharacter { Name = "Beta" }, null), later, Calendar));
+    }
+
+    // The overlay's calendar is made again when the server offset in Settings changes, and only then (deep audit on #60:
+    // a page that kept the first one would estimate with the old offset until restart).
+    [Fact]
+    public void TheCalendarFollowsTheServerOffset()
+    {
+        var cache = new RechargeCalendarCache();
+        var nine = cache.For(9);
+        Assert.Same(nine, cache.For(9));
+        var eight = cache.For(8);
+        Assert.NotSame(nine, eight);
+        Assert.NotEqual(nine.LastSiege(Monday), eight.LastSiege(Monday)); // the server-time schedule moves with the offset
+        Assert.Same(eight, cache.For(8));
+    }
 }
