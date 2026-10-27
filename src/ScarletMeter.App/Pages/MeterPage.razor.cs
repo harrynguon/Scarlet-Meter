@@ -45,6 +45,8 @@ public partial class MeterPage : IAsyncDisposable
     private int? ping;
     // The latest Odyle energy, read with each refresh; null until the game sends it.
     private OdyleEnergy? odyle;
+    // The latest Shugo Festival keys, read with the Odyle energy; null until the game sends them.
+    private ShugoKeys? shugo;
     private Task? refreshLoop;
     private bool refreshFailing;
     // The content height last sent to the window (OnAfterRenderAsync).
@@ -132,6 +134,7 @@ public partial class MeterPage : IAsyncDisposable
         appearance = Settings.Current.Appearance;
         alertSettings = Settings.Current.Alerts;
         odyle = Engine.OdyleEnergy;
+        shugo = Engine.ShugoKeys;
         Settings.Changed += OnSettingsChanged;
         Engine.PingUpdated += OnPingUpdated;
         Alerts.Changed += OnAlertsChanged;
@@ -220,6 +223,7 @@ public partial class MeterPage : IAsyncDisposable
                     // Read on this loop, which runs on the renderer's dispatcher, rather than set from the capture
                     // thread's event: the two numbers are read together under the engine's lock, never torn.
                     odyle = Engine.OdyleEnergy;
+                    shugo = Engine.ShugoKeys;
                     var now = Clock.GetUtcNow();
                     killIn = killTimer.Update(snapshot.Target, now);
                     phase = fightState.Update(snapshot.Target, now);

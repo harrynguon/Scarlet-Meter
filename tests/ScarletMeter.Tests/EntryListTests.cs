@@ -664,6 +664,46 @@ public sealed class EntryListTests
         Assert.Equal(new OdyleEnergy(30, 880), engine.OdyleEnergy);
     }
 
+    // The Shugo Festival keys (entry 1) come with the counts, through upstream's real reassembly to the engine: shown at
+    // once from a login's list (before the character is named, as the Odyle energy is), changed by an update, gone with a
+    // list without them, and kept across a reset of the fight.
+    [Fact]
+    public void TheEngineReadsTheShugoKeysFromTheStream()
+    {
+        using var host = new TestEngineHost(CaptureMode.None);
+        var engine = host.Services.GetRequiredService<ICombatEngine>();
+        var stream = host.Services.GetRequiredService<TcpStreamBuffer>();
+        Assert.Null(engine.ShugoKeys);
+
+        Synchronise(stream);
+        // Entry 1, written as the number A2Tools knows it by, not through the constant, so the constant cannot drift.
+        stream.AddData("synthetic", EntryListRecordWriter.List([Odyle, new(1, 12, 3), new(8, 6, 9)]), 0);
+        Assert.Equal(1u, EntryIds.ShugoFestivalKeys);
+        Assert.Equal(new ShugoKeys(12, 3), engine.ShugoKeys);
+        stream.AddData("synthetic", EntryListRecordWriter.Update([new(1, 11, 3)]), 0);
+        Assert.Equal(new ShugoKeys(11, 3), engine.ShugoKeys);
+        engine.Reset();
+        Assert.Equal(new ShugoKeys(11, 3), engine.ShugoKeys);
+        stream.AddData("synthetic", EntryListRecordWriter.List([Odyle]), 0); // a login's list without them
+        Assert.Null(engine.ShugoKeys);
+    }
+
+    // Another character named with no list between drops the last one's counts, the keys with them; a login's list for the
+    // next character brings its server's.
+    [Fact]
+    public void TheShugoKeysGoWithTheCounts()
+    {
+        var tap = NewTap(new() { [7] = Alpha, [9] = Beta }, new FakeTimeProvider(Start));
+        tap.Observe(EntryListRecordWriter.List([Odyle, new(EntryIds.ShugoFestivalKeys, 21, 0)])); // a list is found by its Odyle entry
+        Assert.Equal(new ShugoKeys(21, 0), tap.Shugo); // before the character is named
+        tap.Observe(SelfRecord(7));
+        Assert.Equal(new ShugoKeys(21, 0), tap.Shugo);
+        tap.Observe(SelfRecord(9)); // another character, no list between
+        Assert.Null(tap.Shugo);
+        tap.Observe(EntryListRecordWriter.List([Odyle, new(EntryIds.ShugoFestivalKeys, 6, 1)]));
+        Assert.Equal(new ShugoKeys(6, 1), tap.Shugo);
+    }
+
     // Most of the game's records arrive in LZ4 bundles (ff ff), which the tap opens with upstream's own PacketProcessor.
     [Fact]
     public void TheEngineReadsOdyleEnergyInsideABundle()
@@ -833,8 +873,8 @@ public sealed class EntryListTests
 
     // ---------- The demo ----------
 
-    // The demo hands the tap a login list and the user's own record when it begins, and an Odyle update as each later
-    // fight starts and spends some. They go to the tap directly, not through the stream (upstream's reassembly needs a
+    // The demo hands the tap a login list (its Shugo keys among the entries) and the user's own record when it begins, and
+    // an Odyle update as each later fight starts and spends some. They go to the tap directly, not through the stream (upstream's reassembly needs a
     // keep-alive from an earlier chunk), and never bundled; the record names the demo's user, whom the tap asks upstream's
     // tracker about.
     [Fact]
@@ -851,6 +891,7 @@ public sealed class EntryListTests
         var clock = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
         feed.Begin(clock);
         Assert.Equal(new OdyleEnergy(420, 1200), engine.OdyleEnergy);
+        Assert.Equal(new ShugoKeys(15, 3), engine.ShugoKeys); // the overlay's keys in --demo (audit on #57)
         var login = Assert.Single(raised);
         var user = DemoRoster.Party.Single(member => member.IsUser);
         Assert.Equal(user.Name, login.Character.Name);
@@ -865,6 +906,7 @@ public sealed class EntryListTests
         for (var end = clock.AddSeconds(105); clock < end; clock = clock.AddMilliseconds(100))
             feed.Step(clock, TestContext.Current.CancellationToken);
         Assert.Equal(new OdyleEnergy(410, 1200), engine.OdyleEnergy);
+        Assert.Equal(new ShugoKeys(15, 3), engine.ShugoKeys); // an Odyle update leaves the keys
         Assert.Equal(new OdyleEnergy(410, 1200), raised[^1].Odyle);
         Assert.Equal(1_236_067, raised[^1].Kina?.Kina);
     }

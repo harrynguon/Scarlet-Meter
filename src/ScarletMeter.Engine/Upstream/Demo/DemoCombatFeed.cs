@@ -83,9 +83,12 @@ internal sealed class DemoCombatFeed
     private const long BoundKina = 33_940;
     private const long KinaPerFight = 1_500;
 
-    /// <summary>The demo's other entry counts in its login list: Nightmare 11 (+1), Ascension Trial 3, and an entry it does not name.</summary>
+    /// <summary>
+    /// The demo's other entry counts in its login list: Nightmare 11 (+1), Ascension Trial 3, Shugo Festival keys 15 (+3),
+    /// and an entry it does not name.
+    /// </summary>
     internal static IReadOnlyList<EntryValue> OtherEntries { get; } =
-        [new(EntryIds.Nightmare, 11, 1), new(EntryIds.AscensionTrial, 3, 0), new(1, 6, 9)];
+        [new(EntryIds.Nightmare, 11, 1), new(EntryIds.AscensionTrial, 3, 0), new(EntryIds.ShugoFestivalKeys, 15, 3), new(8, 6, 9)];
 
     /// <summary>
     /// Checks the roster against upstream's game data; throws InvalidOperationException naming what does not resolve.

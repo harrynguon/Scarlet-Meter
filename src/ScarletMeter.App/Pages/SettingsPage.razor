@@ -66,6 +66,8 @@
                                    Value="@S.Appearance.ShowCombatPower" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { ShowCombatPower = v } }))" />
                     <ToggleSetting Label="Show Odyle energy" Description="Beside the ping: basic energy, then charged in brackets. The game sends it at login, after a server transfer and when it changes, so after starting the meter mid-session it appears with the next of those."
                                    Value="@S.Appearance.ShowOdyleEnergy" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { ShowOdyleEnergy = v } }))" />
+                    <ToggleSetting Label="Show Shugo Festival keys" Description="Beside the Odyle energy: the keys left, which your characters on a server share, with the extra from recharge items in brackets when there is any. The game sends them with the Odyle energy, at login, after a server transfer and when they change, so after starting the meter mid-session they appear with the next of those."
+                                   Value="@S.Appearance.ShowShugoKeys" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { ShowShugoKeys = v } }))" />
                     @* The roster also opens from the overlay's Odyle energy; this way works with it hidden or not sent yet. *@
                     <div class="setting">
                         <span class="text">

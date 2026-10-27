@@ -75,15 +75,45 @@ public sealed class FormattingTests
     }
 
     // Odyle energy the way the game writes it: basic, then charged in brackets, with thousands separators whatever
-    // the PC's culture.
+    // the PC's culture (checked under German's, which writes 1.240; audit on #57: the test never set one).
     [Fact]
-    public void OdyleEnergyReadsAsTheGameWritesIt()
+    public void OdyleEnergyReadsAsTheGameWritesIt() => UnderGermanCulture(() =>
     {
         var energy = new ScarletMeter.Engine.OdyleEnergy(1240, 320);
         Assert.Equal("1,240", OdyleText.Basic(energy));
         Assert.Equal("(+320)", OdyleText.Charged(energy));
         Assert.Equal("(+12,000)", OdyleText.Charged(new ScarletMeter.Engine.OdyleEnergy(0, 12000)));
         Assert.Equal("0", OdyleText.Basic(new ScarletMeter.Engine.OdyleEnergy(0, 0)));
+    });
+
+    // Shugo Festival keys as the game writes them: the keys, then the extra in brackets, only when there is any (the line
+    // beside the ping has little room), with thousands separators whatever the PC's culture.
+    [Fact]
+    public void ShugoKeysReadAsTheGameWritesThem() => UnderGermanCulture(() =>
+    {
+        Assert.Equal("12", ShugoText.Keys(new ScarletMeter.Engine.ShugoKeys(12, 3)));
+        Assert.Equal("(+3)", ShugoText.Extra(new ScarletMeter.Engine.ShugoKeys(12, 3)));
+        Assert.Equal(string.Empty, ShugoText.Extra(new ScarletMeter.Engine.ShugoKeys(12, 0)));
+        Assert.Equal("0", ShugoText.Keys(new ScarletMeter.Engine.ShugoKeys(0, 0)));
+        Assert.Equal("1,021", ShugoText.Keys(new ScarletMeter.Engine.ShugoKeys(1021, 0)));
+        Assert.Equal("(+1,500)", ShugoText.Extra(new ScarletMeter.Engine.ShugoKeys(0, 1500)));
+    });
+
+    // Runs a check under a culture whose numbers read differently (de-DE: 1.240), so text that follows the PC's culture
+    // fails it. The culture flows with the test's own execution context only, so other tests are not affected.
+    private static void UnderGermanCulture(Action check)
+    {
+        var before = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("de-DE");
+        try
+        {
+            Assert.Equal("1.240", 1240.ToString("N0", System.Globalization.CultureInfo.CurrentCulture)); // the culture took
+            check();
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = before;
+        }
     }
 
     [Fact]

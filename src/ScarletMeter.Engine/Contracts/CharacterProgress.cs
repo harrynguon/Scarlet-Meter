@@ -66,4 +66,10 @@ public static class EntryIds
 
     /// <summary>Ascension Trial: entries left, then the extra (A2Tools' Roster, 2026-10-24: "Ascension 3+1").</summary>
     public const uint AscensionTrial = 80_000_001;
+
+    /// <summary>
+    /// Shugo Festival keys: keys left, then the extra from recharge items; the server's, shared by its characters, +3 a day
+    /// up to 21 (A2Tools DPS Meter's list of known ids and its Roster plugin's content table, at 5c6f02c and 48f5ecd).
+    /// </summary>
+    public const uint ShugoFestivalKeys = 1;
 }

@@ -198,6 +198,12 @@ public sealed record AppearanceSettings
     /// server transfer and when it changes (ICombatEngine.OdyleEnergy).
     /// </summary>
     public bool ShowOdyleEnergy { get; init; } = true;
+
+    /// <summary>
+    /// Show the Shugo Festival keys beside the Odyle energy, keys (+extra when there is any), once the game has sent them:
+    /// in the same list as the Odyle energy (ICombatEngine.ShugoKeys). On for a settings file from before the switch.
+    /// </summary>
+    public bool ShowShugoKeys { get; init; } = true;
 }
 
 /// <summary>Overlay behaviour.</summary>

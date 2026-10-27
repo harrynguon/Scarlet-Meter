@@ -84,6 +84,18 @@
 
     <div class="ov-totals">
         <span title="Party DPS" class="accent">@Compact.Number(snapshot.PartyDps)/s</span>
+        @* Shugo Festival keys left of the Odyle energy, once the game has sent them (a key of Scarlet's own drawing). *@
+        @if (appearance.ShowShugoKeys && shugo is { } keys)
+        {
+            <span class="shugo" title="Shugo Festival keys: left, shared by your characters on this server (+extra from recharge items)">
+                <svg class="shugo-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="5" cy="8" r="2.8" /><path d="M7.8 8h6.4M12.2 8v2.4M14.2 8v1.8" /></svg>
+                <span class="shugo-keys">@ShugoText.Keys(keys)</span>
+                @if (ShugoText.Extra(keys) is { Length: > 0 } extra)
+                {
+                    <span class="shugo-extra">@extra</span>
+                }
+            </span>
+        }
         @* Odyle energy left of the ping, once the game has sent it (a crystal of Scarlet's own, not the game's art). *@
         @if (appearance.ShowOdyleEnergy && odyle is { } energy)
         {

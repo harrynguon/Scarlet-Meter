@@ -404,6 +404,7 @@ public sealed class RosterTests : IDisposable
         public int ArtifactSubscribers => ArtifactsObserved?.GetInvocationList().Length ?? 0;
         public CharacterIdentity? Character { get; set; }
         public OdyleEnergy? OdyleEnergy => null;
+        public ShugoKeys? ShugoKeys => null;
         public int? MapId => null;
         public bool PausedInAbyss => false;
         public CaptureState Capture => new(false, null);

@@ -335,7 +335,11 @@ button {
     font-variant-numeric: tabular-nums;
 }
 
+/* The totals line: party DPS, then the Shugo keys, the Odyle energy and the ping at its end. Nothing in it wraps, and
+   on a narrow line the ping's bars give way (below), so the line stays one line tall: a wrap grew the window by a line
+   each time a value crossed a width (audit on #57). */
 .ov-totals {
+    container: ov-totals / inline-size;
     display: flex;
     align-items: center;
     gap: 14px;
@@ -347,6 +351,7 @@ button {
 .ov-totals .accent {
     color: var(--accent);
     font-weight: 600;
+    white-space: nowrap;
 }
 
 /* Odyle energy (MeterPage, OdyleText), left of the ping once the game has sent it: a crystal of Scarlet's own, the
@@ -384,11 +389,54 @@ button {
     opacity: 0.85;
 }
 
+/* Shugo Festival keys (MeterPage, ShugoText), left of the Odyle energy once the game has sent them (Harry, 2026-10-27): a
+   key of Scarlet's own in bright yellow, the keys left and, only when there is any, the extra in brackets. The yellow is
+   saturated so it reads apart from the ping's colours, its orange (--slow) and pale yellow (--fair). The keys take the
+   push to the right, the energy then sitting 8 px from them, closer than the line's 14 px gap: the two read as one group.
+   At the overlay's least width (320 px), with both shown, the line holds the longest party DPS (999.9K/s), keys 21 (+12),
+   energy 840 (+1,200) and a ping of 1043 ms, the ping's bars having given way (.ov-totals; headless renders, audit on
+   #57); longer values run past the line's end, clipped, never onto a second line. With the energy hidden or not sent,
+   the ping sits at the keys' side. */
+.shugo {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.shugo + .odyle {
+    margin-left: -6px;
+}
+
+.shugo + .ping {
+    margin-left: 0;
+}
+
+.shugo-icon {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    fill: none;
+    stroke: #ffd60a;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+}
+
+.shugo-keys {
+    color: var(--text);
+}
+
+.shugo-extra {
+    color: #ffd60a;
+}
+
 .ping {
     margin-left: auto;
     display: inline-flex;
     align-items: flex-end;
     gap: 2px;
+    white-space: nowrap;
 }
 
 .ping i {
@@ -410,6 +458,15 @@ button {
 .ping.slow i:nth-child(1) { background: var(--slow); }
 .ping.bad { color: var(--bad); }
 .ping.bad i:nth-child(1) { background: var(--bad); }
+
+/* Near the overlay's least width (up to 340 px, the line's 314 px inside its padding) the ping's bars give way, 19 px,
+   its text keeping the level's colour: with the keys and the energy both shown, a four-digit ping and a two-digit extra
+   then still fit, as they do with the bars from 341 px (headless renders, audit on #57). */
+@container ov-totals (max-width: 314px) {
+    .ping i {
+        display: none;
+    }
+}
 
 /* The bar area. Positioned, so a row's offsetTop (js/overlay-fx.js) is measured from the list, not the panel above it.
    It is as many rows tall as players are shown, up to five (--bar-rows, Pages/BarArea; each row 29 px, its 26 px and

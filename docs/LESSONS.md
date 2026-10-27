@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The overlay's totals line wrapped near its least width** (2026-10-27, the Shugo Festival keys; found by the deep audit on #57).
+- What: with the keys and the Odyle energy both shown, the line had 0.4 px to spare at 320 px, measured with a three-digit ping and a one-digit extra. A ping of 1043 ms or an extra of (+12) wrapped the ping's text onto a second line, and the window grew a line each time the ping crossed 1000 ms. The docs said the line fit "with the longest values".
+- Why: the same slip as the roster's width below, the same day, in work started before that lesson was written: the fit was measured with the values in mind, not each field's widest plausible one (a ping past 999 ms, a two-digit count). Nothing in the line stopped a wrap, so a few pixels over became a line taller, and the lesson below was a note, which work already measured did not meet.
+- Guard: nothing in the totals line breaks (`white-space: nowrap` on the party DPS and the ping, the groups already) and the ping's bars give way up to 340 px; `RazorMarkupTests.ShugoKeysSitLeftOfTheOdyleEnergy` checks both and that the narrow rule covers the overlay's least width. Before claiming a fit, list each field's widest plausible value and say what happens past it; where a line must not grow, make overflow clip rather than wrap.
+
 **The roster's width was measured at the wrong width, with only Harry's values** (deep audit on #56, fixed before merge).
 - What: the headless renders behind the Power column's room were taken in a headless window of 904 px, whose page was 880 px wide, against the roster's 920 px window, whose page (client area) is 904 px, and 896 once the list scrolls; and only with Harry's three characters, short names and small numbers. With a full made-up row (a 12-letter name and the Playing badge, six-digit combat power, the largest Odyle numbers, millions of Kina) the table was 9 px too wide after the change, and had been 20 px too wide before it.
 - Why: the render's width was taken as given rather than checked against the window's client area (a window's outer width includes its frame), and the fit was judged on one player's data, the one at hand.
@@ -230,6 +235,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - Guard: `SettingsTests.AFileSavedWithAByteOrderMarkLoads`. Seed test files the way people actually write them.
 
 ## In the process
+
+**A test said "whatever the culture" but never set one** (2026-10-27, the Shugo Festival keys; found by the deep audit on #57, a mutation that survived).
+- What: the Odyle energy's and the Shugo keys' formatting tests expect "1,240" whatever the PC's culture, but ran under the machine's own, English, so dropping `CultureInfo.InvariantCulture` from `ShugoText.Keys` still passed. The code was right; the tests could not have caught it going wrong, which a player on a German PC would have seen as "1.021".
+- Why: the claim was in the test's comment, not its setup; on an English machine and on CI the culture-dependent and invariant texts are the same.
+- Guard: `FormattingTests.UnderGermanCulture` runs both tests under de-DE and first checks that the culture took, and the mutation now fails. A test that claims independence from an environment sets that environment to something different.
+
+**A test named an id through the constant it guards** (2026-10-27, the Shugo Festival keys; caught by a fail-first run before commit).
+- What: the keys' tests wrote and read the entry through `EntryIds.ShugoFestivalKeys`, so changing the constant from 1 (A2Tools' id) to another entry changed both sides and every test still passed.
+- Why: a constant written on both sides of a test checks the code's consistency with itself, not with the game.
+- Guard: `TheEngineReadsTheShugoKeysFromTheStream` writes the entry as the number the game uses, and the mutation now fails it. When a test pins a value that comes from outside (an id, an offset, a cap), write that value as a literal at least once.
 
 **A mutation runner assumed every file had CRLF line endings, so three mutations never ran** (2026-10-27, the capture lock guard; reported "TEXT NOT FOUND", not as caught or missed).
 - What: the runner turned each multi-line mutation's line breaks into CRLF before looking for it, as the checked-out files have them; the new files, written by the agent's file tool, had LF, so no multi-line mutation of theirs could match.
