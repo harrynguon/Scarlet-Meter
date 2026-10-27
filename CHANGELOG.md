@@ -12,16 +12,18 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 - Settings, About names the Artifact Corridor, the two-minute instance you enter from the Abyss. The meter keeps
   tracking there; it pauses again once you are back in the Abyss. ([#47](https://github.com/harrynguon/Scarlet-Meter/pull/47))
-- A character roster: every character you log in on with the meter running, with its Odyle energy, when basic
-  energy is full again, and Nightmare and Ascension entries left, estimated (≈) from what the game last said, the
-  Artifact Corridors it entered since the last Abyss Siege, out of those whose artifact your side holds (read when
-  you open the Abyss map or enter the Abyss), its Kina and Kina (Bound), with the totals across your characters, and a
-  note of your own under each name. Open it with the Characters button at the top right of the meter, by clicking the
-  Odyle energy beside the ping, or from Settings, Appearance, Characters. The recharge and siege times, the Kina and
-  the artifacts are not yet checked in the game.
+- A character roster: every character you log in on with the meter running, with its class and level from that first
+  login, its combat power and gear score, its Odyle energy, when basic energy is full again, and Nightmare and
+  Ascension entries left, estimated (≈) from what the game last said, the Artifact Corridors it entered since the last
+  Abyss Siege, out of those whose artifact your side holds (read when you open the Abyss map or enter the Abyss), its
+  Kina and Kina (Bound), with the totals across your characters, and a note of your own under each name. Open it with
+  the Characters button at the top right of the meter, by clicking the Odyle energy beside the ping, or from Settings,
+  Appearance, Characters. The recharge and siege times, the Kina, the artifacts and the classes, levels and gear scores
+  are not yet checked in the game.
   ([#48](https://github.com/harrynguon/Scarlet-Meter/pull/48), [#49](https://github.com/harrynguon/Scarlet-Meter/pull/49),
   [#50](https://github.com/harrynguon/Scarlet-Meter/pull/50), [#51](https://github.com/harrynguon/Scarlet-Meter/pull/51),
-  [#53](https://github.com/harrynguon/Scarlet-Meter/pull/53))
+  [#53](https://github.com/harrynguon/Scarlet-Meter/pull/53), [#55](https://github.com/harrynguon/Scarlet-Meter/pull/55),
+  [#56](https://github.com/harrynguon/Scarlet-Meter/pull/56))
 
 ### Changed
 
@@ -37,8 +39,6 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 - A meter left open while the game is closed no longer gets stuck on other traffic, such as a browser's or a
   download's, and then misses your next login: when what it is reading sends nothing from the game, it looks for the
   game again, within about 35 seconds on web traffic. ([#54](https://github.com/harrynguon/Scarlet-Meter/pull/54))
-- The character roster shows each character's class and its icon from the first time you log in on it; before, only
-  once that character had fought with the meter running. ([#55](https://github.com/harrynguon/Scarlet-Meter/pull/55))
 
 ## [0.3.0] - 2026-10-26
 

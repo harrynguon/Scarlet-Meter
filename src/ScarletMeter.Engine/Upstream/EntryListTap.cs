@@ -218,15 +218,15 @@ internal sealed class EntryListTap : IRecordReader
     // waiting for it are reported; another character with no list between drops the last one's.
     private void TakeSelfRecord(ReadOnlySpan<byte> record)
     {
-        if (!SelfRecords.TryRead(record, out var entityId, out var unnamed, out var serverId, out var classCode)) return;
-        if (unnamed || identify(entityId) is not { } named)
+        if (!SelfRecords.TryRead(record, out var read)) return;
+        if (read.Unnamed || identify(read.EntityId) is not { } named)
         {
             if (!unnamedSelfLogged) logger.LogInformation("The game's own character record came, but upstream has no name for it; entry counts wait for the next one.");
             unnamedSelfLogged = true;
             return;
         }
         unnamedSelfLogged = false;
-        var character = WithClass(WithServerId(named, serverId), classCode);
+        var character = WithProfile(WithClass(WithServerId(named, read.ServerId), read.ClassCode), read);
         var now = clock.GetUtcNow();
         CharacterProgress progress;
         var dropped = false;
@@ -273,6 +273,11 @@ internal sealed class EntryListTap : IRecordReader
             && classNameOf(classId) is { Length: > 0 } className
             ? character with { ClassId = classId, ClassName = className }
             : character;
+
+    // The character with the record's level and gear score, which upstream does not read: only from a record whose server
+    // id checked out, as the class (the reader takes them only after a code that is a class).
+    private static CharacterIdentity WithProfile(CharacterIdentity character, SelfRecord read) =>
+        character.ServerId > 0 ? character with { Level = read.Level, GearScore = read.GearScore } : character;
 
     // An inventory record: its Kina slots are kept (a listing replaces them all) and reported with the counts when whose
     // they are is known.

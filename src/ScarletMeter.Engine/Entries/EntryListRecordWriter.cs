@@ -54,11 +54,11 @@ internal static class EntryListRecordWriter
 
     /// <summary>
     /// The player's own character record as upstream reads it: the entity id, a four-byte mask, a byte whose bit 0
-    /// says a name follows, the name (its length, then UTF-8), the server id (u16) and the class code (u32, four codes to a
-    /// class: <see cref="SelfRecords.ClassIdOf"/>; up to 255 here), then made-up bytes and the combat power twice (current
-    /// and highest, u64), where upstream looks for it.
+    /// says a name follows, the name (its length, then UTF-8), the server id (u16), the class code (u32, four codes to a
+    /// class: <see cref="SelfRecords.ClassIdOf"/>), a made-up byte, the level (u32) and the gear score twice (u32 each),
+    /// then made-up bytes and the combat power twice (current and highest, u64), where upstream looks for it.
     /// </summary>
-    public static byte[] SelfRecord(int entityId, string name, int serverId, int jobCode, int combatPower)
+    public static byte[] SelfRecord(int entityId, string name, int serverId, int jobCode, int combatPower, int level = 0, int gearScore = 0)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(entityId);
         var body = new List<byte>();
@@ -69,8 +69,14 @@ internal static class EntryListRecordWriter
         body.AddRange(nameBytes);
         body.Add((byte)(serverId & 0xFF));
         body.Add((byte)(serverId >> 8));
-        body.Add((byte)jobCode);
-        body.AddRange(new byte[12]);
+        var profile = new byte[17];
+        BinaryPrimitives.WriteUInt32LittleEndian(profile, (uint)jobCode);
+        profile[4] = 0x01;
+        BinaryPrimitives.WriteUInt32LittleEndian(profile.AsSpan(5), (uint)level);
+        BinaryPrimitives.WriteUInt32LittleEndian(profile.AsSpan(9), (uint)gearScore);
+        BinaryPrimitives.WriteUInt32LittleEndian(profile.AsSpan(13), (uint)gearScore);
+        body.AddRange(profile);
+        body.AddRange(new byte[8]);
         var power = new byte[16];
         BinaryPrimitives.WriteUInt64LittleEndian(power, (ulong)combatPower);
         BinaryPrimitives.WriteUInt64LittleEndian(power.AsSpan(8), (ulong)combatPower);

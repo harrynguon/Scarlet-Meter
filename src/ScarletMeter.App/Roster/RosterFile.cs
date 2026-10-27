@@ -59,6 +59,12 @@ public sealed record RosterCharacter
     /// <summary>Combat power as the game last said, or 0.</summary>
     public int CombatPower { get; init; }
 
+    /// <summary>The character's level as the game last said at login, or 0 while not known.</summary>
+    public int Level { get; init; }
+
+    /// <summary>The gear score (the equipment's item level) as the game last said at login, or 0 while not known.</summary>
+    public int GearScore { get; init; }
+
     /// <summary>When the game last named this character as the player's.</summary>
     public DateTimeOffset LastSeen { get; init; }
 
@@ -100,7 +106,7 @@ public sealed record RosterCharacter
     public bool Equals(RosterCharacter? other) =>
         other is not null
         && Name == other.Name && Server == other.Server && ServerId == other.ServerId && ClassId == other.ClassId && ClassName == other.ClassName
-        && CombatPower == other.CombatPower && LastSeen == other.LastSeen
+        && CombatPower == other.CombatPower && Level == other.Level && GearScore == other.GearScore && LastSeen == other.LastSeen
         && Equals(Odyle, other.Odyle) && Equals(Nightmare, other.Nightmare) && Equals(Ascension, other.Ascension)
         && OdyleCap == other.OdyleCap && MembershipSeen == other.MembershipSeen
         && CorridorRuns.SequenceEqual(other.CorridorRuns) && Equals(Kina, other.Kina) && Note == other.Note;

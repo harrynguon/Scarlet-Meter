@@ -37,7 +37,15 @@ public static class RosterText
             : local.ToString("ddd d MMM HH:mm", CultureInfo.InvariantCulture);
     }
 
-    /// <summary>The line under a character's name: server and class, whichever are known.</summary>
-    public static string ServerAndClass(RosterCharacter character) =>
-        string.Join(" · ", new[] { character.Server, character.ClassName }.Where(part => part.Length > 0));
+    /// <summary>The line under a character's name: server, class and level ("SIE · Sorcerer · Lv 45"), whichever are known.</summary>
+    public static string ServerClassAndLevel(RosterCharacter character) =>
+        string.Join(" · ", new[] { character.Server, character.ClassName, Level(character.Level) }.Where(part => part.Length > 0));
+
+    /// <summary>A level as the game writes it ("Lv 45"), or empty while not known.</summary>
+    public static string Level(int level) =>
+        level > 0 ? "Lv " + level.ToString(CultureInfo.InvariantCulture) : string.Empty;
+
+    /// <summary>A whole number with thousands separators ("41,000"), or "?" while not known (0).</summary>
+    public static string KnownNumber(int value) =>
+        value > 0 ? value.ToString("N0", CultureInfo.InvariantCulture) : "?";
 }

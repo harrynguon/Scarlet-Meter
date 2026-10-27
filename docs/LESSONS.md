@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The roster's width was measured at the wrong width, with only Harry's values** (deep audit on #56, fixed before merge).
+- What: the headless renders behind the Power column's room were taken in a headless window of 904 px, whose page was 880 px wide, against the roster's 920 px window, whose page (client area) is 904 px, and 896 once the list scrolls; and only with Harry's three characters, short names and small numbers. With a full made-up row (a 12-letter name and the Playing badge, six-digit combat power, the largest Odyle numbers, millions of Kina) the table was 9 px too wide after the change, and had been 20 px too wide before it.
+- Why: the render's width was taken as given rather than checked against the window's client area (a window's outer width includes its frame), and the fit was judged on one player's data, the one at hand.
+- Guard: the roster's renders now set the page's width in the markup to the window's client width (904 and 896) and fill it with a full made-up row as well as the player's own; the CSS that makes the room (the cells' 4 px padding, headers without letter spacing, the cap on its own line) is pinned by `RazorMarkupTests.TheRosterShowsLevelAndPowerAndKeepsTheCapUnderFull`. When a layout must fit a window, measure at its client width and with the widest plausible values, not only today's.
+
 **Characters on the roster had no class until they had fought** (Harry, 2026-10-27: "why do some characters class icons not show?").
 - What: the roster took each character's class from upstream, which learns a class only from a character's skills in a fight, and its own-character record parser reads the class code's first byte but never uses it. Two of three characters showed no class or icon, though the game sends the class at every login, right after the server id the meter already read.
 - Why: the roster was built on upstream's identity and its class was taken as "known when known"; when the server id was ported from A2Tools' self record, the class beside it in the same function (`self_profile`) was left behind. The tests' characters all came with a class, so none showed a character without one.
