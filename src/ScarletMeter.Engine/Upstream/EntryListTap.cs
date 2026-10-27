@@ -31,9 +31,9 @@ namespace ScarletMeter.Engine.Upstream;
 /// as in a sort, and a gone entry clears the item only in its own slot) and reported with the counts by the same rule.
 /// Where the listing falls in a login is not documented, so a whole list keeps the Kina only when a listing came within
 /// <see cref="LoginBurst"/> before it (the same login), never for a change alone (Codex and the deep audit on #50: a
-/// change just before a switch would have gone to the next character); a listing that comes while a character is named
-/// but with no self record within <see cref="LoginBurst"/> before it is held, not reported, until the next self record
-/// (it may be a switch's on the same connection), which keeps it when it comes within <see cref="LoginBurst"/> after the
+/// change just before a switch would have gone to the next character); a listing that comes after a move to a new
+/// connection, or while a character is named but with no self record within <see cref="LoginBurst"/> before it, is held,
+/// not reported, until the next self record (it may be a switch's whose list was lost, or one on the same connection), which keeps it when it comes within <see cref="LoginBurst"/> after the
 /// listing even if it names another character; another character named otherwise forgets it, as it does the counts; and
 /// a move to a new connection before any character is named forgets what was read before. Before any listing (a meter
 /// started mid-session) an item is known only once seen changing.</para>
@@ -244,7 +244,9 @@ internal sealed class EntryListTap : IRecordReader
                 kina.Clear();
                 kinaListed = true;
                 kinaListingAt = now;
-                kinaHeld = named && now - selfRecordAt > LoginBurst;
+                // Held for the next self record: after a move to a new connection (it may be a switch whose list was
+                // lost: Codex on #50), or while a character is named with no self record just before it.
+                kinaHeld = ownerUnconfirmed || (named && now - selfRecordAt > LoginBurst);
             }
             foreach (var slot in read.Slots)
             {

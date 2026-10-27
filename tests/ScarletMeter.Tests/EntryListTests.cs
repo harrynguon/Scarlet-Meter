@@ -864,6 +864,24 @@ public sealed class EntryListTests
         Assert.Equal(4, raised[^1].Kina?.Kina); // the same character named again: theirs
     }
 
+    // A switch on a new connection whose list was lost: the new character's listing, read after the move, waits for the
+    // self record and is theirs (Codex on #50: it was dropped with the last character's counts).
+    [Fact]
+    public void AListingAfterAMoveGoesToTheCharacterNamedNext()
+    {
+        var clock = new FakeTimeProvider(Start);
+        var tap = NewTap(new() { [7] = Alpha, [9] = Beta }, clock);
+        CharacterProgress? last = null;
+        tap.ProgressObserved += (_, progress) => last = progress;
+        tap.Observe(SelfRecord(7));
+        clock.Advance(TimeSpan.FromMinutes(10));
+        tap.ConnectionStarted();
+        tap.Observe(EntryListRecordWriter.InventoryListing([KinaSlot0 with { Quantity = 42 }]));
+        clock.Advance(TimeSpan.FromSeconds(2));
+        tap.Observe(SelfRecord(9));
+        Assert.Same(Beta, last!.Character);
+        Assert.Equal(42, last.Kina?.Kina);
+    }
     // Kina read before any character was named, on a connection the game then left, is not given to whoever is named next.
     [Fact]
     public void KinaReadBeforeAnyoneIsNamedGoesWithItsConnection()
