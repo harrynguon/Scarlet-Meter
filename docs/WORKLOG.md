@@ -10,6 +10,8 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Checks:** docs only (the skill and this entry); no build. The setting read back as on through GitHub's API.
 
+**Review (PR #52):** Codex (P2): a clean worktree and a merged PR do not show that the local branch has no commits past the merged head, which `git branch -D` would lose. The skill now checks the local tip is the PR's merged head or behind it, and keeps the branch and asks otherwise (the check this change's own clean-up ran by hand).
+
 **Next:** none.
 ## 2026-10-27 — Corridors out of what your side holds, and a note per character
 
