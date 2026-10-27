@@ -99,11 +99,11 @@ internal static class EntryListRecordWriter
         return Frame(InventoryRecords.ChangeOpcode, body);
     }
 
-    // One inventory entry in SkeeveAN's documented layout: kind, a byte, a made-up item instance (u32) and a u32, then the
-    // item, its quantity (u64), the container and the slot: the kind ten bytes before the item.
+    // One inventory entry in SkeeveAN's documented layout: kind, a byte, a made-up item instance (u32) and a made-up u32,
+    // then the item, its quantity (u64), the container and the slot: the kind ten bytes before the item.
     private static void AddInventoryEntry(List<byte> body, byte kind, uint item, long quantity, byte container, byte slot)
     {
-        body.AddRange([kind, 0x00, 0x24, 0x9E, slot, 0x00, 0x00, 0x10, 0x00, 0x00]);
+        body.AddRange([kind, 0x00, 0x5A, 0x3C, slot, 0x00, 0x00, 0x07, 0x00, 0x00]);
         AddId(body, item);
         var bytes = new byte[8];
         BinaryPrimitives.WriteUInt64LittleEndian(bytes, (ulong)quantity);

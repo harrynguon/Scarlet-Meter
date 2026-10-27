@@ -13,8 +13,7 @@
     var nextRefill = calendar.NextOdyleRefill(now);
     var lastSiege = calendar.LastSiege(now);
     var nextSiege = calendar.NextSiege(now);
-    var kinaTotal = rows.Sum(row => row.Character.Kina?.Kina ?? 0);
-    var boundTotal = rows.Sum(row => row.Character.Kina?.Bound ?? 0);
+    var kinaTotals = KinaTotals(rows);
 }
 <div class="tool roster" data-window="roster">
     <div class="roster-head">
@@ -22,8 +21,19 @@
         <span class="roster-next" title="Basic Odyle energy refills by 15 every three hours, up to its cap (an estimate)">
             Next +15 Odyle <b>@RosterText.At(nextRefill, now)</b> <span class="muted">in @RosterText.Until(nextRefill - now)</span>
         </span>
-        <span class="roster-next" title="Kina across the characters, as each one's inventory last said">
-            Kina <b>@DetailFormat.Full(kinaTotal)</b> <span class="muted">· Bound</span> <b>@DetailFormat.Full(boundTotal)</b> <span class="muted">· together</span> <b>@DetailFormat.Full(kinaTotal + boundTotal)</b>
+        <span class="roster-next" title="Kina across the characters whose inventory the meter has read, as each one's last said">
+            @if (kinaTotals.Unknown < rows.Count)
+            {
+                <text>Kina <b>@DetailFormat.Full(kinaTotals.Kina)</b> <span class="muted">· Bound</span> <b>@DetailFormat.Full(kinaTotals.Bound)</b> <span class="muted">· together</span> <b>@DetailFormat.Full(kinaTotals.Kina + kinaTotals.Bound)</b></text>
+                @if (kinaTotals.Unknown > 0)
+                {
+                    <span class="muted"> (@kinaTotals.Unknown not known)</span>
+                }
+            }
+            else
+            {
+                <text>Kina <span class="muted">?</span></text>
+            }
         </span>
         <span class="roster-next" title="Corridors count from the last Abyss Siege (@RosterText.At(lastSiege, now)) to the next, on the world-event schedule; not checked in the game">
             Corridors reset <b>@RosterText.At(nextSiege, now)</b>
@@ -60,7 +70,7 @@
                         <th title="Entries left (+extra from recharge items); +@RosterRules.Nightmare.Add a day, up to @RosterRules.Nightmare.Cap">Nightmare</th>
                         <th title="Entries left (+extra from recharge items); +@RosterRules.Ascension.Add a week, up to @RosterRules.Ascension.Cap">Ascension</th>
                         <th title="Artifact Corridors entered since the last Abyss Siege, as the meter saw them; up to @RosterRules.CorridorsPerSiege between sieges, as your side's artifacts allow">Corridors</th>
-                        <th title="Kina, and Kina (Bound) below it, as the character's inventory last said: at login and at each change">Kina</th>
+                        <th title="Kina, and Kina (Bound) below it (Engraved Kina, as the game's Korean and Japanese names have it), as the character's inventory last said: at login and at each change">Kina</th>
                         <th class="left">Last played</th>
                         <th></th>
                     </tr>

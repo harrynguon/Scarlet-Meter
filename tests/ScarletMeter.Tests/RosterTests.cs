@@ -793,4 +793,19 @@ public sealed class RosterTests : IDisposable
         ];
         Assert.Equal(["Alpha", "Beta", "Gamma"], RosterPage.Rows(characters, null, Monday, Calendar, RosterSort.MostKina).Select(r => r.Character.Name));
     }
+
+    // The header's totals: each item summed over the characters that know it, and how many know neither, not counted as none.
+    [Fact]
+    public void KinaTotalsSayHowManyAreNotKnown()
+    {
+        RosterCharacter[] characters =
+        [
+            new() { Name = "Alpha", Server = "SIE", LastSeen = Monday, Kina = new RosterKina(100, 2_900, Monday) },
+            new() { Name = "Beta", Server = "SIE", LastSeen = Monday, Kina = new RosterKina(2_000, null, Monday) },
+            new() { Name = "Gamma", Server = "SIE", LastSeen = Monday },
+            new() { Name = "Delta", Server = "SIE", LastSeen = Monday, Kina = new RosterKina(null, null, Monday) },
+        ];
+        Assert.Equal((2_100L, 2_900L, 2), RosterPage.KinaTotals(RosterPage.Rows(characters, null, Monday, Calendar, RosterSort.Name)));
+        Assert.Equal((0L, 0L, 0), RosterPage.KinaTotals([]));
+    }
 }

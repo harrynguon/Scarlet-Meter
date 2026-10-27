@@ -91,6 +91,15 @@ public partial class RosterPage : IDisposable
         };
     }
 
+    /// <summary>
+    /// The Kina across the rows: each item summed over the characters that know it, and how many characters know neither
+    /// (shown as not known, rather than counted as none).
+    /// </summary>
+    public static (long Kina, long Bound, int Unknown) KinaTotals(IReadOnlyList<RosterRow> rows) => (
+        rows.Sum(row => row.Character.Kina?.Kina ?? 0),
+        rows.Sum(row => row.Character.Kina?.Bound ?? 0),
+        rows.Count(row => row.Character.Kina is null or { Kina: null, Bound: null }));
+
     private DateTimeOffset Now => Clock.GetUtcNow();
 
     private RechargeCalendar Calendar => RechargeCalendar.Default(TimeSpan.FromMinutes(Math.Round(Settings.Current.Alerts.ServerOffsetHours * 60)));

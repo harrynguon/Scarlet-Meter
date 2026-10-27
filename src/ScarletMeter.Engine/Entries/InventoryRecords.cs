@@ -51,9 +51,9 @@ internal static class InventoryRecords
     public static bool IsInventory(ushort opcode) => opcode is ListingOpcode or ChangeOpcode;
 
     /// <summary>
-    /// The Kina slots in one record (its length varint, two opcode bytes, then its body), or null when the record is
-    /// neither kind, a listing too small to be one, or a change that touches no Kina slot. A slot named twice counts
-    /// once, its first entry, as SkeeveAN reads them.
+    /// The Kina entries in one record (its length varint, two opcode bytes, then its body), in order, or null when the
+    /// record is neither kind, a listing too small to be one, or a change that touches no Kina slot. A gone entry has
+    /// quantity 0. The reader of the entries decides what each means (the tap: one slot per item, the last entry wins).
     /// </summary>
     public static KinaReading? Read(ReadOnlySpan<byte> record)
     {
@@ -69,7 +69,7 @@ internal static class InventoryRecords
             if (kind > GoneKind || body[i + 9] != 0 || body[i + 10] != 0 || body[i + 11] != 0 || body[i + 12] != InventoryContainer) continue;
             var slot = body[i + 13];
             var quantity = kind == GoneKind ? 0 : (long)BinaryPrimitives.ReadUInt64LittleEndian(body[(i + 4)..]);
-            if (!slots.Exists(s => s.Slot == slot)) slots.Add(new KinaSlot(item, slot, quantity));
+            slots.Add(new KinaSlot(item, slot, quantity));
             i += 13;
         }
         return listing || slots.Count > 0 ? new KinaReading(slots, listing) : null;

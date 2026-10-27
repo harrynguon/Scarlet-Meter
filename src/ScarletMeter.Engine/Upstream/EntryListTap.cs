@@ -27,10 +27,16 @@ namespace ScarletMeter.Engine.Upstream;
 /// record names the character again, and reported then if it is the same one (deep audit on #48). A self record without
 /// a real name (a tutorial character's placeholder, <see cref="SelfRecords"/>) names no one.</para>
 /// <para>The Kina the character holds comes from its inventory (<see cref="InventoryRecords"/>: the whole listing at world
-/// entry, then each change), kept per slot and reported with the counts by the same rule. Where the listing falls in a
-/// login is not documented, so a whole list keeps a listing read within <see cref="LoginBurst"/> before it (the same
-/// login) and forgets an older one; another character named with no list between forgets it, as it does the counts.
-/// Before any listing (a meter started mid-session) an item's Kina is the sum of the slots seen changing.</para>
+/// entry, then each change), kept per item with the slot it is in (one slot per item: an entry in another slot is a move,
+/// as in a sort, and a gone entry clears the item only in its own slot) and reported with the counts by the same rule.
+/// Where the listing falls in a login is not documented, so a whole list keeps the Kina only when a listing came within
+/// <see cref="LoginBurst"/> before it (the same login), never for a change alone (Codex and the deep audit on #50: a
+/// change just before a switch would have gone to the next character); a listing that comes while a character is named
+/// but with no self record within <see cref="LoginBurst"/> before it is held, not reported, until the next self record
+/// (it may be a switch's on the same connection), which keeps it when it comes within <see cref="LoginBurst"/> after the
+/// listing even if it names another character; another character named otherwise forgets it, as it does the counts; and
+/// a move to a new connection before any character is named forgets what was read before. Before any listing (a meter
+/// started mid-session) an item is known only once seen changing.</para>
 /// <para>Runs on the capture thread, inside upstream's PacketAccumulator callback (see <see cref="RecordTap"/>, which
 /// contains anything that escapes), where upstream also writes its tracker, or on the demo feed's thread, whose records
 /// come through <see cref="Observe"/>. Nothing logged names a character or a count: only which record a change came
@@ -50,11 +56,16 @@ internal sealed class EntryListTap : IRecordReader
     private readonly Lock gate = new();
     // The counts since the last whole list, each with when it was read; whose they are is `owner` unless awaitingOwner.
     private readonly Dictionary<uint, EntryCount> counts = [];
-    // The Kina slots seen since the last listing (or ever, before one), when they were last read, and whether a listing
-    // came, which makes a missing slot none.
-    private readonly Dictionary<byte, KinaSlot> kinaSlots = [];
+    // The Kina of each item as last read, with its slot (one slot per item); when it was last read; whether a listing came,
+    // which makes a missing item none; when the last listing came (only a listing: what a whole list keeps it by); and
+    // whether the Kina waits for the next self record (a listing with no self record just before it).
+    private readonly Dictionary<uint, KinaSlot> kina = [];
     private DateTimeOffset kinaReadAt;
+    private DateTimeOffset kinaListingAt;
     private bool kinaListed;
+    private bool kinaHeld;
+    // When a self record last named the character: a listing within LoginBurst after it is that character's.
+    private DateTimeOffset selfRecordAt;
     private OdyleEnergy? odyle;
     private CharacterIdentity? owner;
     private bool awaitingOwner;
@@ -123,6 +134,8 @@ internal sealed class EntryListTap : IRecordReader
     {
         lock (gate)
         {
+            // Read before any character was named, on a connection now left: whose it was is not known.
+            if (owner is null) ForgetKina();
             if (owner is null || awaitingOwner || ownerUnconfirmed) return;
             ownerUnconfirmed = true;
         }
@@ -149,7 +162,7 @@ internal sealed class EntryListTap : IRecordReader
             if (read.IsWholeList)
             {
                 counts.Clear();
-                if (now - kinaReadAt > LoginBurst) ForgetKina();
+                if (now - kinaListingAt > LoginBurst) ForgetKina();
                 awaitingOwner = true;
             }
             foreach (var count in read.Counts)
@@ -187,6 +200,7 @@ internal sealed class EntryListTap : IRecordReader
             return;
         }
         unnamedSelfLogged = false;
+        var now = clock.GetUtcNow();
         CharacterProgress progress;
         var dropped = false;
         var matched = false;
@@ -195,7 +209,7 @@ internal sealed class EntryListTap : IRecordReader
             if (!awaitingOwner && owner is not null && !owner.IsSameCharacter(character))
             {
                 counts.Clear();
-                ForgetKina();
+                if (!kinaHeld || now - kinaListingAt > LoginBurst) ForgetKina();
                 odyle = null;
                 dropped = true;
             }
@@ -206,6 +220,8 @@ internal sealed class EntryListTap : IRecordReader
             owner = character;
             awaitingOwner = false;
             ownerUnconfirmed = false;
+            kinaHeld = false;
+            selfRecordAt = now;
             progress = Snapshot(character);
         }
         if (dropped) logger.LogInformation("The game named another character with no entry list between; the last character's counts, Odyle energy included, were dropped.");
@@ -222,37 +238,43 @@ internal sealed class EntryListTap : IRecordReader
         CharacterProgress? progress = null;
         lock (gate)
         {
+            var named = !awaitingOwner && !ownerUnconfirmed && owner is not null;
             if (read.IsListing)
             {
-                kinaSlots.Clear();
+                kina.Clear();
                 kinaListed = true;
+                kinaListingAt = now;
+                kinaHeld = named && now - selfRecordAt > LoginBurst;
             }
-            foreach (var slot in read.Slots) kinaSlots[slot.Slot] = slot;
+            foreach (var slot in read.Slots)
+            {
+                // A gone entry clears the item only in the slot it is in; anything else is the item's (new) slot.
+                if (slot.Quantity == 0 && kina.TryGetValue(slot.Item, out var kept) && kept.Slot != slot.Slot) continue;
+                kina[slot.Item] = slot;
+            }
             kinaReadAt = now;
-            if (!awaitingOwner && !ownerUnconfirmed && owner is not null) progress = Snapshot(owner);
+            if (named && !kinaHeld) progress = Snapshot(owner!);
         }
         if (read.IsListing) logger.LogInformation("Inventory listing read ({Slots} Kina slots).", read.Slots.Count);
         if (progress is not null) Raise(() => ProgressObserved?.Invoke(this, progress), "An entry count subscriber failed.");
     }
 
-    // Under the gate: the Kina slots belonged to another character, or to a login long before this one.
+    // Under the gate: the Kina belonged to another character, or to a login long before this one.
     private void ForgetKina()
     {
-        kinaSlots.Clear();
+        kina.Clear();
         kinaListed = false;
+        kinaHeld = false;
         kinaReadAt = default;
+        kinaListingAt = default;
     }
 
-    // Under the gate: the Kina held, each item the sum of its slots; null for an item no slot of which was seen, unless a
-    // listing came (then none). Null altogether before any inventory record.
+    // Under the gate: the Kina held, each item as last read; null for an item not seen, unless a listing came (then none).
+    // Null altogether before any inventory record, and while it waits for a self record.
     private KinaBalance? Kina()
     {
-        if (!kinaListed && kinaSlots.Count == 0) return null;
-        long? Of(uint item)
-        {
-            var slots = kinaSlots.Values.Where(slot => slot.Item == item).ToList();
-            return slots.Count > 0 ? slots.Sum(slot => slot.Quantity) : kinaListed ? 0 : null;
-        }
+        if (kinaHeld || (!kinaListed && kina.Count == 0)) return null;
+        long? Of(uint item) => kina.TryGetValue(item, out var slot) ? slot.Quantity : kinaListed ? 0 : null;
         return new KinaBalance(Of(InventoryRecords.KinaItem), Of(InventoryRecords.BoundKinaItem), kinaReadAt);
     }
 

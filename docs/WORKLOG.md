@@ -12,7 +12,18 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Unresolved:** HANDOFF's Kina check: the ids and the layout are SkeeveAN's, not seen in Harry's game; where the listing falls in a login; whether Kina ever spans more than one slot.
 
-**Next:** PR, deep audit (parsing, saved data), Codex, CI; then Harry's in-game checks.
+**Review (PR #50):** Codex (P2) and the deep audit found the same bug: the ten-second rule kept the Kina when any inventory record, a change included, had been read just before a login's list, so a change of character A just before switching to B went to B (LESSONS). Fixed with the audit's other findings:
+- **Major**: a whole list keeps the Kina only when a listing came within the burst.
+- **Minor**: a listing while a character is named, with no self record just before it, waits for the next self record (a switch on the same connection).
+- **Minor**: Kina read before anyone was named is forgotten at a new connection.
+- **Minor**: Kina is one slot per item, so a move (a sort) is not counted twice; the audit suggested treating a sort as a listing, which needs the whole inventory's anchors, and one slot per item is simpler; HANDOFF asks for a sort check.
+- **Nits**: the header says how many characters are not known ("?" when none is), from a pure `KinaTotals`; the column's tooltip says Engraved Kina is the game's Korean and Japanese name for Kina (Bound); the reader keeps every entry in order (its unused dedupe went); the writer's filler bytes are made up; ARCHITECTURE said four sorts.
+
+Codex's P1 (no changelog line) was already met by 6d104e7; both threads answered.
+
+**Checks after the review:** `scripts/Build.ps1` Debug and Release 779/779. Eight more mutations, each caught by its named test, with controls before and after passing: a whole list keeping only a listing, a listing waiting with no recent self record, a held listing kept for the next self record and not reported meanwhile, the self record's time noted, a new connection before anyone forgetting the Kina, a gone entry only in its own slot, the totals counting the unknown.
+
+**Next:** Codex on the new head, CI, Harry's go-ahead to merge; then Harry's in-game checks.
 ## 2026-10-27 — The roster counts Artifact Corridor runs
 
 **What:** the character roster has a Corridors column: the Artifact Corridors each character entered since the last Abyss Siege, as the meter saw them, and the header says when the next siege resets them (ARCHITECTURE.md "Character roster", "Corridors"). `RosterService.TakeMap` follows `ICombatEngine.MapChanged`: a change to the Artifact Corridor (`MapNames.ArtifactCorridor`, 503001, now a public constant) from another map is a run for the character being played, kept in `RosterCharacter.CorridorRuns` (the 12 most recent, saved in `roster.json`); none while the engine is not sure who is playing, and a load of the corridor straight after an unknown map within five minutes of the last run is the same run (a reconnection). `RechargeCalendar` has the Abyss Siege (`LastSiege`, `NextSiege`) from the world-event schedule; `RosterRules.CorridorRunsSinceSiege` counts the runs after the last one. `ICombatEngine.Character` is now the character only while that is sure (null after a login's list until its self record, and after a new connection until a self record names the character again), so a run is never put on a character the meter is unsure of. `RosterCharacter` compares its runs by value (a record compares lists by reference), guarded by a reflection test over every property; `RosterNormalizer` checks saved runs.
