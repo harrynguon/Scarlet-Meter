@@ -246,6 +246,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**Builds and tests run while the player was in game made the overlay stutter** (Harry, 2026-10-28: "why are the skill effect animations on the dps bar for each player so laggy now ... it used to be smooth like 60fps"; "smooth now" once they had stopped).
+- What: fourteen mutation builds and test runs ran back to back on Harry's PC, at normal priority, while AION 2 and the meter were running; the bars' effects dropped frames until they finished.
+- Why: the rule was about windows and focus ("ask before anything that opens windows"); builds and tests open none, so they ran whenever ready, and the game, the meter's WebView2 and the compilers shared the processor.
+- Guard: before a build, test run or render, check for the `AION2` process; while it runs, run them at idle priority (the shell's own, `(Get-Process -Id $PID).PriorityClass = 'Idle'`, which the processes it starts inherit), and leave full runs to CI. In the same batch a runner's list read in the wrong encoding (a ≈ in it) kept one mutation from running: write such lists in ASCII.
+
 **A test said "whatever the culture" but never set one** (2026-10-27, the Shugo Festival keys; found by the deep audit on #57, a mutation that survived).
 - What: the Odyle energy's and the Shugo keys' formatting tests expect "1,240" whatever the PC's culture, but ran under the machine's own, English, so dropping `CultureInfo.InvariantCulture` from `ShugoText.Keys` still passed. The code was right; the tests could not have caught it going wrong, which a player on a German PC would have seen as "1.021".
 - Why: the claim was in the test's comment, not its setup; on an English machine and on CI the culture-dependent and invariant texts are the same.
