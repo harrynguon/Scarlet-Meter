@@ -37,6 +37,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 - A meter left open while the game is closed no longer gets stuck on other traffic, such as a browser's or a
   download's, and then misses your next login: when what it is reading sends nothing from the game, it looks for the
   game again, within about 35 seconds on web traffic. ([#54](https://github.com/harrynguon/Scarlet-Meter/pull/54))
+- The character roster shows each character's class and its icon from the first time you log in on it; before, only
+  once that character had fought with the meter running. ([#55](https://github.com/harrynguon/Scarlet-Meter/pull/55))
 
 ## [0.3.0] - 2026-10-26
 

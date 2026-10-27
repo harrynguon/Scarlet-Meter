@@ -1,3 +1,4 @@
+using AionDpsMeter.Core.GameData.Services;
 using AionDpsMeter.Core.Models;
 using AionDpsMeter.Services.Models;
 using AionDpsMeter.Services.Services.Session;
@@ -5,7 +6,8 @@ using AionDpsMeter.Services.Services.Session;
 namespace ScarletMeter.Engine.Upstream;
 
 /// <summary>
-/// Pure conversions from upstream's models to Scarlet's records. Nothing here reads shared state: callers pass
+/// Pure conversions from upstream's models to Scarlet's records. Nothing here reads shared state but upstream's game data
+/// (<see cref="ClassNameOf"/>), which is loaded once and only read: callers pass
 /// what they read under upstream's session lock (the live fight) or from a saved snapshot (history), so live
 /// and saved details are built by the same code. A saved snapshot is cleaned by <see cref="SavedFightSanitizer"/>
 /// first; the lists here are still read null-tolerantly, and figures that feed TimeSpan or sums are bounded, so
@@ -31,6 +33,12 @@ internal static class UpstreamMapping
             ? new CharacterIdentity(player.Name, player.ServerName ?? string.Empty, (int)(player.CharacterClass?.Id ?? 0),
                 GlobalNames.Of(player.CharacterClass?.Name), Math.Max(0, player.CombatPower))
             : null;
+
+    /// <summary>
+    /// A class's AION 2 Global name by upstream's class id, from upstream's game data (classes.json, loaded once and only
+    /// read), as <see cref="ToIdentity"/> names a class upstream knows; empty for an id the data does not have.
+    /// </summary>
+    public static string ClassNameOf(int classId) => GlobalNames.Of(GameDataProvider.Instance.Classes.GetById(classId)?.Name);
 
     /// <summary>
     /// One player's details from the parts upstream computes. <paramref name="hitsNewestFirst"/> is the player's
