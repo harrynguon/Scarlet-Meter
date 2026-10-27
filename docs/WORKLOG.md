@@ -2,6 +2,18 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-27 — Merged branches are deleted without asking
+
+**What:** the scarlet-ship skill's merge step now clears away the remote branch, the worktree and the local branch once a PR has merged, without asking, and says how (a worktree with work in it is still the player's to decide); its stacked-PR note says GitHub deletes the base branch and retargets the next PR, which is then rebased onto `main`. The repository's "Automatically delete head branches" setting was turned on (`delete_branch_on_merge`).
+
+**Why:** Harry: "from now on please automatically delete branches which have been merged into main via PR, and delete my local copy too. this'll save on disk space and overall organisation". 45 merged branches and 19 worktrees had piled up and were cleared the same day.
+
+**Checks:** docs only (the skill and this entry); no build. The setting read back as on through GitHub's API.
+
+**Review (PR #52):** Codex (P2): a clean worktree and a merged PR do not show that the local branch has no commits past the merged head, which `git branch -D` would lose. The skill now checks the local tip is the PR's merged head or behind it, and keeps the branch and asks otherwise (the check this change's own clean-up ran by hand). Codex (P1) on that commit: the mistake belongs in LESSONS too, as AGENTS.md asks; added.
+
+**Next:** none.
+
 ## 2026-10-27 — A Characters button in the overlay's header
 
 **What:** the overlay's header has a Characters button (two figures, just left of Settings, after History: Harry moved it there from between the boss timers and History) that opens the character roster, beside the Odyle energy and Settings, Appearance, Characters. On a narrow overlay the header's title now gives way rather than run under the buttons: it clips, the state shortens with an ellipsis and the duration stays whole, with room left in the clip for the avatar's ring.

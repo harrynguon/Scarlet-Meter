@@ -34,7 +34,7 @@ Update the docs the change touches (ARCHITECTURE for structure, DEVELOPMENT for 
 Commit (message ends with the Co-Authored-By line the session's attribution asks for), push, and `gh pr create -R harrynguon/Scarlet-Meter --base main --head <branch>` with a body listing the checks actually run and ending with the session's PR attribution line.
 
 - Write multi-line messages with `git commit -F -` and a quoted heredoc from Bash. Windows PowerShell 5.1 splits a native argument at embedded double quotes, so `-m` with a here-string that holds `"` commits nothing.
-- A PR that needs another open PR's code is stacked: `--base <that branch>`, so its diff shows only its own change. GitHub retargets it to `main` when the base branch is deleted after its merge; then merge `origin/main` into it, rerun the checks and let CI pass before merging.
+- A PR that needs another open PR's code is stacked: `--base <that branch>`, so its diff shows only its own change. When the base PR merges, GitHub deletes its branch (the repository deletes head branches on merge) and retargets this one to `main`; then bring it onto `main` (`git rebase --onto origin/main <old base> <branch>`, since a squash merge shares no commits with the old base), rerun the checks and let CI pass before merging.
 
 ## 5. Audit and review comments
 
@@ -59,6 +59,13 @@ gh run list -R harrynguon/Scarlet-Meter --branch <branch> --limit 2
 gh pr merge <number> -R harrynguon/Scarlet-Meter --squash --match-head-commit <full 40-character sha>
 ```
 
-Then sync the main checkout (`git switch main`, `git pull --ff-only`), check the merged tree equals the tested commit's tree (`git rev-parse HEAD^{tree}` vs `<sha>^{tree}`), and remove the worktree and branch (deleting the remote branch also needs the player's go-ahead). When later branches were built on this one, merge the new `origin/main` into them (or `git rebase --onto origin/main <old base> <branch>` for unpushed ones) before their own PRs merge.
+Then sync the main checkout (`git switch main`, `git pull --ff-only`), check the merged tree equals the tested commit's tree (`git rev-parse HEAD^{tree}` vs `<sha>^{tree}`), and then, without asking (the player's standing instruction, 2026-10-27), clear away what the merge left:
+
+- The remote branch: GitHub has deleted it (the repository's "Automatically delete head branches" is on); `git fetch --prune origin` drops its remote-tracking ref. If it is still there, `git push origin --delete <branch>`.
+- First, the local branch's tip: `git rev-parse <branch>` must be the PR's merged head (`gh pr view <n> -R harrynguon/Scarlet-Meter --json headRefOid`) or an ancestor of it (`git merge-base --is-ancestor`). A tip past it holds commits the merge never saw: keep the branch and its worktree, and ask.
+- The worktree: `git worktree remove '<path>'` once `git -C '<path>' status --porcelain` prints nothing (`--force` only when the refusal is about the `upstream` submodule). Uncommitted or untracked work, or a `portable` or data folder in it, is the player's to decide: ask.
+- The local branch: `git branch -D <branch>` (a squash merge leaves it unmerged in git's eyes).
+
+Only a branch whose PR has merged, at or behind the head it merged; never one whose PR is open or closed unmerged, never `main`, and a branch with no PR only once its commits are found in `main`. When later branches were built on this one, merge the new `origin/main` into them (or `git rebase --onto origin/main <old base> <branch>` for unpushed ones) before their own PRs merge.
 
 Conflicts between parallel PRs are usually only in `README.md` and `docs/` (WORKLOG entries, HANDOFF state lines). Keep both sides' content, WORKLOG newest first with a blank line between entries, then fix any state line that one side made stale (for example the pinned release). Run `git submodule update` after a merge that moved `upstream`, before staging, and check `git ls-tree HEAD upstream` against `main` (a `git add -A` once re-staged an old pin).
