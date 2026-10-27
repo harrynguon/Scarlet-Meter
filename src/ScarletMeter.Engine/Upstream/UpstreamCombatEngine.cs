@@ -34,6 +34,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     private readonly AbyssArtifactTap artifacts;
     private readonly AbyssPause pause;
     private readonly DummyFightFilter dummies;
+    private readonly CaptureLockGuard lockGuard;
     private readonly ILogger<UpstreamCombatEngine> logger;
     private readonly Lock shownLock = new(); // orders GetSnapshot and Reset around `shown`
     private CombatSnapshot shown = CombatSnapshot.Empty; // the snapshot GetSnapshot last returned
@@ -53,6 +54,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         AbyssArtifactTap artifacts,
         AbyssPause pause,
         DummyFightFilter dummies,
+        CaptureLockGuard lockGuard,
         ILogger<UpstreamCombatEngine> logger)
     {
         this.pipeline = pipeline;
@@ -66,6 +68,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         this.artifacts = artifacts;
         this.pause = pause;
         this.dummies = dummies;
+        this.lockGuard = lockGuard;
         this.logger = logger;
     }
 
@@ -149,9 +152,16 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
                 "Packet capture could not start. Install Npcap (https://npcap.com) with \"Install Npcap in " +
                 "WinPcap API-compatible Mode\" ticked, then start the meter again.", ex);
         }
+        // Once capture runs: a lock onto traffic that is not the game's is dropped (CaptureLockGuard).
+        lockGuard.Start();
     }
 
-    public void Stop() => pipeline.Stop();
+    // The lock guard stops first, so none of its resets can reopen the adapters capture is closing.
+    public void Stop()
+    {
+        lockGuard.Stop();
+        pipeline.Stop();
+    }
 
     // Fight state only, under the session manager's lock. Upstream's IPacketService.Reset would also clear the
     // summon-to-owner map (a pet already out would show as an unidentified player) and the TCP reassembly
@@ -426,6 +436,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     {
         if (disposed) return;
         disposed = true;
+        lockGuard.Dispose(); // before capture stops, as in Stop
         try
         {
             pipeline.Stop();

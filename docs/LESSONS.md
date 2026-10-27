@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The meter stayed locked onto web traffic and missed a login** (Harry, 2026-10-27: "is this a stale connection or something? i launched the game with the meter opened beforehand and my current character is not up to date").
+- What: the meter, left open, was locked onto port 443 from 16:23 (an hour and a half after the game closed) until Harry asked at 19:09, and saw nothing of the game started at 19:04: the roster still marked the character played before, and the Odyle reading was hours old. Upstream's detection counts its keep-alive's three bytes with no time window, so enough encrypted web traffic matches them by chance, and its watchdog counts any packet on the locked port as a heartbeat, so the lock never ended.
+- Why: every in-game check started the meter with the game already running or about to run, when the game's port wins detection at once. Nobody had left the meter open across a game restart, and the log's "LOCKED" line was read for the adapter, not the port. Upstream's capture was taken as working because it worked in that one order.
+- Guard: `CaptureLockGuard` drops a lock that gets no server-time record from the game (the reply to its ping, every ten seconds) for 30 s on ports 80 and 443 or 150 s elsewhere, through upstream's own reset (`CaptureLockTests`; the reflection binding pinned by `TheGuardBindsToThePinnedUpstream`). The HANDOFF in-game list now has the meter left open with the game closed, then a login. When a check depends on the order things start in, try the other order too.
+
 **The header's title ran under its buttons on a narrow overlay, and the first fix cut the avatar's ring** (2026-10-27, seen in headless renders before commit, adding the Characters button).
 - What: at the overlay's 300 px, a fight's "Boss combat" and duration ran under the first header buttons, since the header had seven; the eighth made it worse. Clipping the title stopped that but cut the avatar's ring flat on its left, its glow drawn outside the avatar's box. The audit on #53 then found the fix's "the duration stays whole" true only below an hour: at 300 px "01:02:03" was cut to "01:02", a shorter time; an ellipsis on the time fired on fractions of a pixel ("12:…"), so the least width went to 320 px instead.
 - Why: the header was never rendered at the overlay's narrowest width when buttons were added, and the clip was set without measuring what is drawn outside its box, the mistake the bar area's ring taught (below).
@@ -210,6 +215,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - Guard: `SettingsTests.AFileSavedWithAByteOrderMarkLoads`. Seed test files the way people actually write them.
 
 ## In the process
+
+**A mutation runner assumed every file had CRLF line endings, so three mutations never ran** (2026-10-27, the capture lock guard; reported "TEXT NOT FOUND", not as caught or missed).
+- What: the runner turned each multi-line mutation's line breaks into CRLF before looking for it, as the checked-out files have them; the new files, written by the agent's file tool, had LF, so no multi-line mutation of theirs could match.
+- Why: the runner was written against files that git had checked out (CRLF in the working tree), and no new file had been mutated across lines before.
+- Guard: the runner now uses the file's own line endings, and still reports a mutation whose text is not found by name, never as caught; read every line of its report before taking the run as done.
 
 **The ship skill's branch clean-up would have deleted commits the merge never saw** (Codex on #52, fixed before merge).
 - What: the first wording deleted a merged PR's worktree once `git status --porcelain` printed nothing, then the branch with `git branch -D`. A clean worktree says nothing about commits made after the PR's last push, and `-D` deletes a branch even when unmerged, so committed but unpushed work would have gone.

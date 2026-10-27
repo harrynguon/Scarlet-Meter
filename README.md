@@ -223,6 +223,11 @@ then, as RATmeter does.
 Start the game (or change zone) and give it a moment. If it stays, check that Npcap is installed with
 WinPcap API-compatible mode.
 
+**The meter was open before the game started, and it missed your login.**
+Left open with the game closed, the meter can latch onto other traffic, such as a browser's; it lets go once that
+traffic sends nothing from the game (within about 35 seconds for web traffic, 2½ minutes otherwise). If you logged
+in during that time, go back to character select and log in again, and the meter reads your character.
+
 **It closes with a message about Npcap.**
 Install Npcap as in step 1 of [Download and run](#download-and-run).
 

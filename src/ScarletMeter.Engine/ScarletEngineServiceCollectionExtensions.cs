@@ -78,6 +78,9 @@ public static class ScarletEngineServiceCollectionExtensions
         // The Abyss pause: the settings bridge reads its state on every hit, so the state is its own object.
         services.AddSingleton<PauseState>();
         services.AddSingleton<AbyssPause>();
+        // Drops a capture lock onto traffic that is not the game's (upstream's detection can lock onto web traffic while
+        // the game is closed, and its watchdog keeps any lock that still carries packets). Inert in demo mode and with none.
+        services.AddSingleton<CaptureLockGuard>();
 
         services.AddSingleton<ICombatEngine, UpstreamCombatEngine>();
         return services;

@@ -34,6 +34,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
   steps aside, and the time stays whole, even past an hour. To keep room for them the meter can no longer be made
   narrower than 320 px (it was 300). Pointing at a shortened title shows it whole.
   ([#53](https://github.com/harrynguon/Scarlet-Meter/pull/53))
+- A meter left open while the game is closed no longer gets stuck on other traffic, such as a browser's or a
+  download's, and then misses your next login: when what it is reading sends nothing from the game, it looks for the
+  game again, within about 35 seconds on web traffic. ([#54](https://github.com/harrynguon/Scarlet-Meter/pull/54))
 
 ## [0.3.0] - 2026-10-26
 
