@@ -7,8 +7,8 @@ namespace ScarletMeter.Engine.Entries;
 /// PlayerInfoProcessor reads (v1.11.5.341): <c>&lt;entity varint&gt; &lt;u32&gt; &lt;u8: bit 0, a name follows&gt;
 /// &lt;name length varint&gt; &lt;UTF-8 name&gt; &lt;server id u16&gt; &lt;class code u32&gt; …</c>. Upstream decodes the
 /// name itself; this only tells whether the record names a character at all, and reads the two bytes after the name that
-/// upstream takes as the server id (and turns into a short name) and the four after them, the character's class, which
-/// upstream does not read (A2Tools' <c>self_profile</c> in its stream_processor.rs and <c>JobClass::from_roster_class</c> in
+/// upstream takes as the server id (and turns into a short name) and the four after them, the character's class, of which
+/// upstream reads the first byte (its PlayerInfoProcessor's jobCode) and never uses it (A2Tools' <c>self_profile</c> in its stream_processor.rs and <c>JobClass::from_roster_class</c> in
 /// its entity/job_class.rs, at 5c6f02c; THIRD-PARTY-NOTICES.md). A tutorial character's name is a placeholder, <c>$</c>
 /// and a code, which upstream's decoding turns into a plain name by dropping the <c>$</c>; A2Tools treats it as no name
 /// (<c>is_placeholder_name</c> in its stream_processor.rs, at b933531), and so does this. Pure; every read is

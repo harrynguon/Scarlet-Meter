@@ -2,8 +2,9 @@ namespace ScarletMeter.Engine;
 
 /// <summary>
 /// A character the game named as the player's, as upstream read it from the character's own record at login
-/// (<see cref="ICombatEngine.Character"/>). The name and server tell characters apart; the class and combat power are
-/// what upstream knew when the record came (the class is 0 and its name empty until upstream has seen it).
+/// (<see cref="ICombatEngine.Character"/>). The name and server tell characters apart; the combat power is what upstream
+/// read when the record came, and the class is upstream's player class when it knows one (from the character's skills in
+/// a fight), else the one the record itself names (0, and its name empty, when neither is known).
 /// </summary>
 /// <param name="Name">The character's name, as upstream decodes it.</param>
 /// <param name="Server">The server's short name from upstream's table, or empty when the id is not in it.</param>

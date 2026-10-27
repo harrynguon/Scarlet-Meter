@@ -10,9 +10,16 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Checks (SDK 10.0.402):** `scripts/Build.ps1` Debug 875/875; Release 875/875 on a second run, the first having failed only `TestEngineHostTests.TheHistoryStoreIsHandedOutOnlyOnceItsStartupCleanupHasFinished` on upstream's history cleanup timing out (the known 10 s wait, HANDOFF "After acceptance"; the game was running on the machine). No `%TEMP%\scarlet-*` left. Fail-first on a scratch copy, controls passing before and after, each mutation caught by the tests meant for it: Ranger and Assassin swapped, a code past the table taken as a Chanter, the code read a byte early or as one byte, a cut code read, the class taken from a record whose server id was not, upstream's class overridden, a class with no name in upstream's data taken, the class never put on, and upstream's class name in place of Global's (10 of 10).
 
-**Not checked:** in the game: each class's code, and the class showing at login (HANDOFF, "Next: the character roster", a new item). A2Tools checked its table on a Cleric (code 30) and saw other bytes in the class's place on Nezekan, where the code table then gives no class.
+**Review (PR #55, on 419a5af):** CI passed (runs 40483660132 and 40483685856). Codex completed with no findings. The deep audit at high effort approved with nits; it checked the layout against upstream's and A2Tools' readers (upstream's one-byte `jobCode` at the same offset confirms it), the table against both, the paths to a wrong character, the roster's bounds and thread safety, and caught its own mutations:
+- **Minor**: upstream takes a class from a skill code's first two digits, so a Spiritmaster's six-digit skills (100510, 103500 in its skills.json) can give the player upstream's class 10, "Elementalist spirit", at the first hit, and the tap kept upstream's class whenever it was not 0: the roster would lose the Spiritmaster's class and icon again after a fight (not seen in the game: whether the player casts those skills is unverified). Fixed: class 10 is not a player class (`EntryListTap.UpstreamSpiritClassId`), and the record's class stands over it (`TheRecordsClassStandsOverUpstreamsSpiritClass`). Upstream's two-digit rule is a candidate to offer upstream.
+- **Nits**: `CharacterIdentity`'s comment still said the class was upstream's alone; upstream does read the class code's first byte (and never uses it), so "does not read" became that; `UpstreamMapping`'s "nothing reads shared state" now names upstream's game data. All fixed.
+- **Observation**: A2Tools' four-wide ranges are its own reading of the codes it saw (party list, and 30 for a Cleric in a self record), and the bytes it saw on Nezekan could fall inside the table; ARCHITECTURE and the HANDOFF item now say so.
 
-**Next:** the PR, an audit (capture parsing), Codex and CI; then Harry's go-ahead.
+**Checks after the review:** `scripts/Build.ps1` Debug and Release 876/876. The new test fails with upstream's spirit class kept (the fix reverted) and passes with it, the other `EntryListTests` passing both times.
+
+**Not checked:** in the game: each class's code, and the class showing at login (HANDOFF, "Next: the character roster", a new item). A2Tools checked its table in a self record only on a Cleric (code 30) and saw other bytes in the class's place on Nezekan.
+
+**Next:** CI and a fresh Codex review on the new head; then Harry's go-ahead.
 
 ## 2026-10-27 — A capture lock onto other traffic is dropped
 

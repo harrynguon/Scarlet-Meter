@@ -659,6 +659,24 @@ public sealed class EntryListTests
         Assert.Equal(11, progress.Entries[EntryIds.Nightmare].First);
     }
 
+    // Upstream's class 10 is a Spiritmaster's spirit, not a player class: upstream can give it to the player from a
+    // six-digit skill code (deep audit on #55), and the record's class stands over it. Its other classes are kept.
+    [Fact]
+    public void TheRecordsClassStandsOverUpstreamsSpiritClass()
+    {
+        var spirit = new CharacterIdentity("Delta", "SIE", EntryListTap.UpstreamSpiritClassId, "Spiritmaster spirit", 30_000);
+        var tap = NewTap(new() { [8] = spirit }, new FakeTimeProvider(Start));
+        tap.Observe(EntryListRecordWriter.SelfRecord(8, "Delta", 1001, 22, 30_000));
+        Assert.Equal(spirit with { ServerId = 1001, ClassId = 16, ClassName = "Spiritmaster" }, tap.Character);
+        tap.Observe(EntryListRecordWriter.SelfRecord(8, "Delta", 1001, 37, 30_000)); // no class in the record: upstream's stays
+        Assert.Equal(spirit with { ServerId = 1001 }, tap.Character);
+        Assert.Equal("Elementalist spirit", GameDataName(EntryListTap.UpstreamSpiritClassId)); // upstream's data: 10 is the spirit
+    }
+
+    // Upstream's own name for a class id, before Global's names apply.
+    private static string GameDataName(int classId) =>
+        AionDpsMeter.Core.GameData.Services.GameDataProvider.Instance.Classes.GetById(classId)?.Name ?? string.Empty;
+
     // Through the real graph, before any fight: upstream names the character but knows no class, and the record's class
     // code (30, a Cleric's) gives the engine's character, and so the roster, its class and Global name from the login.
     [Fact]

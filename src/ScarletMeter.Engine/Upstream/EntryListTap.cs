@@ -52,6 +52,14 @@ internal sealed class EntryListTap : IRecordReader
     /// <summary>Upstream's opcode for the player's own character record (bytes <c>33 36</c>).</summary>
     public const ushort SelfRecordOpcode = PacketOpcodes.PlayerInfo;
 
+    /// <summary>
+    /// Upstream's class id 10, "Elementalist spirit" (classes.json): a Spiritmaster's spirit, not a player class. Upstream
+    /// takes a class from a skill code's first two digits, so a Spiritmaster's six-digit skills (100510, 103500 in its
+    /// skills.json) can give the player this class at the first hit (deep audit on #55; not seen in the game); the
+    /// record's class stands over it.
+    /// </summary>
+    internal const int UpstreamSpiritClassId = 10;
+
     /// <summary>How long before a login's list an inventory listing still counts as that login's (a login comes in a burst).</summary>
     public static readonly TimeSpan LoginBurst = TimeSpan.FromSeconds(10);
 
@@ -256,11 +264,12 @@ internal sealed class EntryListTap : IRecordReader
             ? character with { ServerId = serverId }
             : character;
 
-    // The character with the record's class, while upstream knows none (it learns a class only from a character's skills,
-    // in a fight): only from a record whose server id checked out, so the class is read from where the record's layout
-    // puts it, and only a code that is a class whose name upstream's data has. Upstream's class, once known, is kept.
+    // The character with the record's class, while upstream knows no player class for it (it learns a class only from a
+    // character's skills, in a fight): only from a record whose server id checked out, so the class is read from where the
+    // record's layout puts it, and only a code that is a class whose name upstream's data has. Upstream's player class,
+    // once known, is kept; its spirit class is not one (UpstreamSpiritClassId).
     private CharacterIdentity WithClass(CharacterIdentity character, uint classCode) =>
-        character.ClassId == 0 && character.ServerId > 0 && SelfRecords.ClassIdOf(classCode) is > 0 and var classId
+        character.ClassId is 0 or UpstreamSpiritClassId && character.ServerId > 0 && SelfRecords.ClassIdOf(classCode) is > 0 and var classId
             && classNameOf(classId) is { Length: > 0 } className
             ? character with { ClassId = classId, ClassName = className }
             : character;
