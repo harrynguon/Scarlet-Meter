@@ -98,8 +98,8 @@ and adds it up per player and per fight.
   full again, and Nightmare and Ascension entries left, estimated (≈) from what the game last said, the Artifact
   Corridors it entered since the last Abyss Siege, as the meter saw them, out of those whose artifact your side holds
   (read when you open the Abyss map or enter the Abyss), and its Kina and Kina (Bound) as of the last time you played
-  it, with the totals across characters, and a note of your own under each name. Click the Odyle energy, or Settings,
-  Appearance, Characters. The recharge and siege times, the Kina and the artifacts are not yet checked in the game.
+  it, with the totals across characters, and a note of your own under each name. Open it with the Characters button
+  at the top right, by clicking the Odyle energy, or from Settings, Appearance, Characters. The recharge and siege times, the Kina and the artifacts are not yet checked in the game.
 
 **World events**
 

@@ -595,13 +595,16 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"margin-left:\s*auto;", Block(css, ".ping")); // without the energy, the ping still ends the line
     }
 
-    // The character roster opens from the overlay's Odyle energy and from Settings, which works with the energy hidden or
-    // not sent yet. Its page masks names as every window does with "Hide nicknames" on, and writes no name without it.
+    // The character roster opens from the overlay's header (Characters, beside History), from its Odyle energy and from
+    // Settings: the header and Settings work with the energy hidden or not sent yet. Its page masks names as every window
+    // does with "Hide nicknames" on, and writes no name without it.
     [Fact]
-    public void TheRosterOpensFromTheOdyleEnergyAndMasksNames()
+    public void TheRosterOpensFromTheHeaderTheOdyleEnergyAndSettingsAndMasksNames()
     {
         var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
-        Assert.Matches(@"<span class=""odyle""[^>]*@onclick=""Windows\.OpenRoster""", File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor")));
+        var meter = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
+        Assert.Matches(@"<span class=""odyle""[^>]*@onclick=""Windows\.OpenRoster""", meter);
+        Assert.Matches(@"(?s)<div class=""ov-actions"".*?<button type=""button"" class=""icon-btn"" title=""Characters"" @onclick=""Windows\.OpenRoster"">.*?title=""History"".*?</header>", meter);
         Assert.Matches(@"(?s)<span class=""label"">Characters</span>.*?@onclick=""Windows\.OpenRoster""", File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor")));
         var roster = File.ReadAllText(Path.Combine(app, "Pages", "RosterPage.razor"));
         Assert.Contains("@Name(character)", roster);
@@ -752,6 +755,41 @@ public sealed partial class RazorMarkupTests
             .Where(l => matches(l.Text))
             .Select(l => $"{Path.GetRelativePath(app, l.File)}:{l.Line}: {l.Text.Trim()}")
             .ToList();
+    }
+
+    // The header's title gives way on a narrow overlay rather than run under the buttons (at the overlay's 300 px a
+    // fight's "Boss combat" and duration ran under the first ones, more so with the Characters button): it clips, the
+    // state shortens with an ellipsis and the duration stays whole. Its clip box reaches past the avatar by at least the
+    // ring's width and its glow's blur, so the ring is never cut (a headless render before commit showed it cut flat, as
+    // the bar area's ring once was). Source-text guard: headless Edge renders at 300, 340 and 400 px measured it (WORKLOG).
+    [Fact]
+    public void TheHeaderTitleGivesWayWithoutCuttingTheAvatarsRing()
+    {
+        var css = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "app.css"));
+        static string Block(string source, string selector) =>
+            Regex.Match(source, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
+        static double Number(string text) => double.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
+        var title = Block(css, ".ov-title");
+        Assert.Matches(@"(?m)^\s*overflow:\s*hidden;", title);
+        var padding = Regex.Match(title, @"(?m)^\s*padding:\s*(?<top>[\d.]+)px 0 (?<bottom>[\d.]+)px (?<left>[\d.]+)px;");
+        var margin = Regex.Match(title, @"(?m)^\s*margin:\s*-(?<top>[\d.]+)px 0 -(?<bottom>[\d.]+)px -(?<left>[\d.]+)px;");
+        Assert.True(padding.Success && margin.Success, "the title's clip box is widened by padding the margin takes back");
+        string[] sides = ["top", "bottom", "left"];
+        foreach (var side in sides) Assert.Equal(padding.Groups[side].Value, margin.Groups[side].Value);
+        // Every rule that rings the avatar: the furthest it reaches is the ring's spread plus its glow's blur.
+        var reaches = Regex.Matches(Regex.Replace(css, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline),
+                @"(?m)^[^{}\r\n]*\.ov-avatar[^{}\r\n]*\{(?<body>[^}]*)\}")
+            .Select(rule => Regex.Match(rule.Groups["body"].Value, @"box-shadow:\s*0 0 0 (?<ring>[\d.]+)px[^,;]*(?:,\s*0 0 (?<glow>[\d.]+)px)?"))
+            .Where(shadow => shadow.Success)
+            .Select(shadow => Number(shadow.Groups["ring"].Value) + (shadow.Groups["glow"].Success ? Number(shadow.Groups["glow"].Value) : 0))
+            .ToList();
+        Assert.True(reaches.Count >= 3, "the faint edge, the HP ring with its glow, and the still and done rings");
+        Assert.True(reaches.Max() > 8, "the HP ring's glow is read");
+        foreach (var side in sides) Assert.True(Number(padding.Groups[side].Value) >= reaches.Max(), $"the clip box's {side} reaches past the ring");
+        var state = Block(css, ".state-text");
+        Assert.Matches(@"(?m)^\s*min-width:\s*0;", state);
+        Assert.Matches(@"(?m)^\s*text-overflow:\s*ellipsis;", state);
+        Assert.Matches(@"(?m)^\s*flex:\s*none;", Block(css, ".state-time"));
     }
 
     // The directory holding ScarletMeter.slnx, above the test assembly.

@@ -2,6 +2,17 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-27 — A Characters button in the overlay's header
+
+**What:** the overlay's header has a Characters button (two figures, between the boss timers and History) that opens the character roster, beside the Odyle energy and Settings, Appearance, Characters. On a narrow overlay the header's title now gives way rather than run under the buttons: it clips, the state shortens with an ellipsis and the duration stays whole, with room left in the clip for the avatar's ring.
+
+**Why:** Harry: "how do i access the dashboard? is there no button on the top right of the window?", then "add a Characters button to the overlay's top-right header that opens the roster".
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` Debug and Release 818/818 (the first Debug run failed only the changelog guard, the new lines then lacking the PR's link). Headless Edge renders of the header with the real `app.css` at 300 px (the overlay's least), 340 and 400 px (its default), idle and in a fight: before, a fight's title ran under the first buttons at 300 px, already with seven; after, "Boss c…" or nothing of the state and the whole duration, the buttons clear; the first clip cut the avatar's ring flat (zoomed render), the second keeps it whole (LESSONS). Fail-first: five mutations (no button, the title not clipped, a clip box short of the ring, the duration shrinking, the state unable to shrink), each caught by its named test, controls passing. No smoke run of the meter's windows (Harry may be in game); the button calls the same `Windows.OpenRoster` the Odyle energy does.
+
+**Unresolved:** not seen in the running meter: the button's look beside the others and the roster window opening from it.
+
+**Next:** PR, audit, Codex, CI; Harry's go-ahead to merge.
 ## 2026-10-27 — Corridors out of what your side holds, and a note per character
 
 **What:** the roster's corridors show as runs out of the corridors the character's side can enter ("1/2"), and each character has a note of the player's own under its name (ARCHITECTURE.md "Abyss artifacts", "Character roster"). `Abyss/AbyssArtifactRecords` reads who holds each Abyss artifact from the Abyss map's record (`07 e3`) and the one on entering the Abyss (`05 e3`), ported from A2Tools' `abyss_artifacts.rs` (6837e55, unchanged up to c3fcce3; GPL v3) and read only when every byte falls into place; `Upstream/AbyssArtifactTap` raises each reading as `ICombatEngine.ArtifactsObserved`. The entry tap reads the server id after the name in the player's own record (`CharacterIdentity.ServerId`, taken when upstream named the character's server by it), since the short names repeat across the two sides and the side is the id's thousands. The roster keeps the lower layer's three holders per server with the holding's start and reset (`RosterFile.Artifacts`), held across a server change like a corridor entry, and counts the corridors open as A2Tools' Roster plugin does (one per artifact the side holds, one nobody holds closed, one not named open); not known (out of 3, in italics) without a server id, a reading on that server, or once its reset or the next scheduled siege has passed. Notes are cleaned from the page and the file alike (`RosterNormalizer.CleanNote`: control characters and other spaces as spaces, invalid UTF-16 replaced, at most 100 UTF-16 units without splitting a character) and saved with the roster.

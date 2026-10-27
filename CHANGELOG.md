@@ -16,10 +16,17 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
   energy is full again, and Nightmare and Ascension entries left, estimated (≈) from what the game last said, the
   Artifact Corridors it entered since the last Abyss Siege, out of those whose artifact your side holds (read when
   you open the Abyss map or enter the Abyss), its Kina and Kina (Bound), with the totals across your characters, and a
-  note of your own under each name. Click the Odyle energy beside the ping, or Settings, Appearance, Characters. The
-  recharge and siege times, the Kina and the artifacts are not yet checked in the game.
+  note of your own under each name. Open it with the Characters button at the top right of the meter, by clicking the
+  Odyle energy beside the ping, or from Settings, Appearance, Characters. The recharge and siege times, the Kina and
+  the artifacts are not yet checked in the game.
   ([#48](https://github.com/harrynguon/Scarlet-Meter/pull/48), [#49](https://github.com/harrynguon/Scarlet-Meter/pull/49),
-  [#50](https://github.com/harrynguon/Scarlet-Meter/pull/50), [#51](https://github.com/harrynguon/Scarlet-Meter/pull/51))
+  [#50](https://github.com/harrynguon/Scarlet-Meter/pull/50), [#51](https://github.com/harrynguon/Scarlet-Meter/pull/51),
+  [#53](https://github.com/harrynguon/Scarlet-Meter/pull/53))
+
+### Fixed
+
+- On a narrow meter, a fight's state and time no longer run under the buttons at the top: the state shortens first,
+  and the time stays whole. ([#53](https://github.com/harrynguon/Scarlet-Meter/pull/53))
 
 ## [0.3.0] - 2026-10-26
 
