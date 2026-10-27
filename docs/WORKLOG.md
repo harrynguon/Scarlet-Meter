@@ -2,6 +2,21 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-28 — #58 seen in the game
+
+**What:** HANDOFF's "Global servers (#58)" and "Kina" items record what Harry's first session with #58 showed; docs only.
+
+**Why:** Harry, after rebuilding the cube copy from #58: "opened dps meter after, stil question mark", then, after a fresh login: "Fixed now", and asked for the findings to be recorded.
+
+**Checks (in the game, on Harry's cube copy built from #58; the meter's log and which fields the roster file has set were read on this PC, no names or values copied):**
+- A character logged in with the meter running: server id in Global's Asia range (1501 to 1510, inside A2Tools' list), class, level and gear score all set.
+- A character already in the game when the meter started: the self record a map change brought gave the server id, class and level but no gear score, so its two gear score copies did not pass (they disagreed, or one was out of range). The login's record carries a gear score that does; the roster keeps one once read, so a later record like that does not undo it.
+- An inventory listing came right after a map change with no login ("Map loaded" then "Inventory listing read (2 Kina slots)"), so that character's bound Kina was read without logging in again.
+
+**Not checked:** the values against the character sheet and inventory; the other characters at their logins; the corridors once the Abyss map is opened; why the map change's record has gear score copies that do not agree (its bytes were not seen).
+
+**Next:** the remaining checks in HANDOFF as Harry plays.
+
 ## 2026-10-27 — Global servers' ids, 840 by default, the roster's icon higher
 
 **What:**
