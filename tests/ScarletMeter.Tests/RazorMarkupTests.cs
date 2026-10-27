@@ -595,7 +595,7 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"margin-left:\s*auto;", Block(css, ".ping")); // without the energy, the ping still ends the line
     }
 
-    // The character roster opens from the overlay's header (Characters, beside History), from its Odyle energy and from
+    // The character roster opens from the overlay's header (Characters, just left of Settings), from its Odyle energy and from
     // Settings: the header and Settings work with the energy hidden or not sent yet. Its page masks names as every window
     // does with "Hide nicknames" on, and writes no name without it.
     [Fact]
@@ -604,7 +604,8 @@ public sealed partial class RazorMarkupTests
         var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
         var meter = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
         Assert.Matches(@"<span class=""odyle""[^>]*@onclick=""Windows\.OpenRoster""", meter);
-        Assert.Matches(@"(?s)<div class=""ov-actions"".*?<button type=""button"" class=""icon-btn"" title=""Characters"" @onclick=""Windows\.OpenRoster"">.*?title=""History"".*?</header>", meter);
+        // Just left of Settings (Harry), after History.
+        Assert.Matches(@"(?s)<div class=""ov-actions"".*?title=""History"".*?<button type=""button"" class=""icon-btn"" title=""Characters"" @onclick=""Windows\.OpenRoster"">\s*<svg[^>]*>.*?</svg>\s*</button>\s*<button type=""button"" class=""icon-btn"" title=""Settings"".*?</header>", meter);
         Assert.Matches(@"(?s)<span class=""label"">Characters</span>.*?@onclick=""Windows\.OpenRoster""", File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor")));
         var roster = File.ReadAllText(Path.Combine(app, "Pages", "RosterPage.razor"));
         Assert.Contains("@Name(character)", roster);
