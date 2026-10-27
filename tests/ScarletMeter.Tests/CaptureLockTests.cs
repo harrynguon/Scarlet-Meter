@@ -16,13 +16,15 @@ using static ScarletMeter.Tests.SyntheticRecords;
 namespace ScarletMeter.Tests;
 
 /// <summary>
-/// The capture lock guard (CaptureLockWatch, CaptureLockGuard): a lock that gets no server-time record from the game for
-/// 30 s on the web's ports, or 150 s on any other, is dropped and upstream's detection starts again; the game's records,
-/// through upstream's real pipeline, keep a lock. Adapter names, ports and records are made up.
+/// The capture lock guard (CaptureLockWatch, CaptureLockGuard): a lock that has carried no server-time record from the
+/// game is dropped after 30 s on the web's ports, or 5 minutes on any other, and upstream's detection starts again; one
+/// that has carried a record, through upstream's real pipeline, is the game's and is kept. Adapter names, ports and
+/// records are made up.
 /// </summary>
 public sealed class CaptureLockTests
 {
-    private static readonly DateTimeOffset Start = new(2026, 10, 27, 16, 23, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset Start = new(2026, 10, 27, 12, 0, 0, TimeSpan.Zero);
+    private static readonly TimeSpan Patience = TimeSpan.FromSeconds(10);
     private static readonly CaptureLock Web = new("adapter", 443);
     private static readonly CaptureLock Game = new("adapter", 13328);
 
@@ -40,11 +42,12 @@ public sealed class CaptureLockTests
         Assert.Equal(TimeSpan.FromSeconds(30), quiet);
     }
 
-    // Any other port gets 150 s: longer than upstream's watchdog takes to drop a port that goes silent (up to 120 s),
-    // so a game that closes is left to upstream. Port 80 is the web's too.
+    // Any other port gets 5 minutes: a lock made at character select, where the game's record may not come, is rarely
+    // reached; and longer than upstream's watchdog takes to drop a port that goes silent (up to 120 s), so a game that
+    // closes is left to upstream. Port 80 is the web's too.
     [Theory]
-    [InlineData(13328, 150)]
-    [InlineData(27015, 150)]
+    [InlineData(13328, 300)]
+    [InlineData(27015, 300)]
     [InlineData(80, 30)]
     [InlineData(443, 30)]
     public void TheQuietLimitDependsOnThePort(int port, int seconds)
@@ -60,24 +63,32 @@ public sealed class CaptureLockTests
         Assert.True(Check(watch, locked, null, clock));
     }
 
-    // The game's record every ten seconds (its ping) keeps a lock, even on a web port (a relay that tunnels the game
-    // there); the quiet time counts from the last one.
-    [Fact]
-    public void TheGamesRecordsKeepALock()
+    // A lock that has carried one of the game's records (its ping's reply) is the game's, even on a web port (a relay
+    // that tunnels the game there): kept however long the records then stop (at character select, a loading screen),
+    // which leaves it to upstream's watchdog (audit on #54: the game's own lock would have been dropped every few
+    // minutes at character select). One record is enough, if it came after the lock was first seen.
+    [Theory]
+    [InlineData(443, 29)]
+    [InlineData(443, 1)]
+    [InlineData(13328, 299)]
+    public void ALockThatCarriedTheGamesRecordIsKept(int port, int recordAfter)
     {
         var clock = new FakeTimeProvider(Start);
         var watch = new CaptureLockWatch();
-        long? last = null;
-        for (var second = 0; second < 600; second += 5)
+        var locked = new CaptureLock("adapter", port);
+        Assert.False(Check(watch, locked, null, clock));
+        clock.Advance(TimeSpan.FromSeconds(recordAfter));
+        var record = clock.GetTimestamp();
+        Assert.False(Check(watch, locked, record, clock));
+        for (var minute = 0; minute < 120; minute++)
         {
-            if (second % 10 == 0) last = clock.GetTimestamp();
-            Assert.False(Check(watch, Web, last, clock));
-            clock.Advance(TimeSpan.FromSeconds(5));
+            clock.Advance(TimeSpan.FromMinutes(1));
+            Assert.False(Check(watch, locked, record, clock));
         }
-        clock.Advance(TimeSpan.FromSeconds(19)); // the last record was at 590 s: now 29 s since
-        Assert.False(Check(watch, Web, last, clock));
-        clock.Advance(TimeSpan.FromSeconds(1));
-        Assert.True(Check(watch, Web, last, clock));
+        Assert.False(Check(watch, null, record, clock)); // detecting: the next lock must prove itself again
+        Assert.False(Check(watch, locked, record, clock));
+        clock.Advance(CaptureLockWatch.QuietLimit(port));
+        Assert.True(Check(watch, locked, record, clock));
     }
 
     // A record from before the lock (the game's, before it closed) does not count for a lock made since: the quiet time
@@ -115,7 +126,13 @@ public sealed class CaptureLockTests
         Assert.False(Check(watch, Web, null, clock)); // the same port after the restart: from now
         clock.Advance(TimeSpan.FromSeconds(29));
         Assert.False(Check(watch, Web, null, clock));
-        Assert.False(Check(watch, new CaptureLock("other adapter", 443), null, clock)); // another adapter: from now
+        clock.Advance(TimeSpan.FromSeconds(2)); // the lock before would now be 31 s old
+        var other = new CaptureLock("other adapter", 443);
+        Assert.False(Check(watch, other, null, clock)); // another adapter, the same port: from now
+        clock.Advance(TimeSpan.FromSeconds(29));
+        Assert.False(Check(watch, other, null, clock));
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.True(Check(watch, other, null, clock));
     }
 
     [Fact]
@@ -153,10 +170,11 @@ public sealed class CaptureLockTests
         Assert.Contains("port 443 for 30 s", warning.Message, StringComparison.Ordinal);
     }
 
-    // Through upstream's real reassembly and pipeline: the game's server-time record (03 36) every ten seconds keeps a
-    // 443 lock (as a relay over 443 would); once they stop, the lock goes 30 s after the last.
+    // Through upstream's real reassembly and pipeline: the game's server-time record (03 36) on a 443 lock (as a relay
+    // over 443 would carry it) makes it the game's, kept after the records stop; a lock made after detection must carry
+    // one again, and without it goes after 30 s.
     [Fact]
-    public void TheGamesServerTimeRecordsThroughUpstreamKeepTheLock()
+    public void TheGamesServerTimeRecordThroughUpstreamKeepsTheLock()
     {
         using var host = new TestEngineHost(CaptureMode.None);
         _ = host.Services.GetRequiredService<IPacketService>(); // subscribes upstream's pipeline to the stream
@@ -167,12 +185,15 @@ public sealed class CaptureLockTests
         using var guard = new CaptureLockGuard(new RunningCapture(), sessions, clock, NullLogger<CaptureLockGuard>.Instance, upstream.Binding);
         guard.Start();
         Synchronise(stream);
-        for (var second = 0; second < 300; second += 5)
-        {
-            if (second % 10 == 0) stream.AddData("synthetic", ServerTime(), 0);
-            clock.Advance(TimeSpan.FromSeconds(5));
-        }
+        clock.Advance(CaptureLockGuard.CheckInterval); // first seen
+        clock.Advance(TimeSpan.FromSeconds(10));
+        stream.AddData("synthetic", ServerTime(), 0);
+        clock.Advance(TimeSpan.FromHours(1));
         Assert.Equal(0, upstream.Restarts);
+        upstream.Locked = null; // upstream's watchdog went back to detection
+        clock.Advance(CaptureLockGuard.CheckInterval);
+        upstream.Locked = Web; // and locked again
+        clock.Advance(CaptureLockGuard.CheckInterval);
         clock.Advance(TimeSpan.FromSeconds(30));
         Assert.Equal(1, upstream.Restarts);
     }
@@ -236,6 +257,48 @@ public sealed class CaptureLockTests
         Assert.Single(log.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("works again", StringComparison.Ordinal));
     }
 
+    // On real threads (audit on #54: none of this was tested): Stop waits for a check under way (here a slow reset)
+    // before it returns, so the engine stops capture only after it; a tick that comes meanwhile is skipped, not queued
+    // behind it; and a check that begins after Stop (a callback already dispatched) does nothing.
+    [Fact]
+    public async Task StopWaitsForACheckUnderWayAndNoneRunsAfter()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var clock = new FakeTimeProvider(Start);
+        using var hold = new ManualResetEventSlim();
+        var upstream = new FakeLock(Web) { HoldRestart = hold };
+        using var host = new TestEngineHost(CaptureMode.None);
+        using var guard = NewGuard(host, upstream, clock, NullLogger<CaptureLockGuard>.Instance, out _);
+        guard.Start();
+        // One tick per step (the fake clock fires a periodic timer once an advance): first seen at 5 s, the reset at 35 s.
+        var checking = Task.Run(() => { for (var i = 0; i < 7; i++) clock.Advance(CaptureLockGuard.CheckInterval); }, token);
+        Assert.True(upstream.RestartEntered.Wait(Patience, token));
+        var reads = upstream.Reads;
+        await Task.Run(guard.Check, token).WaitAsync(Patience, token); // another tick while the reset runs: skipped
+        Assert.Equal(reads, upstream.Reads);
+        var stopping = Task.Run(guard.Stop, token);
+        Assert.NotSame(stopping, await Task.WhenAny(stopping, Task.Delay(TimeSpan.FromMilliseconds(300), token)));
+        hold.Set();
+        await stopping.WaitAsync(Patience, token);
+        await checking.WaitAsync(Patience, token);
+        upstream.Locked = Web;
+        guard.Check(); // a callback that began as Stop ran
+        Assert.Equal(reads, upstream.Reads);
+    }
+
+    // Disposed, the guard stops listening to upstream's ping (it holds the session manager's event otherwise).
+    [Fact]
+    public void ADisposedGuardStopsListening()
+    {
+        using var host = new TestEngineHost(CaptureMode.None);
+        var sessions = host.Services.GetRequiredService<CombatSessionManager>();
+        var before = PingListeners(sessions);
+        var guard = NewGuard(host, new FakeLock(Web), new FakeTimeProvider(Start), NullLogger<CaptureLockGuard>.Instance, out _);
+        Assert.Equal(before + 1, PingListeners(sessions));
+        guard.Dispose();
+        Assert.Equal(before, PingListeners(sessions));
+    }
+
     // The engine starts the guard once capture runs, and stops it before capture, on Stop and on Dispose, so no reset can
     // reopen the adapters capture is closing. Whether it was still checking is noted as capture stops, not asserted
     // there: the engine's Dispose logs what its shutdown throws.
@@ -296,6 +359,11 @@ public sealed class CaptureLockTests
         Assert.Contains(log.Entries, e => e.Message.Contains("Detection mode re-started", StringComparison.Ordinal));
     }
 
+    // How many handlers upstream's session manager has on its ping event (the field behind it, read by reflection).
+    private static int PingListeners(CombatSessionManager sessions) =>
+        (typeof(CombatSessionManager).GetField(nameof(CombatSessionManager.PingUpdated), BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(sessions) as Delegate)?.GetInvocationList().Length ?? 0;
+
     private static bool Check(CaptureLockWatch watch, CaptureLock? locked, long? lastGameRecord, FakeTimeProvider clock) =>
         watch.ShouldRestart(locked, lastGameRecord, clock.GetTimestamp(), clock, out _);
 
@@ -336,7 +404,12 @@ public sealed class CaptureLockTests
     // Upstream's lock as the test sets it: read through the binding, cleared by its restart.
     private sealed class FakeLock(CaptureLock? locked)
     {
-        public CaptureLock? Locked { get; private set; } = locked;
+        public CaptureLock? Locked { get; set; } = locked;
+
+        // When set, the restart waits for it (a slow reset), after setting RestartEntered.
+        public ManualResetEventSlim? HoldRestart { get; set; }
+
+        public ManualResetEventSlim RestartEntered { get; } = new();
 
         public int Reads { get; private set; }
 
@@ -355,6 +428,8 @@ public sealed class CaptureLockTests
             {
                 Restarts++;
                 Locked = null;
+                RestartEntered.Set();
+                HoldRestart?.Wait(TimeSpan.FromSeconds(30));
             });
     }
 

@@ -11,21 +11,20 @@ internal readonly record struct CaptureLock(string Adapter, int Port);
 /// <para>Upstream's detection locks onto the first port whose traffic holds its keep-alive's three bytes
 /// (<c>0e 00 36</c>) five times, counted from the start of detection, with no time window: random encrypted traffic
 /// holds them about once per 16 MB, so with the game closed a long stretch of web traffic is enough (in Harry's game
-/// on 2026-10-27 it locked onto port 443 at 16:23, an hour and a half after the game closed, and missed the next
-/// login). Once locked, its watchdog counts any packet from the port as a heartbeat, so such a lock lasts as long as
-/// the traffic does.</para>
+/// on 2026-10-27 it locked onto port 443 while the game was closed and missed the next login). Once locked, its
+/// watchdog counts any packet from the port as a heartbeat, so such a lock lasts as long as the traffic does.</para>
 /// <para>The game's own sign is its server-time record (<c>03 36</c>, upstream's ServerTime, from which it reads the
 /// ping): the server's reply to the ping request the client sends every ten seconds (A2Tools' ping tracker, 5c6f02c).
-/// Every such record counts, whatever ping upstream makes of it, so a clock upstream cannot read does not count against
-/// the game; random traffic yields one about once in hundreds of gigabytes. A lock that has had none for
-/// <see cref="QuietLimit"/>, counted from the later of the lock (as first seen here) and the last record, is dropped:
-/// <see cref="WebPortQuietLimit"/> on the web's ports, 80 and 443, which the game has never used (A2Tools leaves them
-/// out of its detection; a relay that tunnels the game over them still sends the records, three in that time), and
-/// <see cref="OtherPortQuietLimit"/> elsewhere. That is longer than upstream's watchdog can take to drop a port that goes
-/// silent (up to 120 s: its 60-second check needs a whole silent period), so a game that closes is left to upstream, and
-/// this drops only a lock whose port keeps sending without the game's records. Whether the game sends the record at
-/// character select is not known; if it does not, a lock made there is dropped and made again every
-/// <see cref="OtherPortQuietLimit"/> while the player stays (docs/HANDOFF.md).</para>
+/// Every such record upstream reads counts, whatever ping it makes of it, so a clock upstream cannot read does not
+/// count against the game; random traffic yields one about once in hundreds of gigabytes. A lock that has carried one
+/// since it was first seen is the game's, and is left to upstream's watchdog for as long as it lasts: a wait at
+/// character select, a loading screen or a quiet spell never drops it. A lock that has carried none is dropped after
+/// <see cref="QuietLimit"/>, counted from when it was first seen: <see cref="WebPortQuietLimit"/> on the web's ports,
+/// 80 and 443, which the game has never used (A2Tools leaves them out of its detection; a relay that tunnels the game
+/// over them sends three of the records in that time, and is then the game's), and <see cref="OtherPortQuietLimit"/>
+/// elsewhere, long enough that the game's own lock, made at character select where the record may not come (not
+/// known), is rarely reached before the player enters the world (docs/HANDOFF.md), and longer than upstream's watchdog
+/// can take to drop a port that goes silent (up to 120 s).</para>
 /// </remarks>
 internal sealed class CaptureLockWatch
 {
@@ -33,10 +32,11 @@ internal sealed class CaptureLockWatch
     internal static readonly TimeSpan WebPortQuietLimit = TimeSpan.FromSeconds(30);
 
     /// <summary>How long a lock on any other port may go without the game's server-time record.</summary>
-    internal static readonly TimeSpan OtherPortQuietLimit = TimeSpan.FromSeconds(150);
+    internal static readonly TimeSpan OtherPortQuietLimit = TimeSpan.FromMinutes(5);
 
     private CaptureLock? watched;
     private long watchedSince; // the timestamp the watched lock was first seen at
+    private bool proven; // the watched lock has carried a server-time record since then: it is the game's
 
     /// <summary>Whether a port is one of the web's (HTTP, HTTPS), which the game has never used.</summary>
     internal static bool IsWebPort(int port) => port is 80 or 443;
@@ -48,7 +48,7 @@ internal sealed class CaptureLockWatch
     /// Takes the lock as it stands now (null while detecting) and the timestamp of the last server-time record (null
     /// for none), both on <paramref name="clock"/>'s monotonic timestamps, and says whether to drop the lock; when it
     /// does, <paramref name="quiet"/> is how long the lock went without one, and the lock is forgotten, so the next one
-    /// (even on the same port) is timed afresh.
+    /// (even on the same port) is timed afresh. A lock that has carried a record is never dropped.
     /// </summary>
     public bool ShouldRestart(CaptureLock? now, long? lastGameRecord, long timestamp, TimeProvider clock, out TimeSpan quiet)
     {
@@ -63,9 +63,11 @@ internal sealed class CaptureLockWatch
         {
             watched = current;
             watchedSince = timestamp;
+            proven = false;
         }
-        var quietSince = lastGameRecord is { } last && last > watchedSince ? last : watchedSince;
-        quiet = clock.GetElapsedTime(quietSince, timestamp);
+        if (lastGameRecord is { } last && last > watchedSince) proven = true;
+        if (proven) return false;
+        quiet = clock.GetElapsedTime(watchedSince, timestamp);
         if (quiet < QuietLimit(current.Port)) return false;
         watched = null;
         return true;

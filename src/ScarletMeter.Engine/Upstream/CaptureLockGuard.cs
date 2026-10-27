@@ -23,9 +23,12 @@ namespace ScarletMeter.Engine.Upstream;
 /// check is under way and none will start: the engine stops the guard before capture, so a reset cannot reopen the
 /// adapters capture has just closed. A tick that finds a check still running is skipped. Upstream's watchdog runs on
 /// its own timer and calls the same reset; the two could reset at once only if the watchdog ran its check in the
-/// instant this one resets (a reset stops the watchdog, and it finds no lock to check after one), and a second reset
-/// then would at worst open an adapter twice, which upstream logs and survives. Nothing escapes: an exception from a
-/// timer callback would end the process.</para>
+/// instant this one resets (a reset stops the watchdog, and it finds no lock to check after one). Two resets at once
+/// could each add a packet handler to an adapter the lock had closed (upstream adds it before opening, and SharpPcap's
+/// open of an adapter already open returns without a word), so that adapter's packets would be queued twice until it
+/// is next closed; once locked, upstream's sequence check drops the copies. An adapter that fails to open keeps the
+/// handler each reset adds, since it is never closed (no adapter failed to open in Harry's logs). Both are upstream's
+/// to fix (docs/HANDOFF.md). Nothing escapes: an exception from a timer callback would end the process.</para>
 /// </remarks>
 internal sealed class CaptureLockGuard : IDisposable
 {
@@ -127,8 +130,11 @@ internal sealed class CaptureLockGuard : IDisposable
     // The game's server-time record was read (on the capture thread): only its time is kept.
     private void OnServerTime(object? sender, int milliseconds) => Volatile.Write(ref lastGameRecord, clock.GetTimestamp());
 
-    // One check (the timer's callback): drops a lock the rule says is not the game's. Skipped while another runs.
-    private void Check()
+    /// <summary>
+    /// One check (the timer's callback; tests call it as a callback already under way): drops a lock the rule says is
+    /// not the game's. Skipped while another runs, and does nothing once the guard is stopped.
+    /// </summary>
+    internal void Check()
     {
         if (!gate.TryEnter()) return;
         try
