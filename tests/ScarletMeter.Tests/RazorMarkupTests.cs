@@ -544,7 +544,7 @@ public sealed partial class RazorMarkupTests
         var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
         Assert.Matches(@"StatusText => Engine\.PausedInAbyss \? ""In the Abyss · meter paused"" : Engine\.Capture switch", code);
         var markup = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
-        Assert.Matches(@"(?s)@if \(snapshot\.Target is \{ \} fighting\).*else\s*\{\s*<span class=""target-name muted"">@StatusText</span>", markup);
+        Assert.Matches(@"(?s)@if \(snapshot\.Target is \{ \} fighting\).*else\s*\{\s*<span class=""target-name muted"" title=""@StatusText"">@StatusText</span>", markup);
 
         var settings = File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor"));
         var tracking = Regex.Match(settings, @"(?s)case ""Tracking"":(?<body>.*?)break;").Groups["body"].Value;
@@ -787,10 +787,60 @@ public sealed partial class RazorMarkupTests
         Assert.True(reaches.Count >= 3, "the faint edge, the HP ring with its glow, and the still and done rings");
         Assert.True(reaches.Max() > 8, "the HP ring's glow is read");
         foreach (var side in sides) Assert.True(Number(padding.Groups[side].Value) >= reaches.Max(), $"the clip box's {side} reaches past the ring");
+        // The state clips with an ellipsis (without overflow: hidden an ellipsis does nothing, and the state printed over
+        // the duration: audit on #53); the duration never shrinks (TheOverlaysLeastWidthHoldsItsHeader keeps room for it).
         var state = Block(css, ".state-text");
         Assert.Matches(@"(?m)^\s*min-width:\s*0;", state);
+        Assert.Matches(@"(?m)^\s*white-space:\s*nowrap;", state);
+        Assert.Matches(@"(?m)^\s*overflow:\s*hidden;", state);
         Assert.Matches(@"(?m)^\s*text-overflow:\s*ellipsis;", state);
         Assert.Matches(@"(?m)^\s*flex:\s*none;", Block(css, ".state-time"));
+        // Squeezed past a readable piece, the state goes rather than leave a sliver of a letter beside the duration (seen
+        // in a headless render at 320 px): below a title wide enough for the avatar, its gaps, a long duration and a few
+        // letters with the ellipsis.
+        Assert.Matches(@"(?m)^\s*container:\s*ov-title\s*/\s*inline-size;", title);
+        var hide = Regex.Match(css, @"@container ov-title \(max-width: (?<px>\d+)px\) \{\s*\.state-text \{\s*display: none;\s*\}\s*\}");
+        Assert.True(hide.Success, "the state goes on a title too narrow for it");
+        var readable = Number(Regex.Match(Block(css, ".ov-avatar"), @"(?m)^\s*width:\s*([\d.]+)px;").Groups[1].Value)
+            + 2 * Number(Regex.Match(title, @"(?m)^\s*gap:\s*([\d.]+)px;").Groups[1].Value) + 50 + 24;
+        Assert.True(Number(hide.Groups["px"].Value) >= readable, $"the state shows only with room for a readable piece ({readable} px)");
+        // Pointing at the title shows it whole when it is cut.
+        var markup = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Pages", "MeterPage.razor"));
+        Assert.Contains(@"<span class=""state-text"" title=""@StateText(fighting)"">@StateText(fighting)</span>", markup);
+        Assert.Contains(@"<span class=""target-name muted"" title=""@StatusText"">@StatusText</span>", markup);
+    }
+
+    // The overlay's least width holds its header in a fight with the state gone: the border, the header's side padding and
+    // gap, every button with the gaps between them, the avatar and the title's two gaps, and a duration past an hour
+    // ("01:02:03", 48 px in headless renders at the header's size; 50 counted). At 300 px, with eight buttons, such a
+    // duration was cut to "01:02" (audit on #53). A button added to the header without widening the overlay fails here.
+    [Fact]
+    public void TheOverlaysLeastWidthHoldsItsHeader()
+    {
+        const double LongDuration = 50;
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        var css = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "app.css"));
+        static string Block(string source, string selector) =>
+            Regex.Match(source, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
+        static double Px(string body, string property) => double.Parse(
+            Regex.Match(body, @"(?m)^\s*" + property + @":\s*([\d.]+)px;").Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        var header = Block(css, ".ov-header");
+        var headerPadding = Regex.Match(header, @"(?m)^\s*padding:\s*[\d.]+px (?<right>[\d.]+)px [\d.]+px (?<left>[\d.]+)px;");
+        Assert.True(headerPadding.Success, "the header's padding gives its sides");
+        var markup = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
+        var actions = Regex.Match(markup, @"(?s)<div class=""ov-actions""[^>]*>(?<body>.*?)</div>\s*</header>").Groups["body"].Value;
+        var buttons = Regex.Matches(actions, @"<button\b").Count;
+        Assert.True(buttons >= 8, "the header's buttons are counted");
+        var need = 2 // the panel's border
+            + double.Parse(headerPadding.Groups["left"].Value, System.Globalization.CultureInfo.InvariantCulture)
+            + double.Parse(headerPadding.Groups["right"].Value, System.Globalization.CultureInfo.InvariantCulture)
+            + Px(header, "gap")
+            + buttons * Px(Block(css, ".icon-btn"), "width") + (buttons - 1) * Px(Block(css, ".ov-actions"), "gap")
+            + Px(Block(css, ".ov-avatar"), "width") + 2 * Px(Block(css, ".ov-title"), "gap")
+            + LongDuration;
+        var window = File.ReadAllText(Path.Combine(app, "Windows", "OverlayWindow.cs"));
+        var least = double.Parse(Regex.Match(window, @"MinWidth = (?<w>\d+);").Groups["w"].Value, System.Globalization.CultureInfo.InvariantCulture);
+        Assert.True(least >= need, $"the overlay's least width ({least}) holds its header ({need})");
     }
 
     // The directory holding ScarletMeter.slnx, above the test assembly.

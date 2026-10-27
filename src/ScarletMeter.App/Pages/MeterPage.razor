@@ -12,12 +12,12 @@
             <span class="ov-avatar @AvatarClass" aria-hidden="true"></span>
             @if (snapshot.Target is { } fighting)
             {
-                <span class="state-text">@StateText(fighting)</span>
+                <span class="state-text" title="@StateText(fighting)">@StateText(fighting)</span>
                 <span class="state-time" title="Combat duration">@Compact.Duration(snapshot.Duration)</span>
             }
             else
             {
-                <span class="target-name muted">@StatusText</span>
+                <span class="target-name muted" title="@StatusText">@StatusText</span>
             }
         </div>
         <div class="ov-actions" @onmousedown:stopPropagation="true">

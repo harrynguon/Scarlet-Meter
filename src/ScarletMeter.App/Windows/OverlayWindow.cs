@@ -42,7 +42,9 @@ public sealed class OverlayWindow : ScarletWindow
         Title = "Scarlet Meter";
         Width = 400;
         Height = 260;
-        MinWidth = 300;
+        // Room for the header's buttons beside the avatar and a fight's duration past an hour ("01:02:03"); at 300 it was
+        // cut (audit on #53). RazorMarkupTests.TheOverlaysLeastWidthHoldsItsHeader works it out from the header.
+        MinWidth = 320;
         MinHeight = WindowPlacement.MinSize;
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;

@@ -25,8 +25,10 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ### Fixed
 
-- On a narrow meter, a fight's state and time no longer run under the buttons at the top: the state shortens first,
-  and the time stays whole. ([#53](https://github.com/harrynguon/Scarlet-Meter/pull/53))
+- On a narrow meter, a fight's state and time no longer run under the buttons at the top: the state shortens or
+  steps aside, and the time stays whole, even past an hour. To keep room for them the meter can no longer be made
+  narrower than 320 px (it was 300). Pointing at a shortened title shows it whole.
+  ([#53](https://github.com/harrynguon/Scarlet-Meter/pull/53))
 
 ## [0.3.0] - 2026-10-26
 
