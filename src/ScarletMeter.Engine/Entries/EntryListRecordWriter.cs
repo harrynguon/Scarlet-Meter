@@ -54,8 +54,9 @@ internal static class EntryListRecordWriter
 
     /// <summary>
     /// The player's own character record as upstream reads it: the entity id, a four-byte mask, a byte whose bit 0
-    /// says a name follows, the name (its length, then UTF-8), the server id (u16) and the class code, then made-up
-    /// bytes and the combat power twice (current and highest, u64), where upstream looks for it.
+    /// says a name follows, the name (its length, then UTF-8), the server id (u16) and the class code (u32, four codes to a
+    /// class: <see cref="SelfRecords.ClassIdOf"/>; up to 255 here), then made-up bytes and the combat power twice (current
+    /// and highest, u64), where upstream looks for it.
     /// </summary>
     public static byte[] SelfRecord(int entityId, string name, int serverId, int jobCode, int combatPower)
     {

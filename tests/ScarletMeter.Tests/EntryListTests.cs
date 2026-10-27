@@ -203,8 +203,9 @@ public sealed class EntryListTests
 
     // ---------- Whose the counts are ----------
 
-    private static EntryListTap NewTap(Dictionary<int, CharacterIdentity> who, TimeProvider clock, ILogger<EntryListTap>? log = null) =>
-        new(id => who.GetValueOrDefault(id), clock, log ?? NullLogger<EntryListTap>.Instance);
+    private static EntryListTap NewTap(
+        Dictionary<int, CharacterIdentity> who, TimeProvider clock, ILogger<EntryListTap>? log = null, Func<int, string>? classNameOf = null) =>
+        new(id => who.GetValueOrDefault(id), clock, log ?? NullLogger<EntryListTap>.Instance, classNameOf);
 
     // The player's own character record as the tap reads it: only the entity id counts; upstream names the character.
     private static byte[] SelfRecord(int entityId) => EntryListRecordWriter.SelfRecord(entityId, "Unread", 0, 0, 0);
@@ -419,26 +420,112 @@ public sealed class EntryListTests
         Assert.Equal(4, raised.Count);
     }
 
+    // The class codes after the server id come four to a class, as A2Tools reads them (JobClass::from_roster_class at
+    // 5c6f02c; a Cleric's record held 30), mapped to upstream's class ids; anything else is no class.
+    [Theory]
+    [InlineData(0u, 0)]
+    [InlineData(4u, 0)]
+    [InlineData(5u, 11)]
+    [InlineData(8u, 11)]
+    [InlineData(9u, 12)]
+    [InlineData(12u, 12)]
+    [InlineData(13u, 14)]
+    [InlineData(16u, 14)]
+    [InlineData(17u, 13)]
+    [InlineData(20u, 13)]
+    [InlineData(21u, 16)]
+    [InlineData(24u, 16)]
+    [InlineData(25u, 15)]
+    [InlineData(28u, 15)]
+    [InlineData(29u, 17)]
+    [InlineData(30u, 17)]
+    [InlineData(32u, 17)]
+    [InlineData(33u, 18)]
+    [InlineData(36u, 18)]
+    [InlineData(37u, 0)]
+    [InlineData(0x0100001Eu, 0)]
+    [InlineData(uint.MaxValue, 0)]
+    public void TheClassCodesAreFourToAClass(uint code, int classId) => Assert.Equal(classId, SelfRecords.ClassIdOf(code));
+
+    // Every class a code can be is in upstream's game data, by the name AION 2 Global gives it (Spiritmaster for upstream's
+    // Elementalist), so the roster names it as a fight would.
+    [Theory]
+    [InlineData(5u, "Gladiator")]
+    [InlineData(9u, "Templar")]
+    [InlineData(13u, "Ranger")]
+    [InlineData(17u, "Assassin")]
+    [InlineData(21u, "Spiritmaster")]
+    [InlineData(25u, "Sorcerer")]
+    [InlineData(29u, "Cleric")]
+    [InlineData(33u, "Chanter")]
+    public void UpstreamsDataNamesEveryClassACodeCanBe(uint code, string name) =>
+        Assert.Equal(name, UpstreamMapping.ClassNameOf(SelfRecords.ClassIdOf(code)));
+
+    // The class code is the u32 right after the server id, read only after a real name and only when all four bytes are
+    // there; the bytes are written out here, so the layout is pinned apart from the writer.
+    [Fact]
+    public void TheRecordHoldsTheClassCodeAfterTheServerId()
+    {
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 6C 70 68 61 E9 03 1E 00 00 00 01 1C"), out _, out _, out var serverId, out var classCode));
+        Assert.Equal((1001, 30u), (serverId, classCode));
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 6C 70 68 61 E9 03 1E 00 00"), out _, out _, out serverId, out classCode));
+        Assert.Equal((1001, 0u), (serverId, classCode)); // cut inside the class code
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 6C 70 68 61 E9 03 1E 00 00 01"), out _, out _, out _, out classCode));
+        Assert.Equal(0x0100001Eu, classCode); // read whole, little-endian: no class
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc03", 1001, 30, 0), out _, out _, out _, out classCode));
+        Assert.Equal(0u, classCode); // no real name, so no class either
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "Synthia", 2002, 22, 0), out _, out _, out _, out classCode));
+        Assert.Equal(22u, classCode);
+    }
+
+    // While upstream knows no class for the character (it learns one only from skills in a fight), the record's goes with
+    // it, from the first login; upstream's own, once known, is kept. Only from a record whose server id checked out (the
+    // class sits right after it), only a code that is a class, and only a class upstream's data names.
+    [Fact]
+    public void TheClassGoesWithTheCharacterWhileUpstreamKnowsNone()
+    {
+        var unknown = new CharacterIdentity("Gamma", "SIE", 0, string.Empty, 30_000);
+        var tap = NewTap(new() { [7] = Alpha, [8] = unknown }, new FakeTimeProvider(Start));
+        List<CharacterProgress> raised = [];
+        tap.ProgressObserved += (_, progress) => raised.Add(progress);
+
+        tap.Observe(EntryListRecordWriter.SelfRecord(8, "Gamma", 1001, 30, 30_000));
+        Assert.Equal(unknown with { ServerId = 1001, ClassId = 17, ClassName = "Cleric" }, tap.Character);
+        Assert.Equal(17, raised[^1].Character.ClassId);
+        tap.Observe(EntryListRecordWriter.SelfRecord(8, "Gamma", 1001, 22, 30_000));
+        Assert.Equal((16, "Spiritmaster"), (tap.Character!.ClassId, tap.Character.ClassName));
+        tap.Observe(EntryListRecordWriter.SelfRecord(8, "Gamma", 1002, 30, 30_000)); // NEZ, not the server upstream named
+        Assert.Equal(unknown, tap.Character);
+        tap.Observe(EntryListRecordWriter.SelfRecord(8, "Gamma", 1001, 37, 30_000)); // no class
+        Assert.Equal(unknown with { ServerId = 1001 }, tap.Character);
+        tap.Observe(EntryListRecordWriter.SelfRecord(7, "Alpha", 2002, 30, 41_000)); // upstream knows Alpha's: kept
+        Assert.Equal(Alpha with { ServerId = 2002 }, tap.Character);
+
+        var unnamedClass = NewTap(new() { [8] = unknown }, new FakeTimeProvider(Start), classNameOf: _ => string.Empty);
+        unnamedClass.Observe(EntryListRecordWriter.SelfRecord(8, "Gamma", 1001, 30, 30_000));
+        Assert.Equal(unknown with { ServerId = 1001 }, unnamedClass.Character); // a class upstream's data does not name
+    }
+
     // A self record without a real name names no one: no name flag, or a tutorial character's placeholder ("$" and a
     // code, which upstream's decoding turns into a plain name by dropping the "$"; A2Tools' is_placeholder_name).
     [Fact]
     public void ARecordWithoutARealNameNamesNoOne()
     {
-        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 36 05 41 6C 70 68 61 E9 03"), out var entity, out var unnamed, out var serverId));
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 36 05 41 6C 70 68 61 E9 03"), out var entity, out var unnamed, out var serverId, out _));
         Assert.Equal((7, true, 0), (entity, unnamed, serverId));
-        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc03", 1001, 0, 0), out _, out unnamed, out serverId));
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc03", 1001, 0, 0), out _, out unnamed, out serverId, out _));
         Assert.Equal((true, 0), (unnamed, serverId)); // no real name, so no server either
-        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc0", 0, 0, 0), out _, out unnamed, out _));
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc0", 0, 0, 0), out _, out unnamed, out _, out _));
         Assert.False(unnamed); // too short for a placeholder
-        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc0-3", 0, 0, 0), out _, out unnamed, out _));
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc0-3", 0, 0, 0), out _, out unnamed, out _, out _));
         Assert.False(unnamed);
-        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "Synthia", 2002, 0, 0), out _, out unnamed, out serverId));
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "Synthia", 2002, 0, 0), out _, out unnamed, out serverId, out _));
         Assert.Equal((false, 2002), (unnamed, serverId));
-        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 6C 70 68 61 E9"), out _, out unnamed, out serverId));
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 6C 70 68 61 E9"), out _, out unnamed, out serverId, out _));
         Assert.Equal((false, 0), (unnamed, serverId)); // cut inside the server id
-        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00"), out entity, out unnamed, out _)); // cut before the name: upstream decides
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00"), out entity, out unnamed, out _, out _)); // cut before the name: upstream decides
         Assert.Equal((7, false), (entity, unnamed));
-        Assert.False(SelfRecords.TryRead(Frame(0x3633, "00 00 00 00 00 37"), out _, out _, out _));
+        Assert.False(SelfRecords.TryRead(Frame(0x3633, "00 00 00 00 00 37"), out _, out _, out _, out _));
 
         var tap = NewTap(new() { [7] = Alpha }, new FakeTimeProvider(Start));
         List<CharacterProgress> raised = [];
@@ -570,6 +657,27 @@ public sealed class EntryListTests
         Assert.Equal(new CharacterIdentity("Synthia", server.Value, 0, string.Empty, 1_234_567, server.Key), progress.Character);
         Assert.Equal(progress.Character, engine.Character);
         Assert.Equal(11, progress.Entries[EntryIds.Nightmare].First);
+    }
+
+    // Through the real graph, before any fight: upstream names the character but knows no class, and the record's class
+    // code (30, a Cleric's) gives the engine's character, and so the roster, its class and Global name from the login.
+    [Fact]
+    public void TheCharacterHasItsClassFromTheLoginWithoutAFight()
+    {
+        using var host = new TestEngineHost(CaptureMode.None);
+        var engine = host.Services.GetRequiredService<ICombatEngine>();
+        var stream = host.Services.GetRequiredService<TcpStreamBuffer>();
+        List<CharacterProgress> raised = [];
+        engine.ProgressObserved += (_, progress) => raised.Add(progress);
+        var server = ServerMap.Servers.First();
+
+        Synchronise(stream);
+        stream.AddData("synthetic", [.. EntryListRecordWriter.List([Odyle]), .. EntryListRecordWriter.SelfRecord(4321, "Synthia", server.Key, 30, 1_234_567)], 0);
+
+        Assert.Null(host.Services.GetRequiredService<EntityTracker>().GetPlayerEntity(4321)?.CharacterClass); // upstream's: none
+        var progress = Assert.Single(raised);
+        Assert.Equal(new CharacterIdentity("Synthia", server.Value, 17, "Cleric", 1_234_567, server.Key), progress.Character);
+        Assert.Equal(progress.Character, engine.Character);
     }
 
     // The tap depends on upstream's pipeline, so even resolved first it is built, and listens to the stream, after it.

@@ -44,7 +44,10 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   and two observations behind the capture lock's check (`ScarletMeter.Engine/Capture/CaptureLockWatch`), taken as
   facts, not code: that the client asks for a ping every ten seconds (`src-tauri/src/combat/ping_tracker.rs`) and that
   the game has never used the web's ports, 80 and 443 (`capture_filters` in `src-tauri/src/capture/pcap_capturer.rs`),
-  at 5c6f02cddd81ea1493295d76ef6adccc851da5d5 (read on 2026-10-27);
+  at 5c6f02cddd81ea1493295d76ef6adccc851da5d5 (read on 2026-10-27); and the class code after the server id in the
+  player's own character record, four codes to a class (`ScarletMeter.Engine/Entries/SelfRecords`), from `self_profile`
+  in `src-tauri/src/capture/stream_processor.rs` and `JobClass::from_roster_class` in `src-tauri/src/entity/job_class.rs`
+  at the same commit (read on 2026-10-27);
   GNU GPL v3: its Rust parsing ported to C#. No captured bytes were taken; Scarlet's tests use synthetic records.
 - **SkeeveAN/Aion-DPS-Meter** (the layout of the game's inventory records and how to find an entry in them by its anchor,
   `ScarletMeter.Engine/Entries/InventoryRecords`), https://github.com/SkeeveAN/Aion-DPS-Meter, `Client/Aion2/Aion2Stock.cs`

@@ -14,7 +14,8 @@ namespace ScarletMeter.Engine.Upstream;
 /// record (<c>33 36</c>), and it reads the first two with <see cref="EntryListRecords"/>. The character comes from
 /// upstream, which reads that record itself (PlayerInfoProcessor) and marks the player as the user: the tap only takes
 /// the record's entity id and asks upstream's tracker who it is, and adds the server id after the name, which upstream
-/// keeps only as a short name that both sides share on some servers. Upstream's pipeline is subscribed to the stream before
+/// keeps only as a short name that both sides share on some servers, and the class after it, which upstream learns only
+/// from a character's skills in a fight. Upstream's pipeline is subscribed to the stream before
 /// the tap (the engine resolves it first), so upstream has read the record, and the whole bundle around it, by then.
 /// </summary>
 /// <remarks>
@@ -55,6 +56,7 @@ internal sealed class EntryListTap : IRecordReader
     public static readonly TimeSpan LoginBurst = TimeSpan.FromSeconds(10);
 
     private readonly Func<int, CharacterIdentity?> identify;
+    private readonly Func<int, string> classNameOf;
     private readonly TimeProvider clock;
     private readonly ILogger<EntryListTap> logger;
     private readonly Lock gate = new();
@@ -87,10 +89,14 @@ internal sealed class EntryListTap : IRecordReader
     {
     }
 
-    /// <summary>With the character lookup of the caller's: the constructor above, and tests.</summary>
-    internal EntryListTap(Func<int, CharacterIdentity?> identify, TimeProvider clock, ILogger<EntryListTap> logger)
+    /// <summary>
+    /// With the character lookup of the caller's: the constructor above, and tests. Class names come from upstream's
+    /// game data (<see cref="UpstreamMapping.ClassNameOf"/>) unless the caller gives its own.
+    /// </summary>
+    internal EntryListTap(Func<int, CharacterIdentity?> identify, TimeProvider clock, ILogger<EntryListTap> logger, Func<int, string>? classNameOf = null)
     {
         this.identify = identify;
+        this.classNameOf = classNameOf ?? UpstreamMapping.ClassNameOf;
         this.clock = clock;
         this.logger = logger;
     }
@@ -204,7 +210,7 @@ internal sealed class EntryListTap : IRecordReader
     // waiting for it are reported; another character with no list between drops the last one's.
     private void TakeSelfRecord(ReadOnlySpan<byte> record)
     {
-        if (!SelfRecords.TryRead(record, out var entityId, out var unnamed, out var serverId)) return;
+        if (!SelfRecords.TryRead(record, out var entityId, out var unnamed, out var serverId, out var classCode)) return;
         if (unnamed || identify(entityId) is not { } named)
         {
             if (!unnamedSelfLogged) logger.LogInformation("The game's own character record came, but upstream has no name for it; entry counts wait for the next one.");
@@ -212,7 +218,7 @@ internal sealed class EntryListTap : IRecordReader
             return;
         }
         unnamedSelfLogged = false;
-        var character = WithServerId(named, serverId);
+        var character = WithClass(WithServerId(named, serverId), classCode);
         var now = clock.GetUtcNow();
         CharacterProgress progress;
         var dropped = false;
@@ -248,6 +254,15 @@ internal sealed class EntryListTap : IRecordReader
     private static CharacterIdentity WithServerId(CharacterIdentity character, int serverId) =>
         serverId > 0 && ServerMap.IsValidId(serverId) && ServerMap.GetName(serverId) == character.Server
             ? character with { ServerId = serverId }
+            : character;
+
+    // The character with the record's class, while upstream knows none (it learns a class only from a character's skills,
+    // in a fight): only from a record whose server id checked out, so the class is read from where the record's layout
+    // puts it, and only a code that is a class whose name upstream's data has. Upstream's class, once known, is kept.
+    private CharacterIdentity WithClass(CharacterIdentity character, uint classCode) =>
+        character.ClassId == 0 && character.ServerId > 0 && SelfRecords.ClassIdOf(classCode) is > 0 and var classId
+            && classNameOf(classId) is { Length: > 0 } className
+            ? character with { ClassId = classId, ClassName = className }
             : character;
 
     // An inventory record: its Kina slots are kept (a listing replaces them all) and reported with the counts when whose

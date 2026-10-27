@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**Characters on the roster had no class until they had fought** (Harry, 2026-10-27: "why do some characters class icons not show?").
+- What: the roster took each character's class from upstream, which learns a class only from a character's skills in a fight, and its own-character record parser reads the name, server and combat power but not the class. Two of three characters showed no class or icon, though the game sends the class at every login, right after the server id the meter already read.
+- Why: the roster was built on upstream's identity and its class was taken as "known when known"; when the server id was ported from A2Tools' self record, the class beside it in the same function (`self_profile`) was left behind. The tests' characters all came with a class, so none showed a character without one.
+- Guard: `SelfRecords` reads the class code and `EntryListTap` puts it on a character upstream knows no class for (`EntryListTests.TheCharacterHasItsClassFromTheLoginWithoutAFight`, through upstream's real pipeline with upstream's class shown to be none, and the code table and layout tests). When porting a field from a reference parser, read what else that parser takes from the same record.
+
 **The meter stayed locked onto web traffic and missed a login** (Harry, 2026-10-27: "is this a stale connection or something? i launched the game with the meter opened beforehand and my current character is not up to date").
 - What: the meter, left open while the game was closed, locked onto port 443 and stayed there for hours, and saw nothing of the next login: the roster still marked the character played before, and the Odyle reading was hours old. Upstream's detection counts its keep-alive's three bytes with no time window, so enough encrypted web traffic matches them by chance, and its watchdog counts any packet on the locked port as a heartbeat, so the lock never ended.
 - Why: every in-game check started the meter with the game already running or about to run, when the game's port wins detection at once. Nobody had left the meter open across a game restart, and the log's "LOCKED" line was read for the adapter, not the port. Upstream's capture was taken as working because it worked in that one order.

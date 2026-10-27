@@ -2,6 +2,18 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-27 — Each character's class from its login
+
+**What:** `Entries/SelfRecords` reads the class code, the u32 after the server id in the player's own character record (`33 36`), and maps it to upstream's class ids four codes to a class (`ClassIdOf`, A2Tools' `JobClass::from_roster_class` and `self_profile` at 5c6f02c); `EntryListTap` puts that class, named from upstream's game data by Global's name (`UpstreamMapping.ClassNameOf`), on a character upstream knows no class for, only from a record whose server id it took. Upstream's class, from a fight, is kept when known. The roster already takes a class whenever one comes, so every character now shows its class and icon from its first login (ARCHITECTURE.md "Entry list and Odyle energy").
+
+**Why:** Harry, with the roster open: "why do some characters class icons not show?" Upstream learns a class only from a character's skills in a fight, and its own-character record parser does not read the class, so two of three characters had none (LESSONS, "Characters on the roster had no class until they had fought"). Then: "read the class from the login record as A2Tools does, so every character shows its class and icon from its first login, in its own PR". Harry also asked whether the Daily Dungeon count was read: it is (entry 101, with the rest of the list), but it is the server's, not each character's (A2Tools' Roster plugin keeps it per server), and Harry dropped adding it.
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` Debug 875/875; Release 875/875 on a second run, the first having failed only `TestEngineHostTests.TheHistoryStoreIsHandedOutOnlyOnceItsStartupCleanupHasFinished` on upstream's history cleanup timing out (the known 10 s wait, HANDOFF "After acceptance"; the game was running on the machine). No `%TEMP%\scarlet-*` left. Fail-first on a scratch copy, controls passing before and after, each mutation caught by the tests meant for it: Ranger and Assassin swapped, a code past the table taken as a Chanter, the code read a byte early or as one byte, a cut code read, the class taken from a record whose server id was not, upstream's class overridden, a class with no name in upstream's data taken, the class never put on, and upstream's class name in place of Global's (10 of 10).
+
+**Not checked:** in the game: each class's code, and the class showing at login (HANDOFF, "Next: the character roster", a new item). A2Tools checked its table on a Cleric (code 30) and saw other bytes in the class's place on Nezekan, where the code table then gives no class.
+
+**Next:** the PR, an audit (capture parsing), Codex and CI; then Harry's go-ahead.
+
 ## 2026-10-27 — A capture lock onto other traffic is dropped
 
 **What:** `Upstream/CaptureLockGuard` checks upstream's capture lock every five seconds while capture runs, and `Capture/CaptureLockWatch` (pure) drops a lock that has carried no server-time record from the game (`03 36`, the reply to the client's ping every ten seconds) since it was first seen, after 30 s on ports 80 and 443, which the game has never used, or 5 minutes on any other port, by calling upstream's own reset to detection; a lock that has carried one is the game's and is kept (ARCHITECTURE.md "Capture lock"). Upstream's private `lockedPort` and `ResetToDetection` are bound by reflection once, as the record tap binds `ProcessPacket`; the engine starts the guard with capture and stops it before capture. In demo mode and with no capture it is inert.
