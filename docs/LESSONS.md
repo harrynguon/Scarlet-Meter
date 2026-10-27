@@ -206,6 +206,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**The ship skill's branch clean-up would have deleted commits the merge never saw** (Codex on #52, fixed before merge).
+- What: the first wording deleted a merged PR's worktree once `git status --porcelain` printed nothing, then the branch with `git branch -D`. A clean worktree says nothing about commits made after the PR's last push, and `-D` deletes a branch even when unmerged, so committed but unpushed work would have gone.
+- Why: the rule was written from the safe case (a branch exactly at its merged head); the check that guards the other case was run by hand during the clean-up that prompted it, but not written into the rule.
+- Guard: the skill checks the local tip is the PR's merged head (`gh pr view --json headRefOid`) or an ancestor of it before removing either, and keeps both and asks otherwise. When a manual check makes a destructive step safe, write that check into the rule.
+
 **Save tests passed with a change's save removed** (2026-10-27, the roster's notes; caught by a fail-first run before commit).
 - What: with `MarkChanged` taken out of `RosterService.SetNote`, the note test still passed: earlier changes in the same test (a report, a corridor run) had marked the roster changed, so the note was saved with them. The same run found that a restart's loading of the artifact holders, a control character at a note's end and two listings of one artifact were each in no test.
 - Why: the test checked the saved file at the end of a sequence, not that this change alone leads to a save.
