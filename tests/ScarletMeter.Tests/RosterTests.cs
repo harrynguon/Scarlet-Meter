@@ -203,6 +203,7 @@ public sealed class RosterTests : IDisposable
         Ascension = Seen(3, 0, at),
         OdyleCap = OdyleCapChoice.Membership,
         MembershipSeen = true,
+        Kina = new RosterKina(1_234_567, 33_940, at),
     };
 
     [Fact]
@@ -725,6 +726,7 @@ public sealed class RosterTests : IDisposable
                 RosterCount count => count with { First = count.First + 1 },
                 OdyleCapChoice cap => cap == OdyleCapChoice.Standard ? OdyleCapChoice.Membership : OdyleCapChoice.Standard,
                 IReadOnlyList<DateTimeOffset> list => (IReadOnlyList<DateTimeOffset>)[.. list, Monday.AddHours(1)],
+                RosterKina kina => kina with { Bound = (kina.Bound ?? 0) + 1 },
                 var other => throw new InvalidOperationException($"No change made for {property.Name} ({other?.GetType().Name})."),
             };
             property.SetValue(copy, changed);
@@ -738,5 +740,57 @@ public sealed class RosterTests : IDisposable
         var saturday = new DateTimeOffset(2026, 10, 24, 12, 0, 0, TimeSpan.Zero);
         var character = new RosterCharacter { Name = "Alpha", Server = "SIE", LastSeen = Monday, CorridorRuns = [saturday.AddHours(-2), saturday.AddHours(2)] };
         Assert.Equal(1, Assert.Single(RosterPage.Rows([character], null, Monday, Calendar, RosterSort.Name)).Corridors);
+    }
+
+    // ---------- Kina ----------
+
+    // The Kina from a report replaces the kept one when read later; an item the report does not know keeps its kept value,
+    // an older report changes nothing, and a kept one dated after now (a clock set back) is replaced.
+    [Fact]
+    public void KinaIsKeptFromTheLatestReport()
+    {
+        var clock = new FakeTimeProvider(Monday.AddMinutes(10));
+        using var service = new RosterService(new FakeEngine(), NewStore(), clock, NullLogger<RosterService>.Instance);
+        CharacterProgress Report(long? kina, long? bound, DateTimeOffset at) => new(AlphaIdentity, new Dictionary<uint, EntryCount>(), new KinaBalance(kina, bound, at));
+        service.Take(Report(1_000, 50, Monday));
+        service.Take(Report(2_000, null, Monday.AddMinutes(1)));
+        Assert.Equal(new RosterKina(2_000, 50, Monday.AddMinutes(1)), service.Characters.Single().Kina);
+        service.Take(Report(1, 1, Monday)); // older
+        Assert.Equal(new RosterKina(2_000, 50, Monday.AddMinutes(1)), service.Characters.Single().Kina);
+        service.Take(Report(3_000, 60, Monday.AddHours(5))); // dated ahead of the clock
+        service.Take(Report(4_000, 70, Monday.AddMinutes(5)));
+        Assert.Equal(new RosterKina(4_000, 70, Monday.AddMinutes(5)), service.Characters.Single().Kina);
+        service.Take(Report(null, null, Monday.AddMinutes(6)) with { Kina = null });
+        Assert.Equal(4_000, service.Characters.Single().Kina?.Kina); // a report without Kina keeps it
+    }
+
+    // Saved Kina is checked like every count: out of range, neither item known or an unusable date drops it.
+    [Theory]
+    [InlineData(-1L, 0L, 0)]
+    [InlineData(1L << 40, 0L, 0)]
+    [InlineData(5L, -3L, 0)]
+    [InlineData(null, null, 0)]
+    [InlineData(5L, null, 9)]
+    public void SavedKinaIsChecked(long? kina, long? bound, int daysAhead)
+    {
+        var saved = new RosterCharacter { Name = "Alpha", Server = "SIE", LastSeen = Monday, Kina = new RosterKina(kina, bound, Monday.AddDays(daysAhead)) };
+        var (file, repairs) = RosterNormalizer.Normalize(new RosterFile { Characters = [saved] }, Monday);
+        Assert.Null(Assert.Single(file.Characters).Kina);
+        Assert.NotEmpty(repairs);
+        var kept = saved with { Kina = new RosterKina(5, null, Monday) };
+        Assert.Equal(kept.Kina, Assert.Single(RosterNormalizer.Normalize(new RosterFile { Characters = [kept] }, Monday).File.Characters).Kina);
+    }
+
+    // Most Kina first: Kina and Kina (Bound) together; a character without any known last.
+    [Fact]
+    public void TheRowsSortByKina()
+    {
+        RosterCharacter[] characters =
+        [
+            new() { Name = "Alpha", Server = "SIE", LastSeen = Monday, Kina = new RosterKina(100, 2_900, Monday) },
+            new() { Name = "Beta", Server = "SIE", LastSeen = Monday, Kina = new RosterKina(2_000, null, Monday) },
+            new() { Name = "Gamma", Server = "SIE", LastSeen = Monday },
+        ];
+        Assert.Equal(["Alpha", "Beta", "Gamma"], RosterPage.Rows(characters, null, Monday, Calendar, RosterSort.MostKina).Select(r => r.Character.Name));
     }
 }

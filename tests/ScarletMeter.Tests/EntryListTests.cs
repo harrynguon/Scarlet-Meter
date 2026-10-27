@@ -663,12 +663,14 @@ public sealed class EntryListTests
         Assert.Equal(new OdyleEnergy(420, 1200), login.Odyle);
         Assert.Equal(11, login.Entries[EntryIds.Nightmare].First);
         Assert.Equal(3, login.Entries[EntryIds.AscensionTrial].First);
+        Assert.Equal(new KinaBalance(1_234_567, 33_940, login.Kina!.SeenAt), login.Kina);
 
         // Past the first fight (at most 90 seconds) and its 10-second break: the second fight spends 10.
         for (var end = clock.AddSeconds(105); clock < end; clock = clock.AddMilliseconds(100))
             feed.Step(clock, TestContext.Current.CancellationToken);
         Assert.Equal(new OdyleEnergy(410, 1200), engine.OdyleEnergy);
         Assert.Equal(new OdyleEnergy(410, 1200), raised[^1].Odyle);
+        Assert.Equal(1_236_067, raised[^1].Kina?.Kina);
     }
 
     // The demo's spending: 10 a fight, a recharge of up to 200 from charged once basic runs low, never below 0
@@ -696,5 +698,149 @@ public sealed class EntryListTests
             var update = EntryListRecordWriter.Update([new(EntryIds.OdyleEnergy, energy.Basic, energy.Charged)]);
             Assert.Equal(energy, EntryListRecords.OdyleIn(EntryListRecords.Read(update)!.Counts));
         }
+    }
+
+    // ---------- Kina ----------
+
+    private static readonly KinaSlot KinaSlot0 = new(InventoryRecords.KinaItem, 0, 1_234_567);
+    private static readonly KinaSlot BoundSlot1 = new(InventoryRecords.BoundKinaItem, 1, 33_940);
+
+    // The inventory's listing at world entry and its changes, in SkeeveAN's layout: Kina and Kina (Bound) found by their
+    // item ids with the kind ten bytes before, in the inventory's container; a gone slot holds none.
+    [Fact]
+    public void KinaIsReadFromTheInventory()
+    {
+        var listing = InventoryRecords.Read(EntryListRecordWriter.InventoryListing([KinaSlot0, BoundSlot1]));
+        Assert.NotNull(listing);
+        Assert.True(listing.IsListing);
+        Assert.Equal([KinaSlot0, BoundSlot1], listing.Slots);
+
+        var change = InventoryRecords.Read(EntryListRecordWriter.InventoryChange([(KinaSlot0 with { Quantity = 1_236_067 }, (byte)1), (BoundSlot1, InventoryRecords.GoneKind)]));
+        Assert.False(change!.IsListing);
+        Assert.Equal([KinaSlot0 with { Quantity = 1_236_067 }, BoundSlot1 with { Quantity = 0 }], change.Slots);
+
+        Assert.Empty(InventoryRecords.Read(EntryListRecordWriter.InventoryListing([]))!.Slots); // a listing without Kina: none
+        Assert.Null(InventoryRecords.Read(EntryListRecordWriter.InventoryChange([(new KinaSlot(510_116_006, 4, 3), (byte)1)]))); // no Kina in it
+    }
+
+    // Only an entry that sits on the anchor is Kina: in the inventory's container, a kind of 0 to 2, the quantity's top
+    // bytes zero; a listing too small to be one is not read; nothing throws on cut records.
+    [Fact]
+    public void OnlyAnEntryOnTheAnchorIsKina()
+    {
+        var entry = EntryListRecordWriter.InventoryChange([(KinaSlot0, (byte)1)]);
+        // The entry starts after the length (1 byte), the opcode (2) and the count (1): kind at 4, item at 14, container at 26.
+        Assert.NotNull(InventoryRecords.Read(entry));
+        foreach (var (at, value) in new[] { (26, (byte)15), (4, (byte)3), (25, (byte)1), (24, (byte)1), (23, (byte)1) })
+        {
+            var broken = (byte[])entry.Clone();
+            broken[at] = value;
+            Assert.Null(InventoryRecords.Read(broken));
+        }
+        var small = EntryListRecordWriter.Frame(InventoryRecords.ListingOpcode, [.. EntryListRecordWriter.InventoryChange([(KinaSlot0, (byte)1)]).Skip(3)]);
+        Assert.Null(InventoryRecords.Read(small));
+        var listing = EntryListRecordWriter.InventoryListing([KinaSlot0]);
+        for (var length = 0; length <= 80; length++) _ = InventoryRecords.Read(listing.AsSpan(0, length));
+    }
+
+    // The Kina goes with the counts: the login's listing waits for the record naming the character, then later changes
+    // are theirs; a change of one item leaves the other as it was.
+    [Fact]
+    public void KinaGoesToTheCharacterNamed()
+    {
+        var clock = new FakeTimeProvider(Start);
+        var tap = NewTap(new() { [7] = Alpha }, clock);
+        List<CharacterProgress> raised = [];
+        tap.ProgressObserved += (_, progress) => raised.Add(progress);
+        tap.Observe(EntryListRecordWriter.List([Odyle]));
+        tap.Observe(EntryListRecordWriter.InventoryListing([KinaSlot0, BoundSlot1]));
+        Assert.Empty(raised);
+        tap.Observe(SelfRecord(7));
+        Assert.Equal(new KinaBalance(1_234_567, 33_940, Start), Assert.Single(raised).Kina);
+
+        clock.Advance(TimeSpan.FromMinutes(5));
+        tap.Observe(EntryListRecordWriter.InventoryChange([(KinaSlot0 with { Quantity = 1_000 }, (byte)1)]));
+        Assert.Equal(new KinaBalance(1_000, 33_940, Start.AddMinutes(5)), raised[^1].Kina);
+    }
+
+    // Where the listing falls in a login is not documented: one read just before the login's list is that login's, one
+    // read long before is the last character's and goes, as it goes when another character is named with no list between.
+    [Fact]
+    public void AListingBeforeTheLoginsListIsKeptOnlyWithinTheBurst()
+    {
+        var clock = new FakeTimeProvider(Start);
+        var tap = NewTap(new() { [7] = Alpha, [9] = Beta }, clock);
+        CharacterProgress? last = null;
+        tap.ProgressObserved += (_, progress) => last = progress;
+
+        tap.Observe(EntryListRecordWriter.InventoryListing([KinaSlot0]));
+        clock.Advance(EntryListTap.LoginBurst);
+        tap.Observe(EntryListRecordWriter.List([Odyle]));
+        tap.Observe(SelfRecord(7));
+        Assert.Equal(new KinaBalance(1_234_567, 0, Start), last!.Kina);
+
+        clock.Advance(EntryListTap.LoginBurst + TimeSpan.FromSeconds(1));
+        tap.Observe(EntryListRecordWriter.List([Odyle]));
+        tap.Observe(SelfRecord(7));
+        Assert.Null(last.Kina);
+
+        tap.Observe(EntryListRecordWriter.InventoryListing([KinaSlot0]));
+        tap.Observe(SelfRecord(9)); // another character with no list between
+        Assert.Same(Beta, last.Character);
+        Assert.Null(last.Kina);
+    }
+
+    // While whose the counts are is not sure (a login's list for a switch, a new connection), the inventory waits too: a
+    // switch's Kina never lands on the character named before.
+    [Fact]
+    public void KinaWaitsWhileTheCharacterIsNotSure()
+    {
+        var tap = NewTap(new() { [7] = Alpha, [9] = Beta }, new FakeTimeProvider(Start));
+        tap.Observe(EntryListRecordWriter.List([Odyle]));
+        tap.Observe(SelfRecord(7));
+        List<CharacterProgress> raised = [];
+        tap.ProgressObserved += (_, progress) => raised.Add(progress);
+
+        tap.Observe(EntryListRecordWriter.List([Odyle]));
+        tap.Observe(EntryListRecordWriter.InventoryListing([KinaSlot0]));
+        Assert.Empty(raised);
+        tap.Observe(SelfRecord(9));
+        var beta = Assert.Single(raised);
+        Assert.Same(Beta, beta.Character);
+        Assert.Equal(1_234_567, beta.Kina?.Kina);
+
+        tap.ConnectionStarted();
+        tap.Observe(EntryListRecordWriter.InventoryChange([(KinaSlot0 with { Quantity = 5 }, (byte)1)]));
+        Assert.Single(raised);
+        tap.Observe(SelfRecord(9));
+        Assert.Equal(5, raised[^1].Kina?.Kina);
+    }
+    // A meter started mid-session sees changes before any listing: an item is known from its slots seen, the other not.
+    [Fact]
+    public void BeforeAnyListingOnlyTheItemSeenIsKnown()
+    {
+        var tap = NewTap(new() { [7] = Alpha }, new FakeTimeProvider(Start));
+        CharacterProgress? last = null;
+        tap.ProgressObserved += (_, progress) => last = progress;
+        tap.Observe(SelfRecord(7));
+        Assert.Null(last!.Kina);
+        tap.Observe(EntryListRecordWriter.InventoryChange([(BoundSlot1, (byte)1)]));
+        Assert.Equal(new KinaBalance(null, 33_940, Start), last.Kina);
+    }
+
+    // Through upstream's real reassembly: the listing, 5 KB and more, read from inside an LZ4 bundle.
+    [Fact]
+    public void TheEngineReadsKinaFromABundledListing()
+    {
+        using var host = new TestEngineHost(CaptureMode.None);
+        var engine = host.Services.GetRequiredService<ICombatEngine>();
+        var stream = host.Services.GetRequiredService<TcpStreamBuffer>();
+        List<CharacterProgress> raised = [];
+        engine.ProgressObserved += (_, progress) => raised.Add(progress);
+        Synchronise(stream);
+        stream.AddData("synthetic", Bundle([.. EntryListRecordWriter.List([Odyle]), .. EntryListRecordWriter.InventoryListing([KinaSlot0, BoundSlot1]),
+            .. EntryListRecordWriter.SelfRecord(4321, "Synthia", ServerMap.Servers.First().Key, 0, 0)]), 0);
+        var kina = Assert.Single(raised).Kina;
+        Assert.Equal((1_234_567L, 33_940L), (kina?.Kina, kina?.Bound));
     }
 }

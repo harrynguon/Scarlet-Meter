@@ -39,6 +39,12 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   `src-tauri/src/capture/stream_processor.rs`, added in b1fcd53fd676ad78224f4c89c543d744b0ac3766 and unchanged up to
   6abf5e7e28ddae93e04e870087d2ae457f752681 (v2.0.79, read on 2026-10-26); GNU GPL v3: its Rust parsing ported to C#.
   No captured bytes were taken; Scarlet's tests use synthetic records.
+- **SkeeveAN/Aion-DPS-Meter** (the layout of the game's inventory records and how to find an entry in them by its anchor,
+  `ScarletMeter.Engine/Entries/InventoryRecords`), https://github.com/SkeeveAN/Aion-DPS-Meter, `Client/Aion2/Aion2Stock.cs`
+  as of 010e994c5 (its only commit, unchanged up to 729cb910494a1a0a7b837b8914c98921ce512fd4, read on 2026-10-27),
+  Copyright (c) 2026 SkeeveTV, MIT (`licenses/MIT.txt`): its C# reading rewritten for Kina alone. The item ids of Kina
+  (930100031) and Kina (Bound) (930100001) are from its `Client/assets/aion2/items/item_names.json` (the client's item
+  table) at the same commit. No captured bytes were taken; Scarlet's tests use synthetic records.
 - **.NET** (the runtime bundled in the self-contained `ScarletMeter.exe`, with WPF), Copyright (c) .NET Foundation
   and Contributors, MIT. Its licence and third-party notices are in the release zip's `licenses/runtime/`, and
   WPF's in `licenses/dotnet-wpf/`; for .NET 10 they are also at

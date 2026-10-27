@@ -26,6 +26,11 @@ namespace ScarletMeter.Engine.Upstream;
 /// self record among them, can be lost (see <see cref="RecordTap"/>), so the updates after it are held until a self
 /// record names the character again, and reported then if it is the same one (deep audit on #48). A self record without
 /// a real name (a tutorial character's placeholder, <see cref="SelfRecords"/>) names no one.</para>
+/// <para>The Kina the character holds comes from its inventory (<see cref="InventoryRecords"/>: the whole listing at world
+/// entry, then each change), kept per slot and reported with the counts by the same rule. Where the listing falls in a
+/// login is not documented, so a whole list keeps a listing read within <see cref="LoginBurst"/> before it (the same
+/// login) and forgets an older one; another character named with no list between forgets it, as it does the counts.
+/// Before any listing (a meter started mid-session) an item's Kina is the sum of the slots seen changing.</para>
 /// <para>Runs on the capture thread, inside upstream's PacketAccumulator callback (see <see cref="RecordTap"/>, which
 /// contains anything that escapes), where upstream also writes its tracker, or on the demo feed's thread, whose records
 /// come through <see cref="Observe"/>. Nothing logged names a character or a count: only which record a change came
@@ -36,12 +41,20 @@ internal sealed class EntryListTap : IRecordReader
     /// <summary>Upstream's opcode for the player's own character record (bytes <c>33 36</c>).</summary>
     public const ushort SelfRecordOpcode = PacketOpcodes.PlayerInfo;
 
+    /// <summary>How long before a login's list an inventory listing still counts as that login's (a login comes in a burst).</summary>
+    public static readonly TimeSpan LoginBurst = TimeSpan.FromSeconds(10);
+
     private readonly Func<int, CharacterIdentity?> identify;
     private readonly TimeProvider clock;
     private readonly ILogger<EntryListTap> logger;
     private readonly Lock gate = new();
     // The counts since the last whole list, each with when it was read; whose they are is `owner` unless awaitingOwner.
     private readonly Dictionary<uint, EntryCount> counts = [];
+    // The Kina slots seen since the last listing (or ever, before one), when they were last read, and whether a listing
+    // came, which makes a missing slot none.
+    private readonly Dictionary<byte, KinaSlot> kinaSlots = [];
+    private DateTimeOffset kinaReadAt;
+    private bool kinaListed;
     private OdyleEnergy? odyle;
     private CharacterIdentity? owner;
     private bool awaitingOwner;
@@ -92,12 +105,13 @@ internal sealed class EntryListTap : IRecordReader
 
     /// <summary>The whole list, its updates and the self record.</summary>
     public bool Reads(ushort opcode) =>
-        opcode is EntryListRecords.ListOpcode or EntryListRecords.UpdateOpcode or SelfRecordOpcode;
+        opcode is EntryListRecords.ListOpcode or EntryListRecords.UpdateOpcode or SelfRecordOpcode || InventoryRecords.IsInventory(opcode);
 
     /// <summary>Reads one record from the stream (<see cref="RecordTap"/>).</summary>
     public void Read(byte[] record, ushort opcode)
     {
         if (opcode == SelfRecordOpcode) TakeSelfRecord(record);
+        else if (InventoryRecords.IsInventory(opcode)) TakeInventory(record);
         else TakeEntries(record);
     }
 
@@ -135,6 +149,7 @@ internal sealed class EntryListTap : IRecordReader
             if (read.IsWholeList)
             {
                 counts.Clear();
+                if (now - kinaReadAt > LoginBurst) ForgetKina();
                 awaitingOwner = true;
             }
             foreach (var count in read.Counts)
@@ -180,6 +195,7 @@ internal sealed class EntryListTap : IRecordReader
             if (!awaitingOwner && owner is not null && !owner.IsSameCharacter(character))
             {
                 counts.Clear();
+                ForgetKina();
                 odyle = null;
                 dropped = true;
             }
@@ -197,8 +213,51 @@ internal sealed class EntryListTap : IRecordReader
         Raise(() => ProgressObserved?.Invoke(this, progress), "An entry count subscriber failed.");
     }
 
-    // Every count kept, as a copy for subscribers. Under the gate.
-    private CharacterProgress Snapshot(CharacterIdentity character) => new(character, new Dictionary<uint, EntryCount>(counts));
+    // An inventory record: its Kina slots are kept (a listing replaces them all) and reported with the counts when whose
+    // they are is known.
+    private void TakeInventory(ReadOnlySpan<byte> record)
+    {
+        if (InventoryRecords.Read(record) is not { } read) return;
+        var now = clock.GetUtcNow();
+        CharacterProgress? progress = null;
+        lock (gate)
+        {
+            if (read.IsListing)
+            {
+                kinaSlots.Clear();
+                kinaListed = true;
+            }
+            foreach (var slot in read.Slots) kinaSlots[slot.Slot] = slot;
+            kinaReadAt = now;
+            if (!awaitingOwner && !ownerUnconfirmed && owner is not null) progress = Snapshot(owner);
+        }
+        if (read.IsListing) logger.LogInformation("Inventory listing read ({Slots} Kina slots).", read.Slots.Count);
+        if (progress is not null) Raise(() => ProgressObserved?.Invoke(this, progress), "An entry count subscriber failed.");
+    }
+
+    // Under the gate: the Kina slots belonged to another character, or to a login long before this one.
+    private void ForgetKina()
+    {
+        kinaSlots.Clear();
+        kinaListed = false;
+        kinaReadAt = default;
+    }
+
+    // Under the gate: the Kina held, each item the sum of its slots; null for an item no slot of which was seen, unless a
+    // listing came (then none). Null altogether before any inventory record.
+    private KinaBalance? Kina()
+    {
+        if (!kinaListed && kinaSlots.Count == 0) return null;
+        long? Of(uint item)
+        {
+            var slots = kinaSlots.Values.Where(slot => slot.Item == item).ToList();
+            return slots.Count > 0 ? slots.Sum(slot => slot.Quantity) : kinaListed ? 0 : null;
+        }
+        return new KinaBalance(Of(InventoryRecords.KinaItem), Of(InventoryRecords.BoundKinaItem), kinaReadAt);
+    }
+
+    // Every count kept, and the Kina, as a copy for subscribers. Under the gate.
+    private CharacterProgress Snapshot(CharacterIdentity character) => new(character, new Dictionary<uint, EntryCount>(counts), Kina());
 
     // Raises an event; a subscriber that throws is logged, so the rest of a bundle is still read.
     private void Raise(Action raise, string failure)

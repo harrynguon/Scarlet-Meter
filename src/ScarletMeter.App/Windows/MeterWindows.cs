@@ -94,7 +94,7 @@ public sealed class MeterWindows : IMeterWindows
     public static readonly ToolWindowSpec Settings = new(WindowKeys.Settings, typeof(SettingsPage), "Scarlet Meter · Settings", 540, 660, 420, 360);
     public static readonly ToolWindowSpec History = new(WindowKeys.History, typeof(FightHistoryPage), "Scarlet Meter · History", 860, 620, 560, 360);
     public static readonly ToolWindowSpec PlayerDetails = new(WindowKeys.PlayerDetails, typeof(PlayerDetailsPage), "Scarlet Meter · Player details", 980, 600, 620, 360);
-    public static readonly ToolWindowSpec Roster = new(WindowKeys.Roster, typeof(RosterPage), "Scarlet Meter · Characters", 860, 480, 560, 280);
+    public static readonly ToolWindowSpec Roster = new(WindowKeys.Roster, typeof(RosterPage), "Scarlet Meter · Characters", 920, 480, 560, 280);
 
     private readonly IServiceProvider services;
     private readonly SettingsService settings;

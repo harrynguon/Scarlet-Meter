@@ -413,6 +413,7 @@ tr.child td {
 /* An estimate (≈) is dimmer than what the game said. Charged energy is cyan, as on the overlay (.odyle-charged). */
 .roster-table .estimate { color: #c9c6d6; font-style: italic; }
 .roster-full { color: var(--good); margin-right: 6px; }
+.roster-bound { color: var(--muted); font-size: 11px; }
 
 .roster-cap {
     margin-left: 6px;

@@ -27,10 +27,17 @@ public sealed record CharacterIdentity(string Name, string Server, int ClassId, 
 public readonly record struct EntryCount(int First, int Second, DateTimeOffset SeenAt);
 
 /// <summary>
-/// The player's entry counts with whose they are (<see cref="ICombatEngine.ProgressObserved"/>): every count the game
-/// has sent for this character since its login's list, each with when it was last read, keyed by the game's entry id.
+/// The Kina a character holds, as its inventory last said: Kina and Kina (Bound), each null while not known (before the
+/// inventory's listing at world entry, until a change of that item), and when it was read.
 /// </summary>
-public sealed record CharacterProgress(CharacterIdentity Character, IReadOnlyDictionary<uint, EntryCount> Entries)
+public sealed record KinaBalance(long? Kina, long? Bound, DateTimeOffset SeenAt);
+
+/// <summary>
+/// The player's entry counts with whose they are (<see cref="ICombatEngine.ProgressObserved"/>): every count the game
+/// has sent for this character since its login's list, each with when it was last read, keyed by the game's entry id;
+/// and the Kina it holds, once its inventory has said.
+/// </summary>
+public sealed record CharacterProgress(CharacterIdentity Character, IReadOnlyDictionary<uint, EntryCount> Entries, KinaBalance? Kina = null)
 {
     /// <summary>The Odyle energy among the counts, or null when the game has not sent it.</summary>
     public OdyleEnergy? Odyle =>

@@ -17,8 +17,9 @@ namespace ScarletMeter.Engine.Upstream.Demo;
 /// CompleteAndPersistActiveSessions, the same path that saves open fights when the meter closes (upstream itself
 /// only ends a fight on a 45-second idle timeout or a respawn), so each fight becomes one history entry. The next
 /// starts <see cref="BreakLength"/> later. The entry counts with Odyle energy, which upstream does not decode, come as
-/// the game's own records would, synthetic ones read by the engine's <see cref="EntryListTap"/> (a login list and the
-/// user's own character record when the feed begins, an Odyle update as each later fight starts and spends some).
+/// the game's own records would, synthetic ones read by the engine's <see cref="EntryListTap"/> (a login list, the
+/// inventory's listing with the character's Kina and the user's own character record when the feed begins; an Odyle
+/// update and a Kina change as each later fight starts).
 /// They go to the tap directly rather than through upstream's stream reassembly, which synchronises a new stream only
 /// on a keep-alive left from an earlier chunk.
 /// </summary>
@@ -69,12 +70,18 @@ internal sealed class DemoCombatFeed
     private int fightsStarted;
     private bool partyRegistered;
     private OdyleEnergy odyle = new(StartingOdyle.Basic, StartingOdyle.Charged);
+    private long kina = StartingKina;
 
     // The demo's Odyle energy: where it starts, what a fight spends and what a recharge moves from charged to basic
     // once basic runs low.
     private static readonly OdyleEnergy StartingOdyle = new(420, 1200);
     private const int OdylePerFight = 10;
     private const int OdyleRecharge = 200;
+
+    // The demo's Kina: where it starts (in slot 0, Kina (Bound) in slot 1) and what each later fight brings.
+    private const long StartingKina = 1_234_567;
+    private const long BoundKina = 33_940;
+    private const long KinaPerFight = 1_500;
 
     /// <summary>The demo's other entry counts in its login list: Nightmare 11 (+1), Ascension Trial 3, and an entry it does not name.</summary>
     internal static IReadOnlyList<EntryValue> OtherEntries { get; } =
@@ -124,6 +131,8 @@ internal sealed class DemoCombatFeed
         }
         if (entryTap is null) return;
         entryTap.Observe(EntryListRecordWriter.List([new(EntryIds.OdyleEnergy, odyle.Basic, odyle.Charged), .. OtherEntries]));
+        entryTap.Observe(EntryListRecordWriter.InventoryListing(
+            [new KinaSlot(InventoryRecords.KinaItem, 0, kina), new KinaSlot(InventoryRecords.BoundKinaItem, 1, BoundKina)]));
         var user = DemoRoster.Party.First(member => member.IsUser);
         entryTap.Observe(EntryListRecordWriter.SelfRecord(user.EntityId, user.Name!, 0, 0, user.CombatPower));
     }
@@ -275,7 +284,12 @@ internal sealed class DemoCombatFeed
         entities.UpdateTargetEntityHpCurrent(current.EntityId, hpTotal);
         logger.LogInformation("Demo fight {Number} against {Boss} started, {Hp} HP.",
             current.Number, entities.GetTargetMob(current.EntityId)?.Name, hpTotal);
-        if (fightsStarted > 1) SpendOdyle();
+        if (fightsStarted > 1)
+        {
+            SpendOdyle();
+            kina += KinaPerFight;
+            entryTap?.Observe(EntryListRecordWriter.InventoryChange([(new KinaSlot(InventoryRecords.KinaItem, 0, kina), (byte)1)]));
+        }
     }
 
     private void Cast(Fight current, int index, DateTime at)

@@ -122,6 +122,7 @@ public sealed class RosterService : IDisposable
                 Odyle = Later(character.Odyle, progress.Entries, EntryIds.OdyleEnergy, now),
                 Nightmare = Later(character.Nightmare, progress.Entries, EntryIds.Nightmare, now),
                 Ascension = Later(character.Ascension, progress.Entries, EntryIds.AscensionTrial, now),
+                Kina = LaterKina(character.Kina, progress.Kina, now),
             };
             if (character.Odyle is { First: > RosterRules.StandardCap }) character = character with { MembershipSeen = true };
             characters[key] = character;
@@ -180,6 +181,15 @@ public sealed class RosterService : IDisposable
         if (!entries.TryGetValue(id, out var read)) return kept;
         if (kept is not null && kept.SeenAt <= now && read.SeenAt <= kept.SeenAt) return kept;
         return new RosterCount(read.First, read.Second, read.SeenAt);
+    }
+
+    // The Kina from the report when it was read later than the one kept (a kept one dated after now does not count as later,
+    // as in Later); an item the report does not know keeps the kept value.
+    private static RosterKina? LaterKina(RosterKina? kept, KinaBalance? read, DateTimeOffset now)
+    {
+        if (read is null) return kept;
+        if (kept is not null && kept.SeenAt <= now && read.SeenAt <= kept.SeenAt) return kept;
+        return new RosterKina(read.Kina ?? kept?.Kina, read.Bound ?? kept?.Bound, read.SeenAt);
     }
 
     /// <summary>

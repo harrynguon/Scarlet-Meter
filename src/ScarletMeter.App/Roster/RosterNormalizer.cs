@@ -28,6 +28,9 @@ public static class RosterNormalizer
     /// <summary>The largest Odyle energy kept: the entry list's bound for it.</summary>
     public const int MaxOdyle = 100_000;
 
+    /// <summary>The most Kina kept: the inventory record's quantity has its top three bytes zero, so below 2^40.</summary>
+    public const long MaxKina = 1L << 40;
+
     /// <summary>The earliest date taken: before AION 2's release anything is not the game's.</summary>
     public static readonly DateTimeOffset Earliest = new(2025, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
@@ -79,6 +82,12 @@ public static class RosterNormalizer
         var odyle = CleanCount(character.Odyle, MaxOdyle, now, ref countsDropped);
         var nightmare = CleanCount(character.Nightmare, MaxCount, now, ref countsDropped);
         var ascension = CleanCount(character.Ascension, MaxCount, now, ref countsDropped);
+        var kina = character.Kina;
+        if (kina is not null && (kina.Kina is < 0 or >= MaxKina || kina.Bound is < 0 or >= MaxKina || (kina.Kina, kina.Bound) is (null, null) || !IsUsableDate(kina.SeenAt, now)))
+        {
+            kina = null;
+            countsDropped++;
+        }
         // Corridor entries: usable dates only (a null list reads as none), each once, oldest first, the most recent kept.
         var saved = character.CorridorRuns ?? [];
         List<DateTimeOffset> usable = [.. saved.Where(run => IsUsableDate(run, now))];
@@ -112,6 +121,7 @@ public static class RosterNormalizer
             Nightmare = nightmare,
             Ascension = ascension,
             CorridorRuns = runs,
+            Kina = kina,
         };
     }
 
