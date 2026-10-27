@@ -23,6 +23,11 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
   [#50](https://github.com/harrynguon/Scarlet-Meter/pull/50), [#51](https://github.com/harrynguon/Scarlet-Meter/pull/51),
   [#53](https://github.com/harrynguon/Scarlet-Meter/pull/53))
 
+### Changed
+
+- While the meter is paused in the Abyss, the top of the meter reads "In the Abyss · paused" (it was "In the Abyss · meter
+  paused"), so it fits beside the buttons. ([#53](https://github.com/harrynguon/Scarlet-Meter/pull/53))
+
 ### Fixed
 
 - On a narrow meter, a fight's state and time no longer run under the buttons at the top: the state shortens or

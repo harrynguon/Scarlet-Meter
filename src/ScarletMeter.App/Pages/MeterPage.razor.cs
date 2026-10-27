@@ -108,7 +108,7 @@ public partial class MeterPage : IAsyncDisposable
     private bool NoticesHeld => EventRowLayout.HiddenForFight(alertSettings.HideDuringBossFights, bossFightUnderWay);
 
     // The header with no fight to show: paused for the Abyss (the engine shows nothing there), else capture's state.
-    private string StatusText => Engine.PausedInAbyss ? "In the Abyss · meter paused" : Engine.Capture switch
+    private string StatusText => Engine.PausedInAbyss ? "In the Abyss · paused" : Engine.Capture switch
     {
         { IsCapturing: false } => "Capture is off",
         { AdapterName: null } => "Waiting for the game's connection...",

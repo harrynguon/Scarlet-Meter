@@ -129,7 +129,7 @@ and adds it up per player and per fight.
   or one too new for RATmeter's list is not counted while it is on), summons folded into their owner, a one-minute
   cap on training dummies.
 - **Pauses in the Abyss**: hundreds of players fighting at once slow any meter down, so in the Abyss Scarlet Meter
-  tracks and keeps nothing and its header reads "In the Abyss · meter paused"; it tracks again once you leave. On by
+  tracks and keeps nothing and its header reads "In the Abyss · paused"; it tracks again once you leave. On by
   default; switch it off in Settings, Tracking. Settings, About shows the map you are on (its name, where known, and
   its id).
 

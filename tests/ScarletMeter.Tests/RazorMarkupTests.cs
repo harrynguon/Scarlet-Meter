@@ -542,7 +542,7 @@ public sealed partial class RazorMarkupTests
     {
         var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
         var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
-        Assert.Matches(@"StatusText => Engine\.PausedInAbyss \? ""In the Abyss · meter paused"" : Engine\.Capture switch", code);
+        Assert.Matches(@"StatusText => Engine\.PausedInAbyss \? ""In the Abyss · paused"" : Engine\.Capture switch", code);
         var markup = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
         Assert.Matches(@"(?s)@if \(snapshot\.Target is \{ \} fighting\).*else\s*\{\s*<span class=""target-name muted"" title=""@StatusText"">@StatusText</span>", markup);
 
