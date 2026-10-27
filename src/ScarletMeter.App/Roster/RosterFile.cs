@@ -22,7 +22,8 @@ public sealed record RosterFile
 
     /// <summary>
     /// The Shugo Festival keys on each server the game said them on, one entry per server: the overlay's last known keys
-    /// when the meter starts (a file from before them has none, and an earlier build passes them over).
+    /// when the meter starts. A file from before them has none; an earlier build passes them over when it reads the file
+    /// and leaves them out when it saves it, so they come back with each server's next reading.
     /// </summary>
     public IReadOnlyList<RosterShugoKeys> ShugoKeys { get; init; } = [];
 }

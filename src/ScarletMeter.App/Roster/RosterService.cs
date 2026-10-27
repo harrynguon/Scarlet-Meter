@@ -6,7 +6,8 @@ namespace ScarletMeter.App.Roster;
 
 /// <summary>
 /// The character roster while the meter runs: loads it once, takes each character the engine reports with its entry
-/// counts (<see cref="ICombatEngine.ProgressObserved"/>), each entry into the Artifact Corridor
+/// counts (<see cref="ICombatEngine.ProgressObserved"/>, the Shugo Festival keys among them kept for the character's
+/// server, for the overlay's last known values, <see cref="LastKnown"/>), each entry into the Artifact Corridor
 /// (<see cref="ICombatEngine.MapChanged"/>, put on <see cref="ICombatEngine.Character"/>) and who holds the Abyss's
 /// artifacts (<see cref="ICombatEngine.ArtifactsObserved"/>, put on that character's server), dropping what it holds for a
 /// naming when the game moves to a new connection (<see cref="ICombatEngine.ConnectionStarted"/>), and saves a moment
@@ -119,7 +120,8 @@ public sealed class RosterService : IDisposable
     /// <summary>
     /// What the overlay's last known Odyle energy and Shugo keys are for, while the game has not sent its own this run:
     /// the character the game named last this run, or else the one played last (the meter started while that character
-    /// was already in the game, as it usually is), with the keys saved for its server, if any. Null with no character.
+    /// was already in the game, as it usually is), with the keys saved for its server, if any. Null with no character, and
+    /// when the character named was removed since: another's values would read as its (deep audit on #60).
     /// </summary>
     public RosterLastKnown? LastKnown
     {
@@ -127,9 +129,9 @@ public sealed class RosterService : IDisposable
         {
             lock (gate)
             {
-                var character = current is { } key && characters.TryGetValue(key, out var named)
-                    ? named
-                    : characters.Values.MaxBy(c => c.LastSeen);
+                RosterCharacter? character;
+                if (current is { } key) characters.TryGetValue(key, out character);
+                else character = characters.Values.MaxBy(c => c.LastSeen);
                 if (character is null) return null;
                 return new RosterLastKnown(character, character.ServerId > 0 && shugoKeys.TryGetValue(character.ServerId, out var keys) ? keys : null);
             }

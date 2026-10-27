@@ -393,9 +393,10 @@ button {
    key of Scarlet's own in bright yellow, the keys left and, only when there is any, the extra in brackets. The yellow is
    saturated so it reads apart from the ping's colours, its orange (--slow) and pale yellow (--fair). The keys take the
    push to the right, the energy then sitting 8 px from them, closer than the line's 14 px gap: the two read as one group.
-   At the overlay's least width (320 px), with both shown, the line holds the longest party DPS (999.9K/s), keys 21 (+12),
+   At the overlay's least width (320 px), with both shown, the line holds a party DPS of 999.9K/s, keys 21 (+12),
    energy 840 (+1,200) and a ping of 1043 ms, the ping's bars having given way (.ov-totals; headless renders, audit on
-   #57); longer values run past the line's end, clipped, never onto a second line. With the energy hidden or not sent,
+   #57); longer values (a party DPS in millions, or the last known values' two ≈ marks, about 18 px, with those) run
+   past the line's end, clipped, never onto a second line. With the energy hidden or not sent,
    the ping sits at the keys' side. */
 .shugo {
     margin-left: auto;
@@ -470,7 +471,8 @@ button {
 
 /* Near the overlay's least width (up to 340 px, the line's 314 px inside its padding) the ping's bars give way, 19 px,
    its text keeping the level's colour: with the keys and the energy both shown, a four-digit ping and a two-digit extra
-   then still fit, as they do with the bars from 341 px (headless renders, audit on #57). */
+   then still fit, as they do with the bars from 341 px (headless renders, audit on #57), though not with the last known
+   values' ≈ marks too (12.5 px over at 320, clipped). */
 @container ov-totals (max-width: 314px) {
     .ping i {
         display: none;

@@ -585,7 +585,7 @@ public sealed partial class RazorMarkupTests
 
         var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
         Assert.Matches(@"snapshot = Engine\.GetSnapshot\(\);\s*var now = Clock\.GetUtcNow\(\);\s*ReadEnergy\(now\);", code);
-        Assert.Matches(@"private void ReadEnergy\(DateTimeOffset now\)\s*\{\s*odyle = Engine\.OdyleEnergy;", code);
+        Assert.Matches(@"private void ReadEnergy\(DateTimeOffset now\)\s*\{\s*var shown = LastKnownValues\.Shown\(Engine\.OdyleEnergy,", code);
         Assert.DoesNotContain("OdyleEnergyUpdated", code);
 
         var css = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "app.css"));
@@ -614,7 +614,7 @@ public sealed partial class RazorMarkupTests
 
         // Read with the energy on the refresh loop and when the page starts (ReadEnergy).
         var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
-        Assert.Matches(@"private void ReadEnergy\(DateTimeOffset now\)\s*\{\s*odyle = Engine\.OdyleEnergy;\s*shugo = Engine\.ShugoKeys;", code);
+        Assert.Matches(@"private void ReadEnergy\(DateTimeOffset now\)\s*\{\s*var shown = LastKnownValues\.Shown\(Engine\.OdyleEnergy, Engine\.ShugoKeys,", code);
         Assert.Matches(@"snapshot = Engine\.GetSnapshot\(\);\s*var now = Clock\.GetUtcNow\(\);\s*ReadEnergy\(now\);", code);
         Assert.Matches(@"ReadEnergy\(Clock\.GetUtcNow\(\)\);\s*Settings\.Changed \+= OnSettingsChanged;", code);
         Assert.Contains("ValueChanged=\"@(v => Change(s => s with { Appearance = s.Appearance with { ShowShugoKeys = v } }))\"",
@@ -651,18 +651,17 @@ public sealed partial class RazorMarkupTests
 
     // Until the game sends its own this run, the overlay shows the roster's last known Odyle energy and Shugo keys,
     // estimated, for the character played (Harry, 2026-10-28): the game's first, the roster's only for what the game has
-    // not sent, each marked with ≈, dimmer and italic, and saying so when pointed at.
+    // not sent, each marked with ≈, dimmer and italic, and saying so when pointed at. The choice itself is
+    // LastKnownValues.Shown's, tested in RosterTests; here, that the page hands it the engine's values, the roster and the
+    // calendar for the offset in Settings, and shows what it gives.
     [Fact]
     public void TheOverlayShowsTheLastKnownEnergyAndKeysUntilTheGameSendsItsOwn()
     {
         var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
         var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
         var read = Regex.Match(code, @"(?s)private void ReadEnergy\(DateTimeOffset now\)\s*\{(?<body>.*?)\n    \}").Groups["body"].Value;
-        Assert.Matches(@"(?s)^\s*odyle = Engine\.OdyleEnergy;\s*shugo = Engine\.ShugoKeys;\s*odyleLastKnown = shugoLastKnown = false;\s*"
-            + @"if \(\(odyle is not null && shugo is not null\) \|\| Roster\.LastKnown is not \{ \} last\) return;", read);
-        Assert.Matches(@"(?s)if \(odyle is null && LastKnownValues\.Odyle\(last\.Character, now, calendar\) is \{ \} energy\)\s*\{\s*odyle = energy;\s*odyleLastKnown = true;", read);
-        Assert.Matches(@"(?s)if \(shugo is null && LastKnownValues\.Shugo\(last\.Shugo, now, calendar\) is \{ \} keys\)\s*\{\s*shugo = keys;\s*shugoLastKnown = true;", read);
-        Assert.Matches(@"RechargeCalendar\.ForServerOffsetHours\(alertSettings\.ServerOffsetHours\)", read); // the roster's calendar
+        Assert.Matches(@"LastKnownValues\.Shown\(Engine\.OdyleEnergy, Engine\.ShugoKeys, \(\) => Roster\.LastKnown, now, calendars\.For\(alertSettings\.ServerOffsetHours\)\)", read);
+        Assert.Matches(@"\(odyle, odyleLastKnown, shugo, shugoLastKnown\) = \(shown\.Odyle, shown\.OdyleLastKnown, shown\.Shugo, shown\.ShugoLastKnown\);", read);
 
         var markup = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
         Assert.Contains(@"<span class=""shugo @(shugoLastKnown ? ""last-known"" : """")"" title=""@ShugoTitle"">", markup);

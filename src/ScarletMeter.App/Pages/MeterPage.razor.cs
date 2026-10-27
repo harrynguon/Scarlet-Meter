@@ -51,8 +51,7 @@ public partial class MeterPage : IAsyncDisposable
     private bool odyleLastKnown;
     private bool shugoLastKnown;
     // The calendar those estimates use, made again only when the server offset in Settings changes.
-    private RechargeCalendar? calendar;
-    private double calendarOffsetHours;
+    private readonly RechargeCalendarCache calendars = new();
     private Task? refreshLoop;
     private bool refreshFailing;
     // The content height last sent to the window (OnAfterRenderAsync).
@@ -265,25 +264,8 @@ public partial class MeterPage : IAsyncDisposable
     // (LastKnownValues; Harry, 2026-10-28), shown with ≈ until the game's own replace them.
     private void ReadEnergy(DateTimeOffset now)
     {
-        odyle = Engine.OdyleEnergy;
-        shugo = Engine.ShugoKeys;
-        odyleLastKnown = shugoLastKnown = false;
-        if ((odyle is not null && shugo is not null) || Roster.LastKnown is not { } last) return;
-        if (calendar is null || calendarOffsetHours != alertSettings.ServerOffsetHours)
-        {
-            calendar = RechargeCalendar.ForServerOffsetHours(alertSettings.ServerOffsetHours);
-            calendarOffsetHours = alertSettings.ServerOffsetHours;
-        }
-        if (odyle is null && LastKnownValues.Odyle(last.Character, now, calendar) is { } energy)
-        {
-            odyle = energy;
-            odyleLastKnown = true;
-        }
-        if (shugo is null && LastKnownValues.Shugo(last.Shugo, now, calendar) is { } keys)
-        {
-            shugo = keys;
-            shugoLastKnown = true;
-        }
+        var shown = LastKnownValues.Shown(Engine.OdyleEnergy, Engine.ShugoKeys, () => Roster.LastKnown, now, calendars.For(alertSettings.ServerOffsetHours));
+        (odyle, odyleLastKnown, shugo, shugoLastKnown) = (shown.Odyle, shown.OdyleLastKnown, shown.Shugo, shown.ShugoLastKnown);
     }
 
     // What the Odyle energy and the Shugo keys say when pointed at: the game's own, or the last known, estimated.

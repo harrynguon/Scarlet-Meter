@@ -8,6 +8,30 @@ namespace ScarletMeter.App.Roster;
 /// </summary>
 public sealed record RosterLastKnown(RosterCharacter Character, RosterShugoKeys? Shugo);
 
+/// <summary>The overlay's Odyle energy and Shugo keys, each null when there is none, and whether each is the roster's last known.</summary>
+public readonly record struct OverlayEnergy(OdyleEnergy? Odyle, bool OdyleLastKnown, ShugoKeys? Shugo, bool ShugoLastKnown);
+
+/// <summary>
+/// The recharge calendar for the server offset set in Settings, made again only when that offset changes: the overlay
+/// asks for it ten times a second while it shows last known values.
+/// </summary>
+public sealed class RechargeCalendarCache
+{
+    private RechargeCalendar? calendar;
+    private double offsetHours;
+
+    /// <summary>The calendar at <paramref name="serverOffsetHours"/>: the one kept, unless the offset changed since.</summary>
+    public RechargeCalendar For(double serverOffsetHours)
+    {
+        if (calendar is null || offsetHours != serverOffsetHours)
+        {
+            calendar = RechargeCalendar.ForServerOffsetHours(serverOffsetHours);
+            offsetHours = serverOffsetHours;
+        }
+        return calendar;
+    }
+}
+
 /// <summary>
 /// The overlay's Odyle energy and Shugo Festival keys while the game has not sent its own this run, as when the meter
 /// starts while the character is already in the game (Harry, 2026-10-28: "can the shugo festival key and odyle energy
@@ -18,6 +42,20 @@ public sealed record RosterLastKnown(RosterCharacter Character, RosterShugoKeys?
 /// </summary>
 public static class LastKnownValues
 {
+    /// <summary>
+    /// What the overlay shows: the game's Odyle energy and Shugo keys where it has sent them this run, each on its own;
+    /// for one it has not, the roster's last known, estimated, flagged as such. <paramref name="lastKnown"/> is asked only
+    /// when one of the two is missing (the roster's lock, at the overlay's ten reads a second).
+    /// </summary>
+    public static OverlayEnergy Shown(OdyleEnergy? gameOdyle, ShugoKeys? gameShugo, Func<RosterLastKnown?> lastKnown, DateTimeOffset now, RechargeCalendar calendar)
+    {
+        if (gameOdyle is not null && gameShugo is not null) return new(gameOdyle, false, gameShugo, false);
+        var last = lastKnown();
+        var odyle = gameOdyle ?? (last is null ? null : Odyle(last.Character, now, calendar));
+        var shugo = gameShugo ?? (last is null ? null : Shugo(last.Shugo, now, calendar));
+        return new(odyle, gameOdyle is null && odyle is not null, shugo, gameShugo is null && shugo is not null);
+    }
+
     /// <summary>The character's Odyle energy now, estimated from its last reading; null when it has none.</summary>
     public static OdyleEnergy? Odyle(RosterCharacter character, DateTimeOffset now, RechargeCalendar calendar) =>
         character.Odyle is { } seen
