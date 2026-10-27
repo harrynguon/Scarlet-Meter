@@ -35,7 +35,8 @@ namespace ScarletMeter.Engine.Upstream;
 /// connection, or while a character is named but with no self record within <see cref="LoginBurst"/> before it, is held,
 /// not reported, until the next self record (it may be a switch's whose list was lost, or one on the same connection), which keeps it when it comes within <see cref="LoginBurst"/> after the
 /// listing even if it names another character; another character named otherwise forgets it, as it does the counts; and
-/// a move to a new connection before any character is named, or while a listing is held, forgets what was read before.
+/// a move to a new connection before any character is named, while a listing is held, or after Kina was read with no
+/// character confirmed (a change too), forgets what was read before.
 /// A listing counts towards a login only on its own connection: one read before a move is no new login's (Codex on #50). Before any listing (a meter
 /// started mid-session) an item is known only once seen changing.</para>
 /// <para>Runs on the capture thread, inside upstream's PacketAccumulator callback (see <see cref="RecordTap"/>, which
@@ -65,6 +66,9 @@ internal sealed class EntryListTap : IRecordReader
     private DateTimeOffset kinaListingAt;
     private bool kinaListed;
     private bool kinaHeld;
+    // Kina read while no character was confirmed (a change or listing before the next self record): it may be another
+    // character's, so it is forgotten if its connection is left before a self record confirms it.
+    private bool kinaUnconfirmed;
     // When a self record last named the character: a listing within LoginBurst after it is that character's.
     private DateTimeOffset selfRecordAt;
     private OdyleEnergy? odyle;
@@ -135,9 +139,10 @@ internal sealed class EntryListTap : IRecordReader
     {
         lock (gate)
         {
-            // Read before any character was named, or held for a self record that never came, on a connection now left:
-            // whose it was is not known (Codex on #50: a switch's held listing went to the character named on the next one).
-            if (owner is null || kinaHeld) ForgetKina();
+            // Read before any character was named, held for a self record that never came, or read while the character was
+            // not confirmed, on a connection now left: whose it was is not known (Codex on #50: a switch's listing or change
+            // went to the character named on the next connection).
+            if (owner is null || kinaHeld || kinaUnconfirmed) ForgetKina();
             // A listing read on the connection left is not the next login's: a whole list on the new one does not keep it
             // by its time (Codex on #50), while a self record naming the same character, with no list between, still does.
             kinaListingAt = default;
@@ -226,6 +231,7 @@ internal sealed class EntryListTap : IRecordReader
             awaitingOwner = false;
             ownerUnconfirmed = false;
             kinaHeld = false;
+            kinaUnconfirmed = false;
             selfRecordAt = now;
             progress = Snapshot(character);
         }
@@ -260,6 +266,7 @@ internal sealed class EntryListTap : IRecordReader
                 kina[slot.Item] = slot;
             }
             kinaReadAt = now;
+            if (!named) kinaUnconfirmed = true;
             if (named && !kinaHeld) progress = Snapshot(owner!);
         }
         if (read.IsListing) logger.LogInformation("Inventory listing read ({Slots} Kina slots).", read.Slots.Count);
@@ -272,6 +279,7 @@ internal sealed class EntryListTap : IRecordReader
         kina.Clear();
         kinaListed = false;
         kinaHeld = false;
+        kinaUnconfirmed = false;
         kinaReadAt = default;
         kinaListingAt = default;
     }

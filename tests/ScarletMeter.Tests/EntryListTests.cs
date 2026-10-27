@@ -892,6 +892,39 @@ public sealed class EntryListTests
         Assert.Null(last.Kina); // not Beta's 50; the roster keeps Alpha's saved Kina
     }
 
+    // A change read while no character is confirmed is forgotten when its connection is left too: a switch to B whose
+    // first records were lost but for a change, then back to A whose list and listing were lost, must not give B's
+    // quantity to A (Codex on #50). On the same character's server change, the change is confirmed by its self record.
+    [Fact]
+    public void AnUnconfirmedChangeIsForgottenWhenItsConnectionIsLeft()
+    {
+        var clock = new FakeTimeProvider(Start);
+        var tap = NewTap(new() { [7] = Alpha, [9] = Beta }, clock);
+        CharacterProgress? last = null;
+        tap.ProgressObserved += (_, progress) => last = progress;
+        tap.Observe(EntryListRecordWriter.List([Odyle]));
+        tap.Observe(EntryListRecordWriter.InventoryListing([KinaSlot0]));
+        tap.Observe(SelfRecord(7));
+
+        clock.Advance(TimeSpan.FromMinutes(1));
+        tap.ConnectionStarted(); // a server change on Alpha
+        tap.Observe(EntryListRecordWriter.InventoryChange([(KinaSlot0 with { Quantity = 88 }, (byte)1)]));
+        tap.Observe(SelfRecord(7));
+        Assert.Equal(88, last!.Kina?.Kina); // confirmed by the self record
+        tap.ConnectionStarted(); // another server change: a confirmed balance is kept
+        tap.Observe(SelfRecord(7));
+        Assert.Equal(88, last.Kina?.Kina);
+
+        clock.Advance(TimeSpan.FromMinutes(1));
+        tap.ConnectionStarted(); // to Beta, all but a change lost
+        tap.Observe(EntryListRecordWriter.InventoryChange([(KinaSlot0 with { Quantity = 77 }, (byte)1)]));
+        clock.Advance(TimeSpan.FromMinutes(1));
+        tap.ConnectionStarted(); // back to Alpha, its list and listing lost
+        tap.Observe(SelfRecord(7));
+        Assert.Same(Alpha, last.Character);
+        Assert.Null(last.Kina); // not Beta's 77; the roster keeps Alpha's saved Kina
+    }
+
     // A listing while a character is named but with no self record just before it may be a switch's on the same
     // connection: it waits for the next self record, which takes it within the burst whoever it names, or for the same
     // character later (deep audit on #50).
