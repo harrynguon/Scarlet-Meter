@@ -837,6 +837,36 @@ public sealed class EntryListTests
         Assert.Null(last.Kina);
     }
 
+    // A listing read just before a move to a new connection is the last character's, not the next login's, however soon
+    // the next login's list comes: only a listing on the login's own connection is kept by its time (Codex on #50). The
+    // same character named again with no list between keeps it.
+    [Fact]
+    public void AListingFromTheConnectionLeftIsNotTheNextLogins()
+    {
+        var clock = new FakeTimeProvider(Start);
+        var tap = NewTap(new() { [7] = Alpha, [9] = Beta }, clock);
+        CharacterProgress? last = null;
+        tap.ProgressObserved += (_, progress) => last = progress;
+        tap.Observe(EntryListRecordWriter.List([Odyle]));
+        tap.Observe(EntryListRecordWriter.InventoryListing([KinaSlot0]));
+        tap.Observe(SelfRecord(7));
+        Assert.Equal(1_234_567, last!.Kina?.Kina);
+
+        clock.Advance(TimeSpan.FromSeconds(4));
+        tap.ConnectionStarted(); // a switch, within the burst of Alpha's listing
+        tap.Observe(EntryListRecordWriter.List([Odyle])); // Beta's login, its listing missing
+        tap.Observe(SelfRecord(9));
+        Assert.Same(Beta, last.Character);
+        Assert.Null(last.Kina);
+
+        tap.Observe(EntryListRecordWriter.InventoryListing([KinaSlot0 with { Quantity = 8 }]));
+        clock.Advance(TimeSpan.FromSeconds(2));
+        tap.ConnectionStarted(); // a server change on the same character
+        tap.Observe(SelfRecord(9));
+        Assert.Same(Beta, last.Character);
+        Assert.Equal(8, last.Kina?.Kina);
+    }
+
     // A listing while a character is named but with no self record just before it may be a switch's on the same
     // connection: it waits for the next self record, which takes it within the burst whoever it names, or for the same
     // character later (deep audit on #50).
