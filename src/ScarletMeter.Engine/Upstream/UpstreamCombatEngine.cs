@@ -111,6 +111,12 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         remove => artifacts.Observed -= value;
     }
 
+    public event EventHandler? ConnectionStarted
+    {
+        add => records.ConnectionStarted += value;
+        remove => records.ConnectionStarted -= value;
+    }
+
     public bool PausedInAbyss => pause.Paused;
 
     public CaptureState Capture => new(capture.IsCapturing, capture.DeviceName);

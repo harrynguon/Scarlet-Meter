@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**Held corridor entries, and then artifact holders, outlived the connection they were seen on** (Codex on #51; the entries since #49, never released).
+- What: an Artifact Corridor entry seen while the character being played was not sure was held for the character the roster knew, and counted when the game named that character within ten minutes. #51 held the Abyss's artifact holders the same way. Neither was tied to its connection: after a switch to B whose self record was lost, B's entry or reading was held for A, and when the player went back to A on another connection the game's naming A counted it for A, B's holders landing on A's server.
+- Why: the hold was designed around one connection (entering the Abyss, then the self record on it) and checked only the character and the time, not that the naming came on the connection the thing was seen on. The engine had no way to say a connection had ended; only its own readers were told. The Kina reader on #50 had the same gap, found in pieces by four Codex reviews, and the roster's holds were not looked at against it.
+- Guard: the engine raises `ICombatEngine.ConnectionStarted` after its readers, and the roster drops what it holds there (`RosterTests.WhatIsHeldIsDroppedWhenTheGameMovesToANewConnection`, `MapProbeTests.TheEngineSaysWhenTheGameMovesToANewConnection`; each shown to fail with its part removed). When a fix ties one value to its connection, look for every other value held across the same move, in the engine and outside it.
+
 **A note box with a sensible width pushed the roster's last columns out of its window** (2026-10-27, seen in a headless render before commit).
 - What: a 160 px, then 130 px, least width for the new note box under each name pushed the Last played column and the remove button past the roster's 920 px window: the table had no room to spare, since #50 had already widened the window for the Kina column.
 - Why: a column's least width was chosen for the note's sake, without measuring what the rest of the table needed at the window's width.

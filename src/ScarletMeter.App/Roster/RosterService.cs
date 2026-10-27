@@ -117,6 +117,7 @@ public sealed class RosterService : IDisposable
         engine.ProgressObserved += OnProgress;
         engine.MapChanged += OnMapChanged;
         engine.ArtifactsObserved += OnArtifacts;
+        engine.ConnectionStarted += OnConnectionStarted;
     }
 
     /// <summary>Takes one report of a character and its counts: what the engine's event brings (tests call it directly).</summary>
@@ -374,6 +375,30 @@ public sealed class RosterService : IDisposable
 
     private void OnArtifacts(object? sender, AbyssArtifacts reading) => TakeArtifacts(reading);
 
+    /// <summary>
+    /// Takes a move to a new connection: what the engine's event brings (tests call it directly). The corridor entries and
+    /// the artifact holders held for the game to name the character are dropped: they were seen on the connection left,
+    /// and a self record on another one does not say whose they were (Codex on #51: a switch's reading held for the
+    /// character before it was kept for that character's server when the game named it on the connection after).
+    /// </summary>
+    public void TakeConnectionStarted()
+    {
+        int runs;
+        bool holders;
+        lock (gate)
+        {
+            if (disposed) return;
+            runs = heldRuns.Count;
+            holders = heldArtifacts is not null;
+            heldRuns.Clear();
+            heldArtifacts = null;
+        }
+        if (runs > 0) logger.LogInformation("{Count} held Artifact Corridor entries dropped: the game moved to a new connection before naming the character.", runs);
+        if (holders) logger.LogInformation("Held Abyss artifact holders dropped: the game moved to a new connection before naming the character.");
+    }
+
+    private void OnConnectionStarted(object? sender, EventArgs e) => TakeConnectionStarted();
+
     private void OnMapChanged(object? sender, int? mapId) => TakeMap(mapId);
 
     // Under the gate: the roster differs from the file, so a save is due SaveDelay after the last change.
@@ -445,6 +470,7 @@ public sealed class RosterService : IDisposable
         engine.ProgressObserved -= OnProgress;
         engine.MapChanged -= OnMapChanged;
         engine.ArtifactsObserved -= OnArtifacts;
+        engine.ConnectionStarted -= OnConnectionStarted;
         SaveNow();
     }
 }

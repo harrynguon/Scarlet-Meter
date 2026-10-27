@@ -381,6 +381,9 @@ public sealed class RosterTests : IDisposable
         public event EventHandler<CharacterProgress>? ProgressObserved;
         public event EventHandler<int?>? MapChanged;
         public event EventHandler<AbyssArtifacts>? ArtifactsObserved;
+        public event EventHandler? ConnectionStarted;
+        public void RaiseConnection() => ConnectionStarted?.Invoke(this, EventArgs.Empty);
+        public int ConnectionSubscribers => ConnectionStarted?.GetInvocationList().Length ?? 0;
         public int Subscribers => ProgressObserved?.GetInvocationList().Length ?? 0;
         public int MapSubscribers => MapChanged?.GetInvocationList().Length ?? 0;
         public void Raise(CharacterProgress progress) => ProgressObserved?.Invoke(this, progress);
@@ -940,7 +943,7 @@ public sealed class RosterTests : IDisposable
         using (var service = new RosterService(engine, store, clock, NullLogger<RosterService>.Instance))
         {
             service.Start();
-            Assert.Equal(1, engine.ArtifactSubscribers);
+            Assert.Equal((1, 1), (engine.ArtifactSubscribers, engine.ConnectionSubscribers));
             service.Changed += (_, _) => changes++;
             engine.RaiseArtifacts(Reading(Monday.AddMinutes(-5), (2001, ArtifactHolder.Nobody), (1001, ArtifactHolder.Elyos), (1002, ArtifactHolder.Asmodian), (1003, ArtifactHolder.Elyos)));
             var kept = service.Artifacts[1001];
@@ -965,7 +968,7 @@ public sealed class RosterTests : IDisposable
         Assert.Equal([ArtifactHolder.Unknown, ArtifactHolder.Elyos, ArtifactHolder.Unknown], Assert.Single(loaded.Artifacts).Holders);
         Assert.Equal(1001, Assert.Single(loaded.Artifacts).ServerId);
         Assert.Contains("\"elyos\"", File.ReadAllText(store.FilePath), StringComparison.Ordinal);
-        Assert.Equal(0, engine.ArtifactSubscribers);
+        Assert.Equal((0, 0), (engine.ArtifactSubscribers, engine.ConnectionSubscribers));
         using var again = new RosterService(new FakeEngine(), store, clock, NullLogger<RosterService>.Instance);
         Assert.Equal(Assert.Single(loaded.Artifacts), again.Artifacts[1001]); // the next run starts with them
     }
@@ -1061,6 +1064,41 @@ public sealed class RosterTests : IDisposable
         var loaded = store.Load(Monday);
         Assert.Empty(loaded.File.Characters);
         Assert.Single(Directory.GetFiles(directory.FullPath, "roster.unreadable-*.json"));
+    }
+
+    // What was held for the game to name the character, corridor entries and artifact holders, was seen on its connection:
+    // a move to a new one drops it, so a self record there cannot claim it (Codex on #51). Nothing logged names anyone.
+    [Fact]
+    public void WhatIsHeldIsDroppedWhenTheGameMovesToANewConnection()
+    {
+        var clock = new FakeTimeProvider(Monday);
+        var log = new RecordingLogger<RosterService>();
+        var engine = new FakeEngine();
+        using var service = new RosterService(engine, NewStore(), clock, log);
+        service.Start();
+        var alpha = AlphaIdentity with { ServerId = 1001 };
+        service.Take(Progress(alpha));
+
+        service.TakeMap(20);
+        service.TakeMap(MapNames.ArtifactCorridor); // held: no character sure
+        service.TakeArtifacts(Reading(Monday, (1001, ArtifactHolder.Asmodian))); // held too
+        engine.RaiseConnection(); // a switch, say, whose records were lost
+        clock.Advance(TimeSpan.FromMinutes(2));
+        engine.RaiseConnection(); // and back: nothing held is left to claim
+        service.Take(Progress(alpha));
+        Assert.Empty(service.Characters.Single().CorridorRuns);
+        Assert.Empty(service.Artifacts);
+        Assert.Single(log.Entries, e => e.Message.Contains("held Artifact Corridor entries dropped: the game moved to a new connection", StringComparison.Ordinal));
+        Assert.Single(log.Entries, e => e.Message.StartsWith("Held Abyss artifact holders dropped: the game moved", StringComparison.Ordinal));
+        Assert.All(log.Entries, e => Assert.DoesNotContain("Alpha", e.Message, StringComparison.Ordinal));
+
+        // Held and named on the same connection, they are kept as before.
+        service.TakeMap(20);
+        service.TakeMap(MapNames.ArtifactCorridor);
+        service.TakeArtifacts(Reading(clock.GetUtcNow(), (1001, ArtifactHolder.Elyos)));
+        service.Take(Progress(alpha));
+        Assert.Single(service.Characters.Single().CorridorRuns);
+        Assert.Equal(ArtifactHolder.Elyos, service.Artifacts[1001].Holders[0]);
     }
 
     // A report gives the character its server id; one without (not known this time) keeps the kept one.

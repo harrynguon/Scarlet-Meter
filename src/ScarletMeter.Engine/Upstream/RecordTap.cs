@@ -24,7 +24,8 @@ namespace ScarletMeter.Engine.Upstream;
 /// can be lost: in Harry's game on 2026-10-26 the map record entering the Abyss came after that point and was read,
 /// the ones leaving a dungeon and the Abyss came before it and were not. So the tap tells every reader when it first
 /// reads a record of a connection it has not seen lately (<see cref="IRecordReader.ConnectionStarted"/>), just before
-/// that record, and a reader decides whether its value outlives the move.</para>
+/// that record, and a reader decides whether its value outlives the move. It then raises <see cref="ConnectionStarted"/>
+/// (<see cref="ICombatEngine.ConnectionStarted"/>), for what waits outside the engine on the connection left.</para>
 /// <para>Runs on the capture thread, inside upstream's PacketAccumulator callback and under its lock. A record that no
 /// reader takes and that is not a bundle costs a varint, two byte reads and a question to each reader. A bundle
 /// (<c>ff ff</c>, most of the game's records) is opened a second time, after upstream's pipeline has opened it: a full
@@ -162,7 +163,15 @@ internal sealed class RecordTap : IDisposable
     /// <summary>The connections remembered, for tests.</summary>
     internal int RememberedConnections => recentConnections.Count;
 
-    // Tells every reader the game has moved to a new connection; one reader's failure does not keep it from the others.
+    /// <summary>
+    /// Raised when the tap first reads a record of a connection it has not seen lately (a server change or a switch), after
+    /// every reader was told and just before that record is read, on the capture thread. A subscriber's failure is
+    /// contained and logged as a reader's is.
+    /// </summary>
+    public event EventHandler? ConnectionStarted;
+
+    // Tells every reader the game has moved to a new connection, then the subscribers; one's failure does not keep it
+    // from the others.
     private Exception? StartConnection()
     {
         Exception? failure = null;
@@ -176,6 +185,14 @@ internal sealed class RecordTap : IDisposable
             {
                 failure ??= ex;
             }
+        }
+        try
+        {
+            ConnectionStarted?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception ex)
+        {
+            failure ??= ex;
         }
         return failure;
     }
