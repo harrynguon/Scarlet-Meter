@@ -4,6 +4,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The meter stayed locked onto web traffic and missed a login** (Harry, 2026-10-27: "is this a stale connection or something? i launched the game with the meter opened beforehand and my current character is not up to date").
+- What: the meter, left open while the game was closed, locked onto port 443 and stayed there for hours, and saw nothing of the next login: the roster still marked the character played before, and the Odyle reading was hours old. Upstream's detection counts its keep-alive's three bytes with no time window, so enough encrypted web traffic matches them by chance, and its watchdog counts any packet on the locked port as a heartbeat, so the lock never ended.
+- Why: every in-game check started the meter with the game already running or about to run, when the game's port wins detection at once. Nobody had left the meter open across a game restart, and the log's "LOCKED" line was read for the adapter, not the port. Upstream's capture was taken as working because it worked in that one order.
+- Guard: `CaptureLockGuard` drops a lock that has carried no server-time record from the game (the reply to its ping, every ten seconds) after 30 s on ports 80 and 443 or 5 minutes elsewhere, through upstream's own reset (`CaptureLockTests`; the reflection binding pinned by `TheGuardBindsToThePinnedUpstream`). The HANDOFF in-game list now has the meter left open with the game closed, then a login. When a check depends on the order things start in, try the other order too.
+
+**The first rule against a stuck capture lock could have dropped the game's own lock** (deep audit on #54, fixed before merge).
+- What: the rule dropped any lock that went 150 s without the game's server-time record, the game's port included, and nobody knows whether the game sends that record at character select. If it does not, the game's lock would have been dropped every few minutes there, and a login made while detection found the game again could be missed: the failure the guard was written against. The same audit found the guard's threading promises (`Stop` waits for a check under way; a tick meanwhile is skipped; nothing runs after `Stop`) untested, and the docs' word that two resets at once "would at worst open an adapter twice, which upstream logs" wrong: SharpPcap opens an open adapter silently, and upstream adds a packet handler before each open.
+- Why: the rule was shaped by the failure seen (a lock that is never the game's) and not by the game's quiet states, and an unknown (pings at character select) was written down as a risk instead of designed out. The tests used a fake clock alone, which runs every callback on the test's thread, so no test could reach the gate.
+- Guard: a lock that has carried one record is the game's and is never dropped by the guard (`ALockThatCarriedTheGamesRecordIsKept`, `TheGamesServerTimeRecordThroughUpstreamKeepsTheLock`); only a lock that never has is timed, 5 minutes off the web's ports. `StopWaitsForACheckUnderWayAndNoneRunsAfter` runs the check on real threads, and `ADisposedGuardStopsListening` counts upstream's ping handlers. When a rule can act on the real thing it protects, test that case first; when it rests on an unknown, design so the unknown cannot hurt.
+
 **The header's title ran under its buttons on a narrow overlay, and the first fix cut the avatar's ring** (2026-10-27, seen in headless renders before commit, adding the Characters button).
 - What: at the overlay's 300 px, a fight's "Boss combat" and duration ran under the first header buttons, since the header had seven; the eighth made it worse. Clipping the title stopped that but cut the avatar's ring flat on its left, its glow drawn outside the avatar's box. The audit on #53 then found the fix's "the duration stays whole" true only below an hour: at 300 px "01:02:03" was cut to "01:02", a shorter time; an ellipsis on the time fired on fractions of a pixel ("12:…"), so the least width went to 320 px instead.
 - Why: the header was never rendered at the overlay's narrowest width when buttons were added, and the clip was set without measuring what is drawn outside its box, the mistake the bar area's ring taught (below).
@@ -210,6 +220,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - Guard: `SettingsTests.AFileSavedWithAByteOrderMarkLoads`. Seed test files the way people actually write them.
 
 ## In the process
+
+**A mutation runner assumed every file had CRLF line endings, so three mutations never ran** (2026-10-27, the capture lock guard; reported "TEXT NOT FOUND", not as caught or missed).
+- What: the runner turned each multi-line mutation's line breaks into CRLF before looking for it, as the checked-out files have them; the new files, written by the agent's file tool, had LF, so no multi-line mutation of theirs could match.
+- Why: the runner was written against files that git had checked out (CRLF in the working tree), and no new file had been mutated across lines before.
+- Guard: the runner now uses the file's own line endings, and still reports a mutation whose text is not found by name, never as caught; read every line of its report before taking the run as done.
 
 **The ship skill's branch clean-up would have deleted commits the merge never saw** (Codex on #52, fixed before merge).
 - What: the first wording deleted a merged PR's worktree once `git status --porcelain` printed nothing, then the branch with `git branch -D`. A clean worktree says nothing about commits made after the PR's last push, and `-D` deletes a branch even when unmerged, so committed but unpushed work would have gone.

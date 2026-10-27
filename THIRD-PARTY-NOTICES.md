@@ -41,6 +41,10 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   the one on entering the Abyss, who holds each artifact (`ScarletMeter.Engine/Abyss/AbyssArtifactRecords`), from
   `src-tauri/src/capture/abyss_artifacts.rs`, added in 6837e554919141e130adf08e57ccfb534714e1c0 and unchanged up to
   c3fcce31da487fb5146c653a38640e477536bd68 (read on 2026-10-27), with its side of a server by the id's thousands;
+  and two observations behind the capture lock's check (`ScarletMeter.Engine/Capture/CaptureLockWatch`), taken as
+  facts, not code: that the client asks for a ping every ten seconds (`src-tauri/src/combat/ping_tracker.rs`) and that
+  the game has never used the web's ports, 80 and 443 (`capture_filters` in `src-tauri/src/capture/pcap_capturer.rs`),
+  at 5c6f02cddd81ea1493295d76ef6adccc851da5d5 (read on 2026-10-27);
   GNU GPL v3: its Rust parsing ported to C#. No captured bytes were taken; Scarlet's tests use synthetic records.
 - **SkeeveAN/Aion-DPS-Meter** (the layout of the game's inventory records and how to find an entry in them by its anchor,
   `ScarletMeter.Engine/Entries/InventoryRecords`), https://github.com/SkeeveAN/Aion-DPS-Meter, `Client/Aion2/Aion2Stock.cs`
