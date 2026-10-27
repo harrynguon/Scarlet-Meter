@@ -8,8 +8,9 @@ namespace ScarletMeter.App.Roster;
 /// The character roster while the meter runs: loads it once, takes each character the engine reports with its entry
 /// counts (<see cref="ICombatEngine.ProgressObserved"/>), each entry into the Artifact Corridor
 /// (<see cref="ICombatEngine.MapChanged"/>, put on <see cref="ICombatEngine.Character"/>) and who holds the Abyss's
-/// artifacts (<see cref="ICombatEngine.ArtifactsObserved"/>, put on that character's server), and saves a moment after the
-/// last change, and on disposal. A
+/// artifacts (<see cref="ICombatEngine.ArtifactsObserved"/>, put on that character's server), dropping what it holds for a
+/// naming when the game moves to a new connection (<see cref="ICombatEngine.ConnectionStarted"/>), and saves a moment
+/// after the last change, and on disposal. A
 /// count replaces the saved one only when it was read later, so an older report can never undo a newer one. Saving is
 /// off when the file must not be overwritten (<see cref="CanSave"/>); a failed save is logged once and tried again with
 /// the next change. Nothing logged names a character or a count. Every member may be called from any thread.
@@ -248,7 +249,8 @@ public sealed class RosterService : IDisposable
     /// another map counts a run for the character being played. While that is not sure (the engine's
     /// <see cref="ICombatEngine.Character"/> is null, as after a server change until the game names the character again),
     /// the entry is held for the character the roster knew, and counted if the game names that same character within
-    /// <see cref="CorridorConfirmWindow"/> (<see cref="Take"/>). A load of the corridor straight after an unknown map, the
+    /// <see cref="CorridorConfirmWindow"/> on the same connection (<see cref="Take"/>; a move drops it,
+    /// <see cref="TakeConnectionStarted"/>). A load of the corridor straight after an unknown map, the
     /// last known map being the corridor, within <see cref="CorridorReentryWindow"/> of the last run is that run again (a
     /// reconnection inside it).
     /// </summary>
@@ -317,7 +319,8 @@ public sealed class RosterService : IDisposable
     /// the world's on the server it was read on, which the record does not say, so it is kept for the server of the
     /// character being played; while that is not sure (entering the Abyss is a server change), it is held for the character
     /// the roster knew, as a corridor entry is, and kept if the game names that same character within
-    /// <see cref="CorridorConfirmWindow"/>. A reading without the lower layer's artifacts says nothing of the corridors and
+    /// <see cref="CorridorConfirmWindow"/> on the same connection (a move drops it, <see cref="TakeConnectionStarted"/>).
+    /// A reading without the lower layer's artifacts says nothing of the corridors and
     /// is not kept; nor is one for a character whose server id is not known.
     /// </summary>
     public void TakeArtifacts(AbyssArtifacts reading)

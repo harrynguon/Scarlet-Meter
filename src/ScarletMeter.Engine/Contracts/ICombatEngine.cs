@@ -135,8 +135,10 @@ public interface ICombatEngine : IDisposable
     /// The game moved to a new connection: a server change (into or out of a dungeon or the Abyss) or a switch of
     /// character. Raised on a capture thread just before the first record read of the new connection, once the engine's
     /// own values have taken the move (<see cref="MapId"/> forgotten, <see cref="Character"/> unconfirmed): whatever a
-    /// subscriber holds from the connection left, waiting to be put on a character, was seen there and nowhere else. The
-    /// demo has no connections and never raises it.
+    /// subscriber holds from the connection left, waiting to be put on a character, was seen there and nowhere else. Also
+    /// raised for the meter's first connection, and for one last seen more than 16 connections before. Subscribers run
+    /// under upstream's reassembly lock, so they must be quick; one that throws is logged and keeps the move from no
+    /// other. The demo has no connections and never raises it.
     /// </summary>
     event EventHandler? ConnectionStarted;
 

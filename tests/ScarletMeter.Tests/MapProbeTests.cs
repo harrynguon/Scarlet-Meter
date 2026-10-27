@@ -284,7 +284,8 @@ public sealed partial class MapProbeTests
         Assert.Equal([null, null], mapAtMove); // the second: map A forgotten, map B not read yet
     }
 
-    // A subscriber to the move that throws keeps the record from no reader, and is logged once, as a reader's failure is.
+    // A subscriber to the move that throws keeps neither the record from any reader nor the move from any other subscriber
+    // (the roster drops what it holds there), and is logged once, as a reader's failure is.
     [Fact]
     public void AFailingSubscriberToTheMoveIsContained()
     {
@@ -299,7 +300,7 @@ public sealed partial class MapProbeTests
         stream.AddData("Client:50003", MapLoad(MapA), 0);
         Assert.Equal(MapA, maps.Current);
         Assert.Single(log.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("failed", StringComparison.Ordinal));
-        Assert.Equal(0, moves); // a multicast stops at the first that throws; the readers had their turn first
+        Assert.Equal(1, moves);
     }
 
     // Records in an LZ4 bundle (ff ff), as most of the game's come: the map and Odyle energy in one bundle are both read.

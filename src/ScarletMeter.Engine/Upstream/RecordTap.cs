@@ -165,8 +165,9 @@ internal sealed class RecordTap : IDisposable
 
     /// <summary>
     /// Raised when the tap first reads a record of a connection it has not seen lately (a server change or a switch), after
-    /// every reader was told and just before that record is read, on the capture thread. A subscriber's failure is
-    /// contained and logged as a reader's is.
+    /// every reader was told and just before that record is read, on the capture thread. Each subscriber is called on its
+    /// own, so one that throws keeps the move from no other (it guards what a subscriber holds); a failure is logged as a
+    /// reader's is.
     /// </summary>
     public event EventHandler? ConnectionStarted;
 
@@ -186,13 +187,16 @@ internal sealed class RecordTap : IDisposable
                 failure ??= ex;
             }
         }
-        try
+        foreach (var subscriber in ConnectionStarted?.GetInvocationList() ?? [])
         {
-            ConnectionStarted?.Invoke(this, EventArgs.Empty);
-        }
-        catch (Exception ex)
-        {
-            failure ??= ex;
+            try
+            {
+                ((EventHandler)subscriber)(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                failure ??= ex;
+            }
         }
         return failure;
     }
