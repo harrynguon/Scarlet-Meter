@@ -13,6 +13,8 @@ public enum RosterSort
     MostOdyle,
     /// <summary>Full soonest first; the ones already full at the top, since every refill from then on is lost.</summary>
     FullSoonest,
+    /// <summary>Most Kina, Kina and Kina (Bound) together, first.</summary>
+    MostKina,
     /// <summary>By name.</summary>
     Name,
     /// <summary>Played most recently first.</summary>
@@ -33,8 +35,8 @@ public sealed record RosterRow(
 /// <summary>
 /// The character roster: every character the meter has seen the player log in on, with Odyle energy, when basic energy
 /// is full again, and Nightmare and Ascension Trial entries left, each as the game last said plus the recharges since
-/// (<see cref="RosterRules"/>, marked ≈), and the Artifact Corridors entered since the last Abyss Siege, as the meter saw
-/// them. Re-reads the roster when it changes and every half minute, for the estimates.
+/// (<see cref="RosterRules"/>, marked ≈), the Artifact Corridors entered since the last Abyss Siege, as the meter saw
+/// them, and the Kina it holds, as its inventory last said, with the totals across characters. Re-reads the roster when it changes and every half minute, for the estimates.
 /// </summary>
 public partial class RosterPage : IDisposable
 {
@@ -82,11 +84,21 @@ public partial class RosterPage : IDisposable
         return sort switch
         {
             RosterSort.FullSoonest => [.. rows.OrderBy(r => r.Odyle is null).ThenBy(r => r.Odyle is { Full: true } ? DateTimeOffset.MinValue : r.FullAt ?? DateTimeOffset.MaxValue).ThenBy(r => r.Character.Name, StringComparer.CurrentCultureIgnoreCase)],
+            RosterSort.MostKina => [.. rows.OrderByDescending(r => r.Character.Kina is { } kina ? (kina.Kina ?? 0) + (kina.Bound ?? 0) : -1).ThenBy(r => r.Character.Name, StringComparer.CurrentCultureIgnoreCase)],
             RosterSort.Name => [.. rows.OrderBy(r => r.Character.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(r => r.Character.Server, StringComparer.Ordinal)],
             RosterSort.LastSeen => [.. rows.OrderByDescending(r => r.Character.LastSeen)],
             _ => [.. rows.OrderByDescending(r => r.Odyle?.Value ?? -1).ThenByDescending(r => r.Character.Odyle?.Second ?? -1).ThenBy(r => r.Character.Name, StringComparer.CurrentCultureIgnoreCase)],
         };
     }
+
+    /// <summary>
+    /// The Kina across the rows: each item summed over the characters that know it, and how many characters know neither
+    /// (shown as not known, rather than counted as none).
+    /// </summary>
+    public static (long Kina, long Bound, int Unknown) KinaTotals(IReadOnlyList<RosterRow> rows) => (
+        rows.Sum(row => row.Character.Kina?.Kina ?? 0),
+        rows.Sum(row => row.Character.Kina?.Bound ?? 0),
+        rows.Count(row => row.Character.Kina is null or { Kina: null, Bound: null }));
 
     private DateTimeOffset Now => Clock.GetUtcNow();
 

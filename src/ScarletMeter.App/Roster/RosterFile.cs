@@ -73,6 +73,9 @@ public sealed record RosterCharacter
     /// </summary>
     public IReadOnlyList<DateTimeOffset> CorridorRuns { get; init; } = [];
 
+    /// <summary>The Kina the character holds, as its inventory last said, and when.</summary>
+    public RosterKina? Kina { get; init; }
+
     /// <summary>The character's key in the roster (not saved: it is the name and server).</summary>
     [JsonIgnore]
     public RosterKey Key => new(Server, Name);
@@ -84,13 +87,16 @@ public sealed record RosterCharacter
         && CombatPower == other.CombatPower && LastSeen == other.LastSeen
         && Equals(Odyle, other.Odyle) && Equals(Nightmare, other.Nightmare) && Equals(Ascension, other.Ascension)
         && OdyleCap == other.OdyleCap && MembershipSeen == other.MembershipSeen
-        && CorridorRuns.SequenceEqual(other.CorridorRuns);
+        && CorridorRuns.SequenceEqual(other.CorridorRuns) && Equals(Kina, other.Kina);
 
     public override int GetHashCode() => HashCode.Combine(Name, Server, LastSeen, CorridorRuns.Count);
 }
 
 /// <summary>A count as the game last sent it: its two values and when.</summary>
 public sealed record RosterCount(int First, int Second, DateTimeOffset SeenAt);
+
+/// <summary>The Kina a character holds: Kina and Kina (Bound), each null while not known, and when the inventory said it.</summary>
+public sealed record RosterKina(long? Kina, long? Bound, DateTimeOffset SeenAt);
 
 /// <summary>A character's key: the same name on another server is another character.</summary>
 public readonly record struct RosterKey(string Server, string Name);

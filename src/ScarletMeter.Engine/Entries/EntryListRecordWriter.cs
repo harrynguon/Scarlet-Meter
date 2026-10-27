@@ -77,6 +77,41 @@ internal static class EntryListRecordWriter
         return Frame(SelfRecordOpcode, body);
     }
 
+    /// <summary>
+    /// The whole inventory at world entry (<c>11 56</c>): a made-up header, the Kina slots given, and made-up entries of
+    /// other items in the inventory and a storage until the record is past <see cref="InventoryRecords.MinListingBytes"/>,
+    /// as the game's is 15 KB or more.
+    /// </summary>
+    public static byte[] InventoryListing(IReadOnlyList<KinaSlot> kina)
+    {
+        var body = new List<byte> { 0x00, 0x00, 0x01 };
+        foreach (var slot in kina) AddInventoryEntry(body, 1, slot.Item, slot.Quantity, InventoryRecords.InventoryContainer, slot.Slot);
+        for (byte n = 0; body.Count < InventoryRecords.MinListingBytes + 100; n++)
+            AddInventoryEntry(body, 1, 510_116_006, 3, n % 2 == 0 ? InventoryRecords.InventoryContainer : (byte)15, n);
+        return Frame(InventoryRecords.ListingOpcode, body);
+    }
+
+    /// <summary>A change of the inventory (<c>1b 56</c>): a count, then each slot's entry with its kind (0 new, 1 changed, 2 gone).</summary>
+    public static byte[] InventoryChange(IReadOnlyList<(KinaSlot Slot, byte Kind)> entries)
+    {
+        var body = new List<byte> { checked((byte)entries.Count) };
+        foreach (var (slot, kind) in entries) AddInventoryEntry(body, kind, slot.Item, slot.Quantity, InventoryRecords.InventoryContainer, slot.Slot);
+        return Frame(InventoryRecords.ChangeOpcode, body);
+    }
+
+    // One inventory entry in SkeeveAN's documented layout: kind, a byte, a made-up item instance (u32) and a made-up u32,
+    // then the item, its quantity (u64), the container and the slot: the kind ten bytes before the item.
+    private static void AddInventoryEntry(List<byte> body, byte kind, uint item, long quantity, byte container, byte slot)
+    {
+        body.AddRange([kind, 0x00, 0x5A, 0x3C, slot, 0x00, 0x00, 0x07, 0x00, 0x00]);
+        AddId(body, item);
+        var bytes = new byte[8];
+        BinaryPrimitives.WriteUInt64LittleEndian(bytes, (ulong)quantity);
+        body.AddRange(bytes);
+        body.Add(container);
+        body.Add(slot);
+    }
+
     /// <summary>An entry as the game writes it, a zero left out: no value (00), the first (04), the second (08) or both (0c).</summary>
     public static void AddEntry(List<byte> body, EntryValue entry)
     {

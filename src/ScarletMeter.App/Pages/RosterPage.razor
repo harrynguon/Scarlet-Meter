@@ -13,12 +13,27 @@
     var nextRefill = calendar.NextOdyleRefill(now);
     var lastSiege = calendar.LastSiege(now);
     var nextSiege = calendar.NextSiege(now);
+    var kinaTotals = KinaTotals(rows);
 }
 <div class="tool roster" data-window="roster">
     <div class="roster-head">
         <span class="muted">@rows.Count @(rows.Count == 1 ? "character" : "characters")</span>
         <span class="roster-next" title="Basic Odyle energy refills by 15 every three hours, up to its cap (an estimate)">
             Next +15 Odyle <b>@RosterText.At(nextRefill, now)</b> <span class="muted">in @RosterText.Until(nextRefill - now)</span>
+        </span>
+        <span class="roster-next" title="Kina across the characters whose inventory the meter has read, as each one's last said">
+            @if (kinaTotals.Unknown < rows.Count)
+            {
+                <text>Kina <b>@DetailFormat.Full(kinaTotals.Kina)</b> <span class="muted">· Bound</span> <b>@DetailFormat.Full(kinaTotals.Bound)</b> <span class="muted">· together</span> <b>@DetailFormat.Full(kinaTotals.Kina + kinaTotals.Bound)</b></text>
+                @if (kinaTotals.Unknown > 0)
+                {
+                    <span class="muted"> (@kinaTotals.Unknown not known)</span>
+                }
+            }
+            else
+            {
+                <text>Kina <span class="muted">?</span></text>
+            }
         </span>
         <span class="roster-next" title="Corridors count from the last Abyss Siege (@RosterText.At(lastSiege, now)) to the next, on the world-event schedule; not checked in the game">
             Corridors reset <b>@RosterText.At(nextSiege, now)</b>
@@ -28,6 +43,7 @@
             <select value="@sort" @onchange="OnSortChanged">
                 <option value="@RosterSort.MostOdyle">Most Odyle</option>
                 <option value="@RosterSort.FullSoonest">Full soonest</option>
+                <option value="@RosterSort.MostKina">Most Kina</option>
                 <option value="@RosterSort.Name">Name</option>
                 <option value="@RosterSort.LastSeen">Last played</option>
             </select>
@@ -54,6 +70,7 @@
                         <th title="Entries left (+extra from recharge items); +@RosterRules.Nightmare.Add a day, up to @RosterRules.Nightmare.Cap">Nightmare</th>
                         <th title="Entries left (+extra from recharge items); +@RosterRules.Ascension.Add a week, up to @RosterRules.Ascension.Cap">Ascension</th>
                         <th title="Artifact Corridors entered since the last Abyss Siege, as the meter saw them; up to @RosterRules.CorridorsPerSiege between sieges, as your side's artifacts allow">Corridors</th>
+                        <th title="Kina, and Kina (Bound) below it (Engraved Kina, as the game's Korean and Japanese names have it), as the character's inventory last said: at login and at each change">Kina</th>
                         <th class="left">Last played</th>
                         <th></th>
                     </tr>
@@ -97,6 +114,10 @@
                             <td>@ContentCell(row.Nightmare, character.Nightmare)</td>
                             <td>@ContentCell(row.Ascension, character.Ascension)</td>
                             <td class="@(row.Corridors == 0 ? "muted" : "")">@row.Corridors</td>
+                            <td>
+                                <div>@KinaCell(character.Kina?.Kina)</div>
+                                <div class="roster-bound">bound @KinaCell(character.Kina?.Bound)</div>
+                            </td>
                             <td class="left muted">@RosterText.At(character.LastSeen, now)</td>
                             <td>
                                 <button type="button" class="btn small @(IsArmed(row.Key) ? "danger" : "")" title="Remove from the roster; the character comes back when you play it" @onclick="() => ClickRemove(row.Key)">@(IsArmed(row.Key) ? "Remove?" : "×")</button>
@@ -108,7 +129,7 @@
         }
     </div>
     <footer class="roster-foot muted">
-        ≈ marks an estimate: basic Odyle energy +15 every three hours from the daily reset, Nightmare +@RosterRules.Nightmare.Add at each daily reset, Ascension Trial +@RosterRules.Ascension.Add at the weekly reset, none yet checked in the game. Logging in on a character corrects them. Corridors are the Artifact Corridor entries the meter saw since the last Abyss Siege, not estimated: one is missed when the meter is closed, when it misses the corridor's loading, or when the game does not name your character again within @((int)RosterService.CorridorConfirmWindow.TotalMinutes) minutes of a server change.
+        ≈ marks an estimate: basic Odyle energy +15 every three hours from the daily reset, Nightmare +@RosterRules.Nightmare.Add at each daily reset, Ascension Trial +@RosterRules.Ascension.Add at the weekly reset, none yet checked in the game. Logging in on a character corrects them. Corridors are the Artifact Corridor entries the meter saw since the last Abyss Siege, not estimated: one is missed when the meter is closed, when it misses the corridor's loading, or when the game does not name your character again within @((int)RosterService.CorridorConfirmWindow.TotalMinutes) minutes of a server change. Kina is as each character's inventory last said, at login and at each change, so it is as of the last time you played them.
         @if (!Roster.CanSave)
         {
             <span> Changes are not saved this run.</span>
@@ -117,6 +138,15 @@
 </div>
 
 @code {
+    // A Kina amount, or "?" before the inventory has said.
+    private static RenderFragment KinaCell(long? amount) => builder =>
+    {
+        builder.OpenElement(0, "span");
+        builder.AddAttribute(1, "class", amount is null or 0 ? "muted" : string.Empty);
+        builder.AddContent(2, amount is { } value ? DetailFormat.Full(value) : "?");
+        builder.CloseElement();
+    };
+
     // A content's entries left (+extra), marked ≈ when estimated; "?" before the game has sent it.
     private static RenderFragment ContentCell(Estimate? estimate, RosterCount? seen) => builder =>
     {

@@ -9,7 +9,7 @@ This licence covers the following components bundled in Scarlet Meter, each unde
 - SharpPcap: Copyright (c) Tamir Gal, Chris Morgan and others
 - Microsoft.Data.Sqlite: Copyright (c) .NET Foundation and Contributors
 - Byanski/aion2timeroverlay (schedule defaults adapted, no code): Copyright (c) Byanski
-- SkeeveAN/Aion-DPS-Meter (the open world's and the Abyss's map names, no code): Copyright (c) 2026 SkeeveTV
+- SkeeveAN/Aion-DPS-Meter (the open world's and the Abyss's map names; the inventory record's layout and Kina's item ids): Copyright (c) 2026 SkeeveTV
 
 The runtime's, WPF's and the packages' own licence and third-party notices are in licenses/runtime,
 licenses/dotnet-wpf and licenses/packages beside this file.
