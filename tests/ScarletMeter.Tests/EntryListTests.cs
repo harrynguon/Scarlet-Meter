@@ -867,6 +867,31 @@ public sealed class EntryListTests
         Assert.Equal(8, last.Kina?.Kina);
     }
 
+    // A listing held for a self record that never came is forgotten when its connection is left: a switch to B whose list
+    // and self record were lost, then back to A on another connection whose list and listing were lost, must not give B's
+    // Kina to A (Codex on #50).
+    [Fact]
+    public void AHeldListingIsForgottenWhenItsConnectionIsLeft()
+    {
+        var clock = new FakeTimeProvider(Start);
+        var tap = NewTap(new() { [7] = Alpha, [9] = Beta }, clock);
+        CharacterProgress? last = null;
+        tap.ProgressObserved += (_, progress) => last = progress;
+        tap.Observe(EntryListRecordWriter.List([Odyle]));
+        tap.Observe(EntryListRecordWriter.InventoryListing([KinaSlot0]));
+        tap.Observe(SelfRecord(7));
+        Assert.Equal(1_234_567, last!.Kina?.Kina);
+
+        clock.Advance(TimeSpan.FromMinutes(1));
+        tap.ConnectionStarted(); // to Beta, its list and self record lost
+        tap.Observe(EntryListRecordWriter.InventoryListing([KinaSlot0 with { Quantity = 50 }])); // Beta's, held
+        clock.Advance(TimeSpan.FromMinutes(1));
+        tap.ConnectionStarted(); // back to Alpha, its list and listing lost
+        tap.Observe(SelfRecord(7));
+        Assert.Same(Alpha, last.Character);
+        Assert.Null(last.Kina); // not Beta's 50; the roster keeps Alpha's saved Kina
+    }
+
     // A listing while a character is named but with no self record just before it may be a switch's on the same
     // connection: it waits for the next self record, which takes it within the burst whoever it names, or for the same
     // character later (deep audit on #50).

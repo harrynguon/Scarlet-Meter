@@ -35,8 +35,8 @@ namespace ScarletMeter.Engine.Upstream;
 /// connection, or while a character is named but with no self record within <see cref="LoginBurst"/> before it, is held,
 /// not reported, until the next self record (it may be a switch's whose list was lost, or one on the same connection), which keeps it when it comes within <see cref="LoginBurst"/> after the
 /// listing even if it names another character; another character named otherwise forgets it, as it does the counts; and
-/// a move to a new connection before any character is named forgets what was read before. A listing counts towards a
-/// login only on its own connection: one read before a move is no new login's (Codex on #50). Before any listing (a meter
+/// a move to a new connection before any character is named, or while a listing is held, forgets what was read before.
+/// A listing counts towards a login only on its own connection: one read before a move is no new login's (Codex on #50). Before any listing (a meter
 /// started mid-session) an item is known only once seen changing.</para>
 /// <para>Runs on the capture thread, inside upstream's PacketAccumulator callback (see <see cref="RecordTap"/>, which
 /// contains anything that escapes), where upstream also writes its tracker, or on the demo feed's thread, whose records
@@ -135,8 +135,9 @@ internal sealed class EntryListTap : IRecordReader
     {
         lock (gate)
         {
-            // Read before any character was named, on a connection now left: whose it was is not known.
-            if (owner is null) ForgetKina();
+            // Read before any character was named, or held for a self record that never came, on a connection now left:
+            // whose it was is not known (Codex on #50: a switch's held listing went to the character named on the next one).
+            if (owner is null || kinaHeld) ForgetKina();
             // A listing read on the connection left is not the next login's: a whole list on the new one does not keep it
             // by its time (Codex on #50), while a self record naming the same character, with no list between, still does.
             kinaListingAt = default;
