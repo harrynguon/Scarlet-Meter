@@ -118,10 +118,12 @@ public partial class RosterPage : IDisposable
     };
 
     /// <summary>
-    /// What a "?" the game has not filled yet says when pointed at (the gear score, the bound Kina): both come at login, so
-    /// a character played only since the meter started mid-session has neither until its next login.
+    /// What a "?" the game has not filled yet says when pointed at (the gear score, the bound Kina): both usually come at
+    /// login, so a character played only since the meter started mid-session has neither until its next login. "Usually":
+    /// a gear score also waits on a server id that checked out, and a Kina listing read long before the login's list is
+    /// not taken (deep audit on #58).
     /// </summary>
-    public const string NotReadYet = "not read yet: the game sends it when you log in on this character, so log in on it with the meter running";
+    public const string NotReadYet = "not read yet: the game usually sends it when you log in on this character, so log in on it with the meter running";
 
     /// <summary>What the gear score says when pointed at: what it is, and why it is "?" while not read.</summary>
     public static string GearScoreTitle(RosterCharacter character) =>

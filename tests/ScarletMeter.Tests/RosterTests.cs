@@ -132,7 +132,7 @@ public sealed class RosterTests : IDisposable
 
     // The cap list shows 840 for the default and for a saved choice of 840 (from before it was the default), 560 for 560. A
     // gear score or bound Kina not read yet says why when pointed at (both come at login, so a meter started mid-session
-    // has neither for the character played; Harry, 2026-10-27: "bound kina ... should be 235k, instead of ?"); once read,
+    // has neither for the character played; Harry, 2026-10-27, of a bound Kina shown as "?"); once read,
     // the gear score's tip says what it is and the bound Kina has none.
     [Fact]
     public void TheRosterPageShowsTheCapAndWhyAValueIsNotRead()

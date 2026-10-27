@@ -704,9 +704,10 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"width:\s*22px;\s*height:\s*22px;", Block(views, ".roster-table .class-icon"));
         Assert.Matches(@"width:\s*28px;", Block(views, ".roster-table .icon-cell"));
         // The icon at the top of its cell, centred on the name and class lines, not the row (Harry, 2026-10-27: "a bit
-        // higher up"): 6 px down, the middle of those two lines in headless renders, with a note or without.
+        // higher up"): 6 px down, the middle of those two lines in headless renders, with a note or without; still at the
+        // cell's right, by the name (a block at the left was 6 px further off; deep audit on #58).
         Assert.Matches(@"vertical-align:\s*top;", Block(views, ".roster-table .icon-cell"));
-        Assert.Matches(@"display:\s*block;.*margin-top:\s*6px;", Block(views, ".roster-table .class-icon"));
+        Assert.Matches(@"display:\s*block;.*margin:\s*6px 0 0 auto;", Block(views, ".roster-table .class-icon"));
         // The row's room back from the cells' sides and the headers' spacing.
         Assert.Matches(@"padding-left:\s*4px;\s*padding-right:\s*4px;", Block(views, ".roster-table th, .roster-table td"));
         Assert.Matches(@"letter-spacing:\s*0;", Block(views, ".roster-table th"));
