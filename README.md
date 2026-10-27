@@ -98,8 +98,9 @@ and adds it up per player and per fight.
   full again, and Nightmare and Ascension entries left, estimated (≈) from what the game last said, the Artifact
   Corridors it entered since the last Abyss Siege, as the meter saw them, out of those whose artifact your side holds
   (read when you open the Abyss map or enter the Abyss), and its Kina and Kina (Bound) as of the last time you played
-  it, with the totals across characters, and a note of your own under each name. Click the Odyle energy, or Settings,
-  Appearance, Characters. The recharge and siege times, the Kina and the artifacts are not yet checked in the game.
+  it, with the totals across characters, and a note of your own under each name. Open it with the Characters button
+  at the top right, by clicking the Odyle energy, or from Settings, Appearance, Characters. The recharge and siege
+  times, the Kina and the artifacts are not yet checked in the game.
 
 **World events**
 
@@ -128,7 +129,7 @@ and adds it up per player and per fight.
   or one too new for RATmeter's list is not counted while it is on), summons folded into their owner, a one-minute
   cap on training dummies.
 - **Pauses in the Abyss**: hundreds of players fighting at once slow any meter down, so in the Abyss Scarlet Meter
-  tracks and keeps nothing and its header reads "In the Abyss · meter paused"; it tracks again once you leave. On by
+  tracks and keeps nothing and its header reads "In the Abyss · paused"; it tracks again once you leave. On by
   default; switch it off in Settings, Tracking. Settings, About shows the map you are on (its name, where known, and
   its id).
 

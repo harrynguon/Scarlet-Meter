@@ -130,6 +130,12 @@ button {
     display: flex;
     align-items: center;
     gap: 8px;
+    /* Never under the buttons at the overlay's narrowest. The clip box reaches 10 px past the avatar on the left, top and
+       bottom (padding, taken back by the margin) so its ring's glow, 1.5 px and a 7 px blur, is never cut. */
+    overflow: hidden;
+    padding: 10px 0 10px 10px;
+    margin: -10px 0 -10px -10px;
+    container: ov-title / inline-size;
 }
 
 /* Scarlet's face at the header's left, always there (images/avatar.png, from the app icon's portrait; its source is in
@@ -171,14 +177,27 @@ button {
     box-shadow: 0 0 0 1.5px var(--muted);
 }
 
+/* In a fight, the state gives way on a narrow overlay ("Boss c…"), and goes when there is no room for a readable piece
+   of it beside the duration (rather than leave a sliver of a letter); the duration never shrinks: the overlay's least
+   width (OverlayWindow.MinWidth) leaves room for the header's buttons and a duration past an hour. */
 .state-text {
+    min-width: 0;
     font-weight: 600;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .state-time {
+    flex: none;
     color: var(--good);
     font-variant-numeric: tabular-nums;
+}
+
+@container ov-title (max-width: 119px) {
+    .state-text {
+        display: none;
+    }
 }
 
 .target-name {
