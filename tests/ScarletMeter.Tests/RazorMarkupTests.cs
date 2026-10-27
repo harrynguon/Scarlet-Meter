@@ -577,14 +577,15 @@ public sealed partial class RazorMarkupTests
         var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
         var markup = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
         var totals = Regex.Match(markup, @"(?s)<div class=""ov-totals"">(?<body>.*?)\n    </div>").Groups["body"].Value;
-        Assert.Matches(@"(?s)class=""accent"">.*@if \(appearance\.ShowOdyleEnergy && odyle is \{ \} energy\).*<span class=""odyle"".*"
+        Assert.Matches(@"(?s)class=""accent"">.*@if \(appearance\.ShowOdyleEnergy && odyle is \{ \} energy\).*<span class=""odyle @.*"
             + @"@OdyleText\.Basic\(energy\).*@OdyleText\.Charged\(energy\).*<span class=""ping ", totals);
-        Assert.True(totals.IndexOf(@"<span class=""odyle""", StringComparison.Ordinal) < totals.IndexOf(@"<span class=""ping", StringComparison.Ordinal),
+        Assert.True(totals.IndexOf(@"<span class=""odyle ", StringComparison.Ordinal) < totals.IndexOf(@"<span class=""ping", StringComparison.Ordinal),
             "the energy comes before the ping");
         Assert.DoesNotContain("<img", totals); // the crystal is Scarlet's own drawing, not the game's art
 
         var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
-        Assert.Matches(@"snapshot = Engine\.GetSnapshot\(\);\s*(?://[^\n]*\n\s*)*odyle = Engine\.OdyleEnergy;", code);
+        Assert.Matches(@"snapshot = Engine\.GetSnapshot\(\);\s*var now = Clock\.GetUtcNow\(\);\s*ReadEnergy\(now\);", code);
+        Assert.Matches(@"private void ReadEnergy\(DateTimeOffset now\)\s*\{\s*odyle = Engine\.OdyleEnergy;", code);
         Assert.DoesNotContain("OdyleEnergyUpdated", code);
 
         var css = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "app.css"));
@@ -606,14 +607,16 @@ public sealed partial class RazorMarkupTests
         var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
         var markup = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
         var totals = Regex.Match(markup, @"(?s)<div class=""ov-totals"">(?<body>.*?)\n    </div>").Groups["body"].Value;
-        Assert.Matches(@"(?s)class=""accent"">.*@if \(appearance\.ShowShugoKeys && shugo is \{ \} keys\).*<span class=""shugo"".*"
+        Assert.Matches(@"(?s)class=""accent"">.*@if \(appearance\.ShowShugoKeys && shugo is \{ \} keys\).*<span class=""shugo @.*"
             + @"@ShugoText\.Keys\(keys\).*ShugoText\.Extra\(keys\).*<span class=""shugo-extra"">@extra</span>.*"
-            + @"@if \(appearance\.ShowOdyleEnergy && odyle is \{ \} energy\).*<span class=""odyle"".*<span class=""ping ", totals);
+            + @"@if \(appearance\.ShowOdyleEnergy && odyle is \{ \} energy\).*<span class=""odyle @.*<span class=""ping ", totals);
         Assert.Contains(@"<svg class=""shugo-icon""", totals); // a key of Scarlet's own drawing
 
+        // Read with the energy on the refresh loop and when the page starts (ReadEnergy).
         var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
-        Assert.Matches(@"odyle = Engine\.OdyleEnergy;\s*shugo = Engine\.ShugoKeys;\s*var now = Clock\.GetUtcNow\(\);", code);
-        Assert.Matches(@"odyle = Engine\.OdyleEnergy;\s*shugo = Engine\.ShugoKeys;\s*Settings\.Changed \+= OnSettingsChanged;", code);
+        Assert.Matches(@"private void ReadEnergy\(DateTimeOffset now\)\s*\{\s*odyle = Engine\.OdyleEnergy;\s*shugo = Engine\.ShugoKeys;", code);
+        Assert.Matches(@"snapshot = Engine\.GetSnapshot\(\);\s*var now = Clock\.GetUtcNow\(\);\s*ReadEnergy\(now\);", code);
+        Assert.Matches(@"ReadEnergy\(Clock\.GetUtcNow\(\)\);\s*Settings\.Changed \+= OnSettingsChanged;", code);
         Assert.Contains("ValueChanged=\"@(v => Change(s => s with { Appearance = s.Appearance with { ShowShugoKeys = v } }))\"",
             File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor")));
 
@@ -646,6 +649,36 @@ public sealed partial class RazorMarkupTests
             "the bars give way at the overlay's least width");
     }
 
+    // Until the game sends its own this run, the overlay shows the roster's last known Odyle energy and Shugo keys,
+    // estimated, for the character played (Harry, 2026-10-28): the game's first, the roster's only for what the game has
+    // not sent, each marked with ≈, dimmer and italic, and saying so when pointed at.
+    [Fact]
+    public void TheOverlayShowsTheLastKnownEnergyAndKeysUntilTheGameSendsItsOwn()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
+        var read = Regex.Match(code, @"(?s)private void ReadEnergy\(DateTimeOffset now\)\s*\{(?<body>.*?)\n    \}").Groups["body"].Value;
+        Assert.Matches(@"(?s)^\s*odyle = Engine\.OdyleEnergy;\s*shugo = Engine\.ShugoKeys;\s*odyleLastKnown = shugoLastKnown = false;\s*"
+            + @"if \(\(odyle is not null && shugo is not null\) \|\| Roster\.LastKnown is not \{ \} last\) return;", read);
+        Assert.Matches(@"(?s)if \(odyle is null && LastKnownValues\.Odyle\(last\.Character, now, calendar\) is \{ \} energy\)\s*\{\s*odyle = energy;\s*odyleLastKnown = true;", read);
+        Assert.Matches(@"(?s)if \(shugo is null && LastKnownValues\.Shugo\(last\.Shugo, now, calendar\) is \{ \} keys\)\s*\{\s*shugo = keys;\s*shugoLastKnown = true;", read);
+        Assert.Matches(@"RechargeCalendar\.ForServerOffsetHours\(alertSettings\.ServerOffsetHours\)", read); // the roster's calendar
+
+        var markup = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
+        Assert.Contains(@"<span class=""shugo @(shugoLastKnown ? ""last-known"" : """")"" title=""@ShugoTitle"">", markup);
+        Assert.Contains(@"<span class=""shugo-keys"">@(shugoLastKnown ? ""≈"" : """")@ShugoText.Keys(keys)</span>", markup);
+        Assert.Contains(@"<span class=""odyle @(odyleLastKnown ? ""last-known"" : """")"" title=""@OdyleTitle"" @onclick=""Windows.OpenRoster"">", markup);
+        Assert.Contains(@"<span class=""odyle-basic"">@(odyleLastKnown ? ""≈"" : """")@OdyleText.Basic(energy)</span>", markup);
+        Assert.Matches(@"OdyleTitle => odyleLastKnown\s*\? ""Odyle energy, estimated \(≈\)", code);
+        Assert.Matches(@"ShugoTitle => shugoLastKnown\s*\? ""Shugo Festival keys, estimated \(≈\)", code);
+
+        var css = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "app.css"));
+        var lastKnown = Regex.Match(css, @"(?m)^\.odyle\.last-known \.odyle-basic,\s*\.shugo\.last-known \.shugo-keys \{(?<body>[^}]*)\}").Groups["body"].Value;
+        Assert.Matches(@"font-style:\s*italic;", lastKnown);
+        Assert.Matches(@"color:\s*#c9c6d6;", lastKnown); // the roster's estimate colour
+        Assert.Matches(@"(?m)^\.roster-table \.estimate \{ color: #c9c6d6; font-style: italic; \}", File.ReadAllText(Path.Combine(app, "wwwroot", "css", "views.css")));
+    }
+
     // The character roster opens from the overlay's header (Characters, just left of Settings), from its Odyle energy and from
     // Settings: the header and Settings work with the energy hidden or not sent yet. Its page masks names as every window
     // does with "Hide nicknames" on, and writes no name without it.
@@ -654,7 +687,7 @@ public sealed partial class RazorMarkupTests
     {
         var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
         var meter = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
-        Assert.Matches(@"<span class=""odyle""[^>]*@onclick=""Windows\.OpenRoster""", meter);
+        Assert.Matches(@"<span class=""odyle @[^>]*@onclick=""Windows\.OpenRoster""", meter);
         // Just left of Settings (Harry), after History.
         Assert.Matches(@"(?s)<div class=""ov-actions"".*?title=""History"".*?<button type=""button"" class=""icon-btn"" title=""Characters"" @onclick=""Windows\.OpenRoster"">\s*<svg[^>]*>.*?</svg>\s*</button>\s*<button type=""button"" class=""icon-btn"" title=""Settings"".*?</header>", meter);
         Assert.Matches(@"(?s)<span class=""label"">Characters</span>.*?@onclick=""Windows\.OpenRoster""", File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor")));

@@ -12,8 +12,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 - Your Shugo Festival keys beside the ping, left of the Odyle energy: the keys left, which your characters
   on a server share, with the extra from recharge items in brackets when there is any, once the game sends them (at
-  login, after a server transfer and when they change). "Show Shugo Festival keys" in Settings, Appearance turns them
-  off. Not yet checked in the game. ([#57](https://github.com/harrynguon/Scarlet-Meter/pull/57))
+  login, after a server transfer and when they change); until then, the last keys the game said on that server, marked
+  ≈, with +3 a day added. "Show Shugo Festival keys" in Settings, Appearance turns them off. Not yet checked in the
+  game. ([#57](https://github.com/harrynguon/Scarlet-Meter/pull/57), [#60](https://github.com/harrynguon/Scarlet-Meter/pull/60))
 - Settings, About names the Artifact Corridor, the two-minute instance you enter from the Abyss. The meter keeps
   tracking there; it pauses again once you are back in the Abyss. ([#47](https://github.com/harrynguon/Scarlet-Meter/pull/47))
 - A character roster: every character you log in on with the meter running, with its class and level from that first
@@ -32,6 +33,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ### Changed
 
+- Started while you are already in the game, the meter shows your Odyle energy beside the ping at once: the last the
+  game said for the character you played last, marked ≈, with basic energy's refills since added, until the game sends
+  its own at your next login or when it changes. ([#60](https://github.com/harrynguon/Scarlet-Meter/pull/60))
 - While the meter is paused in the Abyss, the top of the meter reads "In the Abyss · paused" (it was "In the Abyss · meter
   paused"), so it fits beside the buttons. ([#53](https://github.com/harrynguon/Scarlet-Meter/pull/53))
 

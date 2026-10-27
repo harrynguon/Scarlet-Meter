@@ -43,6 +43,8 @@ public sealed class RosterService : IDisposable
     private readonly Dictionary<RosterKey, RosterCharacter> characters = [];
     // The Abyss's lower-layer artifact holders by server id, as the game last said on each.
     private readonly Dictionary<int, RosterArtifacts> artifacts = [];
+    // The Shugo Festival keys by server id, as the game last said on each (they are the server's).
+    private readonly Dictionary<int, RosterShugoKeys> shugoKeys = [];
     private RosterKey? current;
     // The map the engine named last (null: not known), to see the corridor being entered rather than loaded again, and the
     // last map it knew, to tell a reconnection inside the corridor (unknown, then the corridor again) from an entry.
@@ -76,6 +78,7 @@ public sealed class RosterService : IDisposable
         var loaded = store.Load(clock.GetUtcNow());
         foreach (var character in loaded.File.Characters) characters[character.Key] = character;
         foreach (var entry in loaded.File.Artifacts) artifacts[entry.ServerId] = entry;
+        foreach (var entry in loaded.File.ShugoKeys) shugoKeys[entry.ServerId] = entry;
         CanSave = loaded.CanSave;
         Notice = loaded.Notice;
     }
@@ -105,6 +108,32 @@ public sealed class RosterService : IDisposable
     public IReadOnlyDictionary<int, RosterArtifacts> Artifacts
     {
         get { lock (gate) return new Dictionary<int, RosterArtifacts>(artifacts); }
+    }
+
+    /// <summary>The Shugo Festival keys by server id, as the game last said on each (a copy).</summary>
+    public IReadOnlyDictionary<int, RosterShugoKeys> ShugoKeys
+    {
+        get { lock (gate) return new Dictionary<int, RosterShugoKeys>(shugoKeys); }
+    }
+
+    /// <summary>
+    /// What the overlay's last known Odyle energy and Shugo keys are for, while the game has not sent its own this run:
+    /// the character the game named last this run, or else the one played last (the meter started while that character
+    /// was already in the game, as it usually is), with the keys saved for its server, if any. Null with no character.
+    /// </summary>
+    public RosterLastKnown? LastKnown
+    {
+        get
+        {
+            lock (gate)
+            {
+                var character = current is { } key && characters.TryGetValue(key, out var named)
+                    ? named
+                    : characters.Values.MaxBy(c => c.LastSeen);
+                if (character is null) return null;
+                return new RosterLastKnown(character, character.ServerId > 0 && shugoKeys.TryGetValue(character.ServerId, out var keys) ? keys : null);
+            }
+        }
     }
 
     /// <summary>Follows the engine from now on. Later calls, and calls after disposal, do nothing.</summary>
@@ -149,6 +178,8 @@ public sealed class RosterService : IDisposable
             };
             characters[key] = character;
             current = key;
+            if (progress.Entries.TryGetValue(EntryIds.ShugoFestivalKeys, out var keys) && ServerIdOf(who) is > 0 and var serverId)
+                KeepShugoKeys(serverId, keys, now);
             MarkChanged();
             held = SettleHeldRuns(who, now);
             heldArtifactsKept = SettleHeldArtifacts(who, now);
@@ -234,6 +265,15 @@ public sealed class RosterService : IDisposable
         if (!entries.TryGetValue(id, out var read)) return kept;
         if (kept is not null && kept.SeenAt <= now && read.SeenAt <= kept.SeenAt) return kept;
         return new RosterCount(read.First, read.Second, read.SeenAt);
+    }
+
+    // Under the gate: the Shugo Festival keys the game said for the character's server, kept for that server when read
+    // later than the ones kept there (a kept reading dated after now does not count as later, as in Later): they are the
+    // server's, so another character's reading on it replaces them.
+    private void KeepShugoKeys(int serverId, EntryCount read, DateTimeOffset now)
+    {
+        if (shugoKeys.TryGetValue(serverId, out var kept) && kept.SeenAt <= now && read.SeenAt <= kept.SeenAt) return;
+        shugoKeys[serverId] = new RosterShugoKeys(serverId, read.First, read.Second, read.SeenAt);
     }
 
     // The Kina from the report when it was read later than the one kept (a kept one dated after now does not count as later,
@@ -432,6 +472,7 @@ public sealed class RosterService : IDisposable
                 {
                     Characters = [.. characters.Values.OrderBy(c => c.Server, StringComparer.Ordinal).ThenBy(c => c.Name, StringComparer.Ordinal)],
                     Artifacts = [.. artifacts.Values.OrderBy(entry => entry.ServerId)],
+                    ShugoKeys = [.. shugoKeys.Values.OrderBy(entry => entry.ServerId)],
                 };
                 dirty = false;
             }

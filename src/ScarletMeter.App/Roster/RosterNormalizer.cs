@@ -91,7 +91,23 @@ public static class RosterNormalizer
         if (artifactsDropped > 0) repairs.Add($"{artifactsDropped} unusable Abyss artifact {(artifactsDropped == 1 ? "record" : "records")} dropped.");
         if (artifactsTrimmed > 0) repairs.Add($"{artifactsTrimmed} Abyss artifact {(artifactsTrimmed == 1 ? "record" : "records")} listed twice or past the {MaxServers} kept dropped.");
         if (artifactsRepaired > 0) repairs.Add($"Abyss artifact holders or times repaired on {artifactsRepaired} {(artifactsRepaired == 1 ? "server" : "servers")}.");
-        return (new RosterFile { Version = RosterFile.CurrentVersion, Characters = newest, Artifacts = artifacts }, repairs);
+
+        var (shugo, shugoDropped, shugoTrimmed) = CleanShugoKeys(file?.ShugoKeys, now);
+        if (shugoDropped > 0) repairs.Add($"{shugoDropped} unusable Shugo Festival key {(shugoDropped == 1 ? "record" : "records")} dropped.");
+        if (shugoTrimmed > 0) repairs.Add($"{shugoTrimmed} Shugo Festival key {(shugoTrimmed == 1 ? "record" : "records")} listed twice or past the {MaxServers} kept dropped.");
+        return (new RosterFile { Version = RosterFile.CurrentVersion, Characters = newest, Artifacts = artifacts, ShugoKeys = shugo }, repairs);
+    }
+
+    // The Shugo Festival keys as they can be used: on a server with a side, counts within the entry list's bound and a
+    // usable date; one per server, the one read last; the most recently read kept.
+    private static (List<RosterShugoKeys> Kept, int Dropped, int Trimmed) CleanShugoKeys(IReadOnlyList<RosterShugoKeys>? saved, DateTimeOffset now)
+    {
+        List<RosterShugoKeys> usable = [.. (saved ?? []).Where(entry => entry is not null
+            && AbyssArtifacts.SideOf(entry.ServerId) != ArtifactHolder.Unknown
+            && entry.Keys is >= 0 and <= MaxCount && entry.Extra is >= 0 and <= MaxCount && IsUsableDate(entry.SeenAt, now))];
+        var unique = usable.GroupBy(entry => entry.ServerId).Select(g => g.OrderByDescending(entry => entry.SeenAt).First()).ToList();
+        var kept = unique.OrderByDescending(entry => entry.SeenAt).Take(MaxServers).OrderBy(entry => entry.ServerId).ToList();
+        return (kept, (saved?.Count ?? 0) - usable.Count, usable.Count - kept.Count);
     }
 
     // The Abyss artifact holders as they can be used: on a server with a side, a holder for each lower-layer artifact and a

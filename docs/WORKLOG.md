@@ -2,6 +2,21 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-28 — The overlay's last known Odyle energy and Shugo keys
+
+**What:**
+- **Last known values** (`Roster/LastKnownValues`, `RosterService.LastKnown`, `MeterPage.ReadEnergy`): until the game sends its own this run, the overlay shows the roster's last known Odyle energy and Shugo keys, each on its own (the game's always wins): the energy of the character the game named last this run, or else the one played last, estimated as the roster does (basic +15 every three hours to the cap, charged kept), and the keys saved for that character's server, +3 at each daily reset up to 21 (`RosterRules.Shugo`, the content table's rule), extra kept. Marked with ≈ before the number, dimmer and italic as the roster's estimates, with a tip saying so.
+- **Shugo keys saved per server** (`RosterFile.ShugoKeys`, `RosterShugoKeys`): each report's keys are kept for the server of the character named (its server id, or the roster's for it), a later reading replacing them; checked on load as the artifact holders are (a server with a side, counts within the bound, a usable date, one per server). A file from before has none; an earlier build passes them over.
+- `RechargeCalendar.ForServerOffsetHours`: the roster page and the overlay make their calendar the same way.
+
+**Why:** Harry: "can the shugo festival key and odlye energy count be reread without them changing in value?" The meter only listens: the game sends the whole list at login (and, per A2Tools, after some server transfers; the map change seen the night before brought no list) and each value when it changes, so a meter started mid-session showed neither until then. Harry then asked for "the overlay [to] show the last known Odyle energy (from the roster, refills estimated with ≈) and Shugo keys (saved per server) as soon as the meter starts, until the game sends fresh values. In its own PR."
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` Debug 908/908 (a first run failed only `DummyFightTests.AStrangersRunningDummyFightIsNeitherListedNorOpened` on the SQLite handle disposed under it, the known flake in HANDOFF; the next run passed). Fail-first on a scratch copy, controls passing before and after: 13 of 14 mutations caught (the page never falling back, the last known over the game's energy, the style not italic, the keys never kept, an earlier reading taken, kept without a server id, not saved, not loaded, the character played first, the energy at 560, the keys not estimated, a server without a side kept, the first of a server's readings kept); the fourteenth, "no ≈ on the keys", did not run (its text was read in the wrong encoding by the runner), to run again. Headless renders of the totals line with the real stylesheet at 320, 340, 341 and 400 px: the line stays 26 px tall in every case; the two marks take about 18 px; typical values (123.4K/s, ≈15 (+3), ≈735 (+1,200), 117 ms) fit everywhere, 1.5 px to spare at 320; 999.9K/s, ≈21 (+12), ≈840 (+1,200) and 1043 ms run 12.5 px past the end at 320 and 10.5 at 341, clipped; the estimate's style computes italic in rgb(201, 198, 214).
+
+**Not checked:** in the game (HANDOFF, "Last known Odyle energy and Shugo keys", a new item): how far the estimates are from the game's own values when it sends them, and the daily +3 for the keys. The line was rendered only from a static copy of its markup (headless Edge), not in the running meter.
+
+**Next:** the PR, a deep audit (saved data, the overlay's refresh loop reading the roster), Codex and CI; then the merge with Harry's go-ahead.
+
 ## 2026-10-28 — #58 seen in the game
 
 **What:** HANDOFF's "Global servers (#58)" and "Kina" items record what Harry's first session with #58 showed; docs only.

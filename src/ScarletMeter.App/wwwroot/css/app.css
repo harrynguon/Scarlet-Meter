@@ -431,6 +431,15 @@ button {
     color: #ffd60a;
 }
 
+/* The Odyle energy and Shugo keys the roster last knew, estimated, until the game sends its own this run (MeterPage's
+   ReadEnergy; Harry, 2026-10-28): ≈ before the number, dimmer and italic, as the roster shows its estimates (.estimate in
+   views.css). */
+.odyle.last-known .odyle-basic,
+.shugo.last-known .shugo-keys {
+    color: #c9c6d6;
+    font-style: italic;
+}
+
 .ping {
     margin-left: auto;
     display: inline-flex;

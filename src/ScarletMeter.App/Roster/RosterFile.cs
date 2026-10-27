@@ -19,6 +19,12 @@ public sealed record RosterFile
 
     /// <summary>Who held the Abyss's lower-layer artifacts on each server the game said it on: one entry per server.</summary>
     public IReadOnlyList<RosterArtifacts> Artifacts { get; init; } = [];
+
+    /// <summary>
+    /// The Shugo Festival keys on each server the game said them on, one entry per server: the overlay's last known keys
+    /// when the meter starts (a file from before them has none, and an earlier build passes them over).
+    /// </summary>
+    public IReadOnlyList<RosterShugoKeys> ShugoKeys { get; init; } = [];
 }
 
 /// <summary>How a character's basic Odyle energy cap is chosen.</summary>
@@ -122,6 +128,18 @@ public sealed record RosterCount(int First, int Second, DateTimeOffset SeenAt);
 
 /// <summary>The Kina a character holds: Kina and Kina (Bound), each null while not known, and when the inventory said it.</summary>
 public sealed record RosterKina(long? Kina, long? Bound, DateTimeOffset SeenAt);
+
+/// <summary>
+/// The Shugo Festival keys on one server, as the game last said there (they are the server's, shared by its
+/// characters): the keys left, the extra from recharge items, and when. Untrusted on load (<see cref="RosterNormalizer"/>).
+/// </summary>
+/// <param name="ServerId">The server's id (Elyos 1001 and up, Asmodian 2001 and up, Global's among them).</param>
+public sealed record RosterShugoKeys(int ServerId, int Keys, int Extra, DateTimeOffset SeenAt)
+{
+    /// <summary>The keys as a count, for the roster's estimates (<see cref="RosterRules.ContentNow"/>).</summary>
+    [JsonIgnore]
+    public RosterCount Count => new(Keys, Extra, SeenAt);
+}
 
 /// <summary>
 /// Who held the Abyss's lower-layer artifacts, the Artifact Corridors', on one server, as the game last said there
