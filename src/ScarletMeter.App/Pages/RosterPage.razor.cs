@@ -9,6 +9,11 @@ namespace ScarletMeter.App.Pages;
 /// <summary>How the roster is ordered.</summary>
 public enum RosterSort
 {
+    /// <summary>
+    /// Most combat power first, the default (Harry, 2026-10-28: "make a sort by power option ... and make it the
+    /// default ... with highest power being at the top"); a character whose power is not known yet last.
+    /// </summary>
+    MostPower,
     /// <summary>Most basic Odyle energy (as estimated now) first.</summary>
     MostOdyle,
     /// <summary>Full soonest first; the ones already full at the top, since every refill from then on is lost.</summary>
@@ -48,7 +53,7 @@ public partial class RosterPage : IDisposable
 
     // Cancelled when the window closes; not disposed, since the loop's last wait may still check it.
     private readonly CancellationTokenSource stopping = new();
-    private RosterSort sort = RosterSort.MostOdyle;
+    private RosterSort sort = RosterSort.MostPower;
     private (RosterKey Key, DateTimeOffset At)? armedRemoval;
 
     [Inject] private RosterService Roster { get; set; } = default!;
@@ -90,6 +95,7 @@ public partial class RosterPage : IDisposable
         });
         return sort switch
         {
+            RosterSort.MostPower => [.. rows.OrderByDescending(r => r.Character.CombatPower).ThenBy(r => r.Character.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(r => r.Character.Server, StringComparer.Ordinal)],
             RosterSort.FullSoonest => [.. rows.OrderBy(r => r.Odyle is null).ThenBy(r => r.Odyle is { Full: true } ? DateTimeOffset.MinValue : r.FullAt ?? DateTimeOffset.MaxValue).ThenBy(r => r.Character.Name, StringComparer.CurrentCultureIgnoreCase)],
             RosterSort.MostKina => [.. rows.OrderByDescending(r => r.Character.Kina is { } kina ? (kina.Kina ?? 0) + (kina.Bound ?? 0) : -1).ThenBy(r => r.Character.Name, StringComparer.CurrentCultureIgnoreCase)],
             RosterSort.Name => [.. rows.OrderBy(r => r.Character.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(r => r.Character.Server, StringComparer.Ordinal)],

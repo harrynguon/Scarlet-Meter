@@ -42,6 +42,7 @@
         <label class="roster-sort">
             Sort
             <select value="@sort" @onchange="OnSortChanged">
+                <option value="@RosterSort.MostPower">Most power</option>
                 <option value="@RosterSort.MostOdyle">Most Odyle</option>
                 <option value="@RosterSort.FullSoonest">Full soonest</option>
                 <option value="@RosterSort.MostKina">Most Kina</option>
@@ -131,7 +132,14 @@
                                 <div>@KinaCell(character.Kina?.Kina)</div>
                                 <div class="roster-bound" title="@BoundKinaTitle(character)">bound @KinaCell(character.Kina?.Bound)</div>
                             </td>
-                            <td class="left muted">@RosterText.At(character.LastSeen, now)</td>
+                            @* Last played: the day on a line above the time when it is not today, so a date does not widen the column. *@
+                            <td class="left muted" title="@RosterText.At(character.LastSeen, now)">
+                                @if (RosterText.Day(character.LastSeen, now) is { Length: > 0 } day)
+                                {
+                                    <div>@day</div>
+                                }
+                                <div>@RosterText.Time(character.LastSeen)</div>
+                            </td>
                             <td>
                                 <button type="button" class="btn small @(IsArmed(row.Key) ? "danger" : "")" title="Remove from the roster, its note with it; the character comes back when you play it" @onclick="() => ClickRemove(row.Key)">@(IsArmed(row.Key) ? "Remove?" : "×")</button>
                             </td>

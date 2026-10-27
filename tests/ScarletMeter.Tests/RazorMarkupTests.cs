@@ -700,6 +700,22 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?s)public void Dispose\(\).*Roster\.Changed -= OnRosterChanged;.*Settings\.Changed -= OnSettingsChanged;", code);
     }
 
+    // The roster opens sorted by combat power, most first, "Most power" the first of the sorts (Harry, 2026-10-28: "make a
+    // sort by power option ... and make it the default"); Last played puts a date on a line above the time, so it does not
+    // widen the column ("if a date, make it spread over two lines"), the whole of it when pointed at.
+    [Fact]
+    public void TheRosterSortsByPowerAndPutsADateAboveTheTime()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        var code = File.ReadAllText(Path.Combine(app, "Pages", "RosterPage.razor.cs"));
+        Assert.Contains("private RosterSort sort = RosterSort.MostPower;", code);
+        var roster = File.ReadAllText(Path.Combine(app, "Pages", "RosterPage.razor"));
+        Assert.Matches(@"<select value=""@sort"" @onchange=""OnSortChanged"">\s*<option value=""@RosterSort\.MostPower"">Most power</option>", roster);
+        Assert.Matches(@"(?s)<td class=""left muted"" title=""@RosterText\.At\(character\.LastSeen, now\)"">\s*"
+            + @"@if \(RosterText\.Day\(character\.LastSeen, now\) is \{ Length: > 0 \} day\)\s*\{\s*<div>@day</div>\s*\}\s*"
+            + @"<div>@RosterText\.Time\(character\.LastSeen\)</div>\s*</td>", roster);
+    }
+
     // Each roster row shows the level on its class line and a Power column after the character, combat power with the
     // gear score under it, each with its icon (Harry, 2026-10-27). The room for it comes from the basic energy cap moving
     // under when it is full (its own line, display: block), as Harry also asked, two pixels less at each side of a cell and

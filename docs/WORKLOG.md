@@ -2,6 +2,22 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-28 — The roster sorted by power; Last played's date on its own line
+
+**What:** the roster opens sorted by combat power, highest first (`RosterSort.MostPower`, the default and the first in the list; a tie by name, a power not known yet last). Last played puts a date on a line above the time (`RosterText.Day` and `Time`; `At` composes them as before for the header and tips), the whole of it when pointed at.
+
+**Why:** Harry, with a screenshot of the roster: "make a sort by power option at the top right in the dashboard (and make it the default). with highest power being at the top", then "the last played column takes up too much room when it's a date. if a date, make it spread over two lines in the same row i guess? thoughts". A date was the widest thing in that column, the one that took #58's measured room.
+
+**Checks (SDK 10.0.402, at idle priority: the game was running):** `scripts/Build.ps1` Debug 904/904. Headless renders of the roster's markup (synthetic rows: a 12-letter name with the Playing badge, 109,396 combat power, gear score 2,040, ≈ 840 (+2,000), 2,450,000 Kina, "Thu 30 Oct 07:00" under Last played) at the window's client widths, main's markup against the branch's: 10.7 px to spare at 896 on main, 41.1 on the branch (49.1 at 904); a row with 1,234,567 combat power, 12,800,000 Kina and "in 23h 45m" was 6.4 px too wide on main at 896 and fits on the branch with 24 px to spare; rows no taller (66 px), the class icon where it was.
+
+**Standard audit on #61 (approve with nits), addressed:** the sort test's tie was already in name order, so dropping the name tie-break passed it: its tied pair now comes in the other order, and a pair with the same name and power on two servers is ordered by server (`ThenBy(Server)` added, as the Name sort has). ARCHITECTURE's Estimates bullet said a date still needs the narrower cap list; now in the past, pointing to the roster paragraph. The widths were not the worst case: with "Wed 30 May" the auditor's renders gave 36.2 px to spare for the dated row and 19.1 px for the long one on the branch (main: 1.8 px, and the long row 15.3 px too wide), now quoted in ARCHITECTURE. Codex reviewed b7e01e7 with no findings; CI passed on it. Checks after the fixes: `scripts/Build.ps1` Debug 904/904.
+
+**Not checked:** the page in the running meter (only a static copy of its markup was rendered).
+
+**Onto #60 and #62:** squashed onto main after they merged (the changelog's roster line, the docs' test lists and this log keep every change); `scripts/Build.ps1` Debug 914/914 at idle priority.
+
+**Next:** Codex and CI on the squashed head, then the merge (Harry's go-ahead given: "merge #62, #61 and #60 once CI passes").
+
 ## 2026-10-28 — The gear score is the first of the two
 
 **What:** `SelfRecords` takes the first of the self record's two gear scores, the character sheet's, when it is from 1 to 100,000 and the second is that or more within the same bound; A2Tools' rule, which this followed, took it only when the two agreed.

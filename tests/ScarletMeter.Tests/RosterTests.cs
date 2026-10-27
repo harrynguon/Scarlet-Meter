@@ -187,14 +187,23 @@ public sealed class RosterTests : IDisposable
         var at = Monday;
         RosterCharacter[] characters =
         [
-            new() { Name = "Alpha", Server = "SIE", LastSeen = at.AddHours(-1), Odyle = Seen(100, 0, at) },
+            new() { Name = "Alpha", Server = "SIE", LastSeen = at.AddHours(-1), Odyle = Seen(100, 0, at), CombatPower = 109_396 },
             new() { Name = "beta", Server = "SIE", LastSeen = at.AddHours(-3), Odyle = Seen(560, 0, at) },
-            new() { Name = "Gamma", Server = "TRI", LastSeen = at, Odyle = Seen(300, 50, at) },
-            new() { Name = "Delta", Server = "TRI", LastSeen = at.AddHours(-2) },
+            new() { Name = "Gamma", Server = "TRI", LastSeen = at, Odyle = Seen(300, 50, at), CombatPower = 41_000 },
+            new() { Name = "Delta", Server = "TRI", LastSeen = at.AddHours(-2), CombatPower = 41_000 },
         ];
         var current = new RosterKey("TRI", "Gamma");
         string[] Names(RosterSort sort) => [.. RosterPage.Rows(characters, current, at, Calendar, sort).Select(r => r.Character.Name)];
 
+        // Most power first (Harry, 2026-10-28), a tie by name (Gamma comes before Delta here, so the order is the sort's),
+        // a power not known yet last; the same name and power on two servers, by server.
+        Assert.Equal(["Alpha", "Delta", "Gamma", "beta"], Names(RosterSort.MostPower));
+        RosterCharacter[] twins =
+        [
+            new() { Name = "Echo", Server = "TRI", LastSeen = at, CombatPower = 41_000 },
+            new() { Name = "Echo", Server = "SIE", LastSeen = at, CombatPower = 41_000 },
+        ];
+        Assert.Equal(["SIE", "TRI"], RosterPage.Rows(twins, null, at, Calendar, RosterSort.MostPower).Select(r => r.Character.Server));
         Assert.Equal(["beta", "Gamma", "Alpha", "Delta"], Names(RosterSort.MostOdyle));
         Assert.Equal(["beta", "Gamma", "Alpha", "Delta"], Names(RosterSort.FullSoonest)); // the full one first, then soonest, none last
         Assert.Equal(["Alpha", "beta", "Delta", "Gamma"], Names(RosterSort.Name));
@@ -217,6 +226,12 @@ public sealed class RosterTests : IDisposable
         Assert.Equal("12h 16m", RosterText.Until(new TimeSpan(12, 15, 1)));
         Assert.Equal("1m", RosterText.Until(TimeSpan.FromSeconds(1)));
         Assert.Equal("now", RosterText.Until(TimeSpan.Zero));
+        // An instant on another day: its day apart from its time, for Last played's two lines; today's has no day.
+        var now = new DateTimeOffset(new DateTime(2026, 10, 28, 12, 0, 0, DateTimeKind.Local));
+        var yesterday = new DateTimeOffset(new DateTime(2026, 10, 27, 21, 32, 0, DateTimeKind.Local));
+        Assert.Equal(("Tue 27 Oct", "21:32", "Tue 27 Oct 21:32"), (RosterText.Day(yesterday, now), RosterText.Time(yesterday), RosterText.At(yesterday, now)));
+        var earlierToday = now.AddMinutes(-175);
+        Assert.Equal((string.Empty, "09:05", "09:05"), (RosterText.Day(earlierToday, now), RosterText.Time(earlierToday), RosterText.At(earlierToday, now)));
         Assert.Equal("SIE · Gladiator", RosterText.ServerClassAndLevel(new RosterCharacter { Name = "A", Server = "SIE", ClassName = "Gladiator" }));
         Assert.Equal("Gladiator", RosterText.ServerClassAndLevel(new RosterCharacter { Name = "A", ClassName = "Gladiator" }));
         Assert.Equal("SIE · Sorcerer · Lv 45", RosterText.ServerClassAndLevel(new RosterCharacter { Name = "A", Server = "SIE", ClassName = "Sorcerer", Level = 45 }));
