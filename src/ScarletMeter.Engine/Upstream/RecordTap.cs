@@ -10,7 +10,7 @@ namespace ScarletMeter.Engine.Upstream;
 
 /// <summary>
 /// The game's records beside upstream's pipeline, for the readers of records upstream does not decode
-/// (<see cref="EntryListTap"/>, <see cref="MapLoadTap"/>). Upstream's opcode table takes only processors marked with
+/// (<see cref="EntryListTap"/>, <see cref="MapLoadTap"/>, <see cref="AbyssArtifactTap"/>). Upstream's opcode table takes only processors marked with
 /// its own internal attribute, so this listens to upstream's TCP reassembly (<see cref="TcpStreamBuffer.PacketExtracted"/>,
 /// the event the pipeline itself listens to), opens LZ4 bundles with upstream's own <see cref="PacketProcessor"/> (its
 /// internal ProcessPacket, bound once by reflection; a test guards the binding against the pinned release), and hands
@@ -24,7 +24,8 @@ namespace ScarletMeter.Engine.Upstream;
 /// can be lost: in Harry's game on 2026-10-26 the map record entering the Abyss came after that point and was read,
 /// the ones leaving a dungeon and the Abyss came before it and were not. So the tap tells every reader when it first
 /// reads a record of a connection it has not seen lately (<see cref="IRecordReader.ConnectionStarted"/>), just before
-/// that record, and a reader decides whether its value outlives the move.</para>
+/// that record, and a reader decides whether its value outlives the move. It then raises <see cref="ConnectionStarted"/>
+/// (<see cref="ICombatEngine.ConnectionStarted"/>), for what waits outside the engine on the connection left.</para>
 /// <para>Runs on the capture thread, inside upstream's PacketAccumulator callback and under its lock. A record that no
 /// reader takes and that is not a bundle costs a varint, two byte reads and a question to each reader. A bundle
 /// (<c>ff ff</c>, most of the game's records) is opened a second time, after upstream's pipeline has opened it: a full
@@ -162,7 +163,16 @@ internal sealed class RecordTap : IDisposable
     /// <summary>The connections remembered, for tests.</summary>
     internal int RememberedConnections => recentConnections.Count;
 
-    // Tells every reader the game has moved to a new connection; one reader's failure does not keep it from the others.
+    /// <summary>
+    /// Raised when the tap first reads a record of a connection it has not seen lately (a server change or a switch), after
+    /// every reader was told and just before that record is read, on the capture thread. Each subscriber is called on its
+    /// own, so one that throws keeps the move from no other (it guards what a subscriber holds); a failure is logged as a
+    /// reader's is.
+    /// </summary>
+    public event EventHandler? ConnectionStarted;
+
+    // Tells every reader the game has moved to a new connection, then the subscribers; one's failure does not keep it
+    // from the others.
     private Exception? StartConnection()
     {
         Exception? failure = null;
@@ -171,6 +181,17 @@ internal sealed class RecordTap : IDisposable
             try
             {
                 reader.ConnectionStarted();
+            }
+            catch (Exception ex)
+            {
+                failure ??= ex;
+            }
+        }
+        foreach (var subscriber in ConnectionStarted?.GetInvocationList() ?? [])
+        {
+            try
+            {
+                ((EventHandler)subscriber)(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
@@ -201,7 +222,7 @@ internal sealed class RecordTap : IDisposable
             failing = false;
             return;
         }
-        if (!failing) logger.LogWarning(failure, "Reading the game's records beside upstream's pipeline (Odyle energy, the map) failed; trying again with the next record.");
+        if (!failing) logger.LogWarning(failure, "Reading the game's records beside upstream's pipeline (Odyle energy, the map, the Abyss's artifacts) failed; trying again with the next record.");
         failing = true;
     }
 

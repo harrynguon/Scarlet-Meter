@@ -65,12 +65,15 @@ public static class ScarletEngineServiceCollectionExtensions
         services.AddSingleton<CombatSessionManager>();
         services.AddPacketProcessingRouting();
         services.AddSingleton<IPacketService, PacketPipelineService>();
-        // Records upstream does not decode (the entry counts with Odyle energy, the map loaded): read beside the
-        // pipeline from the same reassembled stream by one tap, which opens each LZ4 bundle once for all its readers.
+        // Records upstream does not decode (the entry counts with Odyle energy, the map loaded, the Abyss's artifact
+        // holders): read beside the pipeline from the same reassembled stream by one tap, which opens each LZ4 bundle once
+        // for all its readers.
         services.AddSingleton<EntryListTap>();
         services.AddSingleton<MapLoadTap>();
+        services.AddSingleton<AbyssArtifactTap>();
         services.AddSingleton<IRecordReader>(provider => provider.GetRequiredService<EntryListTap>());
         services.AddSingleton<IRecordReader>(provider => provider.GetRequiredService<MapLoadTap>());
+        services.AddSingleton<IRecordReader>(provider => provider.GetRequiredService<AbyssArtifactTap>());
         services.AddSingleton<RecordTap>();
         // The Abyss pause: the settings bridge reads its state on every hit, so the state is its own object.
         services.AddSingleton<PauseState>();

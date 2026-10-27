@@ -125,6 +125,24 @@ public interface ICombatEngine : IDisposable
     event EventHandler<int?>? MapChanged;
 
     /// <summary>
+    /// Who holds the Abyss's artifacts, each time the game says it: when the player opens the Abyss map (both layers) or
+    /// enters the Abyss (the layer entered). It is the world's on the server it was read on; the record does not say which
+    /// server, so a subscriber puts it on <see cref="Character"/>'s. Raised on a capture thread, never on the UI thread.
+    /// </summary>
+    event EventHandler<AbyssArtifacts>? ArtifactsObserved;
+
+    /// <summary>
+    /// The game moved to a new connection: a server change (into or out of a dungeon or the Abyss) or a switch of
+    /// character. Raised on a capture thread just before the first record read of the new connection, once the engine's
+    /// own values have taken the move (<see cref="MapId"/> forgotten, <see cref="Character"/> unconfirmed): whatever a
+    /// subscriber holds from the connection left, waiting to be put on a character, was seen there and nowhere else. Also
+    /// raised for the meter's first connection, and for one last seen more than 16 connections before. Subscribers run
+    /// under upstream's reassembly lock, so they must be quick; one that throws is logged and keeps the move from no
+    /// other. The demo has no connections and never raises it.
+    /// </summary>
+    event EventHandler? ConnectionStarted;
+
+    /// <summary>
     /// True while the meter is paused because the player is in the Abyss (<see cref="MapId"/> is one of its maps) and
     /// <see cref="EngineSettings.PauseInAbyss"/> is on. Meanwhile hits are dropped and nothing is kept or saved:
     /// <see cref="GetSnapshot"/> is empty and <see cref="GetPlayerDetails"/> null. It ends when the map changes or

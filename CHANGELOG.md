@@ -14,10 +14,12 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
   tracking there; it pauses again once you are back in the Abyss. ([#47](https://github.com/harrynguon/Scarlet-Meter/pull/47))
 - A character roster: every character you log in on with the meter running, with its Odyle energy, when basic
   energy is full again, and Nightmare and Ascension entries left, estimated (≈) from what the game last said, the
-  Artifact Corridors it entered since the last Abyss Siege, and its Kina and Kina (Bound), with the totals across your
-  characters. Click the Odyle energy beside the ping, or Settings, Appearance, Characters. The recharge and siege times
-  and the Kina are not yet checked in the game. ([#48](https://github.com/harrynguon/Scarlet-Meter/pull/48),
-  [#49](https://github.com/harrynguon/Scarlet-Meter/pull/49), [#50](https://github.com/harrynguon/Scarlet-Meter/pull/50))
+  Artifact Corridors it entered since the last Abyss Siege, out of those whose artifact your side holds (read when
+  you open the Abyss map or enter the Abyss), its Kina and Kina (Bound), with the totals across your characters, and a
+  note of your own under each name. Click the Odyle energy beside the ping, or Settings, Appearance, Characters. The
+  recharge and siege times, the Kina and the artifacts are not yet checked in the game.
+  ([#48](https://github.com/harrynguon/Scarlet-Meter/pull/48), [#49](https://github.com/harrynguon/Scarlet-Meter/pull/49),
+  [#50](https://github.com/harrynguon/Scarlet-Meter/pull/50), [#51](https://github.com/harrynguon/Scarlet-Meter/pull/51))
 
 ## [0.3.0] - 2026-10-26
 

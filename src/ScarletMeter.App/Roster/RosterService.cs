@@ -6,9 +6,11 @@ namespace ScarletMeter.App.Roster;
 
 /// <summary>
 /// The character roster while the meter runs: loads it once, takes each character the engine reports with its entry
-/// counts (<see cref="ICombatEngine.ProgressObserved"/>) and each entry into the Artifact Corridor
-/// (<see cref="ICombatEngine.MapChanged"/>, put on <see cref="ICombatEngine.Character"/>), and saves a moment after the
-/// last change, and on disposal. A
+/// counts (<see cref="ICombatEngine.ProgressObserved"/>), each entry into the Artifact Corridor
+/// (<see cref="ICombatEngine.MapChanged"/>, put on <see cref="ICombatEngine.Character"/>) and who holds the Abyss's
+/// artifacts (<see cref="ICombatEngine.ArtifactsObserved"/>, put on that character's server), dropping what it holds for a
+/// naming when the game moves to a new connection (<see cref="ICombatEngine.ConnectionStarted"/>), and saves a moment
+/// after the last change, and on disposal. A
 /// count replaces the saved one only when it was read later, so an older report can never undo a newer one. Saving is
 /// off when the file must not be overwritten (<see cref="CanSave"/>); a failed save is logged once and tried again with
 /// the next change. Nothing logged names a character or a count. Every member may be called from any thread.
@@ -39,6 +41,8 @@ public sealed class RosterService : IDisposable
     // disk never holds up a report. saveFailing is touched only under it.
     private readonly Lock saveGate = new();
     private readonly Dictionary<RosterKey, RosterCharacter> characters = [];
+    // The Abyss's lower-layer artifact holders by server id, as the game last said on each.
+    private readonly Dictionary<int, RosterArtifacts> artifacts = [];
     private RosterKey? current;
     // The map the engine named last (null: not known), to see the corridor being entered rather than loaded again, and the
     // last map it knew, to tell a reconnection inside the corridor (unknown, then the corridor again) from an entry.
@@ -51,6 +55,12 @@ public sealed class RosterService : IDisposable
     // A held corridor entry: when, for whom it would count, and whether it came straight after an unknown map having
     // last known the corridor (a reconnection inside it, for the re-entry rule).
     private readonly record struct HeldRun(DateTimeOffset At, RosterKey Expected, bool Reconnection);
+
+    // Artifact holders read while the character being played was not sure, waiting like a held corridor entry (the record
+    // does not say its server): the latest only, since a later reading says the same of the world, or more.
+    private HeldArtifacts? heldArtifacts;
+
+    private sealed record HeldArtifacts(AbyssArtifacts Reading, RosterKey Expected, DateTimeOffset At);
     private ITimer? saveTimer;
     private bool dirty;
     private bool saveFailing;
@@ -65,6 +75,7 @@ public sealed class RosterService : IDisposable
         this.logger = logger;
         var loaded = store.Load(clock.GetUtcNow());
         foreach (var character in loaded.File.Characters) characters[character.Key] = character;
+        foreach (var entry in loaded.File.Artifacts) artifacts[entry.ServerId] = entry;
         CanSave = loaded.CanSave;
         Notice = loaded.Notice;
     }
@@ -81,13 +92,19 @@ public sealed class RosterService : IDisposable
         get { lock (gate) return current; }
     }
 
-    /// <summary>Raised after the roster changed (a report, a removal, a cap), on the thread that changed it.</summary>
+    /// <summary>Raised after the roster changed (a report, artifact holders, a removal, a cap, a note), on the thread that changed it.</summary>
     public event EventHandler? Changed;
 
     /// <summary>Every character, in no particular order.</summary>
     public IReadOnlyList<RosterCharacter> Characters
     {
         get { lock (gate) return [.. characters.Values]; }
+    }
+
+    /// <summary>The Abyss's lower-layer artifact holders by server id, as the game last said on each (a copy).</summary>
+    public IReadOnlyDictionary<int, RosterArtifacts> Artifacts
+    {
+        get { lock (gate) return new Dictionary<int, RosterArtifacts>(artifacts); }
     }
 
     /// <summary>Follows the engine from now on. Later calls, and calls after disposal, do nothing.</summary>
@@ -100,6 +117,8 @@ public sealed class RosterService : IDisposable
         }
         engine.ProgressObserved += OnProgress;
         engine.MapChanged += OnMapChanged;
+        engine.ArtifactsObserved += OnArtifacts;
+        engine.ConnectionStarted += OnConnectionStarted;
     }
 
     /// <summary>Takes one report of a character and its counts: what the engine's event brings (tests call it directly).</summary>
@@ -107,6 +126,7 @@ public sealed class RosterService : IDisposable
     {
         var now = clock.GetUtcNow();
         var held = (Counted: 0, Dropped: 0);
+        bool? heldArtifactsKept = null;
         lock (gate)
         {
             if (disposed) return;
@@ -115,6 +135,7 @@ public sealed class RosterService : IDisposable
             var character = characters.TryGetValue(key, out var known) ? known : new RosterCharacter { Name = who.Name, Server = who.Server };
             character = character with
             {
+                ServerId = who.ServerId > 0 ? who.ServerId : character.ServerId,
                 ClassId = who.ClassId > 0 ? who.ClassId : character.ClassId,
                 ClassName = who.ClassName.Length > 0 ? who.ClassName : character.ClassName,
                 CombatPower = who.CombatPower > 0 ? who.CombatPower : character.CombatPower,
@@ -129,9 +150,12 @@ public sealed class RosterService : IDisposable
             current = key;
             MarkChanged();
             held = SettleHeldRuns(who, now);
+            heldArtifactsKept = SettleHeldArtifacts(who, now);
         }
         if (held.Counted > 0) logger.LogInformation("{Count} held Artifact Corridor entries counted: the game named the same character again.", held.Counted);
         if (held.Dropped > 0) logger.LogInformation("{Count} held Artifact Corridor entries dropped: the game named another character, or none in time.", held.Dropped);
+        if (heldArtifactsKept is { } kept)
+            logger.LogInformation(kept ? "Held Abyss artifact holders kept for the server of the character named." : "Held Abyss artifact holders dropped: the game named another character, none in time, or one whose server is not known.");
         RaiseChanged();
     }
 
@@ -148,6 +172,21 @@ public sealed class RosterService : IDisposable
         heldRuns.Clear();
         return (counted, dropped);
     }
+
+    // Under the gate: the held artifact holders once the game has named who: kept for its server when it is the character
+    // they were held for, within CorridorConfirmWindow; dropped otherwise. Null when none were held.
+    private bool? SettleHeldArtifacts(CharacterIdentity who, DateTimeOffset now)
+    {
+        if (heldArtifacts is not { } held) return null;
+        heldArtifacts = null;
+        return held.Expected == new RosterKey(who.Server, who.Name) && now - held.At <= CorridorConfirmWindow
+            && ServerIdOf(who) is > 0 and var serverId && KeepArtifacts(serverId, held.Reading, now) is not null;
+    }
+
+    // Under the gate: the server id of a character the game named: the report's, or else the one the roster knows for it
+    // (upstream may keep an older short name for a record whose id it does not know, so the report has none); 0 when neither.
+    private int ServerIdOf(CharacterIdentity who) =>
+        who.ServerId > 0 ? who.ServerId : characters.TryGetValue(new RosterKey(who.Server, who.Name), out var known) ? known.ServerId : 0;
 
     /// <summary>Removes a character (the player's choice); it comes back the next time the game names it.</summary>
     public void Remove(RosterKey key)
@@ -168,6 +207,19 @@ public sealed class RosterService : IDisposable
         {
             if (disposed || !characters.TryGetValue(key, out var character) || character.OdyleCap == choice) return;
             characters[key] = character with { OdyleCap = choice };
+            MarkChanged();
+        }
+        RaiseChanged();
+    }
+
+    /// <summary>Sets the player's note on a character, cleaned as <see cref="RosterNormalizer.CleanNote"/>; empty clears it.</summary>
+    public void SetNote(RosterKey key, string? note)
+    {
+        var clean = RosterNormalizer.CleanNote(note);
+        lock (gate)
+        {
+            if (disposed || !characters.TryGetValue(key, out var character) || character.Note == clean) return;
+            characters[key] = character with { Note = clean };
             MarkChanged();
         }
         RaiseChanged();
@@ -197,7 +249,8 @@ public sealed class RosterService : IDisposable
     /// another map counts a run for the character being played. While that is not sure (the engine's
     /// <see cref="ICombatEngine.Character"/> is null, as after a server change until the game names the character again),
     /// the entry is held for the character the roster knew, and counted if the game names that same character within
-    /// <see cref="CorridorConfirmWindow"/> (<see cref="Take"/>). A load of the corridor straight after an unknown map, the
+    /// <see cref="CorridorConfirmWindow"/> on the same connection (<see cref="Take"/>; a move drops it,
+    /// <see cref="TakeConnectionStarted"/>). A load of the corridor straight after an unknown map, the
     /// last known map being the corridor, within <see cref="CorridorReentryWindow"/> of the last run is that run again (a
     /// reconnection inside it).
     /// </summary>
@@ -245,6 +298,7 @@ public sealed class RosterService : IDisposable
         {
             Name = who.Name,
             Server = who.Server,
+            ServerId = Math.Max(0, who.ServerId),
             ClassId = Math.Max(0, who.ClassId),
             ClassName = who.ClassName,
             CombatPower = Math.Max(0, who.CombatPower),
@@ -260,7 +314,93 @@ public sealed class RosterService : IDisposable
         return true;
     }
 
+    /// <summary>
+    /// Takes one reading of who holds the Abyss's artifacts: what the engine's event brings (tests call it directly). It is
+    /// the world's on the server it was read on, which the record does not say, so it is kept for the server of the
+    /// character being played; while that is not sure (entering the Abyss is a server change), it is held for the character
+    /// the roster knew, as a corridor entry is, and kept if the game names that same character within
+    /// <see cref="CorridorConfirmWindow"/> on the same connection (a move drops it, <see cref="TakeConnectionStarted"/>).
+    /// A reading without the lower layer's artifacts says nothing of the corridors and
+    /// is not kept; nor is one for a character whose server id is not known.
+    /// </summary>
+    public void TakeArtifacts(AbyssArtifacts reading)
+    {
+        if (!reading.Artifacts.Any(artifact => artifact.Id is >= AbyssArtifacts.LowerLayer and < AbyssArtifacts.LowerLayer + AbyssArtifacts.Corridors)) return;
+        var now = clock.GetUtcNow();
+        var who = engine.Character;
+        var kept = false;
+        string? note = null;
+        lock (gate)
+        {
+            if (disposed) return;
+            if (who is not null && ServerIdOf(who) is > 0 and var serverId)
+            {
+                kept = KeepArtifacts(serverId, reading, now) is not null;
+            }
+            else if (who is not null)
+            {
+                note = "Abyss artifact holders were read, but the server of the character being played is not known; not kept.";
+            }
+            else if (current is { } expected)
+            {
+                heldArtifacts = new HeldArtifacts(reading, expected, now);
+                note = "Abyss artifact holders were read while the character being played is not sure; they are held until the game names them again.";
+            }
+            else
+            {
+                note = "Abyss artifact holders were read before the game named any character; not kept.";
+            }
+        }
+        if (note is not null) logger.LogInformation("{Note}", note);
+        if (kept) RaiseChanged();
+    }
+
+    // Under the gate: the reading as the holders on a server, unless one read later is kept there (one dated after now, a
+    // clock set back since, does not count as later, as for counts). Null when it is not kept.
+    private RosterArtifacts? KeepArtifacts(int serverId, AbyssArtifacts reading, DateTimeOffset now)
+    {
+        if (artifacts.TryGetValue(serverId, out var known) && known.SeenAt <= now && reading.SeenAt <= known.SeenAt) return null;
+        var war = reading.War(AbyssArtifacts.LowerLayer);
+        var entry = new RosterArtifacts
+        {
+            ServerId = serverId,
+            Holders = [.. Enumerable.Range(AbyssArtifacts.LowerLayer, AbyssArtifacts.Corridors).Select(reading.HolderOf)],
+            Since = war?.Since,
+            Until = war?.Until,
+            SeenAt = reading.SeenAt,
+        };
+        artifacts[serverId] = entry;
+        MarkChanged();
+        return entry;
+    }
+
     private void OnProgress(object? sender, CharacterProgress progress) => Take(progress);
+
+    private void OnArtifacts(object? sender, AbyssArtifacts reading) => TakeArtifacts(reading);
+
+    /// <summary>
+    /// Takes a move to a new connection: what the engine's event brings (tests call it directly). The corridor entries and
+    /// the artifact holders held for the game to name the character are dropped: they were seen on the connection left,
+    /// and a self record on another one does not say whose they were (Codex on #51: a switch's reading held for the
+    /// character before it was kept for that character's server when the game named it on the connection after).
+    /// </summary>
+    public void TakeConnectionStarted()
+    {
+        int runs;
+        bool holders;
+        lock (gate)
+        {
+            if (disposed) return;
+            runs = heldRuns.Count;
+            holders = heldArtifacts is not null;
+            heldRuns.Clear();
+            heldArtifacts = null;
+        }
+        if (runs > 0) logger.LogInformation("{Count} held Artifact Corridor entries dropped: the game moved to a new connection before naming the character.", runs);
+        if (holders) logger.LogInformation("Held Abyss artifact holders dropped: the game moved to a new connection before naming the character.");
+    }
+
+    private void OnConnectionStarted(object? sender, EventArgs e) => TakeConnectionStarted();
 
     private void OnMapChanged(object? sender, int? mapId) => TakeMap(mapId);
 
@@ -285,7 +425,11 @@ public sealed class RosterService : IDisposable
             lock (gate)
             {
                 if (!dirty) return; // never set while saving is off (MarkChanged)
-                roster = new RosterFile { Characters = [.. characters.Values.OrderBy(c => c.Server, StringComparer.Ordinal).ThenBy(c => c.Name, StringComparer.Ordinal)] };
+                roster = new RosterFile
+                {
+                    Characters = [.. characters.Values.OrderBy(c => c.Server, StringComparer.Ordinal).ThenBy(c => c.Name, StringComparer.Ordinal)],
+                    Artifacts = [.. artifacts.Values.OrderBy(entry => entry.ServerId)],
+                };
                 dirty = false;
             }
             try
@@ -328,6 +472,8 @@ public sealed class RosterService : IDisposable
         }
         engine.ProgressObserved -= OnProgress;
         engine.MapChanged -= OnMapChanged;
+        engine.ArtifactsObserved -= OnArtifacts;
+        engine.ConnectionStarted -= OnConnectionStarted;
         SaveNow();
     }
 }

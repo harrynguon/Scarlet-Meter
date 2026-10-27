@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using ScarletMeter.App.Storage;
+using ScarletMeter.Engine;
 
 namespace ScarletMeter.App.Roster;
 
@@ -29,8 +30,9 @@ public sealed class RosterStore
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        // An unknown cap (a later build's) reads as unknown and is reset by the normalizer, not taken as a damaged file.
-        Converters = { new LenientEnumConverter<OdyleCapChoice>() },
+        // An unknown cap or artifact holder (a later build's) reads as unknown and is reset by the normalizer, not taken as
+        // a damaged file.
+        Converters = { new LenientEnumConverter<OdyleCapChoice>(), new LenientEnumConverter<ArtifactHolder>() },
     };
 
     private readonly ProtectedJsonFile<RosterFile> file;

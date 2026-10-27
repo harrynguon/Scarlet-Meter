@@ -10,7 +10,11 @@ namespace ScarletMeter.Engine;
 /// <param name="ClassId">Upstream's class id (10 to 19), or 0 while not known.</param>
 /// <param name="ClassName">The class's AION 2 Global name, or empty while not known.</param>
 /// <param name="CombatPower">Combat power as the record gave it, or 0.</param>
-public sealed record CharacterIdentity(string Name, string Server, int ClassId, string ClassName, int CombatPower)
+/// <param name="ServerId">
+/// The server's id as the game numbers servers (1001 and up Elyos, 2001 and up Asmodian; <see cref="AbyssArtifacts.SideOf"/>),
+/// or 0 when not known. Upstream's short names repeat across the two sides (SIE is 1001 and 2002), the id does not.
+/// </param>
+public sealed record CharacterIdentity(string Name, string Server, int ClassId, string ClassName, int CombatPower, int ServerId = 0)
 {
     /// <summary>Whether two identities are the same character: the same name on the same server.</summary>
     public bool IsSameCharacter(CharacterIdentity? other) =>

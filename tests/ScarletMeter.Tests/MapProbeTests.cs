@@ -264,6 +264,45 @@ public sealed partial class MapProbeTests
         Assert.Single(log.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("failed", StringComparison.Ordinal));
     }
 
+    // The engine says when the game moves to a new connection: after every reader was told (the map is already forgotten)
+    // and before the new connection's first record is read; once per connection, not for a trailing record of the old one.
+    [Fact]
+    public void TheEngineSaysWhenTheGameMovesToANewConnection()
+    {
+        using var host = new TestEngineHost(CaptureMode.None);
+        var engine = host.Services.GetRequiredService<ICombatEngine>();
+        var stream = host.Services.GetRequiredService<TcpStreamBuffer>();
+        List<int?> mapAtMove = [];
+        engine.ConnectionStarted += (_, _) => mapAtMove.Add(engine.MapId);
+        Synchronise(stream, "Client:50001");
+        stream.AddData("Client:50001", MapLoad(MapA), 0);
+        Assert.Equal(MapA, engine.MapId);
+        Synchronise(stream, "Client:50002");
+        stream.AddData("Client:50002", MapLoad(MapB), 0);
+        Assert.Equal(MapB, engine.MapId);
+        stream.AddData("Client:50001", MapLoad(MapA), 0); // a trailing record of the connection left
+        Assert.Equal([null, null], mapAtMove); // the second: map A forgotten, map B not read yet
+    }
+
+    // A subscriber to the move that throws keeps neither the record from any reader nor the move from any other subscriber
+    // (the roster drops what it holds there), and is logged once, as a reader's failure is.
+    [Fact]
+    public void AFailingSubscriberToTheMoveIsContained()
+    {
+        var stream = new TcpStreamBuffer(NullLogger<TcpStreamBuffer>.Instance);
+        var log = new RecordingLogger<RecordTap>();
+        var maps = new MapLoadTap(NullLogger<MapLoadTap>.Instance);
+        using var tap = new RecordTap(stream, openBundle: null, [maps], log);
+        var moves = 0;
+        tap.ConnectionStarted += (_, _) => throw new InvalidOperationException("subscriber");
+        tap.ConnectionStarted += (_, _) => moves++;
+        Synchronise(stream, "Client:50003");
+        stream.AddData("Client:50003", MapLoad(MapA), 0);
+        Assert.Equal(MapA, maps.Current);
+        Assert.Single(log.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("failed", StringComparison.Ordinal));
+        Assert.Equal(1, moves);
+    }
+
     // Records in an LZ4 bundle (ff ff), as most of the game's come: the map and Odyle energy in one bundle are both read.
     [Fact]
     public void TheEngineReadsTheMapInsideABundle()
@@ -298,15 +337,16 @@ public sealed partial class MapProbeTests
         Assert.Equal(new OdyleEnergy(30, 880), odyle.Odyle);
     }
 
-    // The engine's graph has the one tap and its two readers, the same instances the engine reads from.
+    // The engine's graph has the one tap and its three readers, the same instances the engine reads from.
     [Fact]
-    public void TheEngineHasOneTapWithBothReaders()
+    public void TheEngineHasOneTapWithItsReaders()
     {
         using var host = new TestEngineHost(CaptureMode.None);
         var readers = host.Services.GetServices<IRecordReader>().ToList();
-        Assert.Equal(2, readers.Count);
+        Assert.Equal(3, readers.Count);
         Assert.Same(host.Services.GetRequiredService<EntryListTap>(), Assert.Single(readers.OfType<EntryListTap>()));
         Assert.Same(host.Services.GetRequiredService<MapLoadTap>(), Assert.Single(readers.OfType<MapLoadTap>()));
+        Assert.Same(host.Services.GetRequiredService<AbyssArtifactTap>(), Assert.Single(readers.OfType<AbyssArtifactTap>()));
         Assert.Same(host.Services.GetRequiredService<RecordTap>(), host.Services.GetRequiredService<RecordTap>());
     }
 
