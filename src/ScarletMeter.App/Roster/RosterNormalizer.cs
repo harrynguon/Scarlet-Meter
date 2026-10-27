@@ -81,8 +81,9 @@ public static class RosterNormalizer
         if (runsTrimmed > 0) repairs.Add($"{runsTrimmed} corridor {(runsTrimmed == 1 ? "entry" : "entries")} listed twice or past the {RosterRules.CorridorRunsKept} kept dropped.");
         if (repaired > 0) repairs.Add($"Server, class, combat power, cap, note or the order of corridor entries repaired on {Characters(repaired)}.");
 
-        var (artifacts, artifactsDropped, artifactsRepaired) = CleanArtifacts(file?.Artifacts, now);
+        var (artifacts, artifactsDropped, artifactsTrimmed, artifactsRepaired) = CleanArtifacts(file?.Artifacts, now);
         if (artifactsDropped > 0) repairs.Add($"{artifactsDropped} unusable Abyss artifact {(artifactsDropped == 1 ? "record" : "records")} dropped.");
+        if (artifactsTrimmed > 0) repairs.Add($"{artifactsTrimmed} Abyss artifact {(artifactsTrimmed == 1 ? "record" : "records")} listed twice or past the {MaxServers} kept dropped.");
         if (artifactsRepaired > 0) repairs.Add($"Abyss artifact holders or times repaired on {artifactsRepaired} {(artifactsRepaired == 1 ? "server" : "servers")}.");
         return (new RosterFile { Version = RosterFile.CurrentVersion, Characters = newest, Artifacts = artifacts }, repairs);
     }
@@ -90,7 +91,7 @@ public static class RosterNormalizer
     // The Abyss artifact holders as they can be used: on a server with a side, a holder for each lower-layer artifact and a
     // usable date; one per server, the one read last; the most recently read kept. A holder this build cannot name is
     // unknown, and a start or reset out of range is dropped (the schedule stands in).
-    private static (List<RosterArtifacts> Kept, int Dropped, int Repaired) CleanArtifacts(IReadOnlyList<RosterArtifacts>? saved, DateTimeOffset now)
+    private static (List<RosterArtifacts> Kept, int Dropped, int Trimmed, int Repaired) CleanArtifacts(IReadOnlyList<RosterArtifacts>? saved, DateTimeOffset now)
     {
         var dropped = 0;
         var repaired = 0;
@@ -111,8 +112,7 @@ public static class RosterNormalizer
         }
         var unique = usable.GroupBy(entry => entry.ServerId).Select(g => g.OrderByDescending(entry => entry.SeenAt).First()).ToList();
         var kept = unique.OrderByDescending(entry => entry.SeenAt).Take(MaxServers).OrderBy(entry => entry.ServerId).ToList();
-        dropped += usable.Count - kept.Count;
-        return (kept, dropped, repaired);
+        return (kept, dropped, usable.Count - kept.Count, repaired);
     }
 
     private static string Characters(int count) => count == 1 ? "1 character" : $"{count} characters";

@@ -296,6 +296,7 @@ public sealed class RosterTests : IDisposable
     [InlineData("\"lifetime\"")]
     [InlineData("2")]
     [InlineData("\"-1\"")]
+    [InlineData("null")]
     public void AnUnknownCapIsRepairedNotTakenAsDamage(string cap)
     {
         var store = NewStore();
@@ -645,11 +646,11 @@ public sealed class RosterTests : IDisposable
     [Fact]
     public void ACharacterFirstSeenInTheCorridorHasItsClass()
     {
-        using var service = new RosterService(new FakeEngine { Character = AlphaIdentity }, NewStore(), new FakeTimeProvider(Monday), NullLogger<RosterService>.Instance);
+        using var service = new RosterService(new FakeEngine { Character = AlphaIdentity with { ServerId = 2002 } }, NewStore(), new FakeTimeProvider(Monday), NullLogger<RosterService>.Instance);
         service.TakeMap(20);
         service.TakeMap(MapNames.ArtifactCorridor);
         var alpha = service.Characters.Single();
-        Assert.Equal((16, "Spiritmaster", 41_000), (alpha.ClassId, alpha.ClassName, alpha.CombatPower));
+        Assert.Equal((16, "Spiritmaster", 41_000, 2002), (alpha.ClassId, alpha.ClassName, alpha.CombatPower, alpha.ServerId));
     }
 
     // A reconnection inside the corridor loads it again after an unknown map: within five minutes of the last run that is
@@ -952,6 +953,13 @@ public sealed class RosterTests : IDisposable
             service.TakeArtifacts(Reading(Monday, (1002, ArtifactHolder.Elyos))); // later: an artifact not said is unknown
             Assert.Equal([ArtifactHolder.Unknown, ArtifactHolder.Elyos, ArtifactHolder.Unknown], service.Artifacts[1001].Holders);
             Assert.Equal(2, changes);
+
+            // One dated after now (a clock set back since) is replaced by the next reading, or nothing would replace it.
+            service.TakeArtifacts(Reading(Monday.AddHours(5), (1001, ArtifactHolder.Asmodian)));
+            service.TakeArtifacts(Reading(Monday.AddMinutes(-1), (1001, ArtifactHolder.Nobody)));
+            Assert.Equal(ArtifactHolder.Nobody, service.Artifacts[1001].Holders[0]);
+            service.TakeArtifacts(Reading(Monday, (1002, ArtifactHolder.Elyos)));
+            Assert.Equal(5, changes);
         }
         var loaded = store.Load(Monday).File;
         Assert.Equal([ArtifactHolder.Unknown, ArtifactHolder.Elyos, ArtifactHolder.Unknown], Assert.Single(loaded.Artifacts).Holders);
@@ -991,11 +999,13 @@ public sealed class RosterTests : IDisposable
         var beta = AlphaIdentity with { Name = "Beta", ServerId = 2002 };
         service.Take(Progress(alpha));
 
-        service.TakeArtifacts(Reading(Monday, (1001, ArtifactHolder.Elyos)));
+        service.TakeArtifacts(Reading(Monday.AddSeconds(-5), (1001, ArtifactHolder.Asmodian)));
+        service.TakeArtifacts(Reading(Monday, (1001, ArtifactHolder.Elyos))); // the latest is the one held
         Assert.Empty(service.Artifacts);
         clock.Advance(TimeSpan.FromMinutes(1));
         service.Take(Progress(alpha));
         Assert.Equal(Monday, service.Artifacts[1001].SeenAt); // at the reading's time
+        Assert.Equal(ArtifactHolder.Elyos, service.Artifacts[1001].Holders[0]);
 
         service.TakeArtifacts(Reading(clock.GetUtcNow(), (1001, ArtifactHolder.Asmodian)));
         service.Take(Progress(beta));
@@ -1011,6 +1021,46 @@ public sealed class RosterTests : IDisposable
         Assert.Single(log.Entries, e => e.Message.StartsWith("Held Abyss artifact holders kept", StringComparison.Ordinal));
         Assert.Equal(2, log.Entries.Count(e => e.Message.StartsWith("Held Abyss artifact holders dropped", StringComparison.Ordinal)));
         Assert.All(log.Entries, e => Assert.DoesNotContain("Alpha", e.Message, StringComparison.Ordinal));
+    }
+
+    // A report without a server id (upstream kept an older short name for a record whose id it did not know) still puts
+    // holders on the server the roster knows for that character, when they are read and when they were held.
+    [Fact]
+    public void HoldersGoToTheServerTheRosterKnowsForTheCharacter()
+    {
+        var engine = new FakeEngine();
+        using var service = new RosterService(engine, NewStore(), new FakeTimeProvider(Monday), NullLogger<RosterService>.Instance);
+        service.Take(Progress(AlphaIdentity with { ServerId = 1001 }));
+        service.TakeArtifacts(Reading(Monday, (1001, ArtifactHolder.Elyos))); // held: no character sure
+        service.Take(Progress(AlphaIdentity));
+        Assert.Equal(ArtifactHolder.Elyos, service.Artifacts[1001].Holders[0]);
+        engine.Character = AlphaIdentity;
+        service.TakeArtifacts(Reading(Monday.AddMinutes(1), (1001, ArtifactHolder.Asmodian)));
+        Assert.Equal(ArtifactHolder.Asmodian, service.Artifacts[1001].Holders[0]);
+    }
+
+    // At most 64 servers' holders are kept, those read most recently.
+    [Fact]
+    public void TheHoldersOfTheServersReadMostRecentlyAreKept()
+    {
+        List<RosterArtifacts> entries = [.. Enumerable.Range(0, RosterNormalizer.MaxServers + 6)
+            .Select(i => Holders(i < 35 ? 1001 + i : 2001 + i - 35, Monday.AddMinutes(-i), null, ArtifactHolder.Elyos, ArtifactHolder.Elyos, ArtifactHolder.Elyos))];
+        var (file, repairs) = RosterNormalizer.Normalize(new RosterFile { Artifacts = entries }, Monday);
+        Assert.Equal(RosterNormalizer.MaxServers, file.Artifacts.Count);
+        Assert.DoesNotContain(file.Artifacts, a => a.SeenAt < Monday.AddMinutes(-(RosterNormalizer.MaxServers - 1)));
+        Assert.Equal(["6 Abyss artifact records listed twice or past the 64 kept dropped."], repairs);
+    }
+
+    // A file holding text that is not valid Unicode (a lone surrogate in a note) cannot be read as JSON at all: it is set
+    // aside like any damaged file, never half-read; the note's own cleaning is for what the page sends.
+    [Fact]
+    public void ARosterWithTextThatIsNotUnicodeIsSetAside()
+    {
+        var store = NewStore();
+        File.WriteAllText(store.FilePath, "{ \"version\": 1, \"characters\": [ { \"name\": \"Alpha\", \"server\": \"SIE\", \"lastSeen\": \"2026-10-26T01:00:00+00:00\", \"note\": \"x\\ud800y\" } ] }");
+        var loaded = store.Load(Monday);
+        Assert.Empty(loaded.File.Characters);
+        Assert.Single(Directory.GetFiles(directory.FullPath, "roster.unreadable-*.json"));
     }
 
     // A report gives the character its server id; one without (not known this time) keeps the kept one.
@@ -1062,18 +1112,22 @@ public sealed class RosterTests : IDisposable
                 { "serverId": 2002, "holders": [ "elyos", "elyos" ], "seenAt": "2026-10-25T01:00:00+00:00" },
                 { "serverId": 7, "holders": [ "elyos", "elyos", "elyos" ], "seenAt": "2026-10-25T01:00:00+00:00" },
                 { "serverId": 2003, "holders": [ "elyos", "elyos", "elyos" ], "seenAt": "2019-10-25T01:00:00+00:00" },
-                { "serverId": 2004, "holders": [ "elyos", "nobody", "asmodian" ], "since": "2026-10-24T12:10:00+00:00", "until": "2026-10-26T12:00:00+00:00", "seenAt": "2026-10-25T01:00:00+00:00" }
+                { "serverId": 2004, "holders": [ "elyos", "nobody", "asmodian" ], "since": "2026-10-24T12:10:00+00:00", "until": "2026-10-26T12:00:00+00:00", "seenAt": "2026-10-25T01:00:00+00:00" },
+                { "serverId": 2005, "holders": [ "elyos", null, "asmodian" ], "since": "2019-10-24T12:10:00+00:00", "seenAt": "2026-10-25T01:00:00+00:00" }
               ] }
             """);
         var loaded = store.Load(Monday);
         Assert.Equal(0, Assert.Single(loaded.File.Characters).ServerId);
-        Assert.Equal([1001, 2004], loaded.File.Artifacts.Select(a => a.ServerId));
+        Assert.Equal([1001, 2004, 2005], loaded.File.Artifacts.Select(a => a.ServerId));
+        Assert.Equal([ArtifactHolder.Elyos, ArtifactHolder.Unknown, ArtifactHolder.Asmodian], loaded.File.Artifacts[2].Holders); // a null holder
+        Assert.Null(loaded.File.Artifacts[2].Since); // a start before 2025
         var first = loaded.File.Artifacts[0];
         Assert.Equal([ArtifactHolder.Elyos, ArtifactHolder.Unknown, ArtifactHolder.Nobody], first.Holders);
         Assert.Null(first.Until);
         Assert.Equal(new DateTimeOffset(2026, 10, 26, 12, 0, 0, TimeSpan.Zero), loaded.File.Artifacts[1].Until);
-        Assert.Contains("4 unusable Abyss artifact records dropped.", loaded.Notice, StringComparison.Ordinal);
-        Assert.Contains("Abyss artifact holders or times repaired on 1 server.", loaded.Notice, StringComparison.Ordinal);
+        Assert.Contains("3 unusable Abyss artifact records dropped.", loaded.Notice, StringComparison.Ordinal);
+        Assert.Contains("1 Abyss artifact record listed twice or past the 64 kept dropped.", loaded.Notice, StringComparison.Ordinal);
+        Assert.Contains("Abyss artifact holders or times repaired on 2 servers.", loaded.Notice, StringComparison.Ordinal);
         Assert.Contains("Server, class", loaded.Notice, StringComparison.Ordinal);
         Assert.DoesNotContain("1001", loaded.Notice, StringComparison.Ordinal);
         Assert.Empty(RosterNormalizer.Normalize(loaded.File, Monday).Repairs); // clean once repaired
@@ -1085,5 +1139,7 @@ public sealed class RosterTests : IDisposable
         Assert.NotEqual(first, copy with { Holders = [ArtifactHolder.Elyos, ArtifactHolder.Elyos, ArtifactHolder.Nobody] });
         Assert.NotEqual(first, copy with { SeenAt = copy.SeenAt.AddMinutes(1) });
         Assert.NotEqual(first, copy with { Since = Saturday });
+        Assert.NotEqual(first, copy with { Until = Monday });
+        Assert.NotEqual(first, copy with { ServerId = 1002 });
     }
 }

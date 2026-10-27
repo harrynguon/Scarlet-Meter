@@ -429,8 +429,8 @@ tr.child td {
 
 .roster-cap:hover { border-color: var(--line); }
 
-/* The player's note under a name: plain text until pointed at or edited; the placeholder only on the row pointed at. It takes\r
-   the name column's width, never more: the table has no room to spare at the window's width (a longer note scrolls in its\r
+/* The player's note under a name: plain text until pointed at or edited; the placeholder only on the row pointed at. It takes
+   the name column's width, never more: the table has no room to spare at the window's width (a longer note scrolls in its
    box, and pointing at it shows it whole). */
 .roster-note {
     display: block;

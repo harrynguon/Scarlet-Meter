@@ -10,7 +10,7 @@ namespace ScarletMeter.Engine.Upstream;
 
 /// <summary>
 /// The game's records beside upstream's pipeline, for the readers of records upstream does not decode
-/// (<see cref="EntryListTap"/>, <see cref="MapLoadTap"/>). Upstream's opcode table takes only processors marked with
+/// (<see cref="EntryListTap"/>, <see cref="MapLoadTap"/>, <see cref="AbyssArtifactTap"/>). Upstream's opcode table takes only processors marked with
 /// its own internal attribute, so this listens to upstream's TCP reassembly (<see cref="TcpStreamBuffer.PacketExtracted"/>,
 /// the event the pipeline itself listens to), opens LZ4 bundles with upstream's own <see cref="PacketProcessor"/> (its
 /// internal ProcessPacket, bound once by reflection; a test guards the binding against the pinned release), and hands
@@ -201,7 +201,7 @@ internal sealed class RecordTap : IDisposable
             failing = false;
             return;
         }
-        if (!failing) logger.LogWarning(failure, "Reading the game's records beside upstream's pipeline (Odyle energy, the map) failed; trying again with the next record.");
+        if (!failing) logger.LogWarning(failure, "Reading the game's records beside upstream's pipeline (Odyle energy, the map, the Abyss's artifacts) failed; trying again with the next record.");
         failing = true;
     }
 

@@ -150,7 +150,8 @@ public partial class RosterPage : IDisposable
         if (Enum.TryParse<OdyleCapChoice>(e.Value?.ToString(), out var choice) && Enum.IsDefined(choice)) Roster.SetOdyleCap(key, choice);
     }
 
-    // The note is cleaned and kept by the service; the box shows what was kept at the next render.
+    // The note is cleaned and kept by the service. The box shows the kept note at the next render when it changed; when the
+    // cleaned note is the one already kept (only spaces added at an end), the box keeps what was typed until the window opens again.
     private void OnNoteChanged(RosterKey key, ChangeEventArgs e) => Roster.SetNote(key, e.Value?.ToString());
 
     private void OnRosterChanged(object? sender, EventArgs e) => _ = InvokeAsync(StateHasChanged);

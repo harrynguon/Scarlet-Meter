@@ -118,16 +118,17 @@ public sealed class AbyssArtifactTests
         Assert.Single(log.Entries, e => e.Message.Contains("subscriber failed", StringComparison.Ordinal));
     }
 
-    // An artifact or war listed twice is the last listing's, as A2Tools keeps them (each one overwrites).
+    // An artifact listed twice is the last listing's (A2Tools' Roster plugin overwrites each), a war the first's (it finds
+    // the first).
     [Fact]
-    public void TheLastListingWins()
+    public void AnArtifactIsItsLastListingsAndAWarItsFirsts()
     {
         var reading = new AbyssArtifacts(
             [new ArtifactWar(1001, Since, null), new ArtifactWar(1001, null, Until)],
             [new AbyssArtifact(1001, ArtifactHolder.Elyos), new AbyssArtifact(1001, ArtifactHolder.Asmodian), new AbyssArtifact(1002, ArtifactHolder.Unknown)],
             Since);
         Assert.Equal(ArtifactHolder.Asmodian, reading.HolderOf(1001));
-        Assert.Equal(new ArtifactWar(1001, null, Until), reading.War(1001));
+        Assert.Equal(new ArtifactWar(1001, Since, null), reading.War(1001));
     }
 
     // A server's side, by its id: 1001 and up Elyos, 2001 and up Asmodian; anything else not known.

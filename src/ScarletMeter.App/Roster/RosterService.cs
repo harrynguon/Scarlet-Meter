@@ -177,9 +177,14 @@ public sealed class RosterService : IDisposable
     {
         if (heldArtifacts is not { } held) return null;
         heldArtifacts = null;
-        return held.Expected == new RosterKey(who.Server, who.Name) && now - held.At <= CorridorConfirmWindow && who.ServerId > 0
-            && KeepArtifacts(who.ServerId, held.Reading, now) is not null;
+        return held.Expected == new RosterKey(who.Server, who.Name) && now - held.At <= CorridorConfirmWindow
+            && ServerIdOf(who) is > 0 and var serverId && KeepArtifacts(serverId, held.Reading, now) is not null;
     }
+
+    // Under the gate: the server id of a character the game named: the report's, or else the one the roster knows for it
+    // (upstream may keep an older short name for a record whose id it does not know, so the report has none); 0 when neither.
+    private int ServerIdOf(CharacterIdentity who) =>
+        who.ServerId > 0 ? who.ServerId : characters.TryGetValue(new RosterKey(who.Server, who.Name), out var known) ? known.ServerId : 0;
 
     /// <summary>Removes a character (the player's choice); it comes back the next time the game names it.</summary>
     public void Remove(RosterKey key)
@@ -324,9 +329,9 @@ public sealed class RosterService : IDisposable
         lock (gate)
         {
             if (disposed) return;
-            if (who is { ServerId: > 0 })
+            if (who is not null && ServerIdOf(who) is > 0 and var serverId)
             {
-                kept = KeepArtifacts(who.ServerId, reading, now) is not null;
+                kept = KeepArtifacts(serverId, reading, now) is not null;
             }
             else if (who is not null)
             {

@@ -38,7 +38,10 @@ public sealed record AbyssArtifacts(IReadOnlyList<ArtifactWar> Wars, IReadOnlyLi
     /// <summary>How many artifacts, and so Artifact Corridors, the lower layer has: ids 1001 to 1003.</summary>
     public const int Corridors = 3;
 
-    /// <summary>Who holds an artifact, or <see cref="ArtifactHolder.Unknown"/> when this reading does not list it (the last listing wins).</summary>
+    /// <summary>
+    /// Who holds an artifact, or <see cref="ArtifactHolder.Unknown"/> when this reading does not list it (the last listing
+    /// wins, as A2Tools' Roster plugin overwrites each).
+    /// </summary>
     public ArtifactHolder HolderOf(int id)
     {
         var holder = ArtifactHolder.Unknown;
@@ -47,13 +50,12 @@ public sealed record AbyssArtifacts(IReadOnlyList<ArtifactWar> Wars, IReadOnlyLi
         return holder;
     }
 
-    /// <summary>A layer's war, or null when this reading does not carry it (the last one wins).</summary>
+    /// <summary>A layer's war, or null when this reading does not carry it (the first one listed, as A2Tools' Roster plugin finds it).</summary>
     public ArtifactWar? War(int eventId)
     {
-        ArtifactWar? war = null;
-        foreach (var each in Wars)
-            if (each.EventId == eventId) war = each;
-        return war;
+        foreach (var war in Wars)
+            if (war.EventId == eventId) return war;
+        return null;
     }
 
     /// <summary>
