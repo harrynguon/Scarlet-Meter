@@ -605,6 +605,8 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?s)<span class=""label"">Characters</span>.*?@onclick=""Windows\.OpenRoster""", File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor")));
         var roster = File.ReadAllText(Path.Combine(app, "Pages", "RosterPage.razor"));
         Assert.Contains("@Name(character)", roster);
+        // The footer says when a corridor entry is missed, the confirmation window from the service itself (audit on #49).
+        Assert.Matches(@"one is missed when the meter is closed, when it misses the corridor's loading, or when the game does not name your character again within @\(\(int\)RosterService\.CorridorConfirmWindow\.TotalMinutes\) minutes", roster);
         Assert.DoesNotMatch(@"@\(?(character|row\.Character)\.Name\b", roster);
         var code = File.ReadAllText(Path.Combine(app, "Pages", "RosterPage.razor.cs"));
         Assert.Matches(@"Settings\.Current\.Appearance\.HideNicknames \? NicknameMask\.Mask\(character\.Name\) : character\.Name", code);

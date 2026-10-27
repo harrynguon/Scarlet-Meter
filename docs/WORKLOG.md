@@ -2,6 +2,29 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-27 — The roster counts Artifact Corridor runs
+
+**What:** the character roster has a Corridors column: the Artifact Corridors each character entered since the last Abyss Siege, as the meter saw them, and the header says when the next siege resets them (ARCHITECTURE.md "Character roster", "Corridors"). `RosterService.TakeMap` follows `ICombatEngine.MapChanged`: a change to the Artifact Corridor (`MapNames.ArtifactCorridor`, 503001, now a public constant) from another map is a run for the character being played, kept in `RosterCharacter.CorridorRuns` (the 12 most recent, saved in `roster.json`); none while the engine is not sure who is playing, and a load of the corridor straight after an unknown map within five minutes of the last run is the same run (a reconnection). `RechargeCalendar` has the Abyss Siege (`LastSiege`, `NextSiege`) from the world-event schedule; `RosterRules.CorridorRunsSinceSiege` counts the runs after the last one. `ICombatEngine.Character` is now the character only while that is sure (null after a login's list until its self record, and after a new connection until a self record names the character again), so a run is never put on a character the meter is unsure of. `RosterCharacter` compares its runs by value (a record compares lists by reference), guarded by a reflection test over every property; `RosterNormalizer` checks saved runs.
+
+**Why:** Harry: "work on next feature please", the next in the order agreed for the dashboard (Odyle roster, then corridors, then Kinah): the simple version, counting the corridor's map loads the meter already reads, rather than A2Tools' passage timers and artifact holdings, which are only evidenced by A2Tools.
+
+**Checks (SDK 10.0.402):** `scripts/Build.ps1` Debug and Release 756/756. Fail-first: 14 mutations, each caught by its named test (a repeat load, a run while not sure, a reconnection, the runs kept, the map changes followed, runs after the siege only, a siege at the instant, equality over the runs and over the membership, saved runs' dates and order, the rows' count, the engine's character only while sure), with controls before and after passing. A headless Edge render of a synthetic roster page with the real styles (no window): the ninth column fits the default 860 px window. Nothing has run with the game.
+
+**Unresolved:** HANDOFF's corridor check: whether the count matches the game, when corridors really reset, a second layer's corridor id, and how many corridors a side may run (not read; the page shows the runs alone).
+
+**Review (PR #49):** the deep audit asked for changes:
+- **Major (design)**: a corridor entry seen while the engine was not sure who was playing was dropped. A2Tools says the record naming the character comes at a zone load and every few minutes after, so it can follow the corridor's load, and a whole Abyss visit could go uncounted. Fixed: such an entry is held for the character the roster knew and counted, at its own time, if the game names that same character within ten minutes; another character (a switch) or none in time drops it.
+- **Minor (also Codex P2)**: a saved run dated after now (a clock set back) made every entry straight after an unknown map read as the same run, and broke the order. Runs after now are dropped when a run is added.
+- **Minor**: no test pinned two quick runs with a known map between them; one does now. The reconnection rule also needs the last known map to be the corridor (the audit's nit).
+- **Minor**: the footer said only that a corridor entered with the meter closed is missed. It now names all three cases, with the confirmation window taken from the service, pinned by `RazorMarkupTests`.
+- **Nits**: the normalizer called trimmed runs "unusable" and kept duplicates; they are now counted apart and removed. A character first seen through a corridor run now has its class and combat power. HANDOFF had "corridors and Kinah later" and a log line that changed; this entry lacked a blank line and claimed Debug only.
+
+Codex reviewed 1e1e252 with a P1, no changelog line (added in 3bd78b9, editing #48's unreleased line), and the P2 above; both answered on their threads.
+
+**Checks after the review:** `scripts/Build.ps1` Debug and Release 760/760. Nine more mutations, each caught by its named test, with controls before and after (59 tests): a held run only for the same character, only in time, held at all; runs after now dropped; a reconnection needing the corridor last known; a new character's class; saved runs once each; trimmed runs not called unusable; the footer naming the misses. Not mutated: the sort after adding a run (a held run is settled before any later run can be counted, so it only guards order) and a held reconnection dated before the last run.
+
+**Next:** Codex on the new head, CI, Harry's go-ahead to merge; then Harry's in-game checks; Kinah next.
+
 ## 2026-10-27 — The character roster: Odyle energy, its refill, Nightmare and Ascension
 
 **What:** a character roster (ARCHITECTURE.md "Character roster"): every character the player logs in on with the meter running, with Odyle energy (basic, +charged), when basic energy is full again, Nightmare and Ascension Trial entries left (+extra), last played, the one being played marked; estimates (≈) of the recharges since the game last said; sorts, a cap per character (560, 840 with a membership, automatic by default), removal. It opens from the overlay's Odyle energy and from Settings, Appearance, "Characters". Underneath:

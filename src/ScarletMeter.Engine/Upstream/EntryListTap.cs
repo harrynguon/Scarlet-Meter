@@ -70,10 +70,14 @@ internal sealed class EntryListTap : IRecordReader
         get { lock (gate) return odyle; }
     }
 
-    /// <summary>The character the game last named as the player's, or null until it names one.</summary>
+    /// <summary>
+    /// The character being played, as the game last named it, or null while that is not sure: until a character is
+    /// named, after a login's list until its self record, and after a move to a new connection until a self record names
+    /// the character again (see remarks).
+    /// </summary>
     public CharacterIdentity? Character
     {
-        get { lock (gate) return owner; }
+        get { lock (gate) return awaitingOwner || ownerUnconfirmed ? null : owner; }
     }
 
     /// <summary>Raised when the Odyle energy changes to a value, on the capture (or demo feed) thread.</summary>

@@ -40,11 +40,12 @@ public static class RosterNormalizer
         List<string> repairs = [];
         var dropped = 0;
         var countsDropped = 0;
+        var runsTrimmed = 0;
         var repaired = 0;
         List<RosterCharacter> kept = [];
         foreach (var character in file?.Characters ?? [])
         {
-            if (character is null || Clean(character, now, ref countsDropped, ref repaired) is not { } clean)
+            if (character is null || Clean(character, now, ref countsDropped, ref runsTrimmed, ref repaired) is not { } clean)
             {
                 dropped++;
                 continue;
@@ -61,8 +62,9 @@ public static class RosterNormalizer
         if (dropped > 0) repairs.Add($"{Characters(dropped)} without a usable name, server or date dropped.");
         if (duplicates > 0) repairs.Add($"{Characters(duplicates)} listed twice merged, the latest kept.");
         if (over > 0) repairs.Add($"{Characters(over)} seen longest ago dropped, past the {MaxCharacters} kept.");
-        if (countsDropped > 0) repairs.Add($"{countsDropped} unusable {(countsDropped == 1 ? "count" : "counts")} dropped.");
-        if (repaired > 0) repairs.Add($"Class, combat power or cap repaired on {Characters(repaired)}.");
+        if (countsDropped > 0) repairs.Add($"{countsDropped} unusable {(countsDropped == 1 ? "count or corridor entry" : "counts or corridor entries")} dropped.");
+        if (runsTrimmed > 0) repairs.Add($"{runsTrimmed} corridor {(runsTrimmed == 1 ? "entry" : "entries")} listed twice or past the {RosterRules.CorridorRunsKept} kept dropped.");
+        if (repaired > 0) repairs.Add($"Class, combat power, cap or the order of corridor entries repaired on {Characters(repaired)}.");
         return (new RosterFile { Version = RosterFile.CurrentVersion, Characters = newest }, repairs);
     }
 
@@ -70,13 +72,19 @@ public static class RosterNormalizer
 
     // A character as it can be used, or null when it cannot: no usable name, server or date. Unusable counts go;
     // a class, combat power or cap out of range is reset.
-    private static RosterCharacter? Clean(RosterCharacter character, DateTimeOffset now, ref int countsDropped, ref int repaired)
+    private static RosterCharacter? Clean(RosterCharacter character, DateTimeOffset now, ref int countsDropped, ref int runsTrimmed, ref int repaired)
     {
         if (!IsUsableText(character.Name, MaxNameLength, allowEmpty: false) || !IsUsableText(character.Server, MaxServerLength, allowEmpty: true)) return null;
 
         var odyle = CleanCount(character.Odyle, MaxOdyle, now, ref countsDropped);
         var nightmare = CleanCount(character.Nightmare, MaxCount, now, ref countsDropped);
         var ascension = CleanCount(character.Ascension, MaxCount, now, ref countsDropped);
+        // Corridor entries: usable dates only (a null list reads as none), each once, oldest first, the most recent kept.
+        var saved = character.CorridorRuns ?? [];
+        List<DateTimeOffset> usable = [.. saved.Where(run => IsUsableDate(run, now))];
+        List<DateTimeOffset> runs = [.. usable.Distinct().Order().TakeLast(RosterRules.CorridorRunsKept)];
+        countsDropped += saved.Count - usable.Count;
+        runsTrimmed += usable.Count - runs.Count;
 
         var lastSeen = character.LastSeen;
         if (!IsUsableDate(lastSeen, now))
@@ -90,7 +98,8 @@ public static class RosterNormalizer
         var className = IsUsableText(character.ClassName, MaxClassNameLength, allowEmpty: true) ? character.ClassName : string.Empty;
         var combatPower = character.CombatPower is >= 0 and <= MaxCombatPower ? character.CombatPower : 0;
         var cap = Enum.IsDefined(character.OdyleCap) ? character.OdyleCap : OdyleCapChoice.Automatic;
-        if (classId != character.ClassId || className != character.ClassName || combatPower != character.CombatPower || cap != character.OdyleCap) repaired++;
+        if (classId != character.ClassId || className != character.ClassName || combatPower != character.CombatPower || cap != character.OdyleCap
+            || (runs.Count == usable.Count && !runs.SequenceEqual(usable))) repaired++;
 
         return character with
         {
@@ -102,6 +111,7 @@ public static class RosterNormalizer
             Odyle = odyle,
             Nightmare = nightmare,
             Ascension = ascension,
+            CorridorRuns = runs,
         };
     }
 
