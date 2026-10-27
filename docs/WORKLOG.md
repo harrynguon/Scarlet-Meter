@@ -2,6 +2,22 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-28 — The gear score is the first of the two
+
+**What:** `SelfRecords` takes the first of the self record's two gear scores, the character sheet's, when it is from 1 to 100,000 and the second is that or more within the same bound; A2Tools' rule, which this followed, took it only when the two agreed.
+
+**Why:** Harry asked why one character had no gear score though the others had, and gave two characters' sheet values (left out here: personal progress). A local probe build of main (never committed, deleted after) logged, for each self record, only offsets after the name and which sheet value matched: for both characters the first gear score was the sheet's and the second higher; for a character that read fine, both were the sheet's. The "?" one of them showed the night before after a map change had the same cause, not the record coming mid-session as #59 recorded (HANDOFF corrected; LESSONS, "Two characters never showed a gear score").
+
+**Checks (SDK 10.0.402, at idle priority: the game was running):** `scripts/Build.ps1` Debug 906/906, with new layout cases (made-up bytes: a higher second gives the first, a lower one or one past the bound none). Fail-first on a scratch copy, controls passing before and after: 4 of 4 mutations caught (both must agree, a lower second taken, a second past the bound taken, the second taken instead of the first).
+
+**Not checked:** in the game, the two characters' gear scores against their sheets after a login with this build; what the second gear score is (the highest reached, perhaps).
+
+**Standard audit on #62 (approve with nits), addressed:** the rule guards the record's layout less than equal copies did (a number a patch put between the level and the gear scores would now be taken, within the bound and past the earlier gates); ARCHITECTURE says so, and HANDOFF asks a future probe whether the u32 after the two is the level, as in A2Tools' samples, before the reader checks it. Two long lines wrapped. Not done: the test writer still writes equal gear scores, so a higher second is tested in the reader's cases only, not through the tap. Codex reviewed 13c3e05 with no findings; CI passed on it (push run).
+
+**Onto #60:** squashed onto main after #60 merged (the docs' test lists, HANDOFF's findings and this log keep both changes); `scripts/Build.ps1` Debug 913/913 at idle priority.
+
+**Next:** CI on the squashed head, then the merge (Harry's go-ahead given: "merge #62, #61 and #60 once CI passes").
+
 ## 2026-10-28 — The overlay's last known Odyle energy and Shugo keys
 
 **What:**
