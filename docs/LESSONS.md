@@ -4,6 +4,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**On Global servers the roster's classes, levels and gear scores never showed** (Harry, 2026-10-27: the gear score was "?" for every character; fixed in #58).
+- What: the meter put the login record's server id on the character only when upstream's list named that id and gave the character's server that short name. Upstream's list (`ServerMap`) is Korea's, ids 1001 to 1021 and 2001 to 2021, so it names no Global server: every Global character's short name was empty, no server id was ever taken, and #55's class, #56's level and gear score and the corridors' count, all gated on it, never applied. #55 was reported as fixing Harry's missing class icons; it could not have.
+- Why: every test wrote its records with an id from upstream's own list (SIE's 1001 and 2002), so the gate always passed; nobody checked which ids Harry's servers have, though the docs say Harry plays on Global. The gate guarded against a misread identity and silently turned a whole region away.
+- Guard: an id upstream does not know is taken when it is a server that exists (`Entries/GameServers`, A2Tools' list of Global's open servers) and upstream named none; `EntryListTests.TheCharacterHasItsClassFromTheLoginWithoutAFight` now runs through upstream's real pipeline with a Global id as well, and `AGlobalServerIdGoesWithTheCharacterUpstreamNamesNoServerFor` pins the edges. When a check leans on a reference table, test it with a value from the player's own region, not only with the table's samples.
+
+**The roster's width was measured with today's time under Last played** (2026-10-27, found while narrowing the cap's list in #58).
+- What: #56's full made-up row was last played "21:30"; a character not played today shows a date ("Thu 30 Oct 07:00"), which with a four-digit gear score made the table 20 px too wide at 896 px on main.
+- Why: the "widest plausible values" of the lesson below were taken for the numbers only; a column's other format (the date form of Last played) was not listed.
+- Guard: the cap's list is two choices without "(auto)", 31 px narrower (pinned by `RazorMarkupTests.TheRosterShowsLevelAndPowerAndKeepsTheCapUnderFull`), and the renders list every column's widest form, text formats included: 10.7 px to spare with the date.
+
 **The overlay's totals line wrapped near its least width** (2026-10-27, the Shugo Festival keys; found by the deep audit on #57).
 - What: with the keys and the Odyle energy both shown, the line had 0.4 px to spare at 320 px, measured with a three-digit ping and a one-digit extra. A ping of 1043 ms or an extra of (+12) wrapped the ping's text onto a second line, and the window grew a line each time the ping crossed 1000 ms. The docs said the line fit "with the longest values".
 - Why: the same slip as the roster's width below, the same day, in work started before that lesson was written: the fit was measured with the values in mind, not each field's widest plausible one (a ping past 999 ms, a two-digit count). Nothing in the line stopped a wrap, so a few pixels over became a line taller, and the lesson below was a note, which work already measured did not meet.

@@ -94,7 +94,7 @@
                                 <div class="roster-power @(character.CombatPower > 0 ? "" : "muted")" title="Combat power">
                                     <svg class="cp-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 2.6 11 11M13.4 2.6 5 11" /><path d="M9.3 12.7 12.7 9.3M3.3 9.3 6.7 12.7" /><path d="M11.7 11.7 13.6 13.6M4.3 11.7 2.4 13.6" /></svg>@RosterText.KnownNumber(character.CombatPower)
                                 </div>
-                                <div class="roster-power roster-bound" title="Gear score (the equipment's item level)">
+                                <div class="roster-power roster-bound" title="@GearScoreTitle(character)">
                                     <svg class="gs-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5C4.4 1.5 2.8 4 2.8 7.2v5.4L6 14.5V11h4v3.5l3.2-1.9V7.2c0-3.2-1.6-5.7-5.2-5.7ZM4.6 7.4h6.8v1.4H8.8V11H7.2V8.8H4.6Z" /></svg>@RosterText.KnownNumber(character.GearScore)
                                 </div>
                             </td>
@@ -118,10 +118,10 @@
                                 {
                                     <div title="@RosterText.At(full, now)">in @RosterText.Until(full - now)</div>
                                 }
-                                <select class="roster-cap" title="Basic energy cap: 840 with a membership, 560 without" value="@character.OdyleCap" @onchange="e => OnCapChanged(row.Key, e)">
-                                    <option value="@OdyleCapChoice.Automatic">cap @(character.MembershipSeen ? RosterRules.MembershipCap : RosterRules.StandardCap) (auto)</option>
+                                @* 840 is the default (Harry, 2026-10-27), so the list is the two caps; a saved choice of 840 shows as it. *@
+                                <select class="roster-cap" title="Basic energy cap: 840 with a membership (the default), 560 without" value="@CapShown(character)" @onchange="e => OnCapChanged(row.Key, e)">
+                                    <option value="@OdyleCapChoice.Automatic">cap @RosterRules.MembershipCap</option>
                                     <option value="@OdyleCapChoice.Standard">cap @RosterRules.StandardCap</option>
-                                    <option value="@OdyleCapChoice.Membership">cap @RosterRules.MembershipCap</option>
                                 </select>
                             </td>
                             <td>@ContentCell(row.Nightmare, character.Nightmare)</td>
@@ -129,7 +129,7 @@
                             <td title="@CorridorsTitle(row)">@CorridorsCell(row)</td>
                             <td>
                                 <div>@KinaCell(character.Kina?.Kina)</div>
-                                <div class="roster-bound">bound @KinaCell(character.Kina?.Bound)</div>
+                                <div class="roster-bound" title="@BoundKinaTitle(character)">bound @KinaCell(character.Kina?.Bound)</div>
                             </td>
                             <td class="left muted">@RosterText.At(character.LastSeen, now)</td>
                             <td>

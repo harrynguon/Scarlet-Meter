@@ -406,9 +406,11 @@ tr.child td {
 .roster-sort { margin-left: auto; color: var(--muted); display: flex; align-items: center; gap: 6px; }
 
 /* A roster row is three lines tall, so its class icon is a little larger than other tables' (Harry, 2026-10-27: "a tiny
-   bit bigger"): 22 px rather than 18, in a cell wide enough for it. */
-.roster-table .icon-cell { width: 28px; }
-.roster-table .class-icon { width: 22px; height: 22px; }
+   bit bigger"): 22 px rather than 18, in a cell wide enough for it. It sits beside the name and class lines, centred on
+   them, not on the whole row, whose note line under them is empty for most characters (Harry: "reposition the class icon
+   to a bit higher up ... if there's no note on the character then it looks a bit weird"); measured in headless renders. */
+.roster-table .icon-cell { width: 28px; vertical-align: top; }
+.roster-table .class-icon { display: block; width: 22px; height: 22px; margin-top: 6px; }
 
 /* Room for the Power column: two pixels less at each side of a cell than other tables (the row gains 48 px), and headers
    without their letter spacing (the Nightmare, Ascension and Corridors columns are as wide as their headers). Measured in

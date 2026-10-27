@@ -24,7 +24,10 @@ public sealed record RosterFile
 /// <summary>How a character's basic Odyle energy cap is chosen.</summary>
 public enum OdyleCapChoice
 {
-    /// <summary>560, or 840 once the character has been seen with more than 560 (a membership).</summary>
+    /// <summary>
+    /// The default: 840, a membership's (Harry, 2026-10-27). Until then it was 560, or 840 once the character had been seen
+    /// with more than 560; the name stays, as saved files have it.
+    /// </summary>
     Automatic,
     /// <summary>560: the player says there is no membership.</summary>
     Standard,
@@ -77,11 +80,11 @@ public sealed record RosterCharacter
     /// <summary>Ascension Trial: entries left, then the extra from recharge items.</summary>
     public RosterCount? Ascension { get; init; }
 
-    /// <summary>How the basic energy cap is chosen; the player can change it.</summary>
+    /// <summary>
+    /// How the basic energy cap is chosen; the player can change it. (A file from before 840 was the default also has
+    /// <c>membershipSeen</c>, which the automatic cap no longer needs: it is passed over when read and not written again.)
+    /// </summary>
     public OdyleCapChoice OdyleCap { get; init; }
-
-    /// <summary>Whether more basic energy than the standard cap has ever been seen, which only a membership allows.</summary>
-    public bool MembershipSeen { get; init; }
 
     /// <summary>
     /// When the character entered the Artifact Corridor, as the meter saw it, oldest first: the most recent
@@ -108,7 +111,7 @@ public sealed record RosterCharacter
         && Name == other.Name && Server == other.Server && ServerId == other.ServerId && ClassId == other.ClassId && ClassName == other.ClassName
         && CombatPower == other.CombatPower && Level == other.Level && GearScore == other.GearScore && LastSeen == other.LastSeen
         && Equals(Odyle, other.Odyle) && Equals(Nightmare, other.Nightmare) && Equals(Ascension, other.Ascension)
-        && OdyleCap == other.OdyleCap && MembershipSeen == other.MembershipSeen
+        && OdyleCap == other.OdyleCap
         && CorridorRuns.SequenceEqual(other.CorridorRuns) && Equals(Kina, other.Kina) && Note == other.Note;
 
     public override int GetHashCode() => HashCode.Combine(Name, Server, LastSeen, CorridorRuns.Count);

@@ -17,17 +17,18 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 - Settings, About names the Artifact Corridor, the two-minute instance you enter from the Abyss. The meter keeps
   tracking there; it pauses again once you are back in the Abyss. ([#47](https://github.com/harrynguon/Scarlet-Meter/pull/47))
 - A character roster: every character you log in on with the meter running, with its class and level from that first
-  login, its combat power and gear score, its Odyle energy, when basic energy is full again, and Nightmare and
-  Ascension entries left, estimated (≈) from what the game last said, the Artifact Corridors it entered since the last
-  Abyss Siege, out of those whose artifact your side holds (read when you open the Abyss map or enter the Abyss), its
-  Kina and Kina (Bound), with the totals across your characters, and a note of your own under each name. Open it with
-  the Characters button at the top right of the meter, by clicking the Odyle energy beside the ping, or from Settings,
-  Appearance, Characters. The recharge and siege times, the Kina, the artifacts and the classes, levels and gear scores
-  are not yet checked in the game.
+  login (on Global's servers too), its combat power and gear score, its Odyle energy, when basic energy is full again
+  (at 840, a membership's, unless you set 560 for the character), and Nightmare and Ascension entries left, estimated
+  (≈) from what the game last said, the Artifact Corridors it entered since the last Abyss Siege, out of those whose
+  artifact your side holds (read when you open the Abyss map or enter the Abyss), its Kina and Kina (Bound), with the
+  totals across your characters, and a note of your own under each name. Open it with the Characters button at the top
+  right of the meter, by clicking the Odyle energy beside the ping, or from Settings, Appearance, Characters. The
+  recharge and siege times, the Kina, the artifacts and the classes, levels and gear scores are not yet checked in the
+  game.
   ([#48](https://github.com/harrynguon/Scarlet-Meter/pull/48), [#49](https://github.com/harrynguon/Scarlet-Meter/pull/49),
   [#50](https://github.com/harrynguon/Scarlet-Meter/pull/50), [#51](https://github.com/harrynguon/Scarlet-Meter/pull/51),
   [#53](https://github.com/harrynguon/Scarlet-Meter/pull/53), [#55](https://github.com/harrynguon/Scarlet-Meter/pull/55),
-  [#56](https://github.com/harrynguon/Scarlet-Meter/pull/56))
+  [#56](https://github.com/harrynguon/Scarlet-Meter/pull/56), [#58](https://github.com/harrynguon/Scarlet-Meter/pull/58))
 
 ### Changed
 

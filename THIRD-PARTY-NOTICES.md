@@ -49,7 +49,10 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   (`ScarletMeter.Engine/Entries/SelfRecords`), from `self_profile` and the masked-identity scan in
   `src-tauri/src/capture/stream_processor.rs` and `JobClass::from_roster_class` in `src-tauri/src/entity/job_class.rs`
   at the same commit (read on 2026-10-27); and that entry 1 of the list of entry counts is the Shugo Festival keys
-  (its list of known ids in `character()`, `src-tauri/src/plugins/mod.rs`, at the same commit), taken as a fact;
+  (its list of known ids in `character()`, `src-tauri/src/plugins/mod.rs`, at the same commit), taken as a fact; and
+  which server ids exist, Korea's and Taiwan's and the Global servers NC has opened, by faction, region and slot
+  (`ScarletMeter.Engine/Entries/GameServers`), from `exists` in `src-tauri/src/capture/servers.rs`, added in that
+  commit (read on 2026-10-27), its rule ported and its open slots taken as facts;
   GNU GPL v3: its Rust parsing ported to C#. No captured bytes were taken; Scarlet's tests use synthetic records.
 - **SkeeveAN/Aion-DPS-Meter** (the layout of the game's inventory records and how to find an entry in them by its anchor,
   `ScarletMeter.Engine/Entries/InventoryRecords`), https://github.com/SkeeveAN/Aion-DPS-Meter, `Client/Aion2/Aion2Stock.cs`
