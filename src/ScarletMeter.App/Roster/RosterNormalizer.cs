@@ -25,6 +25,12 @@ public static class RosterNormalizer
     /// <summary>The largest combat power kept.</summary>
     public const int MaxCombatPower = 100_000_000;
 
+    /// <summary>The highest level kept: the engine's reader takes 1 to 99.</summary>
+    public const int MaxLevel = 99;
+
+    /// <summary>The highest gear score kept: the engine's reader takes 1 to 100,000.</summary>
+    public const int MaxGearScore = 100_000;
+
     /// <summary>The largest count kept: the entry list's own bound.</summary>
     public const int MaxCount = 1_000_000;
 
@@ -151,9 +157,12 @@ public static class RosterNormalizer
         var classId = character.ClassId is >= 0 and <= 99 ? character.ClassId : 0;
         var className = IsUsableText(character.ClassName, MaxClassNameLength, allowEmpty: true) ? character.ClassName : string.Empty;
         var combatPower = character.CombatPower is >= 0 and <= MaxCombatPower ? character.CombatPower : 0;
+        var level = character.Level is >= 0 and <= MaxLevel ? character.Level : 0;
+        var gearScore = character.GearScore is >= 0 and <= MaxGearScore ? character.GearScore : 0;
         var cap = Enum.IsDefined(character.OdyleCap) ? character.OdyleCap : OdyleCapChoice.Automatic;
         var note = CleanNote(character.Note);
-        if (serverId != character.ServerId || classId != character.ClassId || className != character.ClassName || combatPower != character.CombatPower || cap != character.OdyleCap
+        if (serverId != character.ServerId || classId != character.ClassId || className != character.ClassName || combatPower != character.CombatPower
+            || level != character.Level || gearScore != character.GearScore || cap != character.OdyleCap
             || note != (character.Note ?? string.Empty) || (runs.Count == usable.Count && !runs.SequenceEqual(usable))) repaired++;
 
         return character with
@@ -162,6 +171,8 @@ public static class RosterNormalizer
             ClassId = classId,
             ClassName = className,
             CombatPower = combatPower,
+            Level = level,
+            GearScore = gearScore,
             OdyleCap = cap,
             LastSeen = lastSeen,
             Odyle = odyle,

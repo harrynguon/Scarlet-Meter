@@ -405,6 +405,15 @@ tr.child td {
 .roster-next { color: var(--text); }
 .roster-sort { margin-left: auto; color: var(--muted); display: flex; align-items: center; gap: 6px; }
 
+/* A roster row is three lines tall, so its class icon is a little larger than other tables' (Harry, 2026-10-27: "a tiny
+   bit bigger"): 22 px rather than 18, in a cell wide enough for it. */
+.roster-table .icon-cell { width: 28px; }
+.roster-table .class-icon { width: 22px; height: 22px; }
+
+/* A pixel less at each side of a cell than other tables: with the Power column's icons, a headless render at the
+   window's 920 px with Harry's own values was half a pixel too wide (a horizontal scrollbar); this gives the row 24 px. */
+.roster-table th, .roster-table td { padding-left: 5px; padding-right: 5px; }
+
 /* A name in a row reads at the table's size, not the details header's. */
 .roster-table .who-name { font-size: 13px; }
 .roster-table .who-sub { font-size: 11px; margin-top: 1px; }
@@ -412,13 +421,37 @@ tr.child td {
 
 /* An estimate (≈) is dimmer than what the game said. Charged energy is cyan, as on the overlay (.odyle-charged). */
 .roster-table .estimate { color: #c9c6d6; font-style: italic; }
-.roster-full { color: var(--good); margin-right: 6px; }
+.roster-full { color: var(--good); }
 .roster-bound { color: var(--muted); font-size: 11px; }
+
+/* The Power column: an icon before each number, right-aligned as the column's numbers are (Harry, 2026-10-27, from the
+   game's own: crossed blades for combat power, a helmet for gear score; these are Scarlet's drawings). */
+.roster-power { display: flex; justify-content: flex-end; align-items: center; gap: 3px; }
+.cp-icon {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    fill: none;
+    stroke: #46d6b4;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+}
+.gs-icon {
+    flex: none;
+    width: 11px;
+    height: 11px;
+    fill: #c9ced8;
+    fill-rule: evenodd;
+}
+
 /* Corridors out of 3 while which artifacts the side holds is not known. */
 .roster-open-unknown { font-style: italic; }
 
+/* The basic energy cap, under when it is full, as Kina (Bound) is under Kina: beside it, it took the room the Power column
+   needs at the window's 920 px (a headless render, 2026-10-27). Its box's padding is pulled back so its text lines up. */
 .roster-cap {
-    margin-left: 6px;
+    display: block;
+    margin: 1px 0 0 -5px;
     background: transparent;
     color: var(--muted);
     border: 1px solid transparent;

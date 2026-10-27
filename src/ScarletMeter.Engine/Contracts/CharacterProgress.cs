@@ -15,7 +15,10 @@ namespace ScarletMeter.Engine;
 /// The server's id as the game numbers servers (1001 and up Elyos, 2001 and up Asmodian; <see cref="AbyssArtifacts.SideOf"/>),
 /// or 0 when not known. Upstream's short names repeat across the two sides (SIE is 1001 and 2002), the id does not.
 /// </param>
-public sealed record CharacterIdentity(string Name, string Server, int ClassId, string ClassName, int CombatPower, int ServerId = 0)
+/// <param name="Level">The character's level as the record gave it (1 to 99), or 0 when not known.</param>
+/// <param name="GearScore">The gear score, the equipment's item level, as the record gave it, or 0 when not known.</param>
+public sealed record CharacterIdentity(
+    string Name, string Server, int ClassId, string ClassName, int CombatPower, int ServerId = 0, int Level = 0, int GearScore = 0)
 {
     /// <summary>Whether two identities are the same character: the same name on the same server.</summary>
     public bool IsSameCharacter(CharacterIdentity? other) =>

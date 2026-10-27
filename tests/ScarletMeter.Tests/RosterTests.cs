@@ -178,8 +178,12 @@ public sealed class RosterTests : IDisposable
         Assert.Equal("12h 16m", RosterText.Until(new TimeSpan(12, 15, 1)));
         Assert.Equal("1m", RosterText.Until(TimeSpan.FromSeconds(1)));
         Assert.Equal("now", RosterText.Until(TimeSpan.Zero));
-        Assert.Equal("SIE · Gladiator", RosterText.ServerAndClass(new RosterCharacter { Name = "A", Server = "SIE", ClassName = "Gladiator" }));
-        Assert.Equal("Gladiator", RosterText.ServerAndClass(new RosterCharacter { Name = "A", ClassName = "Gladiator" }));
+        Assert.Equal("SIE · Gladiator", RosterText.ServerClassAndLevel(new RosterCharacter { Name = "A", Server = "SIE", ClassName = "Gladiator" }));
+        Assert.Equal("Gladiator", RosterText.ServerClassAndLevel(new RosterCharacter { Name = "A", ClassName = "Gladiator" }));
+        Assert.Equal("SIE · Sorcerer · Lv 45", RosterText.ServerClassAndLevel(new RosterCharacter { Name = "A", Server = "SIE", ClassName = "Sorcerer", Level = 45 }));
+        Assert.Equal("Lv 9", RosterText.ServerClassAndLevel(new RosterCharacter { Name = "A", Level = 9 }));
+        Assert.Equal("41,000", RosterText.KnownNumber(41_000));
+        Assert.Equal("?", RosterText.KnownNumber(0));
     }
 
     // ---------- The file ----------
@@ -340,15 +344,23 @@ public sealed class RosterTests : IDisposable
             new() { Name = "Future", Server = "SIE", LastSeen = now.AddDays(3) },  // a date past tomorrow
             new() { Name = "Dated", Server = "TRI", Odyle = Seen(10, 0, now.AddHours(-1)) }, // no date of its own: its count's
             new() { Name = "Odd", Server = "TRI", LastSeen = now, ClassId = 500, CombatPower = -4, OdyleCap = (OdyleCapChoice)9,
+                Level = 100, GearScore = 100_001,
                 Odyle = Seen(200_000, 0, now), Nightmare = Seen(3, 0, now.AddDays(9)), Ascension = Seen(1, 0, now) },
+            new() { Name = "Below", Server = "TRI", LastSeen = now, Level = -1, GearScore = -1 },
+            new() { Name = "Edge", Server = "TRI", LastSeen = now, Level = 99, GearScore = 100_000 },
         ];
         var (file, repairs) = RosterNormalizer.Normalize(new RosterFile { Characters = saved }, now);
 
-        Assert.Equal(["Alpha", "Dated", "Odd"], file.Characters.Select(c => c.Name).Order(StringComparer.Ordinal));
+        Assert.Equal(["Alpha", "Below", "Dated", "Edge", "Odd"], file.Characters.Select(c => c.Name).Order(StringComparer.Ordinal));
         Assert.Equal(41_000, file.Characters.Single(c => c.Name == "Alpha").CombatPower);
         Assert.Equal(now.AddHours(-1), file.Characters.Single(c => c.Name == "Dated").LastSeen);
         var odd = file.Characters.Single(c => c.Name == "Odd");
         Assert.Equal((0, 0, OdyleCapChoice.Automatic), (odd.ClassId, odd.CombatPower, odd.OdyleCap));
+        Assert.Equal((0, 0), (odd.Level, odd.GearScore)); // past the bounds
+        var below = file.Characters.Single(c => c.Name == "Below");
+        Assert.Equal((0, 0), (below.Level, below.GearScore));
+        var edge = file.Characters.Single(c => c.Name == "Edge");
+        Assert.Equal((99, 100_000), (edge.Level, edge.GearScore)); // the bounds kept
         Assert.Null(odd.Odyle);
         Assert.Null(odd.Nightmare);
         Assert.Equal(1, odd.Ascension?.First);
@@ -440,20 +452,25 @@ public sealed class RosterTests : IDisposable
         Assert.Equal([alpha], store.Load(Monday).File.Characters);
     }
 
-    // A count replaces the kept one only when it was read later; an identity without a class or power keeps the kept ones.
+    // A count replaces the kept one only when it was read later; an identity without a class, power, level or gear score
+    // keeps the kept ones, and one with them replaces them (a level gained, new gear).
     [Fact]
     public void AnOlderReportNeverUndoesANewerOne()
     {
         var clock = new FakeTimeProvider(Monday.AddMinutes(10)); // both reads in the past, as the tap's always are
         using var service = new RosterService(new FakeEngine(), NewStore(), clock, NullLogger<RosterService>.Instance);
-        service.Take(Progress(AlphaIdentity, (EntryIds.OdyleEnergy, 300, 0, Monday.AddMinutes(5))));
+        service.Take(Progress(AlphaIdentity with { Level = 45, GearScore = 2_040 }, (EntryIds.OdyleEnergy, 300, 0, Monday.AddMinutes(5))));
         service.Take(Progress(AlphaIdentity with { ClassId = 0, ClassName = "", CombatPower = 0 },
             (EntryIds.OdyleEnergy, 310, 0, Monday), (EntryIds.AscensionTrial, 2, 0, Monday)));
         var alpha = Assert.Single(service.Characters);
         Assert.Equal(Seen(300, 0, Monday.AddMinutes(5)), alpha.Odyle);
         Assert.Equal(Seen(2, 0, Monday), alpha.Ascension);
-        Assert.Equal((16, "Spiritmaster", 41_000), (alpha.ClassId, alpha.ClassName, alpha.CombatPower));
+        Assert.Equal((16, "Spiritmaster", 41_000, 45, 2_040), (alpha.ClassId, alpha.ClassName, alpha.CombatPower, alpha.Level, alpha.GearScore));
         Assert.False(alpha.MembershipSeen);
+
+        service.Take(Progress(AlphaIdentity with { CombatPower = 43_500, Level = 46, GearScore = 2_100 }));
+        alpha = Assert.Single(service.Characters);
+        Assert.Equal((43_500, 46, 2_100), (alpha.CombatPower, alpha.Level, alpha.GearScore));
     }
 
     // A kept count dated after now (a clock set back since) is replaced by the next read, or nothing would ever replace it.
@@ -649,11 +666,13 @@ public sealed class RosterTests : IDisposable
     [Fact]
     public void ACharacterFirstSeenInTheCorridorHasItsClass()
     {
-        using var service = new RosterService(new FakeEngine { Character = AlphaIdentity with { ServerId = 2002 } }, NewStore(), new FakeTimeProvider(Monday), NullLogger<RosterService>.Instance);
+        using var service = new RosterService(
+            new FakeEngine { Character = AlphaIdentity with { ServerId = 2002, Level = 45, GearScore = 2_040 } }, NewStore(), new FakeTimeProvider(Monday), NullLogger<RosterService>.Instance);
         service.TakeMap(20);
         service.TakeMap(MapNames.ArtifactCorridor);
         var alpha = service.Characters.Single();
         Assert.Equal((16, "Spiritmaster", 41_000, 2002), (alpha.ClassId, alpha.ClassName, alpha.CombatPower, alpha.ServerId));
+        Assert.Equal((45, 2_040), (alpha.Level, alpha.GearScore));
     }
 
     // A reconnection inside the corridor loads it again after an unknown map: within five minutes of the last run that is

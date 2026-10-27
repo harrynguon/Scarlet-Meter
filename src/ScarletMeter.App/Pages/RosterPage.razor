@@ -66,6 +66,7 @@
                     <tr>
                         <th></th>
                         <th class="left">Character</th>
+                        <th title="Combat power, and gear score (the equipment's item level) below it, as the game last said at login">Power</th>
                         <th title="Basic energy, then charged energy in brackets">Odyle</th>
                         <th class="left" title="When basic energy reaches its cap, if none is spent">Full</th>
                         <th title="Entries left (+extra from recharge items); +@RosterRules.Nightmare.Add a day, up to @RosterRules.Nightmare.Cap">Nightmare</th>
@@ -84,9 +85,18 @@
                             <td class="icon-cell">@if (WebAssetHosts.ClassIconUrl(character.ClassId) is { } icon) { <span class="class-icon" style="background-image:url('@icon')"></span> }</td>
                             <td class="left">
                                 <div class="who-name">@Name(character) @if (row.IsCurrent) { <span class="badge you">Playing</span> }</div>
-                                <div class="who-sub muted">@RosterText.ServerAndClass(character)</div>
+                                <div class="who-sub muted">@RosterText.ServerClassAndLevel(character)</div>
                                 <input class="roster-note" type="text" maxlength="@RosterNormalizer.MaxNoteLength" placeholder="add a note" aria-label="Note"
                                        title="@NoteTitle(character)" value="@character.Note" @onchange="e => OnNoteChanged(row.Key, e)" />
+                            </td>
+                            @* Combat power (crossed blades) over gear score (a helmet), each icon Scarlet's own drawing, not the game's art. *@
+                            <td>
+                                <div class="roster-power @(character.CombatPower > 0 ? "" : "muted")" title="Combat power">
+                                    <svg class="cp-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 2.6 11 11M13.4 2.6 5 11" /><path d="M9.3 12.7 12.7 9.3M3.3 9.3 6.7 12.7" /><path d="M11.7 11.7 13.6 13.6M4.3 11.7 2.4 13.6" /></svg>@RosterText.KnownNumber(character.CombatPower)
+                                </div>
+                                <div class="roster-power roster-bound" title="Gear score (the equipment's item level)">
+                                    <svg class="gs-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5C4.4 1.5 2.8 4 2.8 7.2v5.4L6 14.5V11h4v3.5l3.2-1.9V7.2c0-3.2-1.6-5.7-5.2-5.7ZM4.6 7.4h6.8v1.4H8.8V11H7.2V8.8H4.6Z" /></svg>@RosterText.KnownNumber(character.GearScore)
+                                </div>
                             </td>
                             <td>
                                 @if (row.Odyle is { } odyle)
@@ -102,11 +112,11 @@
                             <td class="left">
                                 @if (row.Odyle is { Full: true })
                                 {
-                                    <span class="roster-full">Full</span>
+                                    <div class="roster-full">Full</div>
                                 }
                                 else if (row.FullAt is { } full)
                                 {
-                                    <span title="@RosterText.At(full, now)">in @RosterText.Until(full - now)</span>
+                                    <div title="@RosterText.At(full, now)">in @RosterText.Until(full - now)</div>
                                 }
                                 <select class="roster-cap" title="Basic energy cap: 840 with a membership, 560 without" value="@character.OdyleCap" @onchange="e => OnCapChanged(row.Key, e)">
                                     <option value="@OdyleCapChoice.Automatic">cap @(character.MembershipSeen ? RosterRules.MembershipCap : RosterRules.StandardCap) (auto)</option>

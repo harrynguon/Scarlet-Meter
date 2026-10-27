@@ -139,6 +139,8 @@ public sealed class RosterService : IDisposable
                 ClassId = who.ClassId > 0 ? who.ClassId : character.ClassId,
                 ClassName = who.ClassName.Length > 0 ? who.ClassName : character.ClassName,
                 CombatPower = who.CombatPower > 0 ? who.CombatPower : character.CombatPower,
+                Level = who.Level > 0 ? who.Level : character.Level,
+                GearScore = who.GearScore > 0 ? who.GearScore : character.GearScore,
                 LastSeen = now,
                 Odyle = Later(character.Odyle, progress.Entries, EntryIds.OdyleEnergy, now),
                 Nightmare = Later(character.Nightmare, progress.Entries, EntryIds.Nightmare, now),
@@ -302,6 +304,8 @@ public sealed class RosterService : IDisposable
             ClassId = Math.Max(0, who.ClassId),
             ClassName = who.ClassName,
             CombatPower = Math.Max(0, who.CombatPower),
+            Level = Math.Max(0, who.Level),
+            GearScore = Math.Max(0, who.GearScore),
         };
         List<DateTimeOffset> runs = [.. character.CorridorRuns.Where(run => run <= now)];
         if (reconnection && runs.Count > 0 && at >= runs[^1] && at - runs[^1] < CorridorReentryWindow) return false;
