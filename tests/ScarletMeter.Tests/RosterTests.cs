@@ -549,19 +549,102 @@ public sealed class RosterTests : IDisposable
         Assert.Equal([Monday], Assert.Single(store.Load(clock.GetUtcNow()).File.Characters).CorridorRuns);
     }
 
-    // While the engine is not sure who is playing (after a move, before a record names the character), a run is put on no
-    // one, and says so without naming anyone.
+    // Before the game has named any character, a run is put on no one, and says so without naming anyone.
     [Fact]
-    public void ARunWhileTheCharacterIsNotSureIsNotCounted()
+    public void ARunBeforeAnyCharacterIsNamedIsNotCounted()
+    {
+        var clock = new FakeTimeProvider(Monday);
+        var log = new RecordingLogger<RosterService>();
+        using var service = new RosterService(new FakeEngine(), NewStore(), clock, log);
+        service.TakeMap(20);
+        service.TakeMap(MapNames.ArtifactCorridor);
+        Assert.Empty(service.Characters);
+        Assert.Single(log.Entries, e => e.Message.Contains("before the game named any character; not counted", StringComparison.Ordinal));
+    }
+
+    // While the engine is not sure who is playing (entering the Abyss is a server change; the record naming the character
+    // can come after the corridor's load), a run is held for the character the roster knew: counted at its own time when
+    // the game names that same character within ten minutes, dropped when it names another (a switch) or none in time, so
+    // it never lands on the wrong character (deep audit on #49). Nothing logged names anyone.
+    [Fact]
+    public void ARunWhileTheCharacterIsNotSureIsHeldForTheSameCharacter()
     {
         var clock = new FakeTimeProvider(Monday);
         var log = new RecordingLogger<RosterService>();
         var engine = new FakeEngine();
         using var service = new RosterService(engine, NewStore(), clock, log);
+        var beta = AlphaIdentity with { Name = "Beta" };
+        service.Take(Progress(AlphaIdentity));
+
         service.TakeMap(20);
         service.TakeMap(MapNames.ArtifactCorridor);
-        Assert.Empty(service.Characters);
-        Assert.Single(log.Entries, e => e.Message.Contains("not sure; not counted", StringComparison.Ordinal));
+        Assert.Empty(service.Characters.Single().CorridorRuns);
+        clock.Advance(TimeSpan.FromMinutes(2));
+        service.Take(Progress(AlphaIdentity));
+        Assert.Equal([Monday], service.Characters.Single().CorridorRuns); // at the entry's time, not the naming's
+
+        service.TakeMap(20);
+        service.TakeMap(MapNames.ArtifactCorridor);
+        service.Take(Progress(beta));
+        Assert.Equal([Monday], service.Characters.Single(c => c.Name == "Alpha").CorridorRuns);
+        Assert.Empty(service.Characters.Single(c => c.Name == "Beta").CorridorRuns);
+
+        service.TakeMap(20);
+        service.TakeMap(MapNames.ArtifactCorridor); // held for Beta, the character the roster knew last
+        clock.Advance(RosterService.CorridorConfirmWindow + TimeSpan.FromSeconds(1));
+        service.Take(Progress(beta));
+        Assert.Empty(service.Characters.Single(c => c.Name == "Beta").CorridorRuns);
+
+        Assert.Contains(log.Entries, e => e.Message.Contains("held until the game names them again", StringComparison.Ordinal));
+        Assert.Contains(log.Entries, e => e.Message.Contains("held Artifact Corridor entries counted", StringComparison.Ordinal));
+        Assert.Equal(2, log.Entries.Count(e => e.Message.Contains("held Artifact Corridor entries dropped", StringComparison.Ordinal)));
+        Assert.All(log.Entries, e => Assert.DoesNotContain("Alpha", e.Message, StringComparison.Ordinal));
+    }
+
+    // Two quick runs with a known map between them are two runs: only a reload straight after an unknown map, the corridor
+    // the last map known, is the same run.
+    [Fact]
+    public void TwoQuickRunsAreTwoRuns()
+    {
+        var clock = new FakeTimeProvider(Monday);
+        using var service = new RosterService(new FakeEngine { Character = AlphaIdentity }, NewStore(), clock, NullLogger<RosterService>.Instance);
+        service.TakeMap(20);
+        service.TakeMap(MapNames.ArtifactCorridor);
+        clock.Advance(TimeSpan.FromMinutes(3));
+        service.TakeMap(20);
+        service.TakeMap(MapNames.ArtifactCorridor);
+        clock.Advance(TimeSpan.FromMinutes(1));
+        service.TakeMap(20);
+        service.TakeMap(null); // a reconnection in the Abyss: the last map known is not the corridor
+        service.TakeMap(MapNames.ArtifactCorridor);
+        Assert.Equal(3, service.Characters.Single().CorridorRuns.Count);
+    }
+
+    // A saved run dated after now (a clock set back since) neither swallows new runs as "the same run" nor breaks the
+    // order: it is dropped when a run is added (Codex on #49).
+    [Fact]
+    public void ARunDatedAfterNowDoesNotSwallowNewRuns()
+    {
+        var store = NewStore();
+        store.Save(new RosterFile { Characters = [new RosterCharacter { Name = "Alpha", Server = "SIE", LastSeen = Monday, CorridorRuns = [Monday.AddHours(6)] }] });
+        var clock = new FakeTimeProvider(Monday);
+        using var service = new RosterService(new FakeEngine { Character = AlphaIdentity }, store, clock, NullLogger<RosterService>.Instance);
+        service.TakeMap(MapNames.ArtifactCorridor);
+        clock.Advance(TimeSpan.FromMinutes(6));
+        service.TakeMap(null);
+        service.TakeMap(MapNames.ArtifactCorridor);
+        Assert.Equal([Monday, Monday.AddMinutes(6)], service.Characters.Single().CorridorRuns);
+    }
+
+    // A character first seen (or removed and back) through a corridor run has what the engine knows of it.
+    [Fact]
+    public void ACharacterFirstSeenInTheCorridorHasItsClass()
+    {
+        using var service = new RosterService(new FakeEngine { Character = AlphaIdentity }, NewStore(), new FakeTimeProvider(Monday), NullLogger<RosterService>.Instance);
+        service.TakeMap(20);
+        service.TakeMap(MapNames.ArtifactCorridor);
+        var alpha = service.Characters.Single();
+        Assert.Equal((16, "Spiritmaster", 41_000), (alpha.ClassId, alpha.ClassName, alpha.CombatPower));
     }
 
     // A reconnection inside the corridor loads it again after an unknown map: within five minutes of the last run that is
@@ -609,12 +692,14 @@ public sealed class RosterTests : IDisposable
         var runs = Enumerable.Range(0, RosterRules.CorridorRunsKept + 2).Select(i => Monday.AddHours(-i)).ToList();
         runs.Add(Monday.AddDays(5)); // past tomorrow
         runs.Add(new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        runs.Add(Monday); // listed twice
         var (file, repairs) = RosterNormalizer.Normalize(new RosterFile { Characters = [new RosterCharacter { Name = "Alpha", Server = "SIE", LastSeen = Monday, CorridorRuns = runs }] }, Monday);
         var kept = Assert.Single(file.Characters).CorridorRuns;
         Assert.Equal(RosterRules.CorridorRunsKept, kept.Count);
-        Assert.Equal(Monday, kept[^1]);
+        Assert.Equal([Monday.AddHours(-1), Monday], kept.TakeLast(2));
         Assert.Equal(kept.Order(), kept);
-        Assert.NotEmpty(repairs);
+        Assert.Contains("2 unusable counts or corridor entries dropped.", repairs);
+        Assert.Contains("3 corridor entries listed twice or past the 12 kept dropped.", repairs);
         var (none, _) = RosterNormalizer.Normalize(new RosterFile { Characters = [new RosterCharacter { Name = "Alpha", Server = "SIE", LastSeen = Monday, CorridorRuns = null! }] }, Monday);
         Assert.Empty(Assert.Single(none.Characters).CorridorRuns);
     }
