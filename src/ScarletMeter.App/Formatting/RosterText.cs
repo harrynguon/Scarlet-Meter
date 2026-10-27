@@ -29,13 +29,21 @@ public static class RosterText
     }
 
     /// <summary>An instant in the PC's local time, with the day when it is not today ("01:42", "Thu 30 Oct 07:00").</summary>
-    public static string At(DateTimeOffset instant, DateTimeOffset now)
+    public static string At(DateTimeOffset instant, DateTimeOffset now) =>
+        Day(instant, now) is { Length: > 0 } day ? day + " " + Time(instant) : Time(instant);
+
+    /// <summary>
+    /// The day of an instant in the PC's local time ("Thu 30 Oct"), or empty when it is today: the roster's Last played
+    /// puts it on a line above the time, so a date does not widen the column (Harry, 2026-10-28).
+    /// </summary>
+    public static string Day(DateTimeOffset instant, DateTimeOffset now)
     {
         var local = instant.ToLocalTime();
-        return local.Date == now.ToLocalTime().Date
-            ? local.ToString("HH:mm", CultureInfo.InvariantCulture)
-            : local.ToString("ddd d MMM HH:mm", CultureInfo.InvariantCulture);
+        return local.Date == now.ToLocalTime().Date ? string.Empty : local.ToString("ddd d MMM", CultureInfo.InvariantCulture);
     }
+
+    /// <summary>The time of an instant in the PC's local time ("07:00").</summary>
+    public static string Time(DateTimeOffset instant) => instant.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture);
 
     /// <summary>The line under a character's name: server, class and level ("SIE · Sorcerer · Lv 45"), whichever are known.</summary>
     public static string ServerClassAndLevel(RosterCharacter character) =>

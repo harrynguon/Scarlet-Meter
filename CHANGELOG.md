@@ -22,15 +22,16 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
   (at 840, a membership's, unless you set 560 for the character), and Nightmare and Ascension entries left, estimated
   (≈) from what the game last said, the Artifact Corridors it entered since the last Abyss Siege, out of those whose
   artifact your side holds (read when you open the Abyss map or enter the Abyss), its Kina and Kina (Bound), with the
-  totals across your characters, and a note of your own under each name. Open it with the Characters button at the top
-  right of the meter, by clicking the Odyle energy beside the ping, or from Settings, Appearance, Characters. The
-  recharge and siege times, the Kina, the artifacts and the classes, levels and gear scores are not yet checked in the
-  game.
+  totals across your characters, a note of your own under each name, and when you last played them. It opens sorted by
+  combat power, highest first ("Most power"; or by Odyle energy, full soonest, Kina, name or last played). Open it with
+  the Characters button at the top right of the meter, by clicking the Odyle energy beside the ping, or from Settings,
+  Appearance, Characters. The recharge and siege times, the Kina, the artifacts and the classes, levels and gear scores
+  are not yet checked in the game.
   ([#48](https://github.com/harrynguon/Scarlet-Meter/pull/48), [#49](https://github.com/harrynguon/Scarlet-Meter/pull/49),
   [#50](https://github.com/harrynguon/Scarlet-Meter/pull/50), [#51](https://github.com/harrynguon/Scarlet-Meter/pull/51),
   [#53](https://github.com/harrynguon/Scarlet-Meter/pull/53), [#55](https://github.com/harrynguon/Scarlet-Meter/pull/55),
   [#56](https://github.com/harrynguon/Scarlet-Meter/pull/56), [#58](https://github.com/harrynguon/Scarlet-Meter/pull/58),
-  [#62](https://github.com/harrynguon/Scarlet-Meter/pull/62))
+  [#61](https://github.com/harrynguon/Scarlet-Meter/pull/61), [#62](https://github.com/harrynguon/Scarlet-Meter/pull/62))
 
 ### Changed
 
