@@ -18,7 +18,7 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 - **Minor**: the name-and-short-name key, which both sides share on SIE and ISH: a follow-up in HANDOFF (`Roster key`).
 - **Nits**: `RecordTap`'s summary and log name the artifact reader; a war listed twice is the first listing's, as A2Tools' plugin finds it (an artifact still the last's); holders fall back to the server id the roster knows when a report has none; a null enum in the file (a holder, a cap) reads as unknown and is repaired rather than setting the file aside; the note box's comment; stray characters in a CSS comment; HANDOFF asks for a reading at siege time.
 
-**Checks after the review:** `scripts/Build.ps1` Debug and Release 812/812, and 813/813 after rebasing onto #50's next fix (21ea476); ten more mutations, each caught, controls passing (the audit's seven survivors that needed a test, the server-id fallback, a null holder, the war's first listing).
+**Checks after the review:** `scripts/Build.ps1` Debug and Release 812/812, and 814/814 after rebasing onto #50's later fixes (8452fbe); ten more mutations, each caught, controls passing (the audit's seven survivors that needed a test, the server-id fallback, a null holder, the war's first listing).
 
 **Next action:** CI and Codex on the new head, Harry's go-ahead to merge (#50 first; this PR is then rebased onto `main`); then the in-game checks.
 ## 2026-10-27 — The roster shows each character's Kina
