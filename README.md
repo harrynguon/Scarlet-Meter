@@ -67,8 +67,9 @@ and adds it up per player and per fight.
   come back).
 - A **row per player**: class icon, name, **combat power**, deaths, then DPS and share, with the total damage small
   under the share.
-- **Party DPS**, fight duration, your **Odyle energy** (basic, then charged in brackets, once the game sends it: at
-  login, after a server transfer and when it changes) and a colour-coded **ping**.
+- **Party DPS**, fight duration, your **Shugo Festival keys** (shared by your characters on a server) and **Odyle
+  energy** (basic, then charged in brackets), once the game sends them (at login, after a server transfer and when they
+  change), and a colour-coded **ping**.
 - The header says what is going on: **"Boss combat"**, the time, and **"Boss defeated"** when it is down.
 
 **Looks, your way**
@@ -147,7 +148,7 @@ opacity, a background picture, class colours, hidden names and a show/hide hotke
 | Animated bar effects per class, overtake glide | Yes | Own-bar colours and gradients |
 | Picture opacity separate from the meter's | Yes | No |
 | World-event and field-boss alerts | Yes | No |
-| Odyle energy beside the ping | Yes | No |
+| Odyle energy and Shugo Festival keys beside the ping | Yes | No |
 | Every character's Odyle energy and entries at a glance | Yes | No |
 | Pauses itself in the Abyss | Yes | No |
 | Ignores other players' training-dummy fights | Yes | No |

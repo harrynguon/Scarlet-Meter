@@ -116,6 +116,19 @@ internal sealed class EntryListTap : IRecordReader
     }
 
     /// <summary>
+    /// The Shugo Festival keys among the counts kept, or null when the game has not sent them since the last list (or the
+    /// counts were dropped): read from the counts, so they follow the counts' rules, and show at once, as the Odyle energy
+    /// does, before the character is named.
+    /// </summary>
+    public ShugoKeys? Shugo
+    {
+        get
+        {
+            lock (gate) return counts.TryGetValue(EntryIds.ShugoFestivalKeys, out var keys) ? new ShugoKeys(keys.First, keys.Second) : null;
+        }
+    }
+
+    /// <summary>
     /// The character being played, as the game last named it, or null while that is not sure: until a character is
     /// named, after a login's list until its self record, and after a move to a new connection until a self record names
     /// the character again (see remarks).

@@ -91,6 +91,15 @@ public interface ICombatEngine : IDisposable
     event EventHandler<OdyleEnergy>? OdyleEnergyUpdated;
 
     /// <summary>
+    /// The Shugo Festival keys as the game last sent them, or null until it sends them: in the same list as the Odyle
+    /// energy, so at login, after a server transfer and when they change, and null again when the counts are (a login's
+    /// list without them, another character named with no list between). As with the energy, when a move to a new
+    /// connection loses its list, the keys from before show until a new list comes or the game names another character.
+    /// Kept across Stop and Reset.
+    /// </summary>
+    ShugoKeys? ShugoKeys { get; }
+
+    /// <summary>
     /// The character being played, from the character's own record that upstream reads at login (and on loads after it),
     /// or null while that is not sure: until one is named, after a login's list until the record naming who logged in,
     /// and after a move to a new connection (a server change, or a switch whose first records were lost) until a record

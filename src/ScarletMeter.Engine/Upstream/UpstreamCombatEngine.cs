@@ -86,6 +86,8 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
 
     public OdyleEnergy? OdyleEnergy => entries.Odyle;
 
+    public ShugoKeys? ShugoKeys => entries.Shugo;
+
     public event EventHandler<OdyleEnergy>? OdyleEnergyUpdated
     {
         add => entries.OdyleUpdated += value;

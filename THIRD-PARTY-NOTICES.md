@@ -48,7 +48,8 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   player's own character record, four codes to a class, and the level and gear score after it with their bounds
   (`ScarletMeter.Engine/Entries/SelfRecords`), from `self_profile` and the masked-identity scan in
   `src-tauri/src/capture/stream_processor.rs` and `JobClass::from_roster_class` in `src-tauri/src/entity/job_class.rs`
-  at the same commit (read on 2026-10-27);
+  at the same commit (read on 2026-10-27); and that entry 1 of the list of entry counts is the Shugo Festival keys
+  (its list of known ids in `character()`, `src-tauri/src/plugins/mod.rs`, at the same commit), taken as a fact;
   GNU GPL v3: its Rust parsing ported to C#. No captured bytes were taken; Scarlet's tests use synthetic records.
 - **SkeeveAN/Aion-DPS-Meter** (the layout of the game's inventory records and how to find an entry in them by its anchor,
   `ScarletMeter.Engine/Entries/InventoryRecords`), https://github.com/SkeeveAN/Aion-DPS-Meter, `Client/Aion2/Aion2Stock.cs`
@@ -80,7 +81,10 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   and their caps and recharges, and which Artifact Corridors a side can run (one per lower-layer artifact it holds, one
   nobody holds closed to both, one not named open), from the Roster / Content Overview plugin by Nullception in
   taengu/A2Tools-Plugins, `plugins/alt-roster` (`logic.js` and `plugin.js`) at 7a4720bf6af8adfe1fe03359540da007e9566c71
-  (https://github.com/taengu/A2Tools-Plugins), GNU GPL v3: the rules only, written anew in C#.
+  (https://github.com/taengu/A2Tools-Plugins), GNU GPL v3: the rules only, written anew in C#. The Shugo Festival keys'
+  rules (`ScarletMeter.Engine/Contracts/CharacterProgress` and the overlay's keys: shared by a server's characters, the
+  two values the keys left and the extra, +3 a day up to 21) are from the same plugin's content table, its `shugo` row
+  in `plugin.js` at 48f5ecd0885134ab8df2651410378b9ad9a639cc (read on 2026-10-27), taken as facts.
 - **Map names** (`ScarletMeter.Engine/Maps/MapNames`, shown in Settings, About): the dungeons' names and
   difficulties from taengu/A2Tools-DPS-Meter's `src/data/i18n/dungeons/en.json` at
   6abf5e7e28ddae93e04e870087d2ae457f752681 (last changed in f942a54b68c5a5481cf7d4d2ad59a4c00de191fb), GNU GPL v3;

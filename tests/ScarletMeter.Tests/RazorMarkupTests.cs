@@ -595,6 +595,57 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"margin-left:\s*auto;", Block(css, ".ping")); // without the energy, the ping still ends the line
     }
 
+    // The Shugo Festival keys sit left of the Odyle energy (Harry, 2026-10-27: "move it to the left of the odyle energy
+    // count") once the game has sent them and while "Show Shugo Festival keys" is on: keys, then any extra. The two group 8 px
+    // apart, the keys taking the push to the right (the ping at their side when the energy is not shown); the key is a
+    // saturated yellow, apart from the ping's orange and pale yellow (Harry: "i get orange ping"); read on the refresh loop
+    // with the energy. The line stays one line at any width.
+    [Fact]
+    public void ShugoKeysSitLeftOfTheOdyleEnergy()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        var markup = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
+        var totals = Regex.Match(markup, @"(?s)<div class=""ov-totals"">(?<body>.*?)\n    </div>").Groups["body"].Value;
+        Assert.Matches(@"(?s)class=""accent"">.*@if \(appearance\.ShowShugoKeys && shugo is \{ \} keys\).*<span class=""shugo"".*"
+            + @"@ShugoText\.Keys\(keys\).*ShugoText\.Extra\(keys\).*<span class=""shugo-extra"">@extra</span>.*"
+            + @"@if \(appearance\.ShowOdyleEnergy && odyle is \{ \} energy\).*<span class=""odyle"".*<span class=""ping ", totals);
+        Assert.Contains(@"<svg class=""shugo-icon""", totals); // a key of Scarlet's own drawing
+
+        var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
+        Assert.Matches(@"odyle = Engine\.OdyleEnergy;\s*shugo = Engine\.ShugoKeys;\s*var now = Clock\.GetUtcNow\(\);", code);
+        Assert.Matches(@"odyle = Engine\.OdyleEnergy;\s*shugo = Engine\.ShugoKeys;\s*Settings\.Changed \+= OnSettingsChanged;", code);
+        Assert.Contains("ValueChanged=\"@(v => Change(s => s with { Appearance = s.Appearance with { ShowShugoKeys = v } }))\"",
+            File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor")));
+
+        var css = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "app.css"));
+        static string Block(string source, string selector) =>
+            Regex.Match(source, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
+        Assert.Matches(@"margin-left:\s*auto;", Block(css, ".shugo"));
+        Assert.Matches(@"margin-left:\s*-6px;", Block(css, ".shugo + .odyle"));
+        Assert.Matches(@"margin-left:\s*0;", Block(css, ".shugo + .ping"));
+        Assert.Matches(@"stroke:\s*#ffd60a;", Block(css, ".shugo-icon"));
+        Assert.Matches(@"color:\s*#ffd60a;", Block(css, ".shugo-extra"));
+        var root = Block(css, ":root");
+        foreach (var level in new[] { "--slow", "--fair" })
+            Assert.DoesNotMatch(level + @":\s*#ffd60a", root);
+
+        // The line never wraps (a wrap grew the window by a line each time the ping reached 1000 ms; audit on #57): its
+        // text does not break, and at the overlay's least width the ping's bars give way. Headless renders (WORKLOG)
+        // measured what then fits.
+        var line = Block(css, ".ov-totals");
+        Assert.Matches(@"container:\s*ov-totals / inline-size;", line);
+        Assert.Matches(@"white-space:\s*nowrap;", Block(css, ".ov-totals .accent"));
+        Assert.Matches(@"white-space:\s*nowrap;", Block(css, ".ping"));
+        var narrow = Regex.Match(css, @"@container ov-totals \(max-width: (?<w>\d+)px\) \{\s*\.ping i \{\s*display:\s*none;\s*\}\s*\}");
+        Assert.True(narrow.Success, "the ping's bars give way on a narrow totals line");
+        var side = int.Parse(Regex.Match(line, @"padding:\s*\d+px (?<x>\d+)px").Groups["x"].Value, System.Globalization.CultureInfo.InvariantCulture);
+        var least = int.Parse(Regex.Match(File.ReadAllText(Path.Combine(app, "Windows", "OverlayWindow.cs")), @"MinWidth = (?<w>\d+);").Groups["w"].Value,
+            System.Globalization.CultureInfo.InvariantCulture);
+        // The query measures the line inside its padding, inside the panel's 1 px border.
+        Assert.True(int.Parse(narrow.Groups["w"].Value, System.Globalization.CultureInfo.InvariantCulture) + 2 * side + 2 >= least,
+            "the bars give way at the overlay's least width");
+    }
+
     // The character roster opens from the overlay's header (Characters, just left of Settings), from its Odyle energy and from
     // Settings: the header and Settings work with the energy hidden or not sent yet. Its page masks names as every window
     // does with "Hide nicknames" on, and writes no name without it.
