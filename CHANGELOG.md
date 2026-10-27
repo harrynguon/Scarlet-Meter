@@ -29,7 +29,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
   ([#48](https://github.com/harrynguon/Scarlet-Meter/pull/48), [#49](https://github.com/harrynguon/Scarlet-Meter/pull/49),
   [#50](https://github.com/harrynguon/Scarlet-Meter/pull/50), [#51](https://github.com/harrynguon/Scarlet-Meter/pull/51),
   [#53](https://github.com/harrynguon/Scarlet-Meter/pull/53), [#55](https://github.com/harrynguon/Scarlet-Meter/pull/55),
-  [#56](https://github.com/harrynguon/Scarlet-Meter/pull/56), [#58](https://github.com/harrynguon/Scarlet-Meter/pull/58))
+  [#56](https://github.com/harrynguon/Scarlet-Meter/pull/56), [#58](https://github.com/harrynguon/Scarlet-Meter/pull/58),
+  [#62](https://github.com/harrynguon/Scarlet-Meter/pull/62))
 
 ### Changed
 

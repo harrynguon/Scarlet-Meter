@@ -13,7 +13,8 @@ internal readonly record struct SelfRecord(int EntityId, bool Unnamed, int Serve
 /// The player's own character record (<c>33 36</c>) as far as the entry list's owner and the roster need it, in the layout
 /// upstream's PlayerInfoProcessor reads (v1.11.5.341): <c>&lt;entity varint&gt; &lt;u32&gt; &lt;u8: bit 0, a name
 /// follows&gt; &lt;name length varint&gt; &lt;UTF-8 name&gt; &lt;server id u16&gt; &lt;class code u32&gt; &lt;u8&gt;
-/// &lt;level u32&gt; &lt;gear score u32&gt; &lt;gear score u32&gt; …</c>. Upstream decodes the name itself; this only tells
+/// &lt;level u32&gt; &lt;gear score u32&gt; &lt;a second gear score u32, the same or higher&gt; …</c>. Upstream decodes the
+/// name itself; this only tells
 /// whether the record names a character at all, and reads the two bytes after the name that upstream takes as the server
 /// id (and turns into a short name), the four after them, the character's class, of which upstream reads the first byte
 /// (its PlayerInfoProcessor's jobCode) and never uses it, and the level and the gear score (the equipment's item level),
@@ -35,9 +36,13 @@ internal static class SelfRecords
     /// Reads the record (<see cref="SelfRecord"/>); false when it has no entity id to read. A record cut before its name is
     /// not called unnamed: upstream then has no name for it either, which the tap learns by asking. The server id and class
     /// code are as the record has them: the reader checks the server id against upstream's, and <see cref="ClassIdOf"/> says
-    /// which class a code is, if any. The level and gear score follow A2Tools: the level (after a byte) only in the layout
-    /// whose class code is a class, and only from 1 to <see cref="MaxLevel"/>; the gear score only with a level, and only
-    /// when its two copies agree and it is from 1 to <see cref="MaxGearScore"/>.
+    /// which class a code is, if any. The level follows A2Tools: after a byte, only in the layout whose class code is a
+    /// class, and only from 1 to <see cref="MaxLevel"/>. The gear score is the first of the two that follow, the character
+    /// sheet's, taken only with a level, from 1 to <see cref="MaxGearScore"/>, and only when the second is that or more and
+    /// within the same bound. A2Tools takes it only when the two agree, which they do for most characters; for two of
+    /// Harry's, whose sheets he read, the first was the sheet's and the second higher (a local probe, 2026-10-28: offsets
+    /// and yes/no answers only), so A2Tools' rule showed them none. The second is not the sheet's: perhaps the highest
+    /// reached; not known.
     /// </summary>
     public static bool TryRead(ReadOnlySpan<byte> record, out SelfRecord read)
     {
@@ -64,7 +69,8 @@ internal static class SelfRecords
         read = read with { ClassCode = classCode };
         if (ClassIdOf(classCode) == 0 || U32At(after, 7) is not (>= 1 and <= MaxLevel and var level)) return true;
         read = read with { Level = (int)level };
-        if (U32At(after, 11) is (>= 1 and <= MaxGearScore) and var gearScore && U32At(after, 15) == gearScore)
+        if (U32At(after, 11) is (>= 1 and <= MaxGearScore) and var gearScore
+            && U32At(after, 15) is { } second && second >= gearScore && second <= MaxGearScore)
             read = read with { GearScore = (int)gearScore };
         return true;
     }

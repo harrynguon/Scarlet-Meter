@@ -523,10 +523,12 @@ public sealed class EntryListTests
         Assert.Equal(22u, read.ClassCode);
     }
 
-    // After the class code, a byte, the level (u32) and the gear score twice (u32 each), as A2Tools reads them; the bytes
-    // written out here are made up in that layout (class 31, level 33, gear score 517; level 52, 1,234), none of its
-    // captured bytes (deep audit on #56: the first rows had been its fixture's): the level only after a code that is a class
-    // and only from 1 to 99, the gear score only with a level, when both copies agree and it is from 1 to 100,000.
+    // After the class code, a byte, the level (u32) and two gear scores (u32 each), as A2Tools reads them; the bytes written
+    // out here are made up in that layout (class 31, level 33, gear score 517; level 52, 1,234), none of its captured bytes
+    // (deep audit on #56: the first rows had been its fixture's): the level only after a code that is a class and only from
+    // 1 to 99; the gear score, the first of the two, only with a level, from 1 to 100,000, when the second is that or more
+    // within the same bound (a local probe on Harry's characters, 2026-10-28: the sheet's was the first, the second higher
+    // for two of them; A2Tools' "both agree" showed those none).
     [Theory]
     [InlineData("1F 00 00 00 02 21 00 00 00 05 02 00 00 05 02 00 00", 33, 517)]
     [InlineData("1F 00 00 00 02 34 00 00 00 D2 04 00 00 D2 04 00 00", 52, 1234)]
@@ -534,7 +536,10 @@ public sealed class EntryListTests
     [InlineData("1F 00 00 00 02 00 00 00 00 05 02 00 00 05 02 00 00", 0, 0)] // level 0
     [InlineData("1F 00 00 00 02 64 00 00 00 05 02 00 00 05 02 00 00", 0, 0)] // level 100
     [InlineData("1F 00 00 00 02 63 00 00 00 05 02 00 00 05 02 00 00", 99, 517)] // level 99
-    [InlineData("1F 00 00 00 02 21 00 00 00 05 02 00 00 06 02 00 00", 33, 0)] // the copies disagree
+    [InlineData("1F 00 00 00 02 21 00 00 00 05 02 00 00 06 02 00 00", 33, 517)] // the second higher: the first taken
+    [InlineData("1F 00 00 00 02 21 00 00 00 06 02 00 00 05 02 00 00", 33, 0)] // the second lower: none
+    [InlineData("1F 00 00 00 02 21 00 00 00 05 02 00 00 A0 86 01 00", 33, 517)] // the second at the bound
+    [InlineData("1F 00 00 00 02 21 00 00 00 05 02 00 00 A1 86 01 00", 33, 0)] // the second past the bound: none
     [InlineData("1F 00 00 00 02 21 00 00 00 A1 86 01 00 A1 86 01 00", 33, 0)] // 100,001
     [InlineData("1F 00 00 00 02 21 00 00 00 A0 86 01 00 A0 86 01 00", 33, 100_000)]
     [InlineData("1F 00 00 00 02 21 00 00 00 00 00 00 00 00 00 00 00", 33, 0)] // gear score 0

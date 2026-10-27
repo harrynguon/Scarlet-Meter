@@ -48,7 +48,8 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   player's own character record, four codes to a class, and the level and gear score after it with their bounds
   (`ScarletMeter.Engine/Entries/SelfRecords`), from `self_profile` and the masked-identity scan in
   `src-tauri/src/capture/stream_processor.rs` and `JobClass::from_roster_class` in `src-tauri/src/entity/job_class.rs`
-  at the same commit (read on 2026-10-27); and that entry 1 of the list of entry counts is the Shugo Festival keys
+  at the same commit (read on 2026-10-27; Scarlet takes the first gear score also when the second is higher, where
+  A2Tools takes it only when the two agree); and that entry 1 of the list of entry counts is the Shugo Festival keys
   (its list of known ids in `character()`, `src-tauri/src/plugins/mod.rs`, at the same commit), taken as a fact; and
   which server ids exist, Korea's and Taiwan's and the Global servers NC has opened, by faction, region and slot
   (`ScarletMeter.Engine/Entries/GameServers`), from `exists` in `src-tauri/src/capture/servers.rs`, added in that
