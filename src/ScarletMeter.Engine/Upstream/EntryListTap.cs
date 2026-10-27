@@ -270,10 +270,17 @@ internal sealed class EntryListTap : IRecordReader
         Raise(() => ProgressObserved?.Invoke(this, progress), "An entry count subscriber failed.");
     }
 
-    // The character with the record's server id, when upstream knows that id and gave the character its short name: upstream
-    // read the same two bytes for the name, so a mismatch means the identity came from another record, and no id is taken.
+    // The character with the record's server id, once it checks out. An id upstream knows must be the one it gave the
+    // character its short name by: upstream read the same two bytes for the name, so a mismatch means the identity came
+    // from another record. An id upstream does not know (every Global server's: its list is Korea's) must be a server that
+    // exists, and upstream must have named none for the character (Harry's roster, 2026-10-27: without this no Global
+    // character ever had a server id, nor so a class, level or gear score from its login). On Global that is the whole
+    // check: upstream names no server for any character there, so it cannot tell an identity from another record (one
+    // whose name upstream's reader refused, an older user under a reused entity id) as the name match does elsewhere.
     private static CharacterIdentity WithServerId(CharacterIdentity character, int serverId) =>
-        serverId > 0 && ServerMap.IsValidId(serverId) && ServerMap.GetName(serverId) == character.Server
+        serverId > 0 && (ServerMap.IsValidId(serverId)
+            ? ServerMap.GetName(serverId) == character.Server
+            : string.IsNullOrEmpty(character.Server) && GameServers.Exists(serverId))
             ? character with { ServerId = serverId }
             : character;
 

@@ -119,7 +119,7 @@ public sealed record ContentRule(string Key, string Name, int Cap, int Add, bool
 
 /// <summary>
 /// The roster's estimates, pure: Odyle energy refills and the content entries' recharges, from a count the game sent and
-/// when. Odyle energy: +15 basic every three hours up to the cap (560, or 840 with a membership); charged never refills.
+/// when. Odyle energy: +15 basic every three hours up to the cap (840, a membership's, or 560 without); charged never refills.
 /// Contents, from the game's own tooltips as A2Tools' Roster plugin quotes them (plugin.js at 7a4720b): Nightmare +2 a
 /// day up to 14, Ascension Trial +3 a week up to 3. None of the recharge times is verified in the game.
 /// </summary>
@@ -179,13 +179,11 @@ public static class RosterRules
         return current ? artifacts.Holders.Count(holder => holder == side || holder == ArtifactHolder.Unknown) : null;
     }
 
-    /// <summary>The cap the character's basic energy refills to: the player's choice, or 840 once more than 560 was seen.</summary>
-    public static int OdyleCap(RosterCharacter character) => character.OdyleCap switch
-    {
-        OdyleCapChoice.Standard => StandardCap,
-        OdyleCapChoice.Membership => MembershipCap,
-        _ => character.MembershipSeen ? MembershipCap : StandardCap,
-    };
+    /// <summary>
+    /// The cap the character's basic energy refills to: 560 when the player chose it (no membership), else 840, a
+    /// membership's, the default (Harry, 2026-10-27; it was 560 until more than 560 had been seen).
+    /// </summary>
+    public static int OdyleCap(RosterCharacter character) => character.OdyleCap == OdyleCapChoice.Standard ? StandardCap : MembershipCap;
 
     /// <summary>
     /// Basic energy as it likely is at <paramref name="now"/>: what the game said, plus a step for each refill since, up

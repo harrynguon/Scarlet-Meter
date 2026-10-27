@@ -147,7 +147,6 @@ public sealed class RosterService : IDisposable
                 Ascension = Later(character.Ascension, progress.Entries, EntryIds.AscensionTrial, now),
                 Kina = LaterKina(character.Kina, progress.Kina, now),
             };
-            if (character.Odyle is { First: > RosterRules.StandardCap }) character = character with { MembershipSeen = true };
             characters[key] = character;
             current = key;
             MarkChanged();

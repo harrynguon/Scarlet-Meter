@@ -118,14 +118,53 @@ public sealed class RosterTests : IDisposable
         Assert.True(RosterRules.OdyleNow(Seen(500, 0, Monday), 560, full, Calendar).Full);
     }
 
+    // 840, a membership's, unless the player chose 560 (Harry, 2026-10-27: "make the default 'full' odyle energy 840
+    // (membership) as opposed to 560").
     [Fact]
-    public void TheCapIsThePlayersChoiceOrSeenFromAMembership()
+    public void TheCapIs840UnlessThePlayerChose560()
     {
         var character = new RosterCharacter { Name = "Alpha" };
-        Assert.Equal(560, RosterRules.OdyleCap(character));
-        Assert.Equal(840, RosterRules.OdyleCap(character with { MembershipSeen = true }));
-        Assert.Equal(560, RosterRules.OdyleCap(character with { MembershipSeen = true, OdyleCap = OdyleCapChoice.Standard }));
+        Assert.Equal(840, RosterRules.OdyleCap(character));
+        Assert.Equal(560, RosterRules.OdyleCap(character with { OdyleCap = OdyleCapChoice.Standard }));
         Assert.Equal(840, RosterRules.OdyleCap(character with { OdyleCap = OdyleCapChoice.Membership }));
+        Assert.Equal(OdyleCapChoice.Automatic, character.OdyleCap); // a new character's
+    }
+
+    // The cap list shows 840 for the default and for a saved choice of 840 (from before it was the default), 560 for 560. A
+    // gear score or bound Kina not read yet says why when pointed at (both come at login, so a meter started mid-session
+    // has neither for the character played; Harry, 2026-10-27, of a bound Kina shown as "?"); once read,
+    // the gear score's tip says what it is and the bound Kina has none.
+    [Fact]
+    public void TheRosterPageShowsTheCapAndWhyAValueIsNotRead()
+    {
+        var character = new RosterCharacter { Name = "Alpha" };
+        Assert.Equal(OdyleCapChoice.Automatic, RosterPage.CapShown(character));
+        Assert.Equal(OdyleCapChoice.Automatic, RosterPage.CapShown(character with { OdyleCap = OdyleCapChoice.Membership }));
+        Assert.Equal(OdyleCapChoice.Standard, RosterPage.CapShown(character with { OdyleCap = OdyleCapChoice.Standard }));
+
+        Assert.EndsWith(RosterPage.NotReadYet, RosterPage.GearScoreTitle(character), StringComparison.Ordinal);
+        Assert.Equal("Gear score (the equipment's item level)", RosterPage.GearScoreTitle(character with { GearScore = 2_040 }));
+        Assert.EndsWith(RosterPage.NotReadYet, RosterPage.BoundKinaTitle(character), StringComparison.Ordinal);
+        Assert.EndsWith(RosterPage.NotReadYet, RosterPage.BoundKinaTitle(character with { Kina = new RosterKina(2_000_135, null, Monday) }), StringComparison.Ordinal);
+        Assert.Null(RosterPage.BoundKinaTitle(character with { Kina = new RosterKina(2_000_135, 0, Monday) }));
+    }
+
+    // A roster saved before 840 was the default (its membershipSeen flag, false or true) loads unrepaired, the automatic
+    // cap now 840 and the player's own choices kept, and the flag is not written again.
+    [Fact]
+    public void ARosterFromBefore840WasTheDefaultLoadsWithIt()
+    {
+        var store = NewStore();
+        File.WriteAllText(store.FilePath, "{ \"version\": 1, \"characters\": ["
+            + " { \"name\": \"Alpha\", \"server\": \"SIE\", \"lastSeen\": \"2026-10-26T01:00:00+00:00\", \"odyleCap\": \"automatic\", \"membershipSeen\": false },"
+            + " { \"name\": \"Beta\", \"server\": \"SIE\", \"lastSeen\": \"2026-10-26T01:00:00+00:00\", \"odyleCap\": \"automatic\", \"membershipSeen\": true },"
+            + " { \"name\": \"Gamma\", \"server\": \"SIE\", \"lastSeen\": \"2026-10-26T01:00:00+00:00\", \"odyleCap\": \"standard\", \"membershipSeen\": true } ] }");
+        var loaded = store.Load(Monday);
+        Assert.Equal(StoredFileStatus.Loaded, loaded.Status);
+        Assert.Null(loaded.Notice);
+        Assert.Equal([840, 840, 560], loaded.File.Characters.Select(RosterRules.OdyleCap));
+        store.Save(loaded.File);
+        Assert.DoesNotContain("membershipSeen", File.ReadAllText(store.FilePath), StringComparison.Ordinal);
     }
 
     // Nightmare +2 at each daily reset up to 14; Ascension Trial +3 at the weekly up to 3. The extra from items is apart.
@@ -206,7 +245,6 @@ public sealed class RosterTests : IDisposable
         Nightmare = Seen(11, 1, at),
         Ascension = Seen(3, 0, at),
         OdyleCap = OdyleCapChoice.Membership,
-        MembershipSeen = true,
         Kina = new RosterKina(1_234_567, 33_940, at),
         Note = "Main · healer",
     };
@@ -443,7 +481,7 @@ public sealed class RosterTests : IDisposable
         Assert.Equal(Seen(600, 1200, Monday), alpha.Odyle);
         Assert.Equal(Seen(11, 1, Monday), alpha.Nightmare);
         Assert.Null(alpha.Ascension);
-        Assert.True(alpha.MembershipSeen); // more than 560 basic
+        Assert.Equal(OdyleCapChoice.Automatic, alpha.OdyleCap); // 840 by default, whatever the game sends
         Assert.Equal(new RosterKey("SIE", "Alpha"), service.Current);
 
         Assert.False(File.Exists(store.FilePath));
@@ -467,7 +505,6 @@ public sealed class RosterTests : IDisposable
         Assert.Equal(Seen(300, 0, Monday.AddMinutes(5)), alpha.Odyle);
         Assert.Equal(Seen(2, 0, Monday), alpha.Ascension);
         Assert.Equal((16, "Spiritmaster", 41_000, 45, 2_040), (alpha.ClassId, alpha.ClassName, alpha.CombatPower, alpha.Level, alpha.GearScore));
-        Assert.False(alpha.MembershipSeen);
 
         service.Take(Progress(AlphaIdentity with { CombatPower = 43_500, Level = 46, GearScore = 2_100 }));
         alpha = Assert.Single(service.Characters);

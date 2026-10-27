@@ -673,7 +673,7 @@ public sealed partial class RazorMarkupTests
     // under when it is full (its own line, display: block), as Harry also asked, two pixels less at each side of a cell and
     // headers without letter spacing: without them a full row outgrew the window's client width (904 px at its default 920,
     // 896 once the list scrolls) in headless renders (deep audit on #56). The class icon is a little larger than other
-    // tables' (22 px).
+    // tables' (22 px) and sits beside the name and class lines.
     [Fact]
     public void TheRosterShowsLevelAndPowerAndKeepsTheCapUnderFull()
     {
@@ -683,9 +683,18 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?s)<th class=""left"">Character</th>\s*<th title=""Combat power, and gear score[^""]*"">Power</th>\s*<th[^>]*>Odyle</th>", roster);
         // Each number with its icon before it (Harry, from the game's: crossed blades for combat power, a helmet for gear score).
         Assert.Matches(@"(?s)<td>\s*<div class=""roster-power[^\n]*?title=""Combat power"">\s*<svg class=""cp-icon""[^>]*>.*?</svg>@RosterText\.KnownNumber\(character\.CombatPower\)\s*</div>"
-            + @"\s*<div class=""roster-power roster-bound"" title=""Gear score[^""]*"">\s*<svg class=""gs-icon""[^>]*>.*?</svg>@RosterText\.KnownNumber\(character\.GearScore\)\s*</div>\s*</td>", roster);
-        // When it is full, as a line of its own, then the cap.
-        Assert.Matches(@"(?s)<div class=""roster-full"">Full</div>.*?<div title=""[^""]*"">in @RosterText\.Until\(full - now\)</div>\s*\}\s*<select class=""roster-cap""", roster);
+            + @"\s*<div class=""roster-power roster-bound"" title=""@GearScoreTitle\(character\)"">\s*<svg class=""gs-icon""[^>]*>.*?</svg>@RosterText\.KnownNumber\(character\.GearScore\)\s*</div>\s*</td>", roster);
+        // When it is full, as a line of its own, then the cap: two choices, 840 the default (Harry, 2026-10-27), shown as
+        // CapShown has it. Without "(auto)" and a second 840 the list is 31 px narrower, which a date under Last played
+        // needs (headless renders: main's table was up to 20 px too wide with one).
+        Assert.Matches(@"(?s)<div class=""roster-full"">Full</div>.*?<div title=""[^""]*"">in @RosterText\.Until\(full - now\)</div>\s*\}\s*(@\*[^*]*\*@\s*)?<select class=""roster-cap""", roster);
+        var cap = Regex.Match(roster, @"(?s)<select class=""roster-cap""[^>]*value=""@CapShown\(character\)""[^>]*>(?<options>.*?)</select>");
+        Assert.True(cap.Success, "the cap list shows CapShown's choice");
+        Assert.Equal(
+            ["<option value=\"@OdyleCapChoice.Automatic\">cap @RosterRules.MembershipCap</option>", "<option value=\"@OdyleCapChoice.Standard\">cap @RosterRules.StandardCap</option>"],
+            Regex.Matches(cap.Groups["options"].Value, "<option[^>]*>[^<]*</option>").Select(m => m.Value));
+        // A bound Kina not read yet says why when pointed at.
+        Assert.Contains(@"<div class=""roster-bound"" title=""@BoundKinaTitle(character)"">bound @KinaCell(character.Kina?.Bound)</div>", roster);
 
         var views = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "views.css"));
         static string Block(string source, string selector) =>
@@ -694,6 +703,11 @@ public sealed partial class RazorMarkupTests
         Assert.DoesNotMatch(@"margin-left:\s*[1-9]", Block(views, ".roster-cap"));
         Assert.Matches(@"width:\s*22px;\s*height:\s*22px;", Block(views, ".roster-table .class-icon"));
         Assert.Matches(@"width:\s*28px;", Block(views, ".roster-table .icon-cell"));
+        // The icon at the top of its cell, centred on the name and class lines, not the row (Harry, 2026-10-27: "a bit
+        // higher up"): 6 px down, the middle of those two lines in headless renders, with a note or without; still at the
+        // cell's right, by the name (a block at the left was 6 px further off; deep audit on #58).
+        Assert.Matches(@"vertical-align:\s*top;", Block(views, ".roster-table .icon-cell"));
+        Assert.Matches(@"display:\s*block;.*margin:\s*6px 0 0 auto;", Block(views, ".roster-table .class-icon"));
         // The row's room back from the cells' sides and the headers' spacing.
         Assert.Matches(@"padding-left:\s*4px;\s*padding-right:\s*4px;", Block(views, ".roster-table th, .roster-table td"));
         Assert.Matches(@"letter-spacing:\s*0;", Block(views, ".roster-table th"));

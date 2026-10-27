@@ -117,6 +117,29 @@ public partial class RosterPage : IDisposable
         { } open => $"Artifact Corridors entered since the last Abyss Siege, out of the {open} whose artifact your side holds, as the game last said on this server.",
     };
 
+    /// <summary>
+    /// What a "?" the game has not filled yet says when pointed at (the gear score, the bound Kina): both usually come at
+    /// login, so a character played only since the meter started mid-session has neither until its next login. "Usually":
+    /// a gear score also waits on a server id that checked out, and a Kina listing read long before the login's list is
+    /// not taken (deep audit on #58).
+    /// </summary>
+    public const string NotReadYet = "not read yet: the game usually sends it when you log in on this character, so log in on it with the meter running";
+
+    /// <summary>What the gear score says when pointed at: what it is, and why it is "?" while not read.</summary>
+    public static string GearScoreTitle(RosterCharacter character) =>
+        "Gear score (the equipment's item level)" + (character.GearScore > 0 ? string.Empty : ": " + NotReadYet);
+
+    /// <summary>What the bound Kina says when pointed at while it is "?"; null (no tip) once read.</summary>
+    public static string? BoundKinaTitle(RosterCharacter character) =>
+        character.Kina?.Bound is null ? "Kina (Bound): " + NotReadYet : null;
+
+    /// <summary>
+    /// The cap list's choice for a character: 560 when the player chose it, else the default 840, which a saved choice of
+    /// 840 (<see cref="OdyleCapChoice.Membership"/>, from before 840 was the default) shows as too; it stays saved until changed.
+    /// </summary>
+    public static OdyleCapChoice CapShown(RosterCharacter character) =>
+        character.OdyleCap == OdyleCapChoice.Standard ? OdyleCapChoice.Standard : OdyleCapChoice.Automatic;
+
     /// <summary>What the note box says when pointed at: the note whole (a long one is cut in its box), or how to write one.</summary>
     public static string NoteTitle(RosterCharacter character) =>
         character.Note.Length > 0 ? character.Note : "Your note on this character, kept on this PC; Enter or leaving the box saves it";

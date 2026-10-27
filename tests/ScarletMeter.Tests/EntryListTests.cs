@@ -417,7 +417,51 @@ public sealed class EntryListTests
         Assert.Equal(Alpha, tap.Character);
         tap.Observe(EntryListRecordWriter.SelfRecord(7, "Alpha", 2999, 16, 41_000)); // not a server upstream knows
         Assert.Equal(Alpha, tap.Character);
-        Assert.Equal(4, raised.Count);
+        tap.Observe(EntryListRecordWriter.SelfRecord(7, "Alpha", 1503, 16, 41_000)); // a Global server, but upstream named SIE
+        Assert.Equal(Alpha, tap.Character);
+        Assert.Equal(5, raised.Count);
+    }
+
+    // Upstream's list of servers is Korea's, so it names no Global server and a Global character's short name is empty
+    // (Harry's roster, 2026-10-27: every character had no server id, and so no class, level or gear score from its
+    // login). An id upstream does not know is taken when it is a server that exists and upstream named none: made-up ids
+    // in Global's ranges here, never a real character's.
+    [Fact]
+    public void AGlobalServerIdGoesWithTheCharacterUpstreamNamesNoServerFor()
+    {
+        var global = new CharacterIdentity("Gamma", string.Empty, 0, string.Empty, 30_000);
+        var tap = NewTap(new() { [8] = global }, new FakeTimeProvider(Start));
+        tap.Observe(EntryListRecordWriter.SelfRecord(8, "Gamma", 1503, 30, 30_000));
+        Assert.Equal(global with { ServerId = 1503, ClassId = 17, ClassName = "Cleric" }, tap.Character);
+        tap.Observe(EntryListRecordWriter.SelfRecord(8, "Gamma", 2323, 30, 30_000)); // Europe's last slot, Asmodian
+        Assert.Equal(2323, tap.Character!.ServerId);
+        foreach (var id in new[] { 1511, 2324, 1100, 1600, 3101, 1059, 999 }) // past the open slots, or no server at all
+        {
+            tap.Observe(EntryListRecordWriter.SelfRecord(8, "Gamma", id, 30, 30_000));
+            Assert.Equal(global, tap.Character);
+        }
+        tap.Observe(EntryListRecordWriter.SelfRecord(8, "Gamma", 1001, 30, 30_000)); // upstream names 1001, but not for Gamma
+        Assert.Equal(global, tap.Character);
+    }
+
+    // The servers that exist, as A2Tools' list has them (servers.rs at 5c6f02c, from NC's notice): each Global region's
+    // first and last open slot for both factions and none past it, 106 Global servers in all, and Korea's and Taiwan's 58
+    // a side.
+    [Fact]
+    public void TheGameServersAreThoseThatExist()
+    {
+        foreach (var (first, last) in new[] { (1101, 1109), (1201, 1205), (1301, 1323), (1401, 1406), (1501, 1510) })
+        {
+            foreach (var id in new[] { first, last, first + 1000, last + 1000 })
+                Assert.True(GameServers.Exists(id), id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            Assert.False(GameServers.Exists(last + 1));
+            Assert.False(GameServers.Exists(last + 1001));
+        }
+        Assert.Equal(106, Enumerable.Range(1000, 2000).Count(id => GameServers.Exists(id) && id % 1000 >= 100));
+        Assert.True(GameServers.Exists(1001) && GameServers.Exists(2058));
+        foreach (var id in new[] { 1059, 1000, 0, -1, 999, 3101, 1100, 2100, 1600, int.MaxValue, int.MinValue })
+            Assert.False(GameServers.Exists(id), id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Assert.All(ServerMap.Servers.Keys, id => Assert.True(GameServers.Exists(id))); // upstream's are among them
     }
 
     // The class codes after the server id come four to a class, as A2Tools reads them (JobClass::from_roster_class at
@@ -764,24 +808,26 @@ public sealed class EntryListTests
 
     // Through the real graph, before any fight: upstream names the character but knows no class, and the record's class
     // code (30, a Cleric's) gives the engine's character, and so the roster, its class and Global name from the login,
-    // with the record's level and gear score; upstream finds the combat power in the same record as before.
-    [Fact]
-    public void TheCharacterHasItsClassFromTheLoginWithoutAFight()
+    // with the record's level and gear score; upstream finds the combat power in the same record as before. On a server
+    // upstream's list names, and on a Global one, which it names none for (the case Harry's roster showed missing).
+    [Theory]
+    [InlineData(1001)] // a server upstream's list names
+    [InlineData(1503)] // a Global server (made up: Asia's third slot), which upstream's list does not name
+    public void TheCharacterHasItsClassFromTheLoginWithoutAFight(int serverId)
     {
         using var host = new TestEngineHost(CaptureMode.None);
         var engine = host.Services.GetRequiredService<ICombatEngine>();
         var stream = host.Services.GetRequiredService<TcpStreamBuffer>();
         List<CharacterProgress> raised = [];
         engine.ProgressObserved += (_, progress) => raised.Add(progress);
-        var server = ServerMap.Servers.First();
 
         Synchronise(stream);
         stream.AddData("synthetic",
-            [.. EntryListRecordWriter.List([Odyle]), .. EntryListRecordWriter.SelfRecord(4321, "Synthia", server.Key, 30, 1_234_567, level: 45, gearScore: 2_040)], 0);
+            [.. EntryListRecordWriter.List([Odyle]), .. EntryListRecordWriter.SelfRecord(4321, "Synthia", serverId, 30, 1_234_567, level: 45, gearScore: 2_040)], 0);
 
         Assert.Null(host.Services.GetRequiredService<EntityTracker>().GetPlayerEntity(4321)?.CharacterClass); // upstream's: none
         var progress = Assert.Single(raised);
-        Assert.Equal(new CharacterIdentity("Synthia", server.Value, 17, "Cleric", 1_234_567, server.Key, 45, 2_040), progress.Character);
+        Assert.Equal(new CharacterIdentity("Synthia", ServerMap.GetName(serverId), 17, "Cleric", 1_234_567, serverId, 45, 2_040), progress.Character);
         Assert.Equal(progress.Character, engine.Character);
     }
 
