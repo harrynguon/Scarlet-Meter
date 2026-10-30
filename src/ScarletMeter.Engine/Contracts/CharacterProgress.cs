@@ -35,6 +35,12 @@ public sealed record CharacterIdentity(
 public readonly record struct EntryCount(int First, int Second, DateTimeOffset SeenAt);
 
 /// <summary>
+/// One time entry of the game's list of entry counts as last read (kind <c>01</c>, not a count): its u64 and when the game
+/// last sent it. An Abyss passage's is its usage time left, in milliseconds (<see cref="EntryIds.AbyssPassages"/>).
+/// </summary>
+public readonly record struct EntryTime(ulong Value, DateTimeOffset SeenAt);
+
+/// <summary>
 /// The Kina a character holds, as its inventory last said: Kina and Kina (Bound), each null while not known (before the
 /// inventory's listing at world entry, until a change of that item), and when it was read.
 /// </summary>
@@ -47,6 +53,13 @@ public sealed record KinaBalance(long? Kina, long? Bound, DateTimeOffset SeenAt)
 /// </summary>
 public sealed record CharacterProgress(CharacterIdentity Character, IReadOnlyDictionary<uint, EntryCount> Entries, KinaBalance? Kina = null)
 {
+    /// <summary>
+    /// The Abyss passages' time entries the game has sent for this character since its login's list, keyed by entry id,
+    /// by the same rules as <see cref="Entries"/>; a passage is in one or the other, as the game last sent it (it turns
+    /// from a time into a count once used). Other time entries are not kept.
+    /// </summary>
+    public IReadOnlyDictionary<uint, EntryTime> Times { get; init; } = new Dictionary<uint, EntryTime>();
+
     /// <summary>The Odyle energy among the counts, or null when the game has not sent it.</summary>
     public OdyleEnergy? Odyle =>
         Entries.TryGetValue(EntryIds.OdyleEnergy, out var energy) ? new OdyleEnergy(energy.First, energy.Second) : null;
@@ -72,4 +85,13 @@ public static class EntryIds
     /// up to 21 (A2Tools DPS Meter's list of known ids and its Roster plugin's content table, at 5c6f02c and 48f5ecd).
     /// </summary>
     public const uint ShugoFestivalKeys = 1;
+
+    /// <summary>
+    /// The Abyss passages, a character's entries to the Artifact Corridors: passage 1000000N is the corridor of the lower
+    /// layer's artifact 100N (<see cref="AbyssArtifacts.LowerLayer"/>), in that order. One not yet run in the current holding
+    /// comes as a time entry, its usage time left (2:10 when unused); a used one as a count with no value; all three as
+    /// counts also before the passages are handed out, on the first Abyss visit after a siege (A2Tools' Roster plugin,
+    /// 2026-10-25, checked there against what the game showed for a character with all three still to run and one with one).
+    /// </summary>
+    public static IReadOnlyList<uint> AbyssPassages { get; } = [10_000_001, 10_000_002, 10_000_003];
 }

@@ -90,7 +90,7 @@ public partial class RosterPage : IDisposable
                 character.Odyle is { } seen ? RosterRules.OdyleFullAt(seen, cap, calendar) : null,
                 character.Nightmare is { } nightmare ? RosterRules.ContentNow(RosterRules.Nightmare, nightmare, now, calendar) : null,
                 character.Ascension is { } ascension ? RosterRules.ContentNow(RosterRules.Ascension, ascension, now, calendar) : null,
-                RosterRules.CorridorRunsSinceSiege(character.CorridorRuns, now, calendar),
+                RosterRules.CorridorsDone(character, artifacts?.GetValueOrDefault(character.ServerId), now, calendar),
                 RosterRules.CorridorsOpen(character.ServerId, artifacts?.GetValueOrDefault(character.ServerId), now, calendar));
         });
         return sort switch
@@ -118,9 +118,9 @@ public partial class RosterPage : IDisposable
     /// <summary>What the corridors cell says when pointed at: the runs out of what, and where that comes from.</summary>
     public static string CorridorsTitle(RosterRow row) => row.CorridorsOpen switch
     {
-        null => $"Artifact Corridors entered since the last Abyss Siege, out of {RosterRules.CorridorsPerSiege}: which artifacts your side holds is not known on this server since the siege. Open the Abyss map in the game on this character to read it.",
+        null => $"Artifact Corridors run since the last Abyss Siege, out of {RosterRules.CorridorsPerSiege}: which artifacts your side holds is not known on this server since the siege. Open the Abyss map in the game on this character to read it.",
         0 => "Your side holds none of the corridors' artifacts until the next Abyss Siege, as the game last said on this server.",
-        { } open => $"Artifact Corridors entered since the last Abyss Siege, out of the {open} whose artifact your side holds, as the game last said on this server.",
+        { } open => $"Artifact Corridors run since the last Abyss Siege, out of the {open} whose artifact your side holds, as the game last said on this server.",
     };
 
     /// <summary>

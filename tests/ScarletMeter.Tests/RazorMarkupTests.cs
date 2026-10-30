@@ -723,8 +723,10 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"(?s)<span class=""label"">Characters</span>.*?@onclick=""Windows\.OpenRoster""", File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor")));
         var roster = File.ReadAllText(Path.Combine(app, "Pages", "RosterPage.razor"));
         Assert.Contains("@Name(character)", roster);
-        // The footer says when a corridor entry is missed, the confirmation window from the service itself (audit on #49).
-        Assert.Matches(@"one is missed when the meter is closed, when it misses the corridor's loading, or when the game does not name your character again within @\(\(int\)RosterService\.CorridorConfirmWindow\.TotalMinutes\) minutes", roster);
+        // The footer says when the meter's own count misses a corridor entry, the confirmation window from the service
+        // itself (audit on #49), and that the game's passages count a run made with the meter closed once it has said so.
+        Assert.Contains("so a run made with the meter closed counts once you log in on that character with the meter open; but when every corridor your side can enter was run, the passages read as they do before they are handed out after a siege, so the meter's own count stands.", roster);
+        Assert.Matches(@"The meter's own count misses one when the meter is closed, when it misses the corridor's loading, or when the game does not name your character again within @\(\(int\)RosterService\.CorridorConfirmWindow\.TotalMinutes\) minutes", roster);
         Assert.DoesNotMatch(@"@\(?(character|row\.Character)\.Name\b", roster);
         var code = File.ReadAllText(Path.Combine(app, "Pages", "RosterPage.razor.cs"));
         Assert.Matches(@"Settings\.Current\.Appearance\.HideNicknames \? NicknameMask\.Mask\(character\.Name\) : character\.Name", code);

@@ -179,14 +179,48 @@ public static class RosterRules
     /// the side not known (no server id), no holders read on that server, or the holders read are past: their reset has
     /// come, or, without a reset the meter can use (<see cref="LongestHolding"/>), a siege on the schedule since they were read.
     /// </summary>
-    public static int? CorridorsOpen(int serverId, RosterArtifacts? artifacts, DateTimeOffset now, RechargeCalendar calendar)
+    public static int? CorridorsOpen(int serverId, RosterArtifacts? artifacts, DateTimeOffset now, RechargeCalendar calendar) =>
+        OpenCorridors(serverId, artifacts, now, calendar)?.Count(open => open);
+
+    /// <summary>
+    /// Which of the Artifact Corridors (artifacts 1001 to 1003, in that order) the side of a character on
+    /// <paramref name="serverId"/> can enter until the next siege, by <see cref="CorridorsOpen"/>'s rules; null while not known.
+    /// </summary>
+    public static IReadOnlyList<bool>? OpenCorridors(int serverId, RosterArtifacts? artifacts, DateTimeOffset now, RechargeCalendar calendar)
     {
         var side = AbyssArtifacts.SideOf(serverId);
         if (side == ArtifactHolder.Unknown || artifacts is null || artifacts.ServerId != serverId) return null;
         var current = artifacts.Until is { } until && until > artifacts.SeenAt && until - artifacts.SeenAt <= LongestHolding
             ? now < until
             : artifacts.SeenAt >= calendar.LastSiege(now);
-        return current ? artifacts.Holders.Count(holder => holder == side || holder == ArtifactHolder.Unknown) : null;
+        return current ? [.. artifacts.Holders.Select(holder => holder == side || holder == ArtifactHolder.Unknown)] : null;
+    }
+
+    /// <summary>
+    /// The Artifact Corridors a character has run since the last Abyss Siege at <paramref name="now"/>: the meter's own
+    /// count (<see cref="CorridorRunsSinceSiege"/>), or, when more, the passages the game last said were used, read since
+    /// that siege, among the corridors its side can enter (all three while that is not known), as A2Tools' Roster plugin
+    /// counts them: so runs made with the meter closed count once the game has said so, at a login or as a passage changes.
+    /// Every passage of the reading must have been read since the siege: one read before it says nothing of the holding
+    /// since (deep audit and Codex on #66). All of those read as used is taken only when one had time left since the siege
+    /// (the passages had been handed out): before they are, on the first Abyss visit after a siege, all three read so with
+    /// none run, so then the meter's own count stands. A reading or time dated after now (a clock set back) is not taken.
+    /// </summary>
+    public static int CorridorsDone(RosterCharacter character, RosterArtifacts? artifacts, DateTimeOffset now, RechargeCalendar calendar)
+    {
+        var own = CorridorRunsSinceSiege(character.CorridorRuns, now, calendar);
+        var since = calendar.LastSiege(now);
+        if (character.Passages is not { } passages || passages.ReadFrom <= since || passages.SeenAt > now) return own;
+        var open = OpenCorridors(character.ServerId, artifacts, now, calendar);
+        var (cap, done) = (0, 0);
+        for (var n = 0; n < passages.Used.Count; n++)
+        {
+            if (open is not null && (n >= open.Count || !open[n])) continue;
+            cap++;
+            if (passages.Used[n]) done++;
+        }
+        var handedOut = passages.LeftSeenAt is { } left && left > since && left <= now;
+        return cap == 0 || done < cap || handedOut ? Math.Max(own, done) : own;
     }
 
     /// <summary>

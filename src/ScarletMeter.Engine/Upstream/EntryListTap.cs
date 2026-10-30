@@ -8,7 +8,7 @@ using ScarletMeter.Engine.Records;
 namespace ScarletMeter.Engine.Upstream;
 
 /// <summary>
-/// The game's list of entry counts (Odyle energy, Nightmare, Ascension Trial and the rest) from the captured stream,
+/// The game's list of entry counts (Odyle energy, Nightmare, Ascension Trial, the Abyss passages and the rest) from the captured stream,
 /// and whose they are. Upstream decodes no entry record, so <see cref="RecordTap"/> hands this the whole list
 /// (<c>0b 61</c>, at login and after a server transfer), its updates (<c>0c 61</c>) and the player's own character
 /// record (<c>33 36</c>), and it reads the first two with <see cref="EntryListRecords"/>. The character comes from
@@ -70,6 +70,11 @@ internal sealed class EntryListTap : IRecordReader
     private readonly Lock gate = new();
     // The counts since the last whole list, each with when it was read; whose they are is `owner` unless awaitingOwner.
     private readonly Dictionary<uint, EntryCount> counts = [];
+
+    // The Abyss passages' time entries (their usage time left), cleared and reported with the counts; a passage is in one
+    // of the two, as the game last sent it. Other time entries are not kept: they are no counts, and only the passages'
+    // are read (deep audit on #66: a time under a count's id would have dropped that count, and a time alone reported).
+    private readonly Dictionary<uint, EntryTime> times = [];
     // The Kina of each item as last read, with its slot (one slot per item); when it was last read; whether a listing came,
     // which makes a missing item none; when the last listing came (only a listing: what a whole list keeps it by); and
     // whether the Kina waits for the next self record (a listing with no self record just before it).
@@ -192,6 +197,7 @@ internal sealed class EntryListTap : IRecordReader
     private void TakeEntries(ReadOnlySpan<byte> record)
     {
         if (EntryListRecords.Read(record) is not { } read) return;
+        var passageTimes = read.Times.Where(time => EntryIds.AbyssPassages.Contains(time.Id)).ToList();
         var now = clock.GetUtcNow();
         OdyleEnergy? odyleNow = null;
         var odyleChanged = false;
@@ -201,6 +207,7 @@ internal sealed class EntryListTap : IRecordReader
             if (read.IsWholeList)
             {
                 counts.Clear();
+                times.Clear();
                 if (now - kinaListingAt > LoginBurst) ForgetKina();
                 awaitingOwner = true;
             }
@@ -208,6 +215,12 @@ internal sealed class EntryListTap : IRecordReader
             {
                 if (count.Id == EntryIds.OdyleEnergy && EntryListRecords.OdyleIn([count]) is null) continue;
                 counts[count.Id] = new EntryCount(count.First, count.Second, now);
+                times.Remove(count.Id);
+            }
+            foreach (var time in passageTimes)
+            {
+                times[time.Id] = new EntryTime(time.Value, now);
+                counts.Remove(time.Id);
             }
             if (read.IsWholeList || read.Counts.Any(c => c.Id == EntryIds.OdyleEnergy))
             {
@@ -215,9 +228,15 @@ internal sealed class EntryListTap : IRecordReader
                 odyleChanged = odyleNow != odyle;
                 odyle = odyleNow;
             }
-            if (!awaitingOwner && !ownerUnconfirmed && owner is not null && read.Counts.Count > 0) progress = Snapshot(owner);
+            if (!awaitingOwner && !ownerUnconfirmed && owner is not null && (read.Counts.Count > 0 || passageTimes.Count > 0)) progress = Snapshot(owner);
         }
         if (read.IsWholeList) logger.LogInformation("Entry list read ({Count} counts); waiting for the game to name the character.", read.Counts.Count);
+        // Which records bring the Abyss passages (when a corridor is entered or left, at login, and whether on entering
+        // the Abyss): how many of the three, never which or their values.
+        var passages = read.Counts.Count(c => EntryIds.AbyssPassages.Contains(c.Id)) + passageTimes.Count;
+        if (passages > 0)
+            logger.LogInformation("Abyss corridor passages read from {Record}: {Count} of {Total}.",
+                read.IsWholeList ? "the list of entry counts (0b 61)" : "an update (0c 61)", passages, EntryIds.AbyssPassages.Count);
         if (odyleChanged)
         {
             logger.LogInformation("Odyle energy changed, read from {Record}.",
@@ -249,11 +268,12 @@ internal sealed class EntryListTap : IRecordReader
             if (!awaitingOwner && owner is not null && !owner.IsSameCharacter(character))
             {
                 counts.Clear();
+                times.Clear();
                 if (!kinaHeld || now - kinaListingAt > LoginBurst) ForgetKina();
                 odyle = null;
                 dropped = true;
             }
-            else if (awaitingOwner && counts.Count > 0)
+            else if (awaitingOwner && (counts.Count > 0 || times.Count > 0))
             {
                 matched = true;
             }
@@ -352,8 +372,9 @@ internal sealed class EntryListTap : IRecordReader
         return new KinaBalance(Of(InventoryRecords.KinaItem), Of(InventoryRecords.BoundKinaItem), kinaReadAt);
     }
 
-    // Every count kept, and the Kina, as a copy for subscribers. Under the gate.
-    private CharacterProgress Snapshot(CharacterIdentity character) => new(character, new Dictionary<uint, EntryCount>(counts), Kina());
+    // Every count and time kept, and the Kina, as a copy for subscribers. Under the gate.
+    private CharacterProgress Snapshot(CharacterIdentity character) =>
+        new(character, new Dictionary<uint, EntryCount>(counts), Kina()) { Times = new Dictionary<uint, EntryTime>(times) };
 
     // Raises an event; a subscriber that throws is logged, so the rest of a bundle is still read.
     private void Raise(Action raise, string failure)

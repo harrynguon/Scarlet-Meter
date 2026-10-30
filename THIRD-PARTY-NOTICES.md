@@ -82,8 +82,10 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   schedule parameters only, no code.
 - **Character roster rules** (`ScarletMeter.App/Roster/RosterRules`): basic Odyle energy's refill (+15 every three
   hours on the hours that meet the daily reset, the 560 and 840 caps), the entry ids of Nightmare and Ascension Trial
-  and their caps and recharges, and which Artifact Corridors a side can run (one per lower-layer artifact it holds, one
-  nobody holds closed to both, one not named open), from the Roster / Content Overview plugin by Nullception in
+  and their caps and recharges, which Artifact Corridors a side can run (one per lower-layer artifact it holds, one
+  nobody holds closed to both, one not named open), and which a character has used from its Abyss passages (ids
+  10000001 to 10000003: a time still to run, a count used, all three counts before they are handed out after a siege),
+  from the Roster / Content Overview plugin by Nullception in
   taengu/A2Tools-Plugins, `plugins/alt-roster` (`logic.js` and `plugin.js`) at 7a4720bf6af8adfe1fe03359540da007e9566c71
   (https://github.com/taengu/A2Tools-Plugins), GNU GPL v3: the rules only, written anew in C#. The Shugo Festival keys'
   rules (`ScarletMeter.Engine/Contracts/CharacterProgress` and the overlay's keys: shared by a server's characters, the
