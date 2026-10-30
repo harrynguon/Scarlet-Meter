@@ -3,6 +3,12 @@
   <!-- The meter window: WPF hosting a Blazor WebView whose pages are Scarlet Meter's own. It references the
        engine only; the upstream boundary test fails if an upstream project reference appears here. -->
 
+  <!-- Test seams (a settings save held, SettingsService) stay internal, out of the app's surface and of dependency
+       injection's choice of constructors. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="ScarletMeter.Tests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <!-- A Windows 10 SDK version, not plain net10.0-windows: BlazorWebView draws the see-through overlay with

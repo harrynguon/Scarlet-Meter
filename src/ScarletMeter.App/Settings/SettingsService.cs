@@ -9,8 +9,9 @@ namespace ScarletMeter.App.Settings;
 /// engine's fight rules are mirrored on every change) and written to disk shortly after the last change,
 /// so dragging a slider does not rewrite the file for every step. <see cref="Flush"/> writes any pending
 /// change immediately; the app calls it on exit. The write happens outside the lock that <see cref="Current"/> and
-/// <see cref="Update"/> take: the overlay reads the settings on every render, and a save (written through, flushed and
-/// replaced) must not stall it.
+/// <see cref="Update"/> take: the overlay reads the settings on every render (the update notice's switch,
+/// UpdateNotice.Visible), the UI thread updates them (the overlay's placement after each fit), and the settings and roster
+/// pages read them as they render, and a save (written through, flushed and replaced) must not stall them.
 /// </summary>
 public sealed class SettingsService : IDisposable
 {
@@ -34,11 +35,9 @@ public sealed class SettingsService : IDisposable
     {
     }
 
-    /// <summary>
-    /// For tests: <paramref name="save"/> stands in for the store's write (to hold a save while the settings are read and
-    /// changed); null writes to <paramref name="store"/>.
-    /// </summary>
-    public SettingsService(SettingsStore store, EngineSettings engineSettings, ILogger<SettingsService> logger, Action<MeterSettings>? save)
+    // For tests: `save` stands in for the store's write (to hold a save while the settings are read and changed); null
+    // writes to `store`. Internal, so dependency injection never picks it.
+    internal SettingsService(SettingsStore store, EngineSettings engineSettings, ILogger<SettingsService> logger, Action<MeterSettings>? save)
     {
         this.store = store;
         this.save = save ?? store.Save;
@@ -68,7 +67,11 @@ public sealed class SettingsService : IDisposable
     /// <summary>Raised after every applied change, on the thread that made it (the UI thread in this app).</summary>
     public event EventHandler<MeterSettings>? Changed;
 
-    /// <summary>Applies a change. The result is normalized, so callers cannot store an out-of-range value.</summary>
+    /// <summary>
+    /// Applies a change. The result is normalized, so callers cannot store an out-of-range value. <paramref name="change"/>
+    /// runs under the service's lock and must not call back into the service (a Flush there would take the save's lock
+    /// inside it, against the order <see cref="Flush"/> takes them in).
+    /// </summary>
     public void Update(Func<MeterSettings, MeterSettings> change)
     {
         ArgumentNullException.ThrowIfNull(change);
