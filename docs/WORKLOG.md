@@ -6,13 +6,15 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **What:** the roster's Nightmare and Ascension cells write the count's cap after it, dimmed (`RosterText.OutOf`, the caps from `RosterRules`): "6 (+1) /14" with an extra, "2/3" without, estimated ones marked ≈ as before.
 
-**Why:** Harry, with a roster screenshot: "nightmare: it's out of 14 runs. so do /14 for the count", "ascension - it's a max of 3 runs"; from mock-ups he chose "6 (+1) /14 ... 3 (+3) /3 ... i think that looks neater and is similar to what is shown in game", then "do 2/3 instead of 2 /3 when there's no extra attempts. like how it looks with abyss corridors".
+**Why:** Harry, with a roster screenshot: "nightmare: it's out of 14 runs. so do /14 for the count", "ascension - it's a max of 3 runs"; from mock-ups they chose "6 (+1) /14 ... 3 (+3) /3 ... i think that looks neater and is similar to what is shown in game", then "do 2/3 instead of 2 /3 when there's no extra attempts. like how it looks with abyss corridors".
 
-**Checks (SDK 10.0.402, at idle priority: the game was running):** `scripts/Build.ps1` Debug 915/915. Fail-first on a scratch copy, controls passing before and after: 3 of 3 mutations caught (the cap always spaced, no cap in the cell, Nightmare out of Ascension's cap). Headless renders of the roster's markup at the window's client widths, the widest values ("≈ 14 (+4) /14", "3 (+3) /3", "Wed 30 May" under Last played): a full row has 23.3 px to spare at 896 (36.2 on main), the long row (1,234,567 combat power, 12,800,000 Kina) 6.2 px (19.1 on main).
+**Checks (SDK 10.0.402, at idle priority: the game was running):** `scripts/Build.ps1` Debug 915/915. Fail-first on a scratch copy, controls passing before and after: 3 of 3 mutations caught (the cap always spaced, no cap in the cell, Nightmare out of Ascension's cap). Headless renders of the roster's markup at the window's client widths, the widest values ("≈ 14 (+4) /14", "≈ 3 (+3) /3", "Wed 30 May" under Last played): a full row has 21.2 px to spare at 896 (36.2 on main), the long row (1,234,567 combat power, 12,800,000 Kina) 4.1 px (19.1 on main). The first renders took "3 (+3) /3" and gave 23.3 and 6.2 px; the audit found the estimated form wider.
 
 **Not checked:** the page in the running meter; whether the game's Nightmare extra ever reaches two digits (it would take the long row past the window's width).
 
-**Next:** the PR, a standard audit, Codex and CI; then the merge with Harry's go-ahead.
+**Standard audit on #63 (approve with nits), addressed:** the widest Ascension value is "≈ 3 (+3) /3" (an estimate with an extra), not "3 (+3) /3": 21.2 and 4.1 px to spare, not 23.3 and 6.2, now quoted in ARCHITECTURE with a LESSONS entry; ARCHITECTURE no longer says the Nightmare column is as wide as its header (its count is wider now); the CHANGELOG line rewrapped. Codex reviewed 36c765d with no findings; CI passed on it.
+
+**Next:** Codex and CI on the fixes; then the merge with Harry's go-ahead.
 
 ## 2026-10-28 — The roster sorted by power; Last played's date on its own line
 
