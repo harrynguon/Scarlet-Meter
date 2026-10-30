@@ -387,6 +387,139 @@ public sealed class SettingsTests : IDisposable
         Assert.Equal("{ this is not json", File.ReadAllText(kept));
     }
 
+    // A save writes outside the lock the settings are read under: the overlay reads them on every render, and a save is
+    // written through, flushed and replaced. While a write is held, reading and changing return at once; a second save
+    // waits for it, then writes the change made meanwhile, so saves land in order and a Flush returns with every change
+    // made before it written (Dispose's, on exit).
+    [Fact]
+    public async Task ASaveDoesNotHoldTheSettingsWhileItWrites()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var timeout = TimeSpan.FromSeconds(10);
+        var store = NewStore();
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var written = new List<MeterSettings>();
+        using var service = new SettingsService(store, new EngineSettings(), NullLogger<SettingsService>.Instance, settings =>
+        {
+            lock (written) written.Add(settings);
+            if (!entered.IsSet)
+            {
+                entered.Set();
+                Assert.True(release.Wait(timeout, ct));
+            }
+            store.Save(settings);
+        });
+        service.Update(s => s with { Appearance = s.Appearance with { ShowDeaths = false } });
+        var first = Task.Run(service.Flush, ct);
+        Assert.True(entered.Wait(timeout, ct));
+
+        // While the write is held, reading and changing return (WaitAsync throws if they do not, in time).
+        await Task.Run(() => service.Current, ct).WaitAsync(TimeSpan.FromSeconds(2), ct);
+        await Task.Run(() => service.Update(s => s with { Appearance = s.Appearance with { ShowCombatPower = false } }), ct)
+            .WaitAsync(TimeSpan.FromSeconds(2), ct);
+        var second = Task.Run(service.Flush, ct);
+        Assert.NotSame(second, await Task.WhenAny(second, Task.Delay(200, ct))); // a second save waits for the first
+
+        release.Set();
+        await Task.WhenAll(first, second).WaitAsync(timeout, ct);
+        lock (written)
+        {
+            Assert.Equal(2, written.Count);
+            Assert.Equal((false, true), (written[0].Appearance.ShowDeaths, written[0].Appearance.ShowCombatPower));
+            Assert.Equal((false, false), (written[1].Appearance.ShowDeaths, written[1].Appearance.ShowCombatPower));
+        }
+        Assert.Equal(service.Current, store.Load().Settings);
+    }
+    // Any failed save leaves the change pending, an unexpected failure included (it is not caught), so the next save writes it.
+    // It fails only on the test's own thread: the 500 ms timer's save, should a slow runner let it come first, must not
+    // throw on the timer's thread, which would end the test run.
+    [Fact]
+    public void AFailedSaveLeavesTheChangePending()
+    {
+        var store = NewStore();
+        var fail = true;
+        var testThread = Environment.CurrentManagedThreadId;
+        using var service = new SettingsService(store, new EngineSettings(), NullLogger<SettingsService>.Instance, settings =>
+        {
+            if (fail && Environment.CurrentManagedThreadId == testThread) throw new InvalidOperationException("synthetic");
+            store.Save(settings);
+        });
+        service.Update(s => s with { Appearance = s.Appearance with { ShowDeaths = false } });
+        Assert.Throws<InvalidOperationException>(service.Flush);
+        fail = false;
+        service.Flush();
+        Assert.False(store.Load().Settings.Appearance.ShowDeaths);
+    }
+
+    // A real disk failure (a folder where the temporary file goes): the error is shown and the status raised once, a repeat
+    // raises nothing more, a save that works again clears it and raises once more and writes the file, and a save with
+    // nothing pending writes nothing (deep audit on #69: none of this was tested).
+    [Fact]
+    public void ADiskFailureIsReportedOnceAndClearedOnceSaved()
+    {
+        var store = NewStore();
+        var writes = 0;
+        using var service = new SettingsService(store, new EngineSettings(), NullLogger<SettingsService>.Instance, settings =>
+        {
+            writes++;
+            store.Save(settings);
+        });
+        var reported = new List<string?>();
+        service.SaveStatusChanged += (_, _) => reported.Add(service.SaveError);
+        var blocker = Path.Combine(directory.FullPath, "settings.json.tmp");
+        Directory.CreateDirectory(blocker);
+        service.Update(s => s with { Appearance = s.Appearance with { ShowDeaths = false } });
+        service.Flush();
+        Assert.NotNull(service.SaveError);
+        Assert.Single(reported);
+        service.Flush();
+        Assert.Single(reported); // the same failure again: no new status
+        Directory.Delete(blocker);
+        service.Flush();
+        Assert.Null(service.SaveError);
+        Assert.Equal(2, reported.Count);
+        Assert.Null(reported[1]);
+        Assert.False(store.Load().Settings.Appearance.ShowDeaths);
+        var before = writes;
+        service.Flush(); // nothing pending
+        Assert.Equal(before, writes);
+        Assert.Equal(2, reported.Count);
+    }
+
+    // Disposing (on exit) waits for a save under way, then writes the change made meanwhile.
+    [Fact]
+    public async Task DisposingWaitsForASaveUnderWayAndWritesTheRest()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var timeout = TimeSpan.FromSeconds(10);
+        var store = NewStore();
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var writes = 0;
+        var service = new SettingsService(store, new EngineSettings(), NullLogger<SettingsService>.Instance, settings =>
+        {
+            Interlocked.Increment(ref writes);
+            if (!entered.IsSet)
+            {
+                entered.Set();
+                Assert.True(release.Wait(timeout, ct));
+            }
+            store.Save(settings);
+        });
+        service.Update(s => s with { Appearance = s.Appearance with { ShowDeaths = false } });
+        var first = Task.Run(service.Flush, ct);
+        Assert.True(entered.Wait(timeout, ct));
+        service.Update(s => s with { Appearance = s.Appearance with { ShowCombatPower = false } });
+        var disposing = Task.Run(service.Dispose, ct);
+        Assert.NotSame(disposing, await Task.WhenAny(disposing, Task.Delay(200, ct))); // it waits for the save under way
+        release.Set();
+        await Task.WhenAll(first, disposing).WaitAsync(timeout, ct);
+        Assert.Equal(2, Volatile.Read(ref writes));
+        var saved = store.Load().Settings.Appearance;
+        Assert.Equal((false, false), (saved.ShowDeaths, saved.ShowCombatPower));
+    }
+
     [Fact]
     public void AFileFromAnEarlierBuildGetsTheNewAppearanceOptionsOnAndKeepsItsOwn()
     {

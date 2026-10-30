@@ -60,8 +60,13 @@ public static class ScarletEngineServiceCollectionExtensions
 
         // Upstream game state, the timed trackers its session manager requires, decoding and the pipeline.
         services.AddSingleton<EntityTracker>();
-        services.AddKeyedSingleton<ITimedEventTracker, BuffTimedEventTracker>("Buffs");
-        services.AddKeyedSingleton<ITimedEventTracker, SkillCdTimedEventTracker>("SkillCdUpdate");
+        // The two trackers tick every 100 ms from construction, to drop expired items. They take an item only while their
+        // overlay is enabled with its id listed, and Scarlet never enables them (UpstreamSettingsBridge keeps upstream's
+        // defaults: off, nothing listed), so they hold none and every tick did nothing: they are built without a tick.
+        services.AddKeyedSingleton<ITimedEventTracker>("Buffs",
+            (sp, _) => new BuffTimedEventTracker(sp.GetRequiredService<IAppSettingsService>(), Timeout.InfiniteTimeSpan));
+        services.AddKeyedSingleton<ITimedEventTracker>("SkillCdUpdate",
+            (sp, _) => new SkillCdTimedEventTracker(sp.GetRequiredService<IAppSettingsService>(), Timeout.InfiniteTimeSpan));
         services.AddSingleton<CombatSessionManager>();
         services.AddPacketProcessingRouting();
         services.AddSingleton<IPacketService, PacketPipelineService>();

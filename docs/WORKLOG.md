@@ -2,6 +2,38 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-31 — Two idle timers off; settings saved outside their lock
+
+**What:**
+- **Timed trackers:** upstream's two timed trackers (buffs, skill cooldowns) are registered with no tick. Each ticked every 100 ms from construction to drop expired items, but takes an item only while its overlay is enabled with the id listed, and Scarlet's settings bridge never enables them, so every tick did nothing.
+- **Settings saves:** `SettingsService.Flush` takes the settings under the service's lock and writes them outside it, under a lock of the save's own. Saves are still one at a time and in order; a Flush still returns once every change before it is written; any failure, an unexpected one included, still leaves the change pending.
+
+**Why:** Harry asked for "an extremely thorough check to see if you can make any performance improvements or to lighten the load of running the dps meter. make sure no functionality of it changes". Three read-only reviews covered the overlay's render path, the engine's per-packet path and the background work; these two were verified against the code and are without risk.
+- **Trackers:** they were two wake-ups ten times a second each for the whole run, each taking a lock and building an empty list.
+- **Settings:** the overlay reads the settings on every render (the update notice's switch, `UpdateNotice.Visible`), the UI thread updates them (the placement saved after each fit), and the settings and roster pages read them as they render, all under that lock. A save, written through and flushed, held it for as long as the disk took. That happens at fight start and end, since the overlay's fitted height is saved.
+
+The other findings, deferred, are listed in HANDOFF ("Possible lighter load").
+
+**Checks (SDK 10.0.402, at idle priority with no shared compiler server; a game was running, so nothing was launched):**
+- `scripts/Build.ps1` Debug 929/929.
+- Fail-first on a scratch copy, controls passing before and after: 7 of 7 caught (either tracker ticking again, the bridge enabling an overlay, the write under the lock, saves not one at a time, a failure not left pending, only a disk failure left pending). One mutation was first written so that it did not compile, and was rewritten.
+
+**Not checked:** the gains measured on the running meter (the save stall depends on the disk).
+
+**Deep audit on #69 (approve with nits), addressed:**
+- **Untested reporting:** the save's error reporting and the exit save were untested: a save not clearing the error, a failure not setting it, the status never raised, a successful save left pending, or Dispose skipping its save all passed. Two tests now cover them, and a save with nothing pending writing nothing.
+- **Test could end the run:** the failure test could throw on the 500 ms timer's thread if a slow runner let the timer come first. It now throws only on the test's own thread.
+- **Wording:** the reason named only the overlay's reads. It now names each reader and writer, the overlay's reads being the update notice's switch.
+- **Test seam:** the test constructor is internal (the app now shows its internals to the tests), so dependency injection never chooses it.
+- **Update's summary:** says its change must not call back into the service.
+- **Deferred findings:** now in HANDOFF.
+
+Codex reviewed 8764ce5 with no findings; CI passed on it.
+
+**Checks after the fixes:** `scripts/Build.ps1` Debug 931/931; the five mutations the audit found missed (the error not cleared, not set, the status never raised, a success left pending, Dispose skipping its save) are now caught, controls passing before and after (one first written so that it did not compile, rewritten).
+
+**Next:** Codex and CI on the fixes; the frame cap's read-then-write change in its own PR (#70); the merge with Harry's go-ahead.
+
 ## 2026-10-31 — Dimensional Invasion keys on the overlay
 
 **What:**
