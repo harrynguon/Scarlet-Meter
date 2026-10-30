@@ -18,11 +18,17 @@ public static class RosterText
         extra > 0 || always ? "(+" + Math.Max(0, extra).ToString("N0", CultureInfo.InvariantCulture) + ")" : string.Empty;
 
     /// <summary>
-    /// A count's cap after it, as the game writes it: "/14" straight after the count ("2/3"), " /14" after an extra
-    /// ("6 (+1) /14"), since the extra comes on top of the cap (Harry, 2026-10-28, from the game's own).
+    /// A count's cap after it, straight after the count or its extra: "2/3", "6 (+1)/14" (Harry, 2026-10-28, from the
+    /// game's own; 2026-10-30: "remove the space before the / count").
     /// </summary>
-    public static string OutOf(int cap, bool afterExtra) =>
-        (afterExtra ? " /" : "/") + cap.ToString("N0", CultureInfo.InvariantCulture);
+    public static string OutOf(int cap) => "/" + cap.ToString("N0", CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// The corridors a character's side can enter, after the runs: "/2" once the game has said, or the most there can be
+    /// with an asterisk, "/3*", while it has not since the last siege (Harry, 2026-10-30: an asterisk, not italics).
+    /// </summary>
+    public static string CorridorsOutOf(int? open) =>
+        open is { } known ? OutOf(known) : OutOf(RosterRules.CorridorsPerSiege) + "*";
 
     /// <summary>Time left, to the minute, rounded up so it never reads 0 before the moment: "4d 15h", "12h 16m", "15m"; "now" once it has passed.</summary>
     public static string Until(TimeSpan left)

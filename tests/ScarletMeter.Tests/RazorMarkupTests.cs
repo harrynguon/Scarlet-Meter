@@ -747,8 +747,9 @@ public sealed partial class RazorMarkupTests
             + @"<div>@RosterText\.Time\(character\.LastSeen\)</div>\s*</td>", roster);
     }
 
-    // Nightmare and Ascension show their counts out of their caps, as the game writes them (Harry, 2026-10-28: "6 (+1) /14",
-    // "3 (+3) /3", and "2/3" with no extra), the cap dimmed like the extra and taken from the rules, not written here.
+    // Nightmare and Ascension show their counts out of their caps, as the game writes them (Harry, 2026-10-30: "6 (+1)/14",
+    // "3 (+3)/3", and "2/3" with no extra), the cap dimmed like the extra and taken from the rules, not written here. The
+    // corridors' cap is dimmed too, starred rather than in italics while it is not known ("0/3*").
     [Fact]
     public void TheRosterShowsNightmareAndAscensionOutOfTheirCaps()
     {
@@ -757,7 +758,11 @@ public sealed partial class RazorMarkupTests
         Assert.Contains("<td>@ContentCell(row.Ascension, character.Ascension, RosterRules.Ascension.Cap)</td>", roster);
         var cell = Regex.Match(roster, @"(?s)private static RenderFragment ContentCell\(Estimate\? estimate, RosterCount\? seen, int cap\) => builder =>(?<body>.*?)\n    \};").Groups["body"].Value;
         Assert.Matches(@"(?s)var extra = RosterText\.Extra\(seen\.Second, always: false\);.*"
-            + @"builder\.AddAttribute\(\d+, ""class"", ""muted""\);\s*builder\.AddContent\(\d+, RosterText\.OutOf\(cap, afterExtra: extra\.Length > 0\)\);", cell);
+            + @"builder\.AddAttribute\(\d+, ""class"", ""muted""\);\s*builder\.AddContent\(\d+, RosterText\.OutOf\(cap\)\);", cell);
+        var corridors = Regex.Match(roster, @"(?s)private static RenderFragment CorridorsCell\(RosterRow row\) => builder =>(?<body>.*?)\n    \};").Groups["body"].Value;
+        Assert.Matches(@"builder\.AddAttribute\(\d+, ""class"", ""muted""\);\s*builder\.AddContent\(\d+, RosterText\.CorridorsOutOf\(row\.CorridorsOpen\)\);", corridors);
+        Assert.DoesNotContain("italic", corridors);
+        Assert.DoesNotContain("roster-open-unknown", File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "views.css")));
         Assert.Equal((14, 3), (ScarletMeter.App.Roster.RosterRules.Nightmare.Cap, ScarletMeter.App.Roster.RosterRules.Ascension.Cap)); // the game's caps (A2Tools' Roster plugin)
     }
 

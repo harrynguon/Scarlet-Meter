@@ -72,7 +72,7 @@
                         <th class="left" title="When basic energy reaches its cap, if none is spent">Full</th>
                         <th title="Entries left (+extra from recharge items); +@RosterRules.Nightmare.Add a day, up to @RosterRules.Nightmare.Cap">Nightmare</th>
                         <th title="Entries left (+extra from recharge items); +@RosterRules.Ascension.Add a week, up to @RosterRules.Ascension.Cap">Ascension</th>
-                        <th title="Artifact Corridors entered since the last Abyss Siege, as the meter saw them, out of those whose artifact your side holds (up to @RosterRules.CorridorsPerSiege), as the game said when you last opened the Abyss map or entered the Abyss; out of @RosterRules.CorridorsPerSiege in italics while that is not known">Corridors</th>
+                        <th title="Artifact Corridors entered since the last Abyss Siege, as the meter saw them, out of those whose artifact your side holds (up to @RosterRules.CorridorsPerSiege), as the game said when you last opened the Abyss map or entered the Abyss; out of @RosterRules.CorridorsPerSiege with an asterisk (*) while that is not known">Corridors</th>
                         <th title="Kina, and Kina (Bound) below it (Engraved Kina, as the game's Korean and Japanese names have it), as the character's inventory last said: at login and at each change">Kina</th>
                         <th class="left">Last played</th>
                         <th></th>
@@ -150,7 +150,7 @@
         }
     </div>
     <footer class="roster-foot muted">
-        ≈ marks an estimate: basic Odyle energy +15 every three hours from the daily reset, Nightmare +@RosterRules.Nightmare.Add at each daily reset, Ascension Trial +@RosterRules.Ascension.Add at the weekly reset, none yet checked in the game. Logging in on a character corrects them. Corridors are the Artifact Corridor entries the meter saw since the last Abyss Siege, not estimated: one is missed when the meter is closed, when it misses the corridor's loading, or when the game does not name your character again within @((int)RosterService.CorridorConfirmWindow.TotalMinutes) minutes of a server change. They are out of the corridors whose artifact your side holds, as the game said when you last opened the Abyss map or entered the Abyss on that server since the siege; out of @RosterRules.CorridorsPerSiege, in italics, until then. Kina is as each character's inventory last said, at login and at each change, so it is as of the last time you played them.
+        ≈ marks an estimate: basic Odyle energy +15 every three hours from the daily reset, Nightmare +@RosterRules.Nightmare.Add at each daily reset, Ascension Trial +@RosterRules.Ascension.Add at the weekly reset, none yet checked in the game. Logging in on a character corrects them. Corridors are the Artifact Corridor entries the meter saw since the last Abyss Siege, not estimated: one is missed when the meter is closed, when it misses the corridor's loading, or when the game does not name your character again within @((int)RosterService.CorridorConfirmWindow.TotalMinutes) minutes of a server change. They are out of the corridors whose artifact your side holds, as the game said when you last opened the Abyss map or entered the Abyss on that server since the siege; out of @RosterRules.CorridorsPerSiege, marked *, until then. Kina is as each character's inventory last said, at login and at each change, so it is as of the last time you played them.
         @if (!Roster.CanSave)
         {
             <span> Changes are not saved this run.</span>
@@ -159,8 +159,8 @@
 </div>
 
 @code {
-    // The runs since the siege out of the corridors the side can enter: the bound in italics while that is not known, a
-    // dash when the side holds none and none were run.
+    // The runs since the siege out of the corridors the side can enter ("1/2"): the most there can be with an asterisk
+    // while that is not known ("0/3*"), a dash when the side holds none and none were run.
     private static RenderFragment CorridorsCell(RosterRow row) => builder =>
     {
         if (row is { CorridorsOpen: 0, Corridors: 0 })
@@ -173,8 +173,8 @@
         builder.AddContent(3, row.Corridors);
         builder.CloseElement();
         builder.OpenElement(4, "span");
-        builder.AddAttribute(5, "class", row.CorridorsOpen is null ? "muted roster-open-unknown" : "muted");
-        builder.AddContent(6, "/" + (row.CorridorsOpen ?? RosterRules.CorridorsPerSiege));
+        builder.AddAttribute(5, "class", "muted");
+        builder.AddContent(6, RosterText.CorridorsOutOf(row.CorridorsOpen));
         builder.CloseElement();
     };
 
@@ -187,7 +187,7 @@
         builder.CloseElement();
     };
 
-    // A content's entries left (+extra) out of its cap, as the game writes it ("6 (+1) /14", "2/3"), marked ≈ when
+    // A content's entries left (+extra) out of its cap, as the game writes it ("6 (+1)/14", "2/3"), marked ≈ when
     // estimated; "?" before the game has sent it.
     private static RenderFragment ContentCell(Estimate? estimate, RosterCount? seen, int cap) => builder =>
     {
@@ -210,7 +210,7 @@
         }
         builder.OpenElement(7, "span");
         builder.AddAttribute(8, "class", "muted");
-        builder.AddContent(9, RosterText.OutOf(cap, afterExtra: extra.Length > 0));
+        builder.AddContent(9, RosterText.OutOf(cap));
         builder.CloseElement();
     };
 }
