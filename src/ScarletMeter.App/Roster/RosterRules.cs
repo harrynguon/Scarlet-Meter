@@ -127,8 +127,9 @@ public sealed record ContentRule(string Key, string Name, int Cap, int Add, bool
 /// The roster's estimates, pure: Odyle energy refills and the content entries' recharges, from a count the game sent and
 /// when. Odyle energy: +15 basic every three hours up to the cap (840, a membership's, or 560 without); charged never refills.
 /// Contents, from the game's own tooltips as A2Tools' Roster plugin quotes them (plugin.js at 7a4720b): Nightmare +2 a
-/// day up to 14, Ascension Trial +3 a week up to 3; and the Shugo Festival keys, the server's, +3 a day up to 21 (its
-/// content table at 48f5ecd). None of the recharge times is verified in the game.
+/// day up to 14, Ascension Trial +3 a week up to 3; and the Shugo Festival keys, the server's, +3 a day up to 21, and the
+/// Dimensional Invasion keys, the server's, +1 a day up to 7 (its content table at 48f5ecd). None of the recharge times is
+/// verified in the game.
 /// </summary>
 public static class RosterRules
 {
@@ -149,6 +150,12 @@ public static class RosterRules
 
     /// <summary>The Shugo Festival keys (entry 1), a server's, shared by its characters: +3 at each daily reset, up to 21.</summary>
     public static readonly ContentRule Shugo = new("shugo", "Shugo Festival keys", 21, 3, Weekly: false);
+
+    /// <summary>
+    /// The Dimensional Invasion reward keys (entry 8), a server's, shared by its characters: +1 at each daily reset, up to 7
+    /// (A2Tools' Roster plugin, as another roster app shows them; the game's own dialog writes them out of 7).
+    /// </summary>
+    public static readonly ContentRule Invasion = new("invasion", "Dimensional Invasion keys", 7, 1, Weekly: false);
 
     /// <summary>How many of a character's Artifact Corridor entries are kept: more than a siege's worth.</summary>
     public const int CorridorRunsKept = 12;

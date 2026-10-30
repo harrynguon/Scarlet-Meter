@@ -133,6 +133,15 @@ internal sealed class EntryListTap : IRecordReader
         }
     }
 
+    /// <summary>The Dimensional Invasion reward keys among the counts kept, by the same rules as <see cref="Shugo"/>.</summary>
+    public InvasionKeys? Invasion
+    {
+        get
+        {
+            lock (gate) return counts.TryGetValue(EntryIds.DimensionalInvasionKeys, out var keys) ? new InvasionKeys(keys.First, keys.Second) : null;
+        }
+    }
+
     /// <summary>
     /// The character being played, as the game last named it, or null while that is not sure: until a character is
     /// named, after a login's list until its self record, and after a move to a new connection until a self record names

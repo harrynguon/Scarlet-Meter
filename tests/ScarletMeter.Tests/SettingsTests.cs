@@ -401,9 +401,10 @@ public sealed class SettingsTests : IDisposable
         Assert.True(loaded.Appearance.ShowCombatPower);
         Assert.True(loaded.Appearance.ShowOdyleEnergy);
         Assert.True(loaded.Appearance.ShowShugoKeys);
+        Assert.True(loaded.Appearance.ShowInvasionKeys);
         Assert.Equal(1.0, loaded.Appearance.PictureOpacity); // the picture as it looked before the setting
 
-        var plain = loaded with { Appearance = loaded.Appearance with { BarEffects = false, EffectsOnEveryBar = false, ShowCombatPower = false, ShowShugoKeys = false, PictureOpacity = 0.4 } };
+        var plain = loaded with { Appearance = loaded.Appearance with { BarEffects = false, EffectsOnEveryBar = false, ShowCombatPower = false, ShowShugoKeys = false, ShowInvasionKeys = false, PictureOpacity = 0.4 } };
         store.Save(plain);
         Assert.Equal(plain, store.Load().Settings);
     }

@@ -44,12 +44,15 @@ public partial class MeterPage : IAsyncDisposable
     // The notices' switches: the header's bell (Enabled) and whether they stand aside for a boss fight.
     private AlertSettings alertSettings = new();
     private int? ping;
-    // The Odyle energy and Shugo Festival keys shown, read with each refresh (ReadEnergy): the game's latest, or until it
-    // has sent them this run the roster's last known, estimated (odyleLastKnown, shugoLastKnown); null when neither is there.
+    // The Odyle energy, Shugo Festival keys and Dimensional Invasion keys shown, read with each refresh (ReadEnergy): the
+    // game's latest, or until it has sent them this run the roster's last known, estimated (the *LastKnown flags); null
+    // when neither is there.
     private OdyleEnergy? odyle;
     private ShugoKeys? shugo;
+    private InvasionKeys? invasion;
     private bool odyleLastKnown;
     private bool shugoLastKnown;
+    private bool invasionLastKnown;
     // The calendar those estimates use, made again only when the server offset in Settings changes.
     private readonly RechargeCalendarCache calendars = new();
     private Task? refreshLoop;
@@ -258,14 +261,16 @@ public partial class MeterPage : IAsyncDisposable
         }
     }
 
-    // The Odyle energy and Shugo keys to show: the game's, read on the refresh loop (on the renderer's dispatcher, rather
-    // than set from the capture thread's event: each pair of numbers is read together under the engine's lock, never
-    // torn), or while the game has not sent them this run, the roster's last known for the character played, estimated
-    // (LastKnownValues; Harry, 2026-10-28), shown with ≈ until the game's own replace them.
+    // The Odyle energy and the two kinds of keys to show: the game's, read on the refresh loop (on the renderer's
+    // dispatcher, rather than set from the capture thread's event: each pair of numbers is read together under the
+    // engine's lock, never torn), or while the game has not sent them this run, the roster's last known for the character
+    // played, estimated (LastKnownValues; Harry, 2026-10-28), shown with ≈ until the game's own replace them.
     private void ReadEnergy(DateTimeOffset now)
     {
-        var shown = LastKnownValues.Shown(Engine.OdyleEnergy, Engine.ShugoKeys, () => Roster.LastKnown, now, calendars.For(alertSettings.ServerOffsetHours));
+        var shown = LastKnownValues.Shown(
+            Engine.OdyleEnergy, Engine.ShugoKeys, Engine.InvasionKeys, () => Roster.LastKnown, now, calendars.For(alertSettings.ServerOffsetHours));
         (odyle, odyleLastKnown, shugo, shugoLastKnown) = (shown.Odyle, shown.OdyleLastKnown, shown.Shugo, shown.ShugoLastKnown);
+        (invasion, invasionLastKnown) = (shown.Invasion, shown.InvasionLastKnown);
     }
 
     // What the Odyle energy and the Shugo keys say when pointed at: the game's own, or the last known, estimated.
@@ -276,6 +281,10 @@ public partial class MeterPage : IAsyncDisposable
     private string ShugoTitle => shugoLastKnown
         ? "Shugo Festival keys, estimated (≈): left, shared by your characters on this server (+extra from recharge items), as the game last said on this server, with the daily keys since. The game's own replace them at your next login or when they change."
         : "Shugo Festival keys: left, shared by your characters on this server (+extra from recharge items)";
+
+    private string InvasionTitle => invasionLastKnown
+        ? "Dimensional Invasion reward keys, estimated (≈): left out of 7, shared by your characters on this server (+extra from recharge items), as the game last said on this server, with the daily key since. The game's own replace them at your next login or when they change."
+        : "Dimensional Invasion reward keys: left out of 7, shared by your characters on this server (+extra from recharge items)";
 
     private void OnSettingsChanged(object? sender, MeterSettings changed)
     {

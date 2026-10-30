@@ -84,6 +84,17 @@
 
     <div class="ov-totals">
         <span title="Party DPS" class="accent">@Compact.Number(snapshot.PartyDps)/s</span>
+        @* Dimensional Invasion reward keys left of the Shugo keys, out of 7 as the game's dialog writes them, once the game has
+           sent them or the roster knows them (a key of Scarlet's own drawing, its bow a diamond); the roster's last known,
+           estimated, with ≈ until the game's own come (ReadEnergy). On a narrow meter they give way first (app.css). *@
+        @if (appearance.ShowInvasionKeys && invasion is { } invasionKeys)
+        {
+            <span class="invasion @(invasionLastKnown ? "last-known" : "")" title="@InvasionTitle">
+                <svg class="invasion-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.9 4.9 7.9 8 4.9 11.1 1.8 8Z" /><path d="M7.9 8h6.3M12.2 8v2.4M14.2 8v1.8" /></svg>
+                <span class="invasion-count"><span class="invasion-keys">@(invasionLastKnown ? "≈" : "")@InvasionText.Keys(invasionKeys)</span>@if (InvasionText.Extra(invasionKeys) is { Length: > 0 } invasionExtra)
+                {<span class="invasion-extra">@invasionExtra</span>}<span class="invasion-cap">@InvasionText.OutOf</span></span>
+            </span>
+        }
         @* Shugo Festival keys left of the Odyle energy, once the game has sent them or the roster knows them (a key of
            Scarlet's own drawing); the roster's last known, estimated, with ≈ until the game's own come (ReadEnergy). *@
         @if (appearance.ShowShugoKeys && shugo is { } keys)

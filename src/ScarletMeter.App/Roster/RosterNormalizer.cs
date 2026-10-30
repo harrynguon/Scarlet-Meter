@@ -92,17 +92,26 @@ public static class RosterNormalizer
         if (artifactsTrimmed > 0) repairs.Add($"{artifactsTrimmed} Abyss artifact {(artifactsTrimmed == 1 ? "record" : "records")} listed twice or past the {MaxServers} kept dropped.");
         if (artifactsRepaired > 0) repairs.Add($"Abyss artifact holders or times repaired on {artifactsRepaired} {(artifactsRepaired == 1 ? "server" : "servers")}.");
 
-        var (shugo, shugoDropped, shugoTrimmed) = CleanShugoKeys(file?.ShugoKeys, now);
-        if (shugoDropped > 0) repairs.Add($"{shugoDropped} unusable Shugo Festival key {(shugoDropped == 1 ? "record" : "records")} dropped.");
-        if (shugoTrimmed > 0) repairs.Add($"{shugoTrimmed} Shugo Festival key {(shugoTrimmed == 1 ? "record" : "records")} listed twice or past the {MaxServers} kept dropped.");
-        return (new RosterFile { Version = RosterFile.CurrentVersion, Characters = newest, Artifacts = artifacts, ShugoKeys = shugo }, repairs);
+        var shugo = CleanServerKeys(file?.ShugoKeys, now, "Shugo Festival", repairs);
+        var invasion = CleanServerKeys(file?.InvasionKeys, now, "Dimensional Invasion", repairs);
+        return (new RosterFile { Version = RosterFile.CurrentVersion, Characters = newest, Artifacts = artifacts, ShugoKeys = shugo, InvasionKeys = invasion }, repairs);
     }
 
-    // The Shugo Festival keys as they can be used: on a server with a side, counts within the entry list's bound and a
-    // usable date; one per server, the one read last; the most recently read kept.
-    private static (List<RosterShugoKeys> Kept, int Dropped, int Trimmed) CleanShugoKeys(IReadOnlyList<RosterShugoKeys>? saved, DateTimeOffset now)
+    // One kind of a server's keys (the Shugo Festival keys, the Dimensional Invasion keys, named `kind` in the repairs) as
+    // they can be used, with what was dropped said in `repairs`.
+    private static List<RosterServerKeys> CleanServerKeys(IReadOnlyList<RosterServerKeys>? saved, DateTimeOffset now, string kind, List<string> repairs)
     {
-        List<RosterShugoKeys> usable = [.. (saved ?? []).Where(entry => entry is not null
+        var (kept, dropped, trimmed) = CleanServerKeys(saved, now);
+        if (dropped > 0) repairs.Add($"{dropped} unusable {kind} key {(dropped == 1 ? "record" : "records")} dropped.");
+        if (trimmed > 0) repairs.Add($"{trimmed} {kind} key {(trimmed == 1 ? "record" : "records")} listed twice or past the {MaxServers} kept dropped.");
+        return kept;
+    }
+
+    // A server's keys as they can be used: on a server with a side, counts within the entry list's bound and a usable date;
+    // one per server, the one read last; the most recently read kept.
+    private static (List<RosterServerKeys> Kept, int Dropped, int Trimmed) CleanServerKeys(IReadOnlyList<RosterServerKeys>? saved, DateTimeOffset now)
+    {
+        List<RosterServerKeys> usable = [.. (saved ?? []).Where(entry => entry is not null
             && AbyssArtifacts.SideOf(entry.ServerId) != ArtifactHolder.Unknown
             && entry.Keys is >= 0 and <= MaxCount && entry.Extra is >= 0 and <= MaxCount && IsUsableDate(entry.SeenAt, now))];
         var unique = usable.GroupBy(entry => entry.ServerId).Select(g => g.OrderByDescending(entry => entry.SeenAt).First()).ToList();

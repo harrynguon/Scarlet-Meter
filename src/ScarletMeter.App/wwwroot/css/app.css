@@ -335,7 +335,8 @@ button {
     font-variant-numeric: tabular-nums;
 }
 
-/* The totals line: party DPS, then the Shugo keys, the Odyle energy and the ping at its end. Nothing in it wraps, and
+/* The totals line: party DPS, then the Dimensional Invasion keys, the Shugo keys, the Odyle energy and the ping at its
+   end. Nothing in it wraps, and
    on a narrow line the ping's bars give way (below), so the line stays one line tall: a wrap grew the window by a line
    each time a value crossed a width (audit on #57). */
 .ov-totals {
@@ -392,7 +393,8 @@ button {
 /* Shugo Festival keys (MeterPage, ShugoText), left of the Odyle energy once the game has sent them (Harry, 2026-10-27): a
    key of Scarlet's own in bright yellow, the keys left and, only when there is any, the extra in brackets. The yellow is
    saturated so it reads apart from the ping's colours, its orange (--slow) and pale yellow (--fair). The keys take the
-   push to the right, the energy then sitting 8 px from them, closer than the line's 14 px gap: the two read as one group.
+   push to the right (the invasion keys before them, when shown), the energy then sitting 8 px from them, closer than the
+   line's 14 px gap: they read as one group.
    At the overlay's least width (320 px), with both shown, the line holds a party DPS of 999.9K/s, keys 21 (+12),
    energy 840 (+1,200) and a ping of 1043 ms, the ping's bars having given way (.ov-totals; headless renders, audit on
    #57); longer values (a party DPS in millions, or the last known values' two ≈ marks, about 18 px, with those) run
@@ -432,10 +434,55 @@ button {
     color: #ffd60a;
 }
 
-/* The Odyle energy and Shugo keys the roster last knew, estimated, until the game sends its own this run (MeterPage's
+/* Dimensional Invasion reward keys (MeterPage, InvasionText), left of the Shugo keys once the game has sent them (Harry,
+   2026-10-31): a key of Scarlet's own with a diamond bow in violet, apart from the keys' yellow and the ping's colours,
+   the keys left out of 7 as the game's dialog writes them ("3/7"), any extra in brackets before the cap. They take the
+   push to the right, the keys or energy after them 8 px away, as one group. On a narrow line they give way first (below). */
+.invasion {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.invasion + .shugo,
+.invasion + .odyle {
+    margin-left: -6px;
+}
+
+.invasion + .ping {
+    margin-left: 0;
+}
+
+.invasion-icon {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    fill: none;
+    stroke: #c4a1ff;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.invasion-keys {
+    color: var(--text);
+}
+
+.invasion-extra {
+    color: #c4a1ff;
+}
+
+.invasion-cap {
+    color: var(--muted);
+}
+
+/* The Odyle energy and the keys the roster last knew, estimated, until the game sends its own this run (MeterPage's
    ReadEnergy; Harry, 2026-10-28): ≈ before the number, dimmer and italic, as the roster shows its estimates (.estimate in
    views.css). */
 .odyle.last-known .odyle-basic,
+.invasion.last-known .invasion-keys,
 .shugo.last-known .shugo-keys {
     color: #c9c6d6;
     font-style: italic;
@@ -476,6 +523,25 @@ button {
 @container ov-totals (max-width: 314px) {
     .ping i {
         display: none;
+    }
+}
+
+/* Below 395 px (the line's 369 px inside its padding) the Dimensional Invasion keys give way, so the rest fits as it did
+   before them; the keys or energy after them then take the push to the right. From 395 px the line holds a party DPS of
+   999.9K/s, keys 7/7 and 21 (+12), energy 840 (+1,200) and a ping of 1043 ms with 18 px to spare, and everyday values
+   with all three last known ≈ marks (123.4K/s, ≈3/7, ≈15 (+3), ≈735 (+1,200), 117 ms), as after starting the meter
+   mid-session, with 5.5 px (1.5 with a party DPS of 12.34M/s; headless renders, deep audit on #68). The widest values
+   with the ≈ marks, or with an extra on the invasion keys ("7 (+2)/7"), need about 410 px, and run past the line's end,
+   clipped, below that. */
+@container ov-totals (max-width: 368px) {
+    .invasion {
+        display: none;
+    }
+
+    .invasion + .shugo,
+    .invasion + .odyle,
+    .invasion + .ping {
+        margin-left: auto;
     }
 }
 

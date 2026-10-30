@@ -90,7 +90,9 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   (https://github.com/taengu/A2Tools-Plugins), GNU GPL v3: the rules only, written anew in C#. The Shugo Festival keys'
   rules (`ScarletMeter.Engine/Contracts/CharacterProgress` and the overlay's keys: shared by a server's characters, the
   two values the keys left and the extra, +3 a day up to 21) are from the same plugin's content table, its `shugo` row
-  in `plugin.js` at 48f5ecd0885134ab8df2651410378b9ad9a639cc (read on 2026-10-27), taken as facts.
+  in `plugin.js` at 48f5ecd0885134ab8df2651410378b9ad9a639cc (read on 2026-10-27), taken as facts, and so are the
+  Dimensional Invasion reward keys' (the same contract and the overlay's keys: entry 8, shared by a server's
+  characters, +1 a day up to 7), its `invasion` row at the same commit (read on 2026-10-31).
 - **Map names** (`ScarletMeter.Engine/Maps/MapNames`, shown in Settings, About): the dungeons' names and
   difficulties from taengu/A2Tools-DPS-Meter's `src/data/i18n/dungeons/en.json` at
   6abf5e7e28ddae93e04e870087d2ae457f752681 (last changed in f942a54b68c5a5481cf7d4d2ad59a4c00de191fb), GNU GPL v3;
