@@ -13,7 +13,7 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 - Your Dimensional Invasion reward keys on the meter, left of the Shugo Festival keys: the keys left out of 7, which
   your characters on a server share, as the game's dialog writes them ("3/7"), once the game sends them; until then,
   the last keys it said on that server, marked ≈, with 1 a day added. "Show Dimensional Invasion keys" in Settings,
-  Appearance turns them off. On a meter narrower than 380 px they make room for the rest. Not yet checked in the game.
+  Appearance turns them off. On a meter narrower than 395 px they make room for the rest. Not yet checked in the game.
   ([#68](https://github.com/harrynguon/Scarlet-Meter/pull/68))
 - Your Shugo Festival keys beside the ping, left of the Odyle energy: the keys left, which your characters
   on a server share, with the extra from recharge items in brackets when there is any, once the game sends them (at

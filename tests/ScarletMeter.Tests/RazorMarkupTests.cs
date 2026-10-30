@@ -630,7 +630,7 @@ public sealed partial class RazorMarkupTests
     // The Dimensional Invasion reward keys sit left of the Shugo keys (Harry, 2026-10-31), once the game has sent them and
     // while "Show Dimensional Invasion keys" is on: keys out of 7 as the game's dialog writes them ("3/7", no space before
     // the cap; any extra before it), ≈ while last known. They group 8 px from what follows and take the push to the right;
-    // the key is violet, apart from the Shugo keys' yellow and the ping's colours. Below 380 px they give way, and what
+    // the key is violet, apart from the Shugo keys' yellow and the ping's colours. Below 395 px they give way, and what
     // follows takes the push again: from there the widest values fit (headless renders, WORKLOG).
     [Fact]
     public void InvasionKeysSitLeftOfTheShugoKeysAndGiveWayOnANarrowLine()
@@ -648,8 +648,13 @@ public sealed partial class RazorMarkupTests
 
         var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
         Assert.Contains("(invasion, invasionLastKnown) = (shown.Invasion, shown.InvasionLastKnown);", code);
-        Assert.Contains("ValueChanged=\"@(v => Change(s => s with { Appearance = s.Appearance with { ShowInvasionKeys = v } }))\"",
-            File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor")));
+        Assert.Matches(@"InvasionTitle => invasionLastKnown\s*\? ""Dimensional Invasion reward keys, estimated \(≈\)", code);
+        // Each switch shows and sets its own setting, the whole control pinned (deep audit on #68: a Value bound to the
+        // Shugo switch's setting built and passed).
+        var settings = File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor"));
+        foreach (var (label, name) in new[] { ("Show Dimensional Invasion keys", "ShowInvasionKeys"), ("Show Shugo Festival keys", "ShowShugoKeys") })
+            Assert.Matches(@"<ToggleSetting Label=""" + Regex.Escape(label) + @""" Description=""[^""]+""\s*Value=""@S\.Appearance\." + name
+                + @""" ValueChanged=""@\(v => Change\(s => s with \{ Appearance = s\.Appearance with \{ " + name + @" = v \} \}\)\)"" />", settings);
 
         var css = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "app.css"));
         static string Block(string source, string selector) =>
@@ -666,8 +671,9 @@ public sealed partial class RazorMarkupTests
             + @"\.invasion \+ \.shugo,\s*\.invasion \+ \.odyle,\s*\.invasion \+ \.ping \{\s*margin-left:\s*auto;\s*\}\s*\}");
         Assert.True(giveWay.Success, "the invasion keys give way on a narrow line, and what follows takes the push");
         var side = int.Parse(Regex.Match(Block(css, ".ov-totals"), @"padding:\s*\d+px (?<x>\d+)px").Groups["x"].Value, System.Globalization.CultureInfo.InvariantCulture);
-        // The query measures the line inside its padding, inside the panel's 1 px border: below 380 px of overlay.
-        Assert.Equal(379, int.Parse(giveWay.Groups["w"].Value, System.Globalization.CultureInfo.InvariantCulture) + 2 * side + 2);
+        // The query measures the line inside its padding, inside the panel's 1 px border: below 395 px of overlay, where
+        // everyday values with the last known ≈ marks still fit (deep audit on #68: at 380 they ran into the ping).
+        Assert.Equal(394, int.Parse(giveWay.Groups["w"].Value, System.Globalization.CultureInfo.InvariantCulture) + 2 * side + 2);
         Assert.True(giveWay.Index > css.IndexOf(".invasion + .ping {", StringComparison.Ordinal), "the query comes after the rules it overrides");
     }
 

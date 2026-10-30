@@ -127,9 +127,9 @@ public sealed class RosterService : IDisposable
     }
 
     /// <summary>
-    /// What the overlay's last known Odyle energy and Shugo keys are for, while the game has not sent its own this run:
-    /// the character the game named last this run, or else the one played last (the meter started while that character
-    /// was already in the game, as it usually is), with the keys saved for its server, if any. Null with no character, and
+    /// What the overlay's last known Odyle energy, Shugo keys and Dimensional Invasion keys are for, while the game has not
+    /// sent its own this run: the character the game named last this run, or else the one played last (the meter started
+    /// while that character was already in the game, as it usually is), with both kinds of keys saved for its server, if any. Null with no character, and
     /// when the character named was removed since: another's values would read as its (deep audit on #60).
     /// </summary>
     public RosterLastKnown? LastKnown

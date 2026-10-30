@@ -466,7 +466,6 @@ public sealed class RosterTests : IDisposable
         public CharacterIdentity? Character { get; set; }
         public OdyleEnergy? OdyleEnergy => null;
         public ShugoKeys? ShugoKeys => null;
-
         public InvasionKeys? InvasionKeys => null;
         public int? MapId => null;
         public bool PausedInAbyss => false;

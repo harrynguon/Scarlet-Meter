@@ -29,7 +29,8 @@ public sealed record RosterFile
 
     /// <summary>
     /// The Dimensional Invasion reward keys on each server the game said them on, one entry per server, as
-    /// <see cref="ShugoKeys"/>: the overlay's last known keys when the meter starts. A file from before them has none.
+    /// <see cref="ShugoKeys"/>: the overlay's last known keys when the meter starts. A file from before them has none; an
+    /// earlier build passes them over when it reads the file and leaves them out when it saves it.
     /// </summary>
     public IReadOnlyList<RosterServerKeys> InvasionKeys { get; init; } = [];
 }

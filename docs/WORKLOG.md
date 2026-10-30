@@ -9,7 +9,7 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 - **Roster:** keeps them per server (`RosterFile.InvasionKeys`). The stored record both kinds of key now share is renamed `RosterServerKeys` (it was `RosterShugoKeys`; the JSON is unchanged), as are `RosterService.KeepServerKeys` and the normalizer's `CleanServerKeys`, which now serve both, with each kind's own repair notices.
 - **Estimates:** `LastKnownValues` gives the overlay the last ones, estimated +1 at each daily reset up to 7 (`RosterRules.Invasion`).
 - **Overlay:** shows them left of the Shugo keys as the game's dialog writes them, out of 7 ("3/7", `Formatting/InvasionText`), ≈ while last known, behind "Show Dimensional Invasion keys" (on by default).
-- **Narrow meter:** below 380 px they give way, so the line holds what it did before them.
+- **Narrow meter:** below 395 px they give way, so the line holds what it did before them.
 
 **Why:** Harry, with a screenshot of the game's teleport dialog ("Dimensional Invasion Reward Key"): "how about dimensional invasion keys?", then chose the overlay beside the Shugo keys.
 - **Source:** A2Tools' Roster plugin's content table has them as entry 8, a server's, +1 a day up to 7. The id was checked there against the game (a key used took it from 7 to 6); the cap and recharge are as another roster app shows them.
@@ -18,7 +18,7 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 **Checks (SDK 10.0.402, at idle priority with no shared compiler server):**
 - `scripts/Build.ps1` Debug 926/926.
 - Headless renders of the totals line with the branch's stylesheet, at overlay widths from 320 to 420 px, synthetic values:
-  - with the keys shown, the widest values (999.9K/s, 7/7, 21 (+12), 840 (+1,200), 1043 ms) need 380 px, with 3.2 px to spare there;
+  - with the keys shown, the widest values (999.9K/s, 7/7, 21 (+12), 840 (+1,200), 1043 ms) need 380 px, with 3.2 px to spare there (the first give-way point; 395 px after the audit, below);
   - below it, with the keys given way, every case measures exactly as without them (5.3 px to spare at 320 with the widest);
   - the line stays 26 px tall throughout.
 - Four existing tests pinned what changed, and were updated: `ReadEnergy`'s call (twice), the last known style's selector, and the earlier-file settings test.
@@ -29,7 +29,17 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 - Whether the game sends an extra for these keys.
 - The give-way rule on the running meter.
 
-**Next:** the PR, a deep audit (saved data and validation), Codex and CI; then the merge with Harry's go-ahead.
+**Deep audit on #68 (approve with nits), addressed:**
+- **The give-way point was too low for last known values:** at 380 to 389 px, everyday values with all three ≈ marks (a mid-session start, the usual case) ran into the ping, and past it with a party DPS in millions; the docs said only the widest values did. The keys now give way below 395 px (the query at 368 px), where those fit with 5.5 px to spare (1.5 with 12.34M/s); the widest with ≈ marks, or with an extra on the invasion keys, need about 410 px, as the stylesheet and ARCHITECTURE now say. ARCHITECTURE's last-known paragraph says its widths are without the invasion keys.
+- **Untested bindings:** the switch's `Value` bound to the Shugo setting, and a tip that always said "estimated", built and passed. Both switches are now pinned whole (label, value, change), and the tip's choice is pinned as the Shugo keys' is.
+- **Comments not updated for the third value:** the roster's `LastKnown`, the rules' summary, the totals line's comment and the Shugo keys' "take the push", and the earlier-build note on `RosterFile.InvasionKeys`.
+- A stray blank line in the tests' fake engine.
+
+Codex reviewed d4a00a3 with no findings; CI passed on it.
+
+**Checks after the fixes:** `scripts/Build.ps1` Debug 926/926; headless renders at 320 to 420 px with the new point (above); fail-first on the new pins, controls passing before and after: 4 of 4 caught (the invasion switch showing the Shugo setting, the Shugo switch showing the energy's, the tip always estimated, the first give-way point).
+
+**Next:** Codex and CI on the fixes; then the merge with Harry's go-ahead.
 
 ## 2026-10-30 — The passages' log line removed
 
