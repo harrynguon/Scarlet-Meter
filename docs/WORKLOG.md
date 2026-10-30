@@ -2,6 +2,26 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-31 — Two idle timers off; settings saved outside their lock
+
+**What:**
+- **Timed trackers:** upstream's two timed trackers (buffs, skill cooldowns) are registered with no tick. Each ticked every 100 ms from construction to drop expired items, but takes an item only while its overlay is enabled with the id listed, and Scarlet's settings bridge never enables them, so every tick did nothing.
+- **Settings saves:** `SettingsService.Flush` takes the settings under the service's lock and writes them outside it, under a lock of the save's own. Saves are still one at a time and in order; a Flush still returns once every change before it is written; any failure, an unexpected one included, still leaves the change pending.
+
+**Why:** Harry asked for "an extremely thorough check to see if you can make any performance improvements or to lighten the load of running the dps meter. make sure no functionality of it changes". Three read-only reviews covered the overlay's render path, the engine's per-packet path and the background work; these two were verified against the code and are without risk.
+- **Trackers:** they were two wake-ups ten times a second each for the whole run, each taking a lock and building an empty list.
+- **Settings:** the overlay reads the settings on every render, under that lock. A save, written through and flushed, held it for as long as the disk took. That happens at fight start and end, since the overlay's fitted height is saved.
+
+The other findings, and those that need a check out of game or a decision, are listed for Harry (below, Next).
+
+**Checks (SDK 10.0.402, at idle priority with no shared compiler server; Harry was playing another game, so nothing was launched):**
+- `scripts/Build.ps1` Debug 929/929.
+- Fail-first on a scratch copy, controls passing before and after: 7 of 7 caught (either tracker ticking again, the bridge enabling an overlay, the write under the lock, saves not one at a time, a failure not left pending, only a disk failure left pending). One mutation was first written so that it did not compile, and was rewritten.
+
+**Not checked:** the gains measured on the running meter (the save stall depends on the disk).
+
+**Next:** the PR, a deep audit (threading), Codex and CI; the frame cap's read-then-write change in its own PR; Harry's choice on the riskier findings.
+
 ## 2026-10-31 — Dimensional Invasion keys on the overlay
 
 **What:**

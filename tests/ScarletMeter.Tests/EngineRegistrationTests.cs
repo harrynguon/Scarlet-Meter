@@ -26,6 +26,36 @@ public sealed class EngineRegistrationTests : IDisposable
         provider = host.Services;
     }
 
+    // Upstream's timed trackers take an item only while their overlay is enabled with its id listed, and Scarlet never
+    // enables them, so they hold none; they are built without their 100 ms tick, which would only drop expired items.
+    // Should the bridge ever enable them, this fails: give them their tick back.
+    [Fact]
+    public void TheTimedTrackersHoldNothingAndAreBuiltWithoutATick()
+    {
+        foreach (var key in new[] { "Buffs", "SkillCdUpdate" })
+        {
+            var tracker = provider.GetRequiredKeyedService<AionDpsMeter.Services.Services.Timed.ITimedEventTracker>(key);
+            var changed = 0;
+            tracker.StateChanged += (_, _) => changed++;
+            tracker.Register(new AionDpsMeter.Services.Services.Timed.TimedEvent { Id = 1, Name = "Synthetic", IconUrl = string.Empty, Duration = TimeSpan.FromMinutes(1) });
+            Assert.Empty(tracker.Items);
+            Assert.Equal(0, changed);
+        }
+        var settings = provider.GetRequiredService<IAppSettingsService>();
+        Assert.False(settings.BufOverlaySettings.Enabled);
+        Assert.False(settings.SkillCdOverlaySettings.Enabled);
+        var source = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.Engine", "ScarletEngineServiceCollectionExtensions.cs"));
+        Assert.Contains("new BuffTimedEventTracker(sp.GetRequiredService<IAppSettingsService>(), Timeout.InfiniteTimeSpan)", source);
+        Assert.Contains("new SkillCdTimedEventTracker(sp.GetRequiredService<IAppSettingsService>(), Timeout.InfiniteTimeSpan)", source);
+    }
+
+    private static string RepositoryRoot()
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+            if (File.Exists(Path.Combine(dir.FullName, "ScarletMeter.slnx"))) return dir.FullName;
+        throw new InvalidOperationException("ScarletMeter.slnx was not found above " + AppContext.BaseDirectory);
+    }
+
     [Fact]
     public void EngineResolvesAndStartsWithoutCapturing()
     {
