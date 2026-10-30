@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The frame cap was measured with one long animation, not the meter's restarting transitions** (standard audit on #64, fixed before merge).
+- What: the cap took animations over only on frames where a step was due, so each newly started one ran at the screen's rate for up to three frames at 240 Hz. The bars' width transitions restart ten times a second, and with the cap they changed 63 to 74 times a second, not about 60. One error inside the loop would also have stopped it for good, freezing every animation it held.
+- Why: the rate was measured on a single infinite animation, which starts once. The meter's own pattern, a transition replaced every 100 ms, was in the CPU benchmark but its rate was never counted. The script's only test pinned its text.
+- Guard: new animations are taken over on the frame after they start, and a failing one is let go. `scripts/Test-FrameCap.ps1` measures the rate for both a looping animation and restarting bars in headless Edge, and fails when either passes 70 a second on a fast screen. When a cap or limit is checked, measure it with the pattern the product actually produces, not only the simplest one.
+
 **The roster's caps were measured without an estimate's mark** (standard audit on #63, fixed before merge).
 - What: the widest Ascension value was taken as "3 (+3) /3", from Harry's mock-up; an estimated count with an extra, "≈ 3 (+3) /3", which any alt shows after a weekly reset, is wider, so the docs claimed 23 and 6 px to spare at 896 where there are 21 and 4. The table still fit.
 - Why: Nightmare's widest value was listed with its ≈ and Ascension's was copied from the example asked for; the width lesson below (every column's widest form) was applied by eye, one mark at a time, not by combining the marks a cell can carry.

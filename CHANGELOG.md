@@ -38,8 +38,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 ### Changed
 
 - The meter's animations (the bar effects, and the bars and rows gliding) run at up to 60 frames a second, whatever
-  your screen's refresh rate, so on a fast screen they take much less of your PC's time from the game.
-  ([#64](https://github.com/harrynguon/Scarlet-Meter/pull/64))
+  your screen's refresh rate, so on a fast screen they should take much less of your PC's time from the game (not yet
+  checked in the game). ([#64](https://github.com/harrynguon/Scarlet-Meter/pull/64))
 - Started while you are already in the game, the meter shows your Odyle energy beside the ping at once: the last the
   game said for the character you played last, marked ≈, with basic energy's refills since added, until the game sends
   its own at your next login or when it changes. ([#60](https://github.com/harrynguon/Scarlet-Meter/pull/60))

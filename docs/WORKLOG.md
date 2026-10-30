@@ -12,7 +12,23 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **Not checked:** the meter itself in the game (the capture into the WPF window, which the cap should cut by the same factor, is not measured); whether the 10 to 15 fps drops come back.
 
-**Next:** the PR, a standard audit, Codex and CI; then the merge with Harry's go-ahead, and a check in game.
+**Standard audit on #64 (approve with nits), addressed:**
+- **Uncapped starts:** a newly started animation ran uncapped until the next step was due, up to three frames at 240 Hz. Bars whose width transitions restart ten times a second (the meter's) changed 63 to 74 times a second. Animations that started since the last frame are now taken over on the next frame, paused where they are; 56 to 61 a second since.
+- **Errors:** one error would have stopped the loop and frozen every animation it held. An animation that fails is now let go to run as it would without the cap, and the loop goes on.
+- **"Left alone":** only an animation paused before the script took it over is left alone. The script's comment and ARCHITECTURE now say that one it drives no longer follows a later pause; nothing in the meter pauses one.
+- **Behaviour check:** the test pins only the text, so `scripts/Test-FrameCap.ps1` (DEVELOPMENT, "Checking the animation frame cap") now checks the behaviour in headless Edge, the rates included.
+- **CHANGELOG:** the line says the benefit should come, not yet checked in the game.
+- **LESSONS:** an entry for the uncapped starts.
+
+Codex reviewed 6451fd4 with no findings; CI passed on it.
+
+**Checks after the fixes:**
+- `scripts/Test-FrameCap.ps1`: 8 of 8, at 240.5 frames a second; the looping animation 60.5 and the restarting bars 61 changes a second.
+- Fail-first, the same script against a copy whose `frame-cap.js` does nothing: 4 failed (driven, delayed, both rates), exit 1.
+- `scripts/Build.ps1` Debug 916/916.
+- Fail-first on the test, on a scratch copy, controls passing before and after: 4 of 4 new mutations caught (no takeover between steps, a failure not let go, advancing on every frame, a start not marked).
+
+**Next:** Codex and CI on the fixes; then the merge with Harry's go-ahead, and a check in game.
 
 ## 2026-10-30 — Nightmare and Ascension out of their caps
 
