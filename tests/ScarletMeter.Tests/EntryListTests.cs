@@ -258,7 +258,7 @@ public sealed class EntryListTests
 
     // The Abyss passages come as the game sends them, with the counts' rules: still to run as a time, used as a count with
     // no value. An id is in one or the other as last sent (entering a corridor sends its time, leaving it a count); a
-    // time alone is a report; a whole list starts afresh. The log says which record brought how many, never which or what.
+    // time alone is a report; a whole list starts afresh. Nothing of them is logged.
     [Fact]
     public void ThePassagesGoWithTheCountsAsTimesOrCounts()
     {
@@ -296,11 +296,7 @@ public sealed class EntryListTests
         Assert.Same(Beta, raised[^1].Character);
         Assert.Empty(raised[^1].Times);
 
-        var lines = log.Entries.Select(e => e.Message).Where(m => m.StartsWith("Abyss corridor passages read", StringComparison.Ordinal)).ToList();
-        Assert.Equal(
-            ["Abyss corridor passages read from the list of entry counts (0b 61): 3 of 3.", "Abyss corridor passages read from an update (0c 61): 1 of 3.",
-             "Abyss corridor passages read from an update (0c 61): 1 of 3.", "Abyss corridor passages read from an update (0c 61): 1 of 3."],
-            lines);
+        Assert.DoesNotContain(log.Entries, e => e.Message.Contains("passage", StringComparison.OrdinalIgnoreCase));
         Assert.All(log.Entries, e => Assert.DoesNotContain("130", e.Message, StringComparison.Ordinal));
         Assert.All(log.Entries, e => Assert.DoesNotContain("10000", e.Message, StringComparison.Ordinal));
     }
