@@ -99,6 +99,12 @@ public sealed record RosterCharacter
     /// </summary>
     public IReadOnlyList<DateTimeOffset> CorridorRuns { get; init; } = [];
 
+    /// <summary>
+    /// The character's Abyss passages as the game last said all three, or null while it has not (the roster counts the
+    /// corridors used from them as well, <see cref="RosterRules.CorridorsDone"/>).
+    /// </summary>
+    public RosterPassages? Passages { get; init; }
+
     /// <summary>The Kina the character holds, as its inventory last said, and when.</summary>
     public RosterKina? Kina { get; init; }
 
@@ -119,13 +125,31 @@ public sealed record RosterCharacter
         && CombatPower == other.CombatPower && Level == other.Level && GearScore == other.GearScore && LastSeen == other.LastSeen
         && Equals(Odyle, other.Odyle) && Equals(Nightmare, other.Nightmare) && Equals(Ascension, other.Ascension)
         && OdyleCap == other.OdyleCap
-        && CorridorRuns.SequenceEqual(other.CorridorRuns) && Equals(Kina, other.Kina) && Note == other.Note;
+        && CorridorRuns.SequenceEqual(other.CorridorRuns) && Equals(Passages, other.Passages) && Equals(Kina, other.Kina) && Note == other.Note;
 
     public override int GetHashCode() => HashCode.Combine(Name, Server, LastSeen, CorridorRuns.Count);
 }
 
 /// <summary>A count as the game last sent it: its two values and when.</summary>
 public sealed record RosterCount(int First, int Second, DateTimeOffset SeenAt);
+
+/// <summary>
+/// A character's Abyss passages, its entries to the Artifact Corridors, as the game last said all three
+/// (<see cref="EntryIds.AbyssPassages"/>): which were used, in the artifacts' order (1001 to 1003), when that was read,
+/// and when one last had time left, which says the passages had been handed out for the holding then (before they are,
+/// all three read as used). Untrusted on load (<see cref="RosterNormalizer"/>).
+/// </summary>
+/// <param name="Used">One flag per passage, <see cref="RosterRules.CorridorsPerSiege"/> of them: true for used.</param>
+/// <param name="SeenAt">When the game last said them.</param>
+/// <param name="LeftSeenAt">When one last had time left, or null if none has been seen so.</param>
+public sealed record RosterPassages(IReadOnlyList<bool> Used, DateTimeOffset SeenAt, DateTimeOffset? LeftSeenAt)
+{
+    /// <summary>Equal when every value is, the flags compared one by one (a record compares a list by reference).</summary>
+    public bool Equals(RosterPassages? other) =>
+        other is not null && Used.SequenceEqual(other.Used) && SeenAt == other.SeenAt && LeftSeenAt == other.LeftSeenAt;
+
+    public override int GetHashCode() => HashCode.Combine(Used.Count, SeenAt, LeftSeenAt);
+}
 
 /// <summary>The Kina a character holds: Kina and Kina (Bound), each null while not known, and when the inventory said it.</summary>
 public sealed record RosterKina(long? Kina, long? Bound, DateTimeOffset SeenAt);

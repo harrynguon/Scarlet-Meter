@@ -27,15 +27,33 @@ internal static class EntryListRecordWriter
     /// A <c>0b 61</c> record: made-up data, then the list of entry counts, with an Abyss passage's time entry after the
     /// first count, as the game's list mixes them.
     /// </summary>
-    public static byte[] List(IReadOnlyList<EntryValue> entries)
+    public static byte[] List(IReadOnlyList<EntryValue> entries) => List(entries, [(10_000_002, 130_000)]);
+
+    /// <summary>
+    /// A <c>0b 61</c> record: made-up data, then the list of entry counts, with <paramref name="times"/> as time entries
+    /// after the first count.
+    /// </summary>
+    public static byte[] List(IReadOnlyList<EntryValue> entries, IReadOnlyList<(uint Id, ulong Time)> times)
     {
         ArgumentOutOfRangeException.ThrowIfZero(entries.Count);
         var body = new List<byte>(DataBeforeList);
-        AddVarInt(body, (uint)entries.Count + 1);
+        AddVarInt(body, (uint)(entries.Count + times.Count));
         AddEntry(body, entries[0]);
-        AddTimeEntry(body, 10_000_002, 130_000);
+        foreach (var (id, time) in times) AddTimeEntry(body, id, time);
         foreach (var entry in entries.Skip(1)) AddEntry(body, entry);
         return Frame(EntryListRecords.ListOpcode, body);
+    }
+
+    /// <summary>
+    /// A <c>0c 61</c> record carrying one time entry, with a <c>00</c> count and a one-byte tail, as the game sends an Abyss
+    /// passage's usage time when its corridor is entered.
+    /// </summary>
+    public static byte[] TimeUpdate(uint id, ulong time)
+    {
+        var body = new List<byte> { 0x00 };
+        AddTimeEntry(body, id, time);
+        body.Add(0x03);
+        return Frame(EntryListRecords.UpdateOpcode, body);
     }
 
     /// <summary>

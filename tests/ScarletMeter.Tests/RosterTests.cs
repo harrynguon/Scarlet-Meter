@@ -792,14 +792,17 @@ public sealed class RosterTests : IDisposable
         Assert.Empty(Assert.Single(none.Characters).CorridorRuns);
     }
 
-    // A record compares a list by reference, so the roster's own equality compares every value, the corridor runs one by
-    // one: a change to any property makes two characters differ, and the same values in a new list do not.
+    // A record compares a list by reference, so the roster's own equality compares every value, the corridor runs and the
+    // passages one by one: a change to any property makes two characters differ, and the same values in a new list do not.
     [Fact]
     public void TwoCharactersAreEqualOnlyWhenEveryValueIs()
     {
-        var baseline = Alpha(Monday) with { CorridorRuns = [Monday] };
-        Assert.Equal(baseline, baseline with { CorridorRuns = [Monday] });
-        Assert.Equal(baseline.GetHashCode(), (baseline with { CorridorRuns = [Monday] }).GetHashCode());
+        var baseline = Alpha(Monday) with { CorridorRuns = [Monday], Passages = new RosterPassages([true, false, false], Monday, Monday) };
+        var same = baseline with { CorridorRuns = [Monday], Passages = new RosterPassages([true, false, false], Monday, Monday) };
+        Assert.Equal(baseline, same);
+        Assert.Equal(baseline.GetHashCode(), same.GetHashCode());
+        Assert.NotEqual(baseline, baseline with { Passages = baseline.Passages! with { SeenAt = Monday.AddMinutes(1) } });
+        Assert.NotEqual(baseline, baseline with { Passages = baseline.Passages! with { LeftSeenAt = null } });
         var clone = typeof(RosterCharacter).GetMethod("<Clone>$")!;
         foreach (var property in typeof(RosterCharacter).GetProperties().Where(p => p.CanWrite))
         {
@@ -814,6 +817,7 @@ public sealed class RosterTests : IDisposable
                 OdyleCapChoice cap => cap == OdyleCapChoice.Standard ? OdyleCapChoice.Membership : OdyleCapChoice.Standard,
                 IReadOnlyList<DateTimeOffset> list => (IReadOnlyList<DateTimeOffset>)[.. list, Monday.AddHours(1)],
                 RosterKina kina => kina with { Bound = (kina.Bound ?? 0) + 1 },
+                RosterPassages passages => passages with { Used = [.. passages.Used.Select(used => !used)] },
                 var other => throw new InvalidOperationException($"No change made for {property.Name} ({other?.GetType().Name})."),
             };
             property.SetValue(copy, changed);
@@ -827,6 +831,12 @@ public sealed class RosterTests : IDisposable
         var saturday = new DateTimeOffset(2026, 10, 24, 12, 0, 0, TimeSpan.Zero);
         var character = new RosterCharacter { Name = "Alpha", Server = "SIE", LastSeen = Monday, CorridorRuns = [saturday.AddHours(-2), saturday.AddHours(2)] };
         Assert.Equal(1, Assert.Single(RosterPage.Rows([character], null, Monday, Calendar, RosterSort.Name)).Corridors);
+        // The passages the game said were used, when more, among the corridors of the side's artifacts on its server.
+        var passages = character with { ServerId = 1001, Passages = new RosterPassages([true, true, true], saturday.AddHours(3), saturday.AddHours(1)) };
+        Assert.Equal(3, Assert.Single(RosterPage.Rows([passages], null, Monday, Calendar, RosterSort.Name)).Corridors);
+        var held = new Dictionary<int, RosterArtifacts> { [1001] = Holders(1001, saturday.AddHours(1), Monday.AddHours(10), ArtifactHolder.Elyos, ArtifactHolder.Asmodian, ArtifactHolder.Elyos) };
+        var row = Assert.Single(RosterPage.Rows([passages], null, Monday, Calendar, RosterSort.Name, held));
+        Assert.Equal((2, 2), (row.Corridors, row.CorridorsOpen));
     }
 
     // ---------- Kina ----------
@@ -967,7 +977,7 @@ public sealed class RosterTests : IDisposable
         var (file, repairs) = RosterNormalizer.Normalize(new RosterFile { Characters = [saved] }, Monday);
         var character = Assert.Single(file.Characters);
         Assert.Equal(repaired ? (0, 0) : (level, gearScore), (character.Level, character.GearScore));
-        if (repaired) Assert.Equal(["Server, class, combat power, level, gear score, cap, note or the order of corridor entries repaired on 1 character."], repairs);
+        if (repaired) Assert.Equal(["Server, class, combat power, level, gear score, cap, note, the order of corridor entries or the corridor passages repaired on 1 character."], repairs);
         else Assert.Empty(repairs);
     }
 
@@ -981,7 +991,7 @@ public sealed class RosterTests : IDisposable
         var note = Assert.Single(file.Characters).Note;
         Assert.StartsWith("Alt  nnn", note, StringComparison.Ordinal);
         Assert.Equal(RosterNormalizer.MaxNoteLength, note.Length);
-        Assert.Equal(["Server, class, combat power, level, gear score, cap, note or the order of corridor entries repaired on 1 character."], repairs);
+        Assert.Equal(["Server, class, combat power, level, gear score, cap, note, the order of corridor entries or the corridor passages repaired on 1 character."], repairs);
 
         var (none, nothing) = RosterNormalizer.Normalize(new RosterFile { Characters = [saved with { Note = null! }] }, Monday);
         Assert.Equal(string.Empty, Assert.Single(none.Characters).Note);
@@ -1025,6 +1035,124 @@ public sealed class RosterTests : IDisposable
         Assert.Null(RosterRules.CorridorsOpen(1001, tooFar with { SeenAt = Saturday.AddHours(-1), Until = Saturday.AddDays(9) }, now, Calendar));
         Assert.Equal(2, RosterRules.CorridorsOpen(1001, tooFar, now, Calendar));
         Assert.Equal(2, RosterRules.CorridorsOpen(1001, held with { Until = held.SeenAt }, now, Calendar)); // a reset not after it was read
+        Assert.Equal([true, false, true], RosterRules.OpenCorridors(1001, held, now, Calendar));
+        Assert.Null(RosterRules.OpenCorridors(1001, null, now, Calendar));
+    }
+
+    // A report with the Abyss passages as the game sends them: "left" a time (its usage time), "zero" a time of 0,
+    // "used" a count with no value, null not sent.
+    private static CharacterProgress PassagesReport(CharacterIdentity who, DateTimeOffset at, params string?[] passages)
+    {
+        var entries = new Dictionary<uint, EntryCount>();
+        var times = new Dictionary<uint, EntryTime>();
+        for (var n = 0; n < passages.Length; n++)
+        {
+            var id = EntryIds.AbyssPassages[n];
+            if (passages[n] == "left") times[id] = new EntryTime(130_000, at);
+            if (passages[n] == "zero") times[id] = new EntryTime(0, at);
+            if (passages[n] == "used") entries[id] = new EntryCount(0, 0, at);
+        }
+        return new CharacterProgress(who, entries) { Times = times };
+    }
+
+    // The passages are taken once the game has said all three (used as a count, still to run as a time), read when the
+    // latest of them was; a report knowing fewer (a meter started mid-session) or with a time of 0 keeps what was kept, as
+    // does one read no later. One still to run dates when the passages were last seen handed out; a reading kept from
+    // after now (a clock set back) is no later than anything.
+    [Fact]
+    public void ThePassagesAreTakenOnceTheGameHasSaidAllThree()
+    {
+        var clock = new FakeTimeProvider(Monday);
+        using var service = new RosterService(new FakeEngine(), NewStore(), clock, NullLogger<RosterService>.Instance);
+        RosterPassages? Kept() => Assert.Single(service.Characters).Passages;
+        service.Take(PassagesReport(AlphaIdentity, Monday, "used", null, "left"));
+        Assert.Null(Kept());
+        service.Take(PassagesReport(AlphaIdentity, Monday, "used", "zero", "left"));
+        Assert.Null(Kept());
+
+        service.Take(PassagesReport(AlphaIdentity, Monday, "used", "used", "left"));
+        Assert.Equal(new RosterPassages([true, true, false], Monday, Monday), Kept());
+
+        clock.Advance(TimeSpan.FromHours(2));
+        var later = Monday.AddHours(1);
+        var mixed = PassagesReport(AlphaIdentity, Monday, "used", "used", "used");
+        mixed = mixed with { Entries = new Dictionary<uint, EntryCount>(mixed.Entries) { [EntryIds.AbyssPassages[2]] = new(0, 0, later) } };
+        service.Take(mixed);
+        Assert.Equal(new RosterPassages([true, true, true], later, Monday), Kept()); // the latest of the three; handed out at Monday
+
+        service.Take(PassagesReport(AlphaIdentity, Monday, "left", "left", "left")); // older
+        Assert.Equal(new RosterPassages([true, true, true], later, Monday), Kept());
+        service.Take(PassagesReport(AlphaIdentity, later, "left", "used", "used")); // no later
+        Assert.Equal(new RosterPassages([true, true, true], later, Monday), Kept());
+
+        service.Take(PassagesReport(AlphaIdentity, Monday.AddDays(1), "used", "used", "used")); // dated after now
+        service.Take(PassagesReport(AlphaIdentity, Monday.AddHours(2), "left", "used", "used"));
+        Assert.Equal(new RosterPassages([false, true, true], Monday.AddHours(2), Monday.AddHours(2)), Kept());
+    }
+
+    // The corridors run since the siege: the meter's own count, or the passages the game said were used since that siege,
+    // among those the side can enter (all three while that is not known), when more. All of those used is taken only when
+    // one had time left since the siege (before the passages are handed out all three read as used); a reading dated after
+    // now is not taken.
+    [Fact]
+    public void TheCorridorsDoneAreTheMetersOrThePassagesWhenMore()
+    {
+        var now = Monday; // the last siege Saturday 12:00 UTC
+        var alpha = new RosterCharacter { Name = "Alpha", Server = "SIE", ServerId = 1001, LastSeen = now };
+        var read = Saturday.AddHours(2);
+        Assert.Equal(0, RosterRules.CorridorsDone(alpha, null, now, Calendar));
+        var two = alpha with { Passages = new RosterPassages([true, true, false], read, read) };
+        Assert.Equal(2, RosterRules.CorridorsDone(two, null, now, Calendar));
+        Assert.Equal(3, RosterRules.CorridorsDone(two with { CorridorRuns = [Saturday.AddHours(3), Saturday.AddHours(4), Saturday.AddHours(5)] }, null, now, Calendar));
+        var before = two.Passages! with { SeenAt = Saturday.AddHours(-1), LeftSeenAt = Saturday.AddHours(-1) };
+        Assert.Equal(1, RosterRules.CorridorsDone(two with { CorridorRuns = [Saturday.AddHours(3)], Passages = before }, null, now, Calendar));
+        Assert.Equal(0, RosterRules.CorridorsDone(two with { Passages = two.Passages! with { SeenAt = now.AddMinutes(1) } }, null, now, Calendar));
+
+        var all = alpha with { Passages = new RosterPassages([true, true, true], read, null) };
+        Assert.Equal(0, RosterRules.CorridorsDone(all, null, now, Calendar));
+        Assert.Equal(0, RosterRules.CorridorsDone(all with { Passages = all.Passages! with { LeftSeenAt = Saturday.AddHours(-1) } }, null, now, Calendar));
+        Assert.Equal(0, RosterRules.CorridorsDone(all with { Passages = all.Passages! with { LeftSeenAt = now.AddMinutes(1) } }, null, now, Calendar));
+        Assert.Equal(3, RosterRules.CorridorsDone(all with { Passages = all.Passages! with { LeftSeenAt = Saturday.AddHours(1) } }, null, now, Calendar));
+
+        // 1002's artifact the other side's: only 1001's and 1003's passages count.
+        var held = Holders(1001, Saturday.AddHours(1), Monday.AddHours(10), ArtifactHolder.Elyos, ArtifactHolder.Asmodian, ArtifactHolder.Elyos);
+        var mixed = alpha with { Passages = new RosterPassages([false, true, true], read, read) };
+        Assert.Equal(1, RosterRules.CorridorsDone(mixed, held, now, Calendar));
+        Assert.Equal(2, RosterRules.CorridorsDone(mixed, null, now, Calendar));
+        var ours = alpha with { Passages = new RosterPassages([true, false, true], read, null) };
+        Assert.Equal(0, RosterRules.CorridorsDone(ours, held, now, Calendar)); // both of the side's used, none seen handed out
+        Assert.Equal(2, RosterRules.CorridorsDone(ours with { Passages = ours.Passages! with { LeftSeenAt = read } }, held, now, Calendar));
+    }
+
+    // Saved passages are three flags read at a usable date, or none; a time left later than the reading, or at no usable
+    // date, is dropped and the character counted as repaired.
+    [Fact]
+    public void SavedPassagesAreCheckedOnLoad()
+    {
+        var saved = new RosterCharacter { Name = "Alpha", Server = "SIE", LastSeen = Monday };
+        (RosterPassages? Passages, IReadOnlyList<string> Repairs) Loaded(RosterPassages? passages)
+        {
+            var (file, repairs) = RosterNormalizer.Normalize(new RosterFile { Characters = [saved with { Passages = passages }] }, Monday);
+            return (Assert.Single(file.Characters).Passages, repairs);
+        }
+        var good = new RosterPassages([true, false, false], Monday.AddHours(-1), Monday.AddHours(-2));
+        Assert.Equal(good, Loaded(good).Passages);
+        Assert.Empty(Loaded(good).Repairs);
+        Assert.Null(Loaded(null).Passages);
+        Assert.Empty(Loaded(null).Repairs);
+        foreach (var bad in new[] { good with { Used = [true, false] }, good with { Used = [true, false, false, true] }, good with { Used = null! },
+                     good with { SeenAt = default }, good with { SeenAt = Monday.AddYears(5) } })
+        {
+            var (passages, repairs) = Loaded(bad);
+            Assert.Null(passages);
+            Assert.Equal(["1 unusable count or corridor entry dropped."], repairs);
+        }
+        foreach (var left in new DateTimeOffset[] { Monday, default })
+        {
+            var (passages, repairs) = Loaded(good with { LeftSeenAt = left });
+            Assert.Equal(good with { LeftSeenAt = null }, passages);
+            Assert.Equal(["Server, class, combat power, level, gear score, cap, note, the order of corridor entries or the corridor passages repaired on 1 character."], repairs);
+        }
     }
 
     // Holders read while a character is played are kept for its server, with the lower layer's war; a later reading

@@ -37,6 +37,10 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ### Changed
 
+- The roster's Corridors count also takes the corridors the game says a character has used, which it sends when you
+  log in on that character (and as you enter or leave a corridor): corridors run with the meter closed count once you
+  log in with it open, so the count is right when you enter the Abyss. Not yet checked in the game.
+  ([#66](https://github.com/harrynguon/Scarlet-Meter/pull/66))
 - The meter's animations (the bar effects, and the bars and rows gliding) run at up to 60 frames a second, whatever
   your screen's refresh rate, so on a fast screen they should take much less of your PC's time from the game (not yet
   checked in the game). ([#64](https://github.com/harrynguon/Scarlet-Meter/pull/64))

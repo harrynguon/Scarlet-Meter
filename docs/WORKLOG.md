@@ -2,6 +2,31 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-30 — Corridors from the game's passages
+
+**What:**
+- **Reader:** `EntryListRecords` keeps time entries (kind `01`) apart from the counts (`EntryRecord.Times`); they were read past.
+- **Tap and contract:** `EntryListTap` keeps and reports them as `CharacterProgress.Times`, by the counts' rules. An id is in one or the other as last sent, and a time alone is a report.
+- **Logging:** the tap logs each record that brings Abyss passages, with how many of the three; never which, or their values.
+- **Ids:** `EntryIds.AbyssPassages` holds 10000001 to 10000003, the corridors of artifacts 1001 to 1003.
+- **Saved passages:** the roster keeps a character's passages once the game has said all three (`RosterCharacter.Passages`): which were used, when read, and when one last had time left. They are checked on load (`RosterNormalizer`).
+- **The count:** `RosterRules.CorridorsDone` shows the meter's own count or, when more, the passages used since the last siege among the corridors the side can enter. All used is taken only once one had time left since the siege, because before the passages are handed out all three read as used.
+- **Supporting changes:** `RosterRules.OpenCorridors` is the side's corridors as flags. The roster's tips and footnote say where the count comes from.
+
+**Why:** Harry: "is there corrdor data load upon entry in the abyss? i entered on my assassin which has cleared 2 out of 3 already. but it's showing as 0 as i did it without dps meter on", then "i just want to be able to have it updated when i enter the abyss".
+- **What the log showed:** no entry list on entering the Abyss at 13:42 and 13:49. There was a whole list at 13:48, at a login a minute before the second entry. The meter had dropped its passage entries.
+- **Where the reading comes from:** A2Tools' Roster plugin reads used corridors from these passages (THIRD-PARTY-NOTICES).
+- **Lag:** asked whether this makes the meter laggier. It doesn't: the list was already parsed, and the work is a few comparisons when it comes and a sum when the roster draws.
+
+**Checks (SDK 10.0.402, at idle priority with no shared compiler server: the game was running):** `scripts/Build.ps1` Debug 920/920 (final run below). Fail-first on a scratch copy, controls passing before and after: 30 of 30 mutations caught across the reader, the tap, the roster service, the rules, the normalizer, equality and the rows. On the first run a list that kept the times before it was missed (the test's second list carried the same passage), so the test now uses a list without passages and a switch with no list between, both caught; and one mutation that did not compile was rewritten and caught. The fixtures are synthetic: passage records are written with `EntryListRecordWriter`, never A2Tools' sample bytes. Two existing guard tests caught changes on the way: the footnote's wording, and the characters' equality needing passages compared.
+
+**Not checked:**
+- Any of it in the game: the passages' layout is A2Tools', against its game on 2026-10-25.
+- Whether entering the Abyss sends passages: the new log line will say.
+- The first Abyss visit after a siege: what the roster shows before and after.
+
+**Next:** fail-first, the PR, a deep audit (saved data, validation and parsing), Codex and CI; then the merge with Harry's go-ahead, and the HANDOFF check in game.
+
 ## 2026-10-30 — The caps without a space; an unknown corridor cap starred
 
 **What:** the roster's Nightmare and Ascension caps follow the count or its extra with no space, "2 (+1)/14", "3 (+2)/3" (`RosterText.OutOf` takes the cap alone). The Corridors cell shows a cap not yet read since the siege as the most there can be with an asterisk, "0/3*", in the same dimmed upright type as a known one, "0/2" (`RosterText.CorridorsOutOf`; `.roster-open-unknown`'s italics removed). The Corridors header's tip and the footnote say so.

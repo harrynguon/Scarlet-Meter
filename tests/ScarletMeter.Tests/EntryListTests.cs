@@ -67,16 +67,19 @@ public sealed class EntryListTests
         Assert.Equal([new EntryValue(EntryIds.Nightmare, first, second)], read!.Counts);
     }
 
-    // A kind 01 entry holds a u64 time (an Abyss passage's), not a count: read past, not kept.
+    // A kind 01 entry holds a u64 time (an Abyss passage's usage time left), not a count: kept apart, little-endian.
     [Fact]
-    public void TimeEntriesAreReadPastAndNotKept()
+    public void TimeEntriesAreKeptApartFromTheCounts()
     {
         var update = EntryListRecords.Read(Frame(0x610C, "00 01 82 96 98 00 11 22 33 00 00 00 00 00 03"));
         Assert.NotNull(update);
         Assert.Empty(update.Counts);
+        Assert.Equal([new TimeEntry(10_000_002, 0x33_22_11)], update.Times);
 
         var list = EntryListRecords.Read(EntryListRecordWriter.List([Odyle, new(EntryIds.Nightmare, 9, 0)]));
         Assert.Equal([Odyle, new EntryValue(EntryIds.Nightmare, 9, 0)], list!.Counts);
+        Assert.Equal([new TimeEntry(10_000_002, 130_000)], list.Times);
+        Assert.Empty(EntryListRecords.Read(EntryListRecordWriter.Update([new(EntryIds.Nightmare, 9, 0)]))!.Times);
     }
 
     // An update must read whole, with no more than a short tail, or none of it is taken: a part read could be another
@@ -251,6 +254,55 @@ public sealed class EntryListTests
         Assert.Same(Alpha, progress.Character);
         Assert.Equal(new EntryCount(10, 1, Start.AddMinutes(20)), progress.Entries[EntryIds.Nightmare]);
         Assert.Equal(new EntryCount(30, 880, Start), progress.Entries[EntryIds.OdyleEnergy]);
+    }
+
+    // The Abyss passages come as the game sends them, with the counts' rules: still to run as a time, used as a count with
+    // no value. An id is in one or the other as last sent (entering a corridor sends its time, leaving it a count); a
+    // time alone is a report; a whole list starts afresh. The log says which record brought how many, never which or what.
+    [Fact]
+    public void ThePassagesGoWithTheCountsAsTimesOrCounts()
+    {
+        var clock = new FakeTimeProvider(Start);
+        var log = new RecordingLogger<EntryListTap>();
+        var tap = NewTap(new() { [7] = Alpha, [9] = Beta }, clock, log);
+        List<CharacterProgress> raised = [];
+        tap.ProgressObserved += (_, progress) => raised.Add(progress);
+        tap.Observe(EntryListRecordWriter.List([Odyle, new(10_000_002, 0, 0), new(10_000_003, 0, 0)], [(10_000_001, 130_000)]));
+        tap.Observe(SelfRecord(7));
+        var login = Assert.Single(raised);
+        Assert.Equal(new EntryTime(130_000, Start), Assert.Single(login.Times).Value);
+        Assert.Equal(10_000_001u, Assert.Single(login.Times).Key);
+        Assert.Equal(new EntryCount(0, 0, Start), login.Entries[10_000_002]);
+        Assert.Equal(new EntryCount(0, 0, Start), login.Entries[10_000_003]);
+
+        clock.Advance(TimeSpan.FromMinutes(5));
+        tap.Observe(EntryListRecordWriter.Update([new(10_000_001, 0, 0)], zeroCount: true)); // run: a count now
+        Assert.Empty(raised[^1].Times);
+        Assert.Equal(new EntryCount(0, 0, Start.AddMinutes(5)), raised[^1].Entries[10_000_001]);
+
+        clock.Advance(TimeSpan.FromMinutes(5));
+        tap.Observe(EntryListRecordWriter.TimeUpdate(10_000_002, 120_000)); // a time alone is reported
+        Assert.Equal(3, raised.Count);
+        Assert.Equal(new EntryTime(120_000, Start.AddMinutes(10)), raised[^1].Times[10_000_002]);
+        Assert.False(raised[^1].Entries.ContainsKey(10_000_002));
+
+        tap.Observe(EntryListRecordWriter.List([Odyle], [])); // a new login's list without passages: those before are gone
+        tap.Observe(SelfRecord(7));
+        Assert.Empty(raised[^1].Times);
+        Assert.DoesNotContain(raised[^1].Entries.Keys, EntryIds.AbyssPassages.Contains);
+
+        tap.Observe(EntryListRecordWriter.TimeUpdate(10_000_003, 130_000));
+        tap.Observe(SelfRecord(9)); // another character with no list between: the last one's passages go with its counts
+        Assert.Same(Beta, raised[^1].Character);
+        Assert.Empty(raised[^1].Times);
+
+        var lines = log.Entries.Select(e => e.Message).Where(m => m.StartsWith("Abyss corridor passages read", StringComparison.Ordinal)).ToList();
+        Assert.Equal(
+            ["Abyss corridor passages read from the list of entry counts (0b 61): 3 of 3.", "Abyss corridor passages read from an update (0c 61): 1 of 3.",
+             "Abyss corridor passages read from an update (0c 61): 1 of 3.", "Abyss corridor passages read from an update (0c 61): 1 of 3."],
+            lines);
+        Assert.All(log.Entries, e => Assert.DoesNotContain("130", e.Message, StringComparison.Ordinal));
+        Assert.All(log.Entries, e => Assert.DoesNotContain("10000", e.Message, StringComparison.Ordinal));
     }
 
     // A switch: the new login's list waits (the character named so far is the one before), then the record names the

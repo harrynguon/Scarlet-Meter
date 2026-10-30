@@ -6,11 +6,19 @@ namespace ScarletMeter.Engine.Entries;
 /// <summary>One count read from the game's list of entry counts: the entry's id and its two values.</summary>
 internal readonly record struct EntryValue(uint Id, int First, int Second);
 
+/// <summary>One time read from the game's list of entry counts (kind <c>01</c>): the entry's id and its u64.</summary>
+internal readonly record struct TimeEntry(uint Id, ulong Value);
+
 /// <summary>
 /// The counts one record of the list carries, and whether it is the whole list (sent at login and after a server
-/// transfer) or the entries that changed (a raid, a recharge item, a key used).
+/// transfer) or the entries that changed (a raid, a recharge item, a key used); its time entries apart, in
+/// <see cref="Times"/> (an Abyss passage's usage time left, <see cref="EntryIds.AbyssPassages"/>).
 /// </summary>
-internal sealed record EntryRecord(IReadOnlyList<EntryValue> Counts, bool IsWholeList);
+internal sealed record EntryRecord(IReadOnlyList<EntryValue> Counts, bool IsWholeList)
+{
+    /// <summary>The record's time entries, which are not counts.</summary>
+    public IReadOnlyList<TimeEntry> Times { get; init; } = [];
+}
 
 /// <summary>
 /// Reads the game's list of entry counts, as A2Tools reads it (taengu/A2Tools-DPS-Meter b79969a, 2149936 and caa7ed4,
@@ -20,7 +28,7 @@ internal sealed record EntryRecord(IReadOnlyList<EntryValue> Counts, bool IsWhol
 /// <c>0b 61</c> is the whole list, <c>&lt;count varint&gt; &lt;entries&gt;</c> running to the end of the record after
 /// other data; record <c>0c 61</c> is <c>&lt;count u8&gt; &lt;entries&gt; &lt;tail&gt;</c>, the entries that changed.
 /// Odyle energy is id 60000001, so <c>0c 01 87 93 03 &lt;basic&gt; &lt;charged&gt;</c> (the "slot 1, key 87 93 03"
-/// of the first port, A2Tools #63, was this id). Time entries are read past and not kept. Pure; every read is
+/// of the first port, A2Tools #63, was this id). Time entries are kept apart from the counts (<see cref="EntryRecord.Times"/>). Pure; every read is
 /// bounds-checked, so malformed bytes give no value rather than an exception.
 /// </summary>
 internal static class EntryListRecords
@@ -101,8 +109,8 @@ internal static class EntryListRecords
         {
             if (!GameRecords.TryReadVarInt(body, start, out var count, out var at)) continue;
             if (count is 0 or > MaxListEntries) continue;
-            if (!TryReadEntries(body, at, (int)count, out var counts, out var end) || end != body.Length) continue;
-            if (counts.Exists(c => c.Id == EntryIds.OdyleEnergy)) return new EntryRecord(counts, IsWholeList: true);
+            if (!TryReadEntries(body, at, (int)count, out var counts, out var times, out var end) || end != body.Length) continue;
+            if (counts.Exists(c => c.Id == EntryIds.OdyleEnergy)) return new EntryRecord(counts, IsWholeList: true) { Times = times };
         }
         return new EntryRecord(OdyleById(body) is { } odyle ? [odyle] : [], IsWholeList: true);
     }
@@ -114,7 +122,7 @@ internal static class EntryListRecords
         {
             if (body[i] is not (FirstValueKind or SecondValueKind or BothValuesKind)) continue;
             if (BinaryPrimitives.ReadUInt32LittleEndian(body[(i + 1)..]) != EntryIds.OdyleEnergy) continue;
-            if (TryReadEntry(body, i, out var entry, out _) && entry is { } count && OdyleIn([count]) is not null) return count;
+            if (TryReadEntry(body, i, out var entry, out _, out _) && entry is { } count && OdyleIn([count]) is not null) return count;
         }
         return null;
     }
@@ -126,27 +134,30 @@ internal static class EntryListRecords
     {
         if (body.IsEmpty) return null;
         var count = Math.Max((int)body[0], 1);
-        if (!TryReadEntries(body, 1, count, out var counts, out var end) || body.Length - end > MaxUpdateTail) return null;
-        return new EntryRecord(counts, IsWholeList: false);
+        if (!TryReadEntries(body, 1, count, out var counts, out var times, out var end) || body.Length - end > MaxUpdateTail) return null;
+        return new EntryRecord(counts, IsWholeList: false) { Times = times };
     }
 
-    // `count` entries from `at`, and where they end; false when any does not read.
-    private static bool TryReadEntries(ReadOnlySpan<byte> body, int at, int count, out List<EntryValue> counts, out int end)
+    // `count` entries from `at`, counts and times apart, and where they end; false when any does not read.
+    private static bool TryReadEntries(ReadOnlySpan<byte> body, int at, int count, out List<EntryValue> counts, out List<TimeEntry> times, out int end)
     {
         counts = [];
+        times = [];
         end = at;
         for (var n = 0; n < count; n++)
         {
-            if (!TryReadEntry(body, end, out var entry, out end)) return false;
+            if (!TryReadEntry(body, end, out var entry, out var time, out end)) return false;
             if (entry is { } value) counts.Add(value);
+            if (time is { } read) times.Add(read);
         }
         return true;
     }
 
-    // One entry at an offset and where the next begins: a count (entry set), or a time (entry null, read past).
-    private static bool TryReadEntry(ReadOnlySpan<byte> body, int at, out EntryValue? entry, out int next)
+    // One entry at an offset and where the next begins: a count (entry set) or a time (time set, its u64 little-endian).
+    private static bool TryReadEntry(ReadOnlySpan<byte> body, int at, out EntryValue? entry, out TimeEntry? time, out int next)
     {
         entry = null;
+        time = null;
         next = at;
         if (at < 0 || at + 5 > body.Length) return false;
         var kind = body[at];
@@ -160,6 +171,7 @@ internal static class EntryListRecords
                 break;
             case TimeKind:
                 if (next + 8 > body.Length) return false;
+                time = new TimeEntry(id, BinaryPrimitives.ReadUInt64LittleEndian(body[next..]));
                 next += 8;
                 return true;
             case FirstValueKind:

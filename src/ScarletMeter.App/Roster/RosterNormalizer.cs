@@ -85,7 +85,7 @@ public static class RosterNormalizer
         if (over > 0) repairs.Add($"{Characters(over)} seen longest ago dropped, past the {MaxCharacters} kept.");
         if (countsDropped > 0) repairs.Add($"{countsDropped} unusable {(countsDropped == 1 ? "count or corridor entry" : "counts or corridor entries")} dropped.");
         if (runsTrimmed > 0) repairs.Add($"{runsTrimmed} corridor {(runsTrimmed == 1 ? "entry" : "entries")} listed twice or past the {RosterRules.CorridorRunsKept} kept dropped.");
-        if (repaired > 0) repairs.Add($"Server, class, combat power, level, gear score, cap, note or the order of corridor entries repaired on {Characters(repaired)}.");
+        if (repaired > 0) repairs.Add($"Server, class, combat power, level, gear score, cap, note, the order of corridor entries or the corridor passages repaired on {Characters(repaired)}.");
 
         var (artifacts, artifactsDropped, artifactsTrimmed, artifactsRepaired) = CleanArtifacts(file?.Artifacts, now);
         if (artifactsDropped > 0) repairs.Add($"{artifactsDropped} unusable Abyss artifact {(artifactsDropped == 1 ? "record" : "records")} dropped.");
@@ -154,6 +154,20 @@ public static class RosterNormalizer
             kina = null;
             countsDropped++;
         }
+        // Passages: three flags read at a usable date, or none; a time left seen later than the reading, or at no usable
+        // date, is not one (the reading is the latest the game said).
+        var passages = character.Passages;
+        var passagesRepaired = false;
+        if (passages is not null && (passages.Used is not { Count: RosterRules.CorridorsPerSiege } || !IsUsableDate(passages.SeenAt, now)))
+        {
+            passages = null;
+            countsDropped++;
+        }
+        else if (passages?.LeftSeenAt is { } left && (!IsUsableDate(left, now) || left > passages.SeenAt))
+        {
+            passages = passages with { LeftSeenAt = null };
+            passagesRepaired = true;
+        }
         // Corridor entries: usable dates only (a null list reads as none), each once, oldest first, the most recent kept.
         var saved = character.CorridorRuns ?? [];
         List<DateTimeOffset> usable = [.. saved.Where(run => IsUsableDate(run, now))];
@@ -179,7 +193,7 @@ public static class RosterNormalizer
         var note = CleanNote(character.Note);
         if (serverId != character.ServerId || classId != character.ClassId || className != character.ClassName || combatPower != character.CombatPower
             || level != character.Level || gearScore != character.GearScore || cap != character.OdyleCap
-            || note != (character.Note ?? string.Empty) || (runs.Count == usable.Count && !runs.SequenceEqual(usable))) repaired++;
+            || note != (character.Note ?? string.Empty) || (runs.Count == usable.Count && !runs.SequenceEqual(usable)) || passagesRepaired) repaired++;
 
         return character with
         {
@@ -195,6 +209,7 @@ public static class RosterNormalizer
             Nightmare = nightmare,
             Ascension = ascension,
             CorridorRuns = runs,
+            Passages = passages,
             Kina = kina,
             Note = note,
         };
