@@ -17,6 +17,13 @@ public static class RosterText
     public static string Extra(int extra, bool always) =>
         extra > 0 || always ? "(+" + Math.Max(0, extra).ToString("N0", CultureInfo.InvariantCulture) + ")" : string.Empty;
 
+    /// <summary>
+    /// A count's cap after it, as the game writes it: "/14" straight after the count ("2/3"), " /14" after an extra
+    /// ("6 (+1) /14"), since the extra comes on top of the cap (Harry, 2026-10-28, from the game's own).
+    /// </summary>
+    public static string OutOf(int cap, bool afterExtra) =>
+        (afterExtra ? " /" : "/") + cap.ToString("N0", CultureInfo.InvariantCulture);
+
     /// <summary>Time left, to the minute, rounded up so it never reads 0 before the moment: "4d 15h", "12h 16m", "15m"; "now" once it has passed.</summary>
     public static string Until(TimeSpan left)
     {

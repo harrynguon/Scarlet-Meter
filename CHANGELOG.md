@@ -19,8 +19,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
   tracking there; it pauses again once you are back in the Abyss. ([#47](https://github.com/harrynguon/Scarlet-Meter/pull/47))
 - A character roster: every character you log in on with the meter running, with its class and level from that first
   login (on Global's servers too), its combat power and gear score, its Odyle energy, when basic energy is full again
-  (at 840, a membership's, unless you set 560 for the character), and Nightmare and Ascension entries left, estimated
-  (≈) from what the game last said, the Artifact Corridors it entered since the last Abyss Siege, out of those whose
+  (at 840, a membership's, unless you set 560 for the character), and Nightmare and Ascension entries left out of 14
+  and 3, as the game writes them ("6 (+1) /14", "2/3"), estimated (≈) from what the game last said, the Artifact Corridors it entered since the last Abyss Siege, out of those whose
   artifact your side holds (read when you open the Abyss map or enter the Abyss), its Kina and Kina (Bound), with the
   totals across your characters, a note of your own under each name, and when you last played them. It opens sorted by
   combat power, highest first ("Most power"; or by Odyle energy, full soonest, Kina, name or last played). Open it with
@@ -31,7 +31,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
   [#50](https://github.com/harrynguon/Scarlet-Meter/pull/50), [#51](https://github.com/harrynguon/Scarlet-Meter/pull/51),
   [#53](https://github.com/harrynguon/Scarlet-Meter/pull/53), [#55](https://github.com/harrynguon/Scarlet-Meter/pull/55),
   [#56](https://github.com/harrynguon/Scarlet-Meter/pull/56), [#58](https://github.com/harrynguon/Scarlet-Meter/pull/58),
-  [#61](https://github.com/harrynguon/Scarlet-Meter/pull/61), [#62](https://github.com/harrynguon/Scarlet-Meter/pull/62))
+  [#61](https://github.com/harrynguon/Scarlet-Meter/pull/61), [#62](https://github.com/harrynguon/Scarlet-Meter/pull/62),
+  [#63](https://github.com/harrynguon/Scarlet-Meter/pull/63))
 
 ### Changed
 

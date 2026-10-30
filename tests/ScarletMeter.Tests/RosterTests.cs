@@ -222,6 +222,9 @@ public sealed class RosterTests : IDisposable
         Assert.Equal("(+1,200)", RosterText.Extra(1200, always: true));
         Assert.Equal("(+0)", RosterText.Extra(0, always: true));
         Assert.Equal(string.Empty, RosterText.Extra(0, always: false));
+        // The cap after a count as the game writes it (Harry, 2026-10-28): "6 (+1) /14", and "2/3" with no extra.
+        Assert.Equal(" /14", RosterText.OutOf(14, afterExtra: true));
+        Assert.Equal("/3", RosterText.OutOf(3, afterExtra: false));
         Assert.Equal("4d 15h", RosterText.Until(new TimeSpan(4, 15, 16, 0)));
         Assert.Equal("12h 16m", RosterText.Until(new TimeSpan(12, 15, 1)));
         Assert.Equal("1m", RosterText.Until(TimeSpan.FromSeconds(1)));
