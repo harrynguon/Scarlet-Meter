@@ -231,12 +231,6 @@ internal sealed class EntryListTap : IRecordReader
             if (!awaitingOwner && !ownerUnconfirmed && owner is not null && (read.Counts.Count > 0 || passageTimes.Count > 0)) progress = Snapshot(owner);
         }
         if (read.IsWholeList) logger.LogInformation("Entry list read ({Count} counts); waiting for the game to name the character.", read.Counts.Count);
-        // Which records bring the Abyss passages (when a corridor is entered or left, at login, and whether on entering
-        // the Abyss): how many of the three, never which or their values.
-        var passages = read.Counts.Count(c => EntryIds.AbyssPassages.Contains(c.Id)) + passageTimes.Count;
-        if (passages > 0)
-            logger.LogInformation("Abyss corridor passages read from {Record}: {Count} of {Total}.",
-                read.IsWholeList ? "the list of entry counts (0b 61)" : "an update (0c 61)", passages, EntryIds.AbyssPassages.Count);
         if (odyleChanged)
         {
             logger.LogInformation("Odyle energy changed, read from {Record}.",
