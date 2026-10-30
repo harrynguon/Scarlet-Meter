@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The roster's caps were measured without an estimate's mark** (standard audit on #63, fixed before merge).
+- What: the widest Ascension value was taken as "3 (+3) /3", from Harry's mock-up; an estimated count with an extra, "≈ 3 (+3) /3", which any alt shows after a weekly reset, is wider, so the docs claimed 23 and 6 px to spare at 896 where there are 21 and 4. The table still fit.
+- Why: Nightmare's widest value was listed with its ≈ and Ascension's was copied from the example asked for; the width lesson below (every column's widest form) was applied by eye, one mark at a time, not by combining the marks a cell can carry.
+- Guard: the renders give each count cell every mark at once (≈, the extra, the cap), and ARCHITECTURE quotes those margins. When listing a cell's widest form, combine all its optional parts, not only the example at hand.
+
 **Two characters never showed a gear score: the reader wanted its two copies equal** (Harry, 2026-10-28, of one character: "not have a gear score? it works for my other characters"; fixed in #62).
 - What: the self record carries two gear scores after the level, and the reader took one only when both agreed, as A2Tools does. For two of Harry's characters the first is the character sheet's and the second higher (a local probe: offsets and which value matched, no values), so they showed "?" at every login. One of them had been seen without a gear score after a map change the night before, and #59 put that down to the record coming mid-session: a wrong cause recorded as found.
 - Why: A2Tools' rule rested on characters whose copies agree, and was ported as a guard without asking what the second number is; and the earlier "?" was explained by the one difference noticed (mid-session against login) without checking the other (which character), on one sample.

@@ -716,6 +716,20 @@ public sealed partial class RazorMarkupTests
             + @"<div>@RosterText\.Time\(character\.LastSeen\)</div>\s*</td>", roster);
     }
 
+    // Nightmare and Ascension show their counts out of their caps, as the game writes them (Harry, 2026-10-28: "6 (+1) /14",
+    // "3 (+3) /3", and "2/3" with no extra), the cap dimmed like the extra and taken from the rules, not written here.
+    [Fact]
+    public void TheRosterShowsNightmareAndAscensionOutOfTheirCaps()
+    {
+        var roster = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Pages", "RosterPage.razor"));
+        Assert.Contains("<td>@ContentCell(row.Nightmare, character.Nightmare, RosterRules.Nightmare.Cap)</td>", roster);
+        Assert.Contains("<td>@ContentCell(row.Ascension, character.Ascension, RosterRules.Ascension.Cap)</td>", roster);
+        var cell = Regex.Match(roster, @"(?s)private static RenderFragment ContentCell\(Estimate\? estimate, RosterCount\? seen, int cap\) => builder =>(?<body>.*?)\n    \};").Groups["body"].Value;
+        Assert.Matches(@"(?s)var extra = RosterText\.Extra\(seen\.Second, always: false\);.*"
+            + @"builder\.AddAttribute\(\d+, ""class"", ""muted""\);\s*builder\.AddContent\(\d+, RosterText\.OutOf\(cap, afterExtra: extra\.Length > 0\)\);", cell);
+        Assert.Equal((14, 3), (ScarletMeter.App.Roster.RosterRules.Nightmare.Cap, ScarletMeter.App.Roster.RosterRules.Ascension.Cap)); // the game's caps (A2Tools' Roster plugin)
+    }
+
     // Each roster row shows the level on its class line and a Power column after the character, combat power with the
     // gear score under it, each with its icon (Harry, 2026-10-27). The room for it comes from the basic energy cap moving
     // under when it is full (its own line, display: block), as Harry also asked, two pixels less at each side of a cell and
