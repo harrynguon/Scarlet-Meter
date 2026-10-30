@@ -2,6 +2,18 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-30 — The caps without a space; an unknown corridor cap starred
+
+**What:** the roster's Nightmare and Ascension caps follow the count or its extra with no space, "2 (+1)/14", "3 (+2)/3" (`RosterText.OutOf` takes the cap alone). The Corridors cell shows a cap not yet read since the siege as the most there can be with an asterisk, "0/3*", in the same dimmed upright type as a known one, "0/2" (`RosterText.CorridorsOutOf`; `.roster-open-unknown`'s italics removed). The Corridors header's tip and the footnote say so.
+
+**Why:** Harry, with "2 (+1) /14	3 (+2) /3": "remove the space before the / count", and of the corridors' italic 3: "change it to non-italics with an asterisk. and no asterisk if known". Then: "push these changes, bypass CI/CD etc because i just want this change merged in asap", so it was merged without waiting for CI, a pr-auditor pass or Codex's review.
+
+**Checks (SDK 10.0.402, at idle priority with no shared compiler server):** the `RosterTests`, `RazorMarkupTests` and `ChangelogTests` classes, 107/107; not the full suite. The roster's widths were not measured again: dropping a space only narrows the cells.
+
+**Not checked:** the page in the running meter; CI and Codex's review, which run after the merge.
+
+**Next:** read CI and Codex's review on the merged PR and fix anything they find.
+
 ## 2026-10-30 — Animations capped at 60 frames a second
 
 **What:** `wwwroot/js/frame-cap.js`, loaded by index.html for every window, pauses each running animation on the document's timeline (the bar effects, the bars' width and rows' glides, the notices) and moves it on from the timeline's time every 60th of a second; a finite one is finished when its time is up, so its end events fire; what something else paused is left alone; its loop runs only while it drives something, woken by `animationstart` or `transitionrun`. `Test-PublishLayout.ps1` requires it in a publish. `RazorMarkupTests.ThePagesLoadOnlyTheAppsOwnScripts` now checks every script in `wwwroot/js` for reaches outside the page, not a list.
