@@ -154,11 +154,12 @@ public static class RosterNormalizer
             kina = null;
             countsDropped++;
         }
-        // Passages: three flags read at a usable date, or none; a time left seen later than the reading, or at no usable
-        // date, is not one (the reading is the latest the game said).
+        // Passages: three flags read between two usable dates, the oldest no later than the latest, or none; a time left
+        // seen later than the reading, or at no usable date, is not one (the reading is the latest the game said).
         var passages = character.Passages;
         var passagesRepaired = false;
-        if (passages is not null && (passages.Used is not { Count: RosterRules.CorridorsPerSiege } || !IsUsableDate(passages.SeenAt, now)))
+        if (passages is not null && (passages.Used is not { Count: RosterRules.CorridorsPerSiege } || !IsUsableDate(passages.SeenAt, now)
+            || !IsUsableDate(passages.ReadFrom, now) || passages.ReadFrom > passages.SeenAt))
         {
             passages = null;
             countsDropped++;

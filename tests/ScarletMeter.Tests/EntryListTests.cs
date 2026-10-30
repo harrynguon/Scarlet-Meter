@@ -305,6 +305,33 @@ public sealed class EntryListTests
         Assert.All(log.Entries, e => Assert.DoesNotContain("10000", e.Message, StringComparison.Ordinal));
     }
 
+    // Only the passages' time entries are kept: another id's time (none is read) neither reports nor drops that id's
+    // count (deep audit on #66: a time under the Shugo keys' id dropped the keys). A passage's time after a login's list
+    // that did not read (no counts) waits for the character named and goes to them, as counts do.
+    [Fact]
+    public void OnlyThePassagesTimesAreKept()
+    {
+        var clock = new FakeTimeProvider(Start);
+        var log = new RecordingLogger<EntryListTap>();
+        var tap = NewTap(new() { [7] = Alpha }, clock, log);
+        List<CharacterProgress> raised = [];
+        tap.ProgressObserved += (_, progress) => raised.Add(progress);
+        tap.Observe(Frame(0x610B, "FF EE DD CC")); // a login's list that does not read: no counts, and the owner awaited
+        tap.Observe(EntryListRecordWriter.TimeUpdate(10_000_001, 130_000));
+        Assert.Empty(raised);
+        tap.Observe(SelfRecord(7));
+        Assert.Equal(new EntryTime(130_000, Start), Assert.Single(raised).Times[10_000_001]);
+        Assert.Contains(log.Entries, e => e.Message.Contains("matched to the character", StringComparison.Ordinal));
+
+        tap.Observe(EntryListRecordWriter.Update([new(EntryIds.ShugoFestivalKeys, 6, 9)]));
+        Assert.Equal(2, raised.Count);
+        tap.Observe(EntryListRecordWriter.TimeUpdate(EntryIds.ShugoFestivalKeys, 5));
+        tap.Observe(EntryListRecordWriter.TimeUpdate(3, 999));
+        Assert.Equal(2, raised.Count);
+        Assert.Equal(new ShugoKeys(6, 9), tap.Shugo);
+        Assert.Equal([10_000_001u], raised[^1].Times.Keys.ToArray());
+    }
+
     // A switch: the new login's list waits (the character named so far is the one before), then the record names the
     // new character, who gets only the new list's counts.
     [Fact]

@@ -71,8 +71,9 @@ internal sealed class EntryListTap : IRecordReader
     // The counts since the last whole list, each with when it was read; whose they are is `owner` unless awaitingOwner.
     private readonly Dictionary<uint, EntryCount> counts = [];
 
-    // The time entries likewise (an Abyss passage's usage time left), cleared and reported with the counts. An id is in
-    // one of the two, as the game last sent it.
+    // The Abyss passages' time entries (their usage time left), cleared and reported with the counts; a passage is in one
+    // of the two, as the game last sent it. Other time entries are not kept: they are no counts, and only the passages'
+    // are read (deep audit on #66: a time under a count's id would have dropped that count, and a time alone reported).
     private readonly Dictionary<uint, EntryTime> times = [];
     // The Kina of each item as last read, with its slot (one slot per item); when it was last read; whether a listing came,
     // which makes a missing item none; when the last listing came (only a listing: what a whole list keeps it by); and
@@ -196,6 +197,7 @@ internal sealed class EntryListTap : IRecordReader
     private void TakeEntries(ReadOnlySpan<byte> record)
     {
         if (EntryListRecords.Read(record) is not { } read) return;
+        var passageTimes = read.Times.Where(time => EntryIds.AbyssPassages.Contains(time.Id)).ToList();
         var now = clock.GetUtcNow();
         OdyleEnergy? odyleNow = null;
         var odyleChanged = false;
@@ -215,7 +217,7 @@ internal sealed class EntryListTap : IRecordReader
                 counts[count.Id] = new EntryCount(count.First, count.Second, now);
                 times.Remove(count.Id);
             }
-            foreach (var time in read.Times)
+            foreach (var time in passageTimes)
             {
                 times[time.Id] = new EntryTime(time.Value, now);
                 counts.Remove(time.Id);
@@ -226,12 +228,12 @@ internal sealed class EntryListTap : IRecordReader
                 odyleChanged = odyleNow != odyle;
                 odyle = odyleNow;
             }
-            if (!awaitingOwner && !ownerUnconfirmed && owner is not null && (read.Counts.Count > 0 || read.Times.Count > 0)) progress = Snapshot(owner);
+            if (!awaitingOwner && !ownerUnconfirmed && owner is not null && (read.Counts.Count > 0 || passageTimes.Count > 0)) progress = Snapshot(owner);
         }
         if (read.IsWholeList) logger.LogInformation("Entry list read ({Count} counts); waiting for the game to name the character.", read.Counts.Count);
         // Which records bring the Abyss passages (when a corridor is entered or left, at login, and whether on entering
         // the Abyss): how many of the three, never which or their values.
-        var passages = read.Counts.Count(c => EntryIds.AbyssPassages.Contains(c.Id)) + read.Times.Count(t => EntryIds.AbyssPassages.Contains(t.Id));
+        var passages = read.Counts.Count(c => EntryIds.AbyssPassages.Contains(c.Id)) + passageTimes.Count;
         if (passages > 0)
             logger.LogInformation("Abyss corridor passages read from {Record}: {Count} of {Total}.",
                 read.IsWholeList ? "the list of entry counts (0b 61)" : "an update (0c 61)", passages, EntryIds.AbyssPassages.Count);

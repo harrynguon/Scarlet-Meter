@@ -272,33 +272,38 @@ public sealed class RosterService : IDisposable
 
     // The passages from the report when the game has said all three (a meter started mid-session knows only those that
     // changed since) and later than the ones kept (a kept reading dated after now does not count as later, as in Later):
-    // a count is a used passage, a time left one still to run; a time of 0 says neither, so none is taken. Read when the
-    // latest of the three was. One still to run dates LeftSeenAt; else the kept one stays.
+    // a count is a used passage, a time left one still to run; a time of 0 says neither, so none is taken. Each passage
+    // keeps when it was read, so the reading spans the oldest to the latest of them. LeftSeenAt is when a passage with time
+    // left was read, the latest of those in the report or the kept one, a kept one only if not after now or the reading.
     private static RosterPassages? LaterPassages(RosterPassages? kept, CharacterProgress progress, DateTimeOffset now)
     {
         var used = new bool[EntryIds.AbyssPassages.Count];
-        var seenAt = DateTimeOffset.MinValue;
-        var anyLeft = false;
+        var (readFrom, seenAt) = (DateTimeOffset.MaxValue, DateTimeOffset.MinValue);
+        DateTimeOffset? leftAt = null;
         for (var n = 0; n < used.Length; n++)
         {
             var id = EntryIds.AbyssPassages[n];
+            DateTimeOffset at;
             if (progress.Times.TryGetValue(id, out var time) && time.Value > 0)
             {
-                anyLeft = true;
-                if (time.SeenAt > seenAt) seenAt = time.SeenAt;
+                at = time.SeenAt;
+                if (leftAt is null || at > leftAt) leftAt = at;
             }
             else if (progress.Entries.TryGetValue(id, out var count))
             {
                 used[n] = true;
-                if (count.SeenAt > seenAt) seenAt = count.SeenAt;
+                at = count.SeenAt;
             }
             else
             {
                 return kept;
             }
+            if (at > seenAt) seenAt = at;
+            if (at < readFrom) readFrom = at;
         }
         if (kept is not null && kept.SeenAt <= now && seenAt <= kept.SeenAt) return kept;
-        return new RosterPassages(used, seenAt, anyLeft ? seenAt : kept?.LeftSeenAt);
+        if (kept?.LeftSeenAt is { } keptLeft && keptLeft <= now && keptLeft <= seenAt && (leftAt is null || keptLeft > leftAt)) leftAt = keptLeft;
+        return new RosterPassages(used, readFrom, seenAt, leftAt);
     }
 
     // Under the gate: the Shugo Festival keys the game said for the character's server, kept for that server when read

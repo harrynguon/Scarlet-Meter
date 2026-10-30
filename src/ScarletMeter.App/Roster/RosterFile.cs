@@ -135,20 +135,23 @@ public sealed record RosterCount(int First, int Second, DateTimeOffset SeenAt);
 
 /// <summary>
 /// A character's Abyss passages, its entries to the Artifact Corridors, as the game last said all three
-/// (<see cref="EntryIds.AbyssPassages"/>): which were used, in the artifacts' order (1001 to 1003), when that was read,
-/// and when one last had time left, which says the passages had been handed out for the holding then (before they are,
-/// all three read as used). Untrusted on load (<see cref="RosterNormalizer"/>).
+/// (<see cref="EntryIds.AbyssPassages"/>): which were used, in the artifacts' order (1001 to 1003), when the oldest and
+/// the latest of the three were read (the game sends each as it changes, so a reading can mix a passage from before a
+/// siege with one from after: deep audit and Codex on #66), and when one last had time left, which says the passages had
+/// been handed out for the holding then (before they are, all three read as used). Untrusted on load
+/// (<see cref="RosterNormalizer"/>).
 /// </summary>
 /// <param name="Used">One flag per passage, <see cref="RosterRules.CorridorsPerSiege"/> of them: true for used.</param>
-/// <param name="SeenAt">When the game last said them.</param>
+/// <param name="ReadFrom">When the oldest of the three was read: the reading says nothing of the time before it.</param>
+/// <param name="SeenAt">When the latest of the three was read: which of two readings is newer.</param>
 /// <param name="LeftSeenAt">When one last had time left, or null if none has been seen so.</param>
-public sealed record RosterPassages(IReadOnlyList<bool> Used, DateTimeOffset SeenAt, DateTimeOffset? LeftSeenAt)
+public sealed record RosterPassages(IReadOnlyList<bool> Used, DateTimeOffset ReadFrom, DateTimeOffset SeenAt, DateTimeOffset? LeftSeenAt)
 {
     /// <summary>Equal when every value is, the flags compared one by one (a record compares a list by reference).</summary>
     public bool Equals(RosterPassages? other) =>
-        other is not null && Used.SequenceEqual(other.Used) && SeenAt == other.SeenAt && LeftSeenAt == other.LeftSeenAt;
+        other is not null && Used.SequenceEqual(other.Used) && ReadFrom == other.ReadFrom && SeenAt == other.SeenAt && LeftSeenAt == other.LeftSeenAt;
 
-    public override int GetHashCode() => HashCode.Combine(Used.Count, SeenAt, LeftSeenAt);
+    public override int GetHashCode() => HashCode.Combine(Used.Count, ReadFrom, SeenAt, LeftSeenAt);
 }
 
 /// <summary>The Kina a character holds: Kina and Kina (Bound), each null while not known, and when the inventory said it.</summary>

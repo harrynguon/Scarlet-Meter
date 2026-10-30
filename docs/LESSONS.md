@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**A corridor reading mixed passages from before a siege with one from after** (deep audit and Codex on #66, fixed before merge).
+- What: the tap keeps each Abyss passage with when it was read until the next login's list, and a corridor changes one at a time, so a player logged in across a siege holds passages from before it beside one from after. The roster dated the whole reading by the latest of the three, so two passages used before the siege counted as runs after it (3 for 1 run in the auditor's probe); the time left took the same latest date.
+- Why: the reading was modelled on a whole list at login, three values read together; that updates come one passage at a time, and that a session can span a siege, was not put to the model, and every test wrote the three at one time.
+- Guard: a reading keeps when its oldest passage was read and counts only when that is after the siege; the time left is that passage's own (`TheCorridorsDoneAreTheMetersOrThePassagesWhenMore`, `ThePassagesAreTakenOnceTheGameHasSaidAllThree` with readings mixed in time). When values that arrive separately are combined, keep each one's age, and test with them read at different times.
+
 **The frame cap was measured with one long animation, not the meter's restarting transitions** (standard audit on #64, fixed before merge).
 - What: the cap took animations over only on frames where a step was due, so each newly started one ran at the screen's rate for up to three frames at 240 Hz. The bars' width transitions restart ten times a second, and with the cap they changed 63 to 74 times a second, not about 60. One error inside the loop would also have stopped it for good, freezing every animation it held.
 - Why: the rate was measured on a single infinite animation, which starts once. The meter's own pattern, a transition replaced every 100 ms, was in the CPU benchmark but its rate was never counted. The script's only test pinned its text.
@@ -260,6 +265,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - Guard: `SettingsTests.AFileSavedWithAByteOrderMarkLoads`. Seed test files the way people actually write them.
 
 ## In the process
+
+**The player's progress and play times went into the public docs** (Codex P1 and the deep audit on #66; #65's already merged).
+- What: #66's WORKLOG entry quoted the player's message naming a character's class and its corridor progress, and gave the times of a login and two Abyss entries read from the meter's log; ARCHITECTURE gave the number of corridors run. #65's entry, merged a few hours before without a review (the player asked to skip CI and reviews), quoted two of the roster's cells, the player's Nightmare and Ascension values. The repository is public, and AGENTS.md forbids personal progress and private logs in it.
+- Why: the "Why" of an entry quotes the player's request verbatim, and requests that report a problem carry their own numbers; times read from the log were written as evidence of what was found. The rule was known, and was applied to code and fixtures, not to quotations and findings in the docs. #65 had no reviewer to catch it.
+- Guard: before committing docs, read each quotation and finding for the player's numbers (counts, energy, Kina, combat power), character names or classes tied to them, and times from their logs; tell the case without them ("corridors run with the meter closed showed 0"). A change merged without review gets the same read before its PR is opened.
 
 **The effects' lag was put down to the development builds without asking whether it came without them** (Harry, 2026-10-30: "no, it lagged when claude wasn't even open"; before #64).
 - What: Harry reported the bar effects at 10 to 15 fps at times. A compiler server was found running at normal priority after a build meant to be at idle priority (the C# compiler server starts itself at normal priority whatever starts it, and is reused by later builds), and the lag was called "likely" those builds. The lag had come with no build running.

@@ -54,9 +54,9 @@ public sealed record KinaBalance(long? Kina, long? Bound, DateTimeOffset SeenAt)
 public sealed record CharacterProgress(CharacterIdentity Character, IReadOnlyDictionary<uint, EntryCount> Entries, KinaBalance? Kina = null)
 {
     /// <summary>
-    /// The time entries the game has sent for this character since its login's list, keyed by entry id, by the same rules
-    /// as <see cref="Entries"/>; an id is in one or the other, as the game last sent it (a passage turns from a time into a
-    /// count once used).
+    /// The Abyss passages' time entries the game has sent for this character since its login's list, keyed by entry id,
+    /// by the same rules as <see cref="Entries"/>; a passage is in one or the other, as the game last sent it (it turns
+    /// from a time into a count once used). Other time entries are not kept.
     /// </summary>
     public IReadOnlyDictionary<uint, EntryTime> Times { get; init; } = new Dictionary<uint, EntryTime>();
 
@@ -91,7 +91,7 @@ public static class EntryIds
     /// layer's artifact 100N (<see cref="AbyssArtifacts.LowerLayer"/>), in that order. One not yet run in the current holding
     /// comes as a time entry, its usage time left (2:10 when unused); a used one as a count with no value; all three as
     /// counts also before the passages are handed out, on the first Abyss visit after a siege (A2Tools' Roster plugin,
-    /// 2026-10-25, against the game: "0/3 on Nully with three, 2/3 on Nullception with one").
+    /// 2026-10-25, checked there against what the game showed for a character with all three still to run and one with one).
     /// </summary>
     public static IReadOnlyList<uint> AbyssPassages { get; } = [10_000_001, 10_000_002, 10_000_003];
 }
