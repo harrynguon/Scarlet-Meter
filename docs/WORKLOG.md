@@ -6,13 +6,15 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 **What:** `EntryListTap` no longer logs which records bring the Abyss passages; `ThePassagesGoWithTheCountsAsTimesOrCounts` now checks that nothing of them is logged.
 
-**Why:** the line was added in #66 to learn whether entering the Abyss sends the passages. In the game, on the cube copy at b71bb88 (main eb9faee), a character switch with the meter open brought the entry list with all three passages, which the roster kept and counted; the Abyss entry straight after brought none. So the count in the Abyss is the one read at the login before it. Then Harry: "if its working then please implement it. remove the diagnostic log likne". ARCHITECTURE and HANDOFF record the result: the login part is checked, a run made with the meter closed and a corridor entered and left with it open are still to see.
+**Why:** the line was added in #66 to learn whether entering the Abyss sends the passages. In the game, on main eb9faee as built into the cube copy (its private additions touch neither the entry list nor the roster), a character switch with the meter open brought the entry list with all three passages, which the roster kept and counted; the Abyss entry straight after brought none. So the count in the Abyss is the one read at the login before it. Then Harry: "if its working then please implement it. remove the diagnostic log likne". ARCHITECTURE and HANDOFF record the result: the login part is checked, a run made with the meter closed and a corridor entered and left with it open are still to see.
 
 **Checks (SDK 10.0.402, at idle priority with no shared compiler server):** `scripts/Build.ps1` Debug 921/921.
 
 **Not checked:** the meter in the game after this change (only a log line goes).
 
-**Next:** the PR, a standard audit, Codex and CI; then the merge, per Harry's request to finish it.
+**Standard audit on #67 (approve with nits), addressed:** a blank line the removal left in the tap; HANDOFF no longer says how many passages the row counted; the tested commit is given as main eb9faee, not the private branch's.
+
+**Next:** Codex and CI; then the merge, per Harry's request to finish it.
 
 ## 2026-10-30 — Corridors from the game's passages
 

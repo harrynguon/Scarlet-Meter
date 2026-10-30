@@ -231,7 +231,6 @@ internal sealed class EntryListTap : IRecordReader
             if (!awaitingOwner && !ownerUnconfirmed && owner is not null && (read.Counts.Count > 0 || passageTimes.Count > 0)) progress = Snapshot(owner);
         }
         if (read.IsWholeList) logger.LogInformation("Entry list read ({Count} counts); waiting for the game to name the character.", read.Counts.Count);
-
         if (odyleChanged)
         {
             logger.LogInformation("Odyle energy changed, read from {Record}.",
