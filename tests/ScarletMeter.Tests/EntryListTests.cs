@@ -828,6 +828,45 @@ public sealed class EntryListTests
         Assert.Equal(new ShugoKeys(6, 1), tap.Shugo);
     }
 
+    // The Dimensional Invasion reward keys come in the same list as the Shugo keys, entry 8, by the same rules: read from
+    // the stream, an update following, kept across a reset, gone with a login's list without them.
+    [Fact]
+    public void TheEngineReadsTheInvasionKeysFromTheStream()
+    {
+        using var host = new TestEngineHost(CaptureMode.None);
+        var engine = host.Services.GetRequiredService<ICombatEngine>();
+        var stream = host.Services.GetRequiredService<TcpStreamBuffer>();
+        Assert.Null(engine.InvasionKeys);
+
+        Synchronise(stream);
+        // Entry 8, written as the number A2Tools knows it by, not through the constant, so the constant cannot drift.
+        stream.AddData("synthetic", EntryListRecordWriter.List([Odyle, new(1, 12, 3), new(8, 6, 0)]), 0);
+        Assert.Equal(8u, EntryIds.DimensionalInvasionKeys);
+        Assert.Equal(new InvasionKeys(6, 0), engine.InvasionKeys);
+        Assert.Equal(new ShugoKeys(12, 3), engine.ShugoKeys); // each its own
+        stream.AddData("synthetic", EntryListRecordWriter.Update([new(8, 5, 2)]), 0);
+        Assert.Equal(new InvasionKeys(5, 2), engine.InvasionKeys);
+        engine.Reset();
+        Assert.Equal(new InvasionKeys(5, 2), engine.InvasionKeys);
+        stream.AddData("synthetic", EntryListRecordWriter.List([Odyle]), 0); // a login's list without them
+        Assert.Null(engine.InvasionKeys);
+    }
+
+    // Another character named with no list between drops the last one's counts, the invasion keys with them.
+    [Fact]
+    public void TheInvasionKeysGoWithTheCounts()
+    {
+        var tap = NewTap(new() { [7] = Alpha, [9] = Beta }, new FakeTimeProvider(Start));
+        tap.Observe(EntryListRecordWriter.List([Odyle, new(EntryIds.DimensionalInvasionKeys, 7, 0)]));
+        Assert.Equal(new InvasionKeys(7, 0), tap.Invasion); // before the character is named
+        tap.Observe(SelfRecord(7));
+        Assert.Equal(new InvasionKeys(7, 0), tap.Invasion);
+        tap.Observe(SelfRecord(9)); // another character, no list between
+        Assert.Null(tap.Invasion);
+        tap.Observe(EntryListRecordWriter.List([Odyle, new(EntryIds.DimensionalInvasionKeys, 1, 0)]));
+        Assert.Equal(new InvasionKeys(1, 0), tap.Invasion);
+    }
+
     // Most of the game's records arrive in LZ4 bundles (ff ff), which the tap opens with upstream's own PacketProcessor.
     [Fact]
     public void TheEngineReadsOdyleEnergyInsideABundle()
@@ -1018,6 +1057,7 @@ public sealed class EntryListTests
         feed.Begin(clock);
         Assert.Equal(new OdyleEnergy(420, 1200), engine.OdyleEnergy);
         Assert.Equal(new ShugoKeys(15, 3), engine.ShugoKeys); // the overlay's keys in --demo (audit on #57)
+        Assert.Equal(new InvasionKeys(6, 0), engine.InvasionKeys);
         var login = Assert.Single(raised);
         var user = DemoRoster.Party.Single(member => member.IsUser);
         Assert.Equal(user.Name, login.Character.Name);

@@ -25,7 +25,13 @@ public sealed record RosterFile
     /// when the meter starts. A file from before them has none; an earlier build passes them over when it reads the file
     /// and leaves them out when it saves it, so they come back with each server's next reading.
     /// </summary>
-    public IReadOnlyList<RosterShugoKeys> ShugoKeys { get; init; } = [];
+    public IReadOnlyList<RosterServerKeys> ShugoKeys { get; init; } = [];
+
+    /// <summary>
+    /// The Dimensional Invasion reward keys on each server the game said them on, one entry per server, as
+    /// <see cref="ShugoKeys"/>: the overlay's last known keys when the meter starts. A file from before them has none.
+    /// </summary>
+    public IReadOnlyList<RosterServerKeys> InvasionKeys { get; init; } = [];
 }
 
 /// <summary>How a character's basic Odyle energy cap is chosen.</summary>
@@ -158,11 +164,12 @@ public sealed record RosterPassages(IReadOnlyList<bool> Used, DateTimeOffset Rea
 public sealed record RosterKina(long? Kina, long? Bound, DateTimeOffset SeenAt);
 
 /// <summary>
-/// The Shugo Festival keys on one server, as the game last said there (they are the server's, shared by its
-/// characters): the keys left, the extra from recharge items, and when. Untrusted on load (<see cref="RosterNormalizer"/>).
+/// One server's keys of a kind the server's characters share (the Shugo Festival keys, the Dimensional Invasion reward
+/// keys), as the game last said there: the keys left, the extra from recharge items, and when. Untrusted on load
+/// (<see cref="RosterNormalizer"/>).
 /// </summary>
 /// <param name="ServerId">The server's id (Elyos 1001 and up, Asmodian 2001 and up, Global's among them).</param>
-public sealed record RosterShugoKeys(int ServerId, int Keys, int Extra, DateTimeOffset SeenAt)
+public sealed record RosterServerKeys(int ServerId, int Keys, int Extra, DateTimeOffset SeenAt)
 {
     /// <summary>The keys as a count, for the roster's estimates (<see cref="RosterRules.ContentNow"/>).</summary>
     [JsonIgnore]

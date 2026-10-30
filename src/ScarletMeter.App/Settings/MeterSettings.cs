@@ -204,6 +204,12 @@ public sealed record AppearanceSettings
     /// in the same list as the Odyle energy (ICombatEngine.ShugoKeys). On for a settings file from before the switch.
     /// </summary>
     public bool ShowShugoKeys { get; init; } = true;
+
+    /// <summary>
+    /// Show the Dimensional Invasion reward keys left of the Shugo Festival keys, out of 7, once the game has sent them: in
+    /// the same list (ICombatEngine.InvasionKeys). On for a settings file from before the switch.
+    /// </summary>
+    public bool ShowInvasionKeys { get; init; } = true;
 }
 
 /// <summary>Overlay behaviour.</summary>

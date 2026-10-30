@@ -150,6 +150,12 @@ public static class RosterRules
     /// <summary>The Shugo Festival keys (entry 1), a server's, shared by its characters: +3 at each daily reset, up to 21.</summary>
     public static readonly ContentRule Shugo = new("shugo", "Shugo Festival keys", 21, 3, Weekly: false);
 
+    /// <summary>
+    /// The Dimensional Invasion reward keys (entry 8), a server's, shared by its characters: +1 at each daily reset, up to 7
+    /// (A2Tools' Roster plugin, as another roster app shows them; the game's own dialog writes them out of 7).
+    /// </summary>
+    public static readonly ContentRule Invasion = new("invasion", "Dimensional Invasion keys", 7, 1, Weekly: false);
+
     /// <summary>How many of a character's Artifact Corridor entries are kept: more than a siege's worth.</summary>
     public const int CorridorRunsKept = 12;
 

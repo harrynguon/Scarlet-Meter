@@ -432,10 +432,55 @@ button {
     color: #ffd60a;
 }
 
-/* The Odyle energy and Shugo keys the roster last knew, estimated, until the game sends its own this run (MeterPage's
+/* Dimensional Invasion reward keys (MeterPage, InvasionText), left of the Shugo keys once the game has sent them (Harry,
+   2026-10-31): a key of Scarlet's own with a diamond bow in violet, apart from the keys' yellow and the ping's colours,
+   the keys left out of 7 as the game's dialog writes them ("3/7"), any extra in brackets before the cap. They take the
+   push to the right, the keys or energy after them 8 px away, as one group. On a narrow line they give way first (below). */
+.invasion {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.invasion + .shugo,
+.invasion + .odyle {
+    margin-left: -6px;
+}
+
+.invasion + .ping {
+    margin-left: 0;
+}
+
+.invasion-icon {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    fill: none;
+    stroke: #c4a1ff;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.invasion-keys {
+    color: var(--text);
+}
+
+.invasion-extra {
+    color: #c4a1ff;
+}
+
+.invasion-cap {
+    color: var(--muted);
+}
+
+/* The Odyle energy and the keys the roster last knew, estimated, until the game sends its own this run (MeterPage's
    ReadEnergy; Harry, 2026-10-28): ≈ before the number, dimmer and italic, as the roster shows its estimates (.estimate in
    views.css). */
 .odyle.last-known .odyle-basic,
+.invasion.last-known .invasion-keys,
 .shugo.last-known .shugo-keys {
     color: #c9c6d6;
     font-style: italic;
@@ -476,6 +521,23 @@ button {
 @container ov-totals (max-width: 314px) {
     .ping i {
         display: none;
+    }
+}
+
+/* Below 380 px (the line's 354 px inside its padding) the Dimensional Invasion keys give way, so the rest fits as it did
+   before them; the keys or energy after them then take the push to the right. From 380 px the line holds a party DPS of
+   999.9K/s, keys 7/7 and 21 (+12), energy 840 (+1,200) and a ping of 1043 ms with 3 px to spare (headless renders, #68);
+   an extra on the invasion keys, or the last known values' ≈ marks, with the widest of the rest, run past the line's
+   end, clipped. */
+@container ov-totals (max-width: 353px) {
+    .invasion {
+        display: none;
+    }
+
+    .invasion + .shugo,
+    .invasion + .odyle,
+    .invasion + .ping {
+        margin-left: auto;
     }
 }
 

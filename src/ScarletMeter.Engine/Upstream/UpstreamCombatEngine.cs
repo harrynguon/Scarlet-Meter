@@ -88,6 +88,8 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
 
     public ShugoKeys? ShugoKeys => entries.Shugo;
 
+    public InvasionKeys? InvasionKeys => entries.Invasion;
+
     public event EventHandler<OdyleEnergy>? OdyleEnergyUpdated
     {
         add => entries.OdyleUpdated += value;

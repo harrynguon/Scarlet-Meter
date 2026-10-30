@@ -68,6 +68,8 @@
                                    Value="@S.Appearance.ShowOdyleEnergy" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { ShowOdyleEnergy = v } }))" />
                     <ToggleSetting Label="Show Shugo Festival keys" Description="Beside the Odyle energy: the keys left, which your characters on a server share, with the extra from recharge items in brackets when there is any. The game sends them with the Odyle energy, at login, after a server transfer and when they change, so after starting the meter mid-session they appear with the next of those."
                                    Value="@S.Appearance.ShowShugoKeys" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { ShowShugoKeys = v } }))" />
+                    <ToggleSetting Label="Show Dimensional Invasion keys" Description="Left of the Shugo Festival keys: the reward keys left out of 7, which your characters on a server share. The game sends them with the Odyle energy, so after starting the meter mid-session the last ones it said show, estimated (≈), until the next login or change. On a narrow meter they give way first."
+                                   Value="@S.Appearance.ShowInvasionKeys" ValueChanged="@(v => Change(s => s with { Appearance = s.Appearance with { ShowInvasionKeys = v } }))" />
                     @* The roster also opens from the overlay's Odyle energy; this way works with it hidden or not sent yet. *@
                     <div class="setting">
                         <span class="text">

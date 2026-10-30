@@ -100,6 +100,12 @@ public interface ICombatEngine : IDisposable
     ShugoKeys? ShugoKeys { get; }
 
     /// <summary>
+    /// The Dimensional Invasion reward keys as the game last sent them, or null until it sends them: in the same list as
+    /// the Shugo Festival keys, by the same rules (<see cref="ShugoKeys"/>).
+    /// </summary>
+    InvasionKeys? InvasionKeys { get; }
+
+    /// <summary>
     /// The character being played, from the character's own record that upstream reads at login (and on loads after it),
     /// or null while that is not sure: until one is named, after a login's list until the record naming who logged in,
     /// and after a move to a new connection (a server change, or a switch whose first records were lost) until a record

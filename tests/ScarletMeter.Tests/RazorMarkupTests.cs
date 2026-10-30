@@ -616,7 +616,7 @@ public sealed partial class RazorMarkupTests
 
         var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
         Assert.Matches(@"snapshot = Engine\.GetSnapshot\(\);\s*var now = Clock\.GetUtcNow\(\);\s*ReadEnergy\(now\);", code);
-        Assert.Matches(@"private void ReadEnergy\(DateTimeOffset now\)\s*\{\s*var shown = LastKnownValues\.Shown\(Engine\.OdyleEnergy,", code);
+        Assert.Matches(@"private void ReadEnergy\(DateTimeOffset now\)\s*\{\s*var shown = LastKnownValues\.Shown\(\s*Engine\.OdyleEnergy,", code);
         Assert.DoesNotContain("OdyleEnergyUpdated", code);
 
         var css = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "app.css"));
@@ -625,6 +625,50 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"margin-left:\s*auto;", Block(css, ".odyle"));
         Assert.Matches(@"margin-left:\s*0;", Block(css, ".odyle + .ping"));
         Assert.Matches(@"margin-left:\s*auto;", Block(css, ".ping")); // without the energy, the ping still ends the line
+    }
+
+    // The Dimensional Invasion reward keys sit left of the Shugo keys (Harry, 2026-10-31), once the game has sent them and
+    // while "Show Dimensional Invasion keys" is on: keys out of 7 as the game's dialog writes them ("3/7", no space before
+    // the cap; any extra before it), ≈ while last known. They group 8 px from what follows and take the push to the right;
+    // the key is violet, apart from the Shugo keys' yellow and the ping's colours. Below 380 px they give way, and what
+    // follows takes the push again: from there the widest values fit (headless renders, WORKLOG).
+    [Fact]
+    public void InvasionKeysSitLeftOfTheShugoKeysAndGiveWayOnANarrowLine()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        var markup = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
+        var totals = Regex.Match(markup, @"(?s)<div class=""ov-totals"">(?<body>.*?)\n    </div>").Groups["body"].Value;
+        Assert.Matches(@"(?s)class=""accent"">.*@if \(appearance\.ShowInvasionKeys && invasion is \{ \} invasionKeys\).*<span class=""invasion @\(invasionLastKnown \? ""last-known"" : """"\)"" title=""@InvasionTitle"">.*"
+            + @"@if \(appearance\.ShowShugoKeys && shugo is \{ \} keys\)", totals);
+        Assert.Contains(@"<svg class=""invasion-icon""", totals); // a key of Scarlet's own drawing
+        Assert.Contains(@"<span class=""invasion-count""><span class=""invasion-keys"">@(invasionLastKnown ? ""≈"" : """")@InvasionText.Keys(invasionKeys)</span>@if (InvasionText.Extra(invasionKeys) is { Length: > 0 } invasionExtra)", totals);
+        Assert.Matches(@"\{<span class=""invasion-extra"">@invasionExtra</span>\}<span class=""invasion-cap"">@InvasionText\.OutOf</span></span>", totals);
+        Assert.Equal(("1", "", " (+2)", "/7"), (ScarletMeter.App.Formatting.InvasionText.Keys(new(1, 0)), ScarletMeter.App.Formatting.InvasionText.Extra(new(1, 0)),
+            ScarletMeter.App.Formatting.InvasionText.Extra(new(1, 2)), ScarletMeter.App.Formatting.InvasionText.OutOf));
+
+        var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
+        Assert.Contains("(invasion, invasionLastKnown) = (shown.Invasion, shown.InvasionLastKnown);", code);
+        Assert.Contains("ValueChanged=\"@(v => Change(s => s with { Appearance = s.Appearance with { ShowInvasionKeys = v } }))\"",
+            File.ReadAllText(Path.Combine(app, "Pages", "SettingsPage.razor")));
+
+        var css = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "app.css"));
+        static string Block(string source, string selector) =>
+            Regex.Match(source, @"(?m)^" + Regex.Escape(selector) + @" \{(?<body>[^}]*)\}").Groups["body"].Value;
+        Assert.Matches(@"margin-left:\s*auto;", Block(css, ".invasion"));
+        Assert.Matches(@"(?m)^\.invasion \+ \.shugo,\s*\.invasion \+ \.odyle \{\s*margin-left:\s*-6px;", css);
+        Assert.Matches(@"margin-left:\s*0;", Block(css, ".invasion + .ping"));
+        Assert.Matches(@"stroke:\s*#c4a1ff;", Block(css, ".invasion-icon"));
+        Assert.Matches(@"color:\s*#c4a1ff;", Block(css, ".invasion-extra"));
+        Assert.DoesNotMatch(@"#c4a1ff", Block(css, ":root"));
+        Assert.Matches(@"\.invasion\.last-known \.invasion-keys,\s*\.shugo\.last-known \.shugo-keys \{\s*color:\s*#c9c6d6;\s*font-style:\s*italic;", css);
+
+        var giveWay = Regex.Match(css, @"@container ov-totals \(max-width: (?<w>\d+)px\) \{\s*\.invasion \{\s*display:\s*none;\s*\}\s*"
+            + @"\.invasion \+ \.shugo,\s*\.invasion \+ \.odyle,\s*\.invasion \+ \.ping \{\s*margin-left:\s*auto;\s*\}\s*\}");
+        Assert.True(giveWay.Success, "the invasion keys give way on a narrow line, and what follows takes the push");
+        var side = int.Parse(Regex.Match(Block(css, ".ov-totals"), @"padding:\s*\d+px (?<x>\d+)px").Groups["x"].Value, System.Globalization.CultureInfo.InvariantCulture);
+        // The query measures the line inside its padding, inside the panel's 1 px border: below 380 px of overlay.
+        Assert.Equal(379, int.Parse(giveWay.Groups["w"].Value, System.Globalization.CultureInfo.InvariantCulture) + 2 * side + 2);
+        Assert.True(giveWay.Index > css.IndexOf(".invasion + .ping {", StringComparison.Ordinal), "the query comes after the rules it overrides");
     }
 
     // The Shugo Festival keys sit left of the Odyle energy (Harry, 2026-10-27: "move it to the left of the odyle energy
@@ -645,7 +689,7 @@ public sealed partial class RazorMarkupTests
 
         // Read with the energy on the refresh loop and when the page starts (ReadEnergy).
         var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
-        Assert.Matches(@"private void ReadEnergy\(DateTimeOffset now\)\s*\{\s*var shown = LastKnownValues\.Shown\(Engine\.OdyleEnergy, Engine\.ShugoKeys,", code);
+        Assert.Matches(@"private void ReadEnergy\(DateTimeOffset now\)\s*\{\s*var shown = LastKnownValues\.Shown\(\s*Engine\.OdyleEnergy, Engine\.ShugoKeys, Engine\.InvasionKeys,", code);
         Assert.Matches(@"snapshot = Engine\.GetSnapshot\(\);\s*var now = Clock\.GetUtcNow\(\);\s*ReadEnergy\(now\);", code);
         Assert.Matches(@"ReadEnergy\(Clock\.GetUtcNow\(\)\);\s*Settings\.Changed \+= OnSettingsChanged;", code);
         Assert.Contains("ValueChanged=\"@(v => Change(s => s with { Appearance = s.Appearance with { ShowShugoKeys = v } }))\"",
@@ -691,8 +735,9 @@ public sealed partial class RazorMarkupTests
         var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
         var code = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor.cs"));
         var read = Regex.Match(code, @"(?s)private void ReadEnergy\(DateTimeOffset now\)\s*\{(?<body>.*?)\n    \}").Groups["body"].Value;
-        Assert.Matches(@"LastKnownValues\.Shown\(Engine\.OdyleEnergy, Engine\.ShugoKeys, \(\) => Roster\.LastKnown, now, calendars\.For\(alertSettings\.ServerOffsetHours\)\)", read);
+        Assert.Matches(@"LastKnownValues\.Shown\(\s*Engine\.OdyleEnergy, Engine\.ShugoKeys, Engine\.InvasionKeys, \(\) => Roster\.LastKnown, now, calendars\.For\(alertSettings\.ServerOffsetHours\)\)", read);
         Assert.Matches(@"\(odyle, odyleLastKnown, shugo, shugoLastKnown\) = \(shown\.Odyle, shown\.OdyleLastKnown, shown\.Shugo, shown\.ShugoLastKnown\);", read);
+        Assert.Matches(@"\(invasion, invasionLastKnown\) = \(shown\.Invasion, shown\.InvasionLastKnown\);", read);
 
         var markup = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
         Assert.Contains(@"<span class=""shugo @(shugoLastKnown ? ""last-known"" : """")"" title=""@ShugoTitle"">", markup);
@@ -703,7 +748,7 @@ public sealed partial class RazorMarkupTests
         Assert.Matches(@"ShugoTitle => shugoLastKnown\s*\? ""Shugo Festival keys, estimated \(≈\)", code);
 
         var css = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "app.css"));
-        var lastKnown = Regex.Match(css, @"(?m)^\.odyle\.last-known \.odyle-basic,\s*\.shugo\.last-known \.shugo-keys \{(?<body>[^}]*)\}").Groups["body"].Value;
+        var lastKnown = Regex.Match(css, @"(?m)^\.odyle\.last-known \.odyle-basic,\s*\.invasion\.last-known \.invasion-keys,\s*\.shugo\.last-known \.shugo-keys \{(?<body>[^}]*)\}").Groups["body"].Value;
         Assert.Matches(@"font-style:\s*italic;", lastKnown);
         Assert.Matches(@"color:\s*#c9c6d6;", lastKnown); // the roster's estimate colour
         Assert.Matches(@"(?m)^\.roster-table \.estimate \{ color: #c9c6d6; font-style: italic; \}", File.ReadAllText(Path.Combine(app, "wwwroot", "css", "views.css")));

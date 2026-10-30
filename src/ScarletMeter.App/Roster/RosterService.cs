@@ -44,8 +44,10 @@ public sealed class RosterService : IDisposable
     private readonly Dictionary<RosterKey, RosterCharacter> characters = [];
     // The Abyss's lower-layer artifact holders by server id, as the game last said on each.
     private readonly Dictionary<int, RosterArtifacts> artifacts = [];
-    // The Shugo Festival keys by server id, as the game last said on each (they are the server's).
-    private readonly Dictionary<int, RosterShugoKeys> shugoKeys = [];
+    // The Shugo Festival keys and the Dimensional Invasion keys by server id, as the game last said on each (they are the
+    // server's).
+    private readonly Dictionary<int, RosterServerKeys> shugoKeys = [];
+    private readonly Dictionary<int, RosterServerKeys> invasionKeys = [];
     private RosterKey? current;
     // The map the engine named last (null: not known), to see the corridor being entered rather than loaded again, and the
     // last map it knew, to tell a reconnection inside the corridor (unknown, then the corridor again) from an entry.
@@ -80,6 +82,7 @@ public sealed class RosterService : IDisposable
         foreach (var character in loaded.File.Characters) characters[character.Key] = character;
         foreach (var entry in loaded.File.Artifacts) artifacts[entry.ServerId] = entry;
         foreach (var entry in loaded.File.ShugoKeys) shugoKeys[entry.ServerId] = entry;
+        foreach (var entry in loaded.File.InvasionKeys) invasionKeys[entry.ServerId] = entry;
         CanSave = loaded.CanSave;
         Notice = loaded.Notice;
     }
@@ -112,9 +115,15 @@ public sealed class RosterService : IDisposable
     }
 
     /// <summary>The Shugo Festival keys by server id, as the game last said on each (a copy).</summary>
-    public IReadOnlyDictionary<int, RosterShugoKeys> ShugoKeys
+    public IReadOnlyDictionary<int, RosterServerKeys> ShugoKeys
     {
-        get { lock (gate) return new Dictionary<int, RosterShugoKeys>(shugoKeys); }
+        get { lock (gate) return new Dictionary<int, RosterServerKeys>(shugoKeys); }
+    }
+
+    /// <summary>The Dimensional Invasion keys by server id, as the game last said on each (a copy).</summary>
+    public IReadOnlyDictionary<int, RosterServerKeys> InvasionKeys
+    {
+        get { lock (gate) return new Dictionary<int, RosterServerKeys>(invasionKeys); }
     }
 
     /// <summary>
@@ -133,7 +142,10 @@ public sealed class RosterService : IDisposable
                 if (current is { } key) characters.TryGetValue(key, out character);
                 else character = characters.Values.MaxBy(c => c.LastSeen);
                 if (character is null) return null;
-                return new RosterLastKnown(character, character.ServerId > 0 && shugoKeys.TryGetValue(character.ServerId, out var keys) ? keys : null);
+                return new RosterLastKnown(
+                    character,
+                    character.ServerId > 0 && shugoKeys.TryGetValue(character.ServerId, out var shugo) ? shugo : null,
+                    character.ServerId > 0 && invasionKeys.TryGetValue(character.ServerId, out var invasion) ? invasion : null);
             }
         }
     }
@@ -181,8 +193,11 @@ public sealed class RosterService : IDisposable
             };
             characters[key] = character;
             current = key;
-            if (progress.Entries.TryGetValue(EntryIds.ShugoFestivalKeys, out var keys) && ServerIdOf(who) is > 0 and var serverId)
-                KeepShugoKeys(serverId, keys, now);
+            if (ServerIdOf(who) is > 0 and var serverId)
+            {
+                if (progress.Entries.TryGetValue(EntryIds.ShugoFestivalKeys, out var shugo)) KeepServerKeys(shugoKeys, serverId, shugo, now);
+                if (progress.Entries.TryGetValue(EntryIds.DimensionalInvasionKeys, out var invasion)) KeepServerKeys(invasionKeys, serverId, invasion, now);
+            }
             MarkChanged();
             held = SettleHeldRuns(who, now);
             heldArtifactsKept = SettleHeldArtifacts(who, now);
@@ -306,13 +321,13 @@ public sealed class RosterService : IDisposable
         return new RosterPassages(used, readFrom, seenAt, leftAt);
     }
 
-    // Under the gate: the Shugo Festival keys the game said for the character's server, kept for that server when read
-    // later than the ones kept there (a kept reading dated after now does not count as later, as in Later): they are the
-    // server's, so another character's reading on it replaces them.
-    private void KeepShugoKeys(int serverId, EntryCount read, DateTimeOffset now)
+    // Under the gate: keys of a kind the game said for the character's server (the Shugo Festival keys, the Dimensional
+    // Invasion keys), kept in `kept` for that server when read later than the ones kept there (a kept reading dated after
+    // now does not count as later, as in Later): they are the server's, so another character's reading on it replaces them.
+    private static void KeepServerKeys(Dictionary<int, RosterServerKeys> kept, int serverId, EntryCount read, DateTimeOffset now)
     {
-        if (shugoKeys.TryGetValue(serverId, out var kept) && kept.SeenAt <= now && read.SeenAt <= kept.SeenAt) return;
-        shugoKeys[serverId] = new RosterShugoKeys(serverId, read.First, read.Second, read.SeenAt);
+        if (kept.TryGetValue(serverId, out var known) && known.SeenAt <= now && read.SeenAt <= known.SeenAt) return;
+        kept[serverId] = new RosterServerKeys(serverId, read.First, read.Second, read.SeenAt);
     }
 
     // The Kina from the report when it was read later than the one kept (a kept one dated after now does not count as later,
@@ -512,6 +527,7 @@ public sealed class RosterService : IDisposable
                     Characters = [.. characters.Values.OrderBy(c => c.Server, StringComparer.Ordinal).ThenBy(c => c.Name, StringComparer.Ordinal)],
                     Artifacts = [.. artifacts.Values.OrderBy(entry => entry.ServerId)],
                     ShugoKeys = [.. shugoKeys.Values.OrderBy(entry => entry.ServerId)],
+                    InvasionKeys = [.. invasionKeys.Values.OrderBy(entry => entry.ServerId)],
                 };
                 dirty = false;
             }

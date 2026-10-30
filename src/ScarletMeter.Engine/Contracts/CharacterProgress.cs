@@ -87,6 +87,13 @@ public static class EntryIds
     public const uint ShugoFestivalKeys = 1;
 
     /// <summary>
+    /// Dimensional Invasion reward keys: keys left, then the extra from recharge items; the server's, shared by its
+    /// characters, +1 a day up to 7 (A2Tools' Roster plugin's content table, its <c>invasion</c> row; the id checked there
+    /// against the game, 2026-10-24: "Invasion 7 to 6 as a key was used").
+    /// </summary>
+    public const uint DimensionalInvasionKeys = 8;
+
+    /// <summary>
     /// The Abyss passages, a character's entries to the Artifact Corridors: passage 1000000N is the corridor of the lower
     /// layer's artifact 100N (<see cref="AbyssArtifacts.LowerLayer"/>), in that order. One not yet run in the current holding
     /// comes as a time entry, its usage time left (2:10 when unused); a used one as a count with no value; all three as

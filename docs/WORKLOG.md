@@ -2,6 +2,35 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-31 — Dimensional Invasion keys on the overlay
+
+**What:**
+- **Engine:** reads entry 8 of the entry list, the Dimensional Invasion reward keys (`EntryIds.DimensionalInvasionKeys`, `InvasionKeys`, `EntryListTap.Invasion`, `ICombatEngine.InvasionKeys`), by the Shugo keys' rules. The demo now sends 6.
+- **Roster:** keeps them per server (`RosterFile.InvasionKeys`). The stored record both kinds of key now share is renamed `RosterServerKeys` (it was `RosterShugoKeys`; the JSON is unchanged), as are `RosterService.KeepServerKeys` and the normalizer's `CleanServerKeys`, which now serve both, with each kind's own repair notices.
+- **Estimates:** `LastKnownValues` gives the overlay the last ones, estimated +1 at each daily reset up to 7 (`RosterRules.Invasion`).
+- **Overlay:** shows them left of the Shugo keys as the game's dialog writes them, out of 7 ("3/7", `Formatting/InvasionText`), ≈ while last known, behind "Show Dimensional Invasion keys" (on by default).
+- **Narrow meter:** below 380 px they give way, so the line holds what it did before them.
+
+**Why:** Harry, with a screenshot of the game's teleport dialog ("Dimensional Invasion Reward Key"): "how about dimensional invasion keys?", then chose the overlay beside the Shugo keys.
+- **Source:** A2Tools' Roster plugin's content table has them as entry 8, a server's, +1 a day up to 7. The id was checked there against the game (a key used took it from 7 to 6); the cap and recharge are as another roster app shows them.
+- **Notices:** THIRD-PARTY-NOTICES names the row, at the commit already cited (checked on 2026-10-31 that the row is in it).
+
+**Checks (SDK 10.0.402, at idle priority with no shared compiler server):**
+- `scripts/Build.ps1` Debug 926/926.
+- Headless renders of the totals line with the branch's stylesheet, at overlay widths from 320 to 420 px, synthetic values:
+  - with the keys shown, the widest values (999.9K/s, 7/7, 21 (+12), 840 (+1,200), 1043 ms) need 380 px, with 3.2 px to spare there;
+  - below it, with the keys given way, every case measures exactly as without them (5.3 px to spare at 320 with the widest);
+  - the line stays 26 px tall throughout.
+- Four existing tests pinned what changed, and were updated: `ReadEnergy`'s call (twice), the last known style's selector, and the earlier-file settings test.
+- Fail-first on a scratch copy, controls passing before and after: 24 of 24 mutations caught across the engine, the demo, the roster service, the normalizer, the estimates, the rules, the page, the stylesheet, the settings and the text. On the first run, saved keys not loaded when the meter starts was missed; the service test now starts a second service from the saved file, and it is caught.
+
+**Not checked:**
+- Any of it in the game: the id, cap and recharge are A2Tools'.
+- Whether the game sends an extra for these keys.
+- The give-way rule on the running meter.
+
+**Next:** the PR, a deep audit (saved data and validation), Codex and CI; then the merge with Harry's go-ahead.
+
 ## 2026-10-30 — The passages' log line removed
 
 **What:** `EntryListTap` no longer logs which records bring the Abyss passages; `ThePassagesGoWithTheCountsAsTimesOrCounts` now checks that nothing of them is logged.
