@@ -8,10 +8,12 @@ starts no animation, so it would prove nothing). Two synthetic pages load the ch
 Edge (no window, a throwaway profile with sync off), and their results are read over the DevTools protocol on
 127.0.0.1:
 - an infinite animation is driven and keeps its timing; one the page paused stays where it is; a width transition
-  reaches its end and fires transitionend; a one-off animation fires animationend; a delayed one is picked up;
-- on a screen faster than 70 Hz, an infinite animation and bars whose width transitions restart ten times a second
-  (as the meter's do) change at most 70 times a second; on a slower screen there is nothing to cap and this is
-  skipped, saying so.
+  reaches its end and fires transitionend; a one-off animation fires animationend; a delayed one is picked up; a
+  transition restarted eight times is paused two frames after each start, so taken over on its first frame;
+- on a screen faster than 70 Hz, an infinite animation changes at most 70 times a second, and on one faster than
+  80 Hz, bars whose width transitions restart ten times a second (as the meter's do) at most 80: their 60 steps and up
+  to one more change at each restart, a new transition being taken over a frame in; on a slower screen there is
+  nothing to cap and the rate is skipped, saying so.
 The pages and profile live in a new folder in the user's temp directory, deleted after. Exits 1 when a check fails.
 Edge comes from its standard install folder, or -Edge (an absolute path).
 
@@ -39,8 +41,9 @@ $pages = @{
     'behaviour.html' = @"
 <!DOCTYPE html><html><head><meta charset="utf-8"><style>$style
 #loop { animation: spin 1s linear infinite; } #held { animation: spin 1s linear -0.25s infinite paused; }
+#restart { width: 10%; transition: width 400ms linear; }
 #bar { width: 10%; transition: width 120ms linear; } #once.go { animation: flash 300ms ease-out; } #late { animation: spin 1s linear 400ms infinite; }
-</style></head><body style="width:400px"><div id="loop"></div><div id="held"></div><div id="bar"></div><div id="once"></div><div id="late"></div>
+</style></head><body style="width:400px"><div id="loop"></div><div id="held"></div><div id="bar"></div><div id="once"></div><div id="late"></div><div id="restart"></div>
 <script src="frame-cap.js"></script><script>
 const events = [], at = {};
 document.addEventListener('transitionend', e => events.push('transitionend ' + e.target.id));
@@ -49,11 +52,29 @@ const x = id => new DOMMatrixReadOnly(getComputedStyle(document.getElementById(i
 const anim = id => document.getElementById(id).getAnimations()[0];
 setTimeout(() => { document.getElementById('bar').style.width = '90%'; document.getElementById('once').classList.add('go'); }, 200);
 setTimeout(() => { at.loop1 = anim('loop').currentTime; at.timeline1 = document.timeline.currentTime; }, 700);
-window.result = new Promise(done => setTimeout(() => done({
-  loopState: anim('loop').playState, loopTime: anim('loop').currentTime - at.loop1, timeline: document.timeline.currentTime - at.timeline1,
-  heldState: anim('held').playState, heldX: x('held'), barWidth: getComputedStyle(document.getElementById('bar')).width,
-  lateState: anim('late').playState, lateTime: anim('late').currentTime, events: events.join(', ')
-}), 1300));
+// A transition restarted is taken over on the frame after it starts, whether or not a step is due: two frames after
+// its width is set it is paused. Eight times, so that a cap taking over only on its steps (every fourth frame at 240 Hz)
+// passes by chance once in about 65,000 runs.
+const frames = n => new Promise(go => { const tick = () => (--n <= 0 ? go() : requestAnimationFrame(tick)); requestAnimationFrame(tick); });
+async function restarts() {
+  const states = [], el = document.getElementById('restart');
+  for (let n = 0; n < 8; n++) {
+    el.style.width = n % 2 ? '10%' : '90%';
+    await frames(2);
+    states.push(el.getAnimations()[0]?.playState ?? 'none');
+    await new Promise(go => setTimeout(go, 120));
+  }
+  return states.join(',');
+}
+window.result = new Promise(done => setTimeout(async () => {
+  const read = {
+    loopState: anim('loop').playState, loopTime: anim('loop').currentTime - at.loop1, timeline: document.timeline.currentTime - at.timeline1,
+    heldState: anim('held').playState, heldX: x('held'), barWidth: getComputedStyle(document.getElementById('bar')).width,
+    lateState: anim('late').playState, lateTime: anim('late').currentTime, events: events.join(', ')
+  };
+  read.restarts = await restarts();
+  done(read);
+}, 1300));
 </script></body></html>
 "@
     'rate.html' = @"
@@ -85,14 +106,20 @@ function Read-Page([string]$Page) {
     Start-Process -FilePath $Edge -ArgumentList $arguments | Out-Null
     try {
         $portFile = Join-Path $userData 'DevToolsActivePort'
-        for ($i = 0; $i -lt 100 -and -not (Test-Path -LiteralPath $portFile); $i++) { Start-Sleep -Milliseconds 100 }
-        $port = (Get-Content -LiteralPath $portFile)[0]
+        # Edge creates the file before it writes the port: wait for the port itself, not only the file.
+        $port = $null
+        for ($i = 0; $i -lt 100 -and -not $port; $i++) {
+            if (Test-Path -LiteralPath $portFile) { $port = @(Get-Content -LiteralPath $portFile -ErrorAction SilentlyContinue)[0] }
+            if (-not $port) { Start-Sleep -Milliseconds 100 }
+        }
+        if (-not $port) { throw "headless Edge gave no DevTools port for $Page" }
         $target = $null
         for ($i = 0; $i -lt 50 -and -not $target; $i++) {
             # In parentheses, so Windows PowerShell passes the list's items down the pipeline rather than the list.
             $target = (Invoke-RestMethod "http://127.0.0.1:$port/json/list") | Where-Object { $_.type -eq 'page' -and $_.url -like 'file:*' } | Select-Object -First 1
             if (-not $target) { Start-Sleep -Milliseconds 100 }
         }
+        if (-not $target) { throw "headless Edge showed no page for $Page" }
         $socket = [System.Net.WebSockets.ClientWebSocket]::new()
         $socket.ConnectAsync([uri]$target.webSocketDebuggerUrl, [Threading.CancellationToken]::None).Wait()
         # The page may still be loading when the target appears: wait for its result to exist, then for it to settle.
@@ -132,13 +159,18 @@ try {
     Check ($b.barWidth -eq '360px' -and $b.events -match 'transitionend bar') "a transition reaches its end and fires transitionend ($($b.barWidth))"
     Check ($b.events -match 'animationend once') 'a one-off animation fires animationend'
     Check ($b.lateState -eq 'paused' -and $b.lateTime -gt 0) 'a delayed animation is picked up'
+    Check ($b.restarts -eq (@('paused') * 8 -join ',')) "a restarted transition is taken over on the frame after it starts, eight times ($($b.restarts))"
 
     $r = Read-Page 'rate.html'
     if ($r.frames -le 70) {
         Write-Host "skip the rate: this screen draws $($r.frames) frames a second, so there is nothing to cap"
     } else {
         Check ($r.loops -le 70) "an infinite animation changes at most 70 times a second ($($r.loops) at $($r.frames) frames a second)"
-        Check ($r.widths -le 70) "bars whose transitions restart change at most 70 times a second ($($r.widths) at $($r.frames) frames a second)"
+        if ($r.frames -le 80) {
+            Write-Host "skip the restarting bars' rate: this screen draws $($r.frames) frames a second, no more than their limit"
+        } else {
+            Check ($r.widths -le 80) "bars whose transitions restart change at most 80 times a second ($($r.widths) at $($r.frames) frames a second)"
+        }
     }
 } finally {
     Start-Sleep -Milliseconds 500

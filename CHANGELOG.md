@@ -42,6 +42,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ### Changed
 
+- The bar effects' frame cap does over a third less work each time it moves them on, so fights with effects
+  on take a little less of your PC's time. ([#70](https://github.com/harrynguon/Scarlet-Meter/pull/70))
 - The meter does a little less in the background: two of upstream's timers that woke ten times a second each, with
   nothing to do, no longer run, and saving the settings no longer holds up the meter while the disk writes (it saves
   when its height changes, so at the start and end of fights). ([#69](https://github.com/harrynguon/Scarlet-Meter/pull/69))

@@ -2,6 +2,26 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-31 — The frame cap reads first, then writes
+
+**What:** `frame-cap.js`'s step reads every animation's state, and when it ends, before it writes any; then it makes the writes, each animation's in the order they had (pause on taking over, then finish or the new time). A failing read or write still lets that animation go (`letGo`). `Test-FrameCap.ps1` allows restarting bars up to 80 changes a second (LESSONS), checks that a restarted transition is taken over on its first frame, and waits for Edge's DevTools port itself rather than only its file (LESSONS).
+
+**Why:** part of Harry's request for "an extremely thorough check" of the meter's load with no change in what it does. The overlay review found that reading an animation's state after another's write makes the browser bring styles up to date there and then, so a step with N animations did about N style updates instead of one. Nothing a step writes changes what another animation reads: every value is set before the frame's own style update, as before.
+
+**Checks (in headless Edge, no window, at idle priority, a profile with sync off; a game was running, so nothing of the meter was launched):**
+- **Step time:** the synthetic eight-bar overlay (71 animations, widths changing ten times a second), three rounds of each script, timing the step and then a forced style update (`document.getAnimations()`), since the new step leaves its one update for the frame: 1.161, 1.114 and 1.102 ms before, 0.722, 0.651 and 0.724 ms after, 34 to 42% less, about 25 ms of the page's main thread a second at 60 steps. The PR first gave the step alone (1.27 to 1.39 ms against 0.21 to 0.24, "about a sixth"), which left out the update it moves (the audit's finding; LESSONS). The browser processes' CPU swung from 34 to 67% of a core between runs, too much to show the difference.
+- **Behaviour:** `Test-FrameCap.ps1` passes its nine checks, four runs in a row at 240 Hz (the first-frame check paused all 8 restarts each time). The new first-frame check failed on a scratch copy without the takeover between steps (two runs: 3 and 4 of the 8 restarts still running), where the rate checks had passed.
+- **Restarting bars:** across repeated runs their rate ranged from about 50 to 70 with either script (old 49.5 to 65, new 51.5 to 70.5). That is the mechanism's own spread, so the limit moved from 70 to 80, and the check runs only on a screen faster than 80 Hz.
+- **Tests:** `RazorMarkupTests` now pins the two passes: no write in the read pass; no read in the write pass (state, time, rate, effect, timing, pending, the animation list); the order within the writes; both catches letting go. Fail-first on a scratch copy, controls passing before and after: 9 of 9 caught (a write in the read pass; the end, time, rate, effect and pending read in the write pass; a failed write not let go; the end never read; one pass again). `scripts/Build.ps1` Debug 926/926.
+
+**Review (standard audit on 3e743d3):** the figures above; the rate limit's margin on a screen just above 70 Hz; no check that a transition is taken over on its first frame; the write-pass guard missing some reads; the read pass's comment not naming `letGo`. All fixed in this entry's change.
+
+**Not checked:** the meter itself in WebView2 (the same engine as headless Edge); the gain on the player's GPU-composited overlay.
+
+**After the fixes:** Codex reviewed 1433f38 with no findings. Harry: "Yes, merge both" (#69, then this). Main, with #69, merged into the branch, the changelog and work log keeping both entries.
+
+**Next:** CI on the merged branch, then the merge.
+
 ## 2026-10-31 — Two idle timers off; settings saved outside their lock
 
 **What:**
