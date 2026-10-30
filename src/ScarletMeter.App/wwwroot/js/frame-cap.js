@@ -21,7 +21,8 @@
 
     // Takes over any animation running on its own (newly started, or played again), paused where it is; when advance
     // is set, moves every driven one on to the timeline's time. True while any is still driven. Everything is read
-    // first, then everything written, each animation's writes in the same order as before: an animation's state read
+    // first (but for letting go of one whose read failed), then everything written, each animation's writes in the same
+    // order as before: an animation's state read
     // after another's was written makes the browser bring styles up to date there and then, once per animation, and
     // nothing written here changes what another animation reads (deep review of the overlay's load, 2026-10-31).
     function step(now, advance) {

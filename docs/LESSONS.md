@@ -266,6 +266,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**A timing left out the work the change moved** (standard audit on #70, fixed before merge).
+- What: #70 timed the frame cap's step alone and gave it as about a sixth of the work (1.27 to 1.39 ms a step against 0.21 to 0.24). Before, each read after a write brought styles up to date inside the step; after, the one update is left for the frame, outside the timing. Timed with a forced style update after the step, it is 1.10 to 1.16 ms against 0.65 to 0.72: over a third less, not five sixths.
+- Why: the change moves work as well as removing it, and the timing's bounds were set by the function's own, not by where the moved work lands.
+- Guard: time a change that defers work up to a point that includes the deferred work (here the step and then `document.getAnimations()`, which brings styles up to date), and say which in the figures.
+
+**The frame-cap check read Edge's DevTools port before Edge wrote it** (found 2026-10-31, running #70's mutants).
+- What: `Test-FrameCap.ps1` waited for the `DevToolsActivePort` file to exist and then read its first line; Edge creates the file before it writes the port, so one run read nothing and stopped with "Cannot index into a null array", a failure that said nothing about the frame cap.
+- Why: the wait tested what was easy to see (the file) rather than what was used (the port), and the runs before were lucky.
+- Guard: the script waits for the port itself and throws a message naming the page when no port or page comes. Wait for the value that is read, not a sign that it may be there.
+
 **A rate check's limit sat at the rate's own ceiling** (found 2026-10-31, measuring #70 against main).
 - What: `Test-FrameCap.ps1` failed a run of bars whose width transitions restart ten times a second at 70.5 changes a second, against a limit of 70; old and new scripts alike ranged from about 50 to 70 over repeated runs. Such bars change at each of the cap's 60 steps a second and once more at a restart taken over a frame in, so up to about 70: the limit was the ceiling, not a margin above it.
 - Why: #64 set the limit from the two or three runs then measured (56 to 61), not from what the mechanism allows, and a check run a few times did not show its spread.

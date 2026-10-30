@@ -42,7 +42,7 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ### Changed
 
-- The bar effects' frame cap does about a sixth of the work it did each time it moves them on, so fights with effects
+- The bar effects' frame cap does over a third less work each time it moves them on, so fights with effects
   on take a little less of your PC's time. ([#70](https://github.com/harrynguon/Scarlet-Meter/pull/70))
 - The roster's Corridors count also takes the corridors the game says a character has used, which it sends when you
   log in on that character (and as you enter or leave a corridor): corridors run with the meter closed count once you

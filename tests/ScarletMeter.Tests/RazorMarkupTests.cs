@@ -80,8 +80,8 @@ public sealed partial class RazorMarkupTests
         var writePass = step[writes..];
         foreach (var write in new[] { @"\.pause\(\)", @"\.finish\(\)", @"\.currentTime\s*=(?!=)", @"\.play\(\)" })
             Assert.DoesNotMatch(write, readPass);
-        foreach (var read in new[] { ".playState", "getComputedTiming", "getAnimations" })
-            Assert.DoesNotContain(read, writePass);
+        foreach (var read in new[] { @"\.playState", "getComputedTiming", "getAnimations", @"\.currentTime(?!\s*=(?!=))", @"\.playbackRate", @"\.effect\b", @"\.pending" })
+            Assert.DoesNotMatch(read, writePass);
         Assert.Matches(@"animation\.playState === 'running' && animation\.playbackRate === 1\s*&& typeof animation\.currentTime === 'number'\) \{\s*origins\.set\(animation, now - animation\.currentTime\);\s*takeOver = true;", readPass);
         Assert.Contains("} else if (animation.playState !== 'paused' || !origins.has(animation)) {", readPass);
         Assert.Matches(@"driving = true;\s*const end = advance && animation\.effect \? animation\.effect\.getComputedTiming\(\)\.endTime : Infinity;\s*steps\.push\(\{ animation, takeOver, end \}\);", readPass);
