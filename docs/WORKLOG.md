@@ -2,6 +2,18 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-30 — Animations capped at 60 frames a second
+
+**What:** `wwwroot/js/frame-cap.js`, loaded by index.html for every window, pauses each running animation on the document's timeline (the bar effects, the bars' width and rows' glides, the notices) and moves it on from the timeline's time every 60th of a second; a finite one is finished when its time is up, so its end events fire; what something else paused is left alone; its loop runs only while it drives something, woken by `animationstart` or `transitionrun`. `Test-PublishLayout.ps1` requires it in a publish. `RazorMarkupTests.ThePagesLoadOnlyTheAppsOwnScripts` now checks every script in `wwwroot/js` for reaches outside the page, not a list.
+
+**Why:** Harry: the effects had felt like 10 to 15 fps at times lately where they used to be 30 to 60+, "it lagged when claude wasn't even open", then "how about also capping the meter to 60fps?". A local probe copy (not committed) showed the page drawing at 239 to 240 fps on Harry's 239 Hz screen while the effects were smooth, with the meter's refresh loop near idle (about 0.3 ms a tick), on WPF's hardware tier and WebView2 156. The web view draws CSS animations at the screen's rate, and every frame it draws is captured and copied into the WPF window (`WebView2CompositionControl` in a layered window), so a 240 Hz screen costs four times the frames of a 60 Hz one. What made the effects drop to 10 to 15 fps is not known: the probe copy saw no drop.
+
+**Checks (SDK 10.0.402, at idle priority with no shared compiler server: the game was running):** `scripts/Build.ps1` Debug 916/916. Fail-first on a scratch copy, controls passing before and after: 10 of 10 mutations caught (a cap of 120, never paused, never finished, driving what something else paused, transitions not waking it, a loop that never stops, any timeline, stepping from the frame time rather than the timeline's, a request in the script, the script not loaded). In headless Edge (scratch pages, no window, idle priority, a profile with sync off, deleted after), read over the DevTools protocol on 127.0.0.1 in real time: a looping animation was driven with its timing kept (current time 677 then 1277 ms, 600 ms apart on the timeline), one the page paused stayed at its time, a width transition reached its end and fired `transitionend`, a one-off animation fired `animationend`, a delayed one was picked up; on the 240 Hz screen an animation's value changed 241 times a second without the cap and 61 with it (61 with the frame rate unthrottled too). A synthetic overlay (eight bars with their effects, widths changing ten times a second) took 121 and 122% of a core in the browser's processes without the cap and 44 and 44% with it at the screen's rate (unthrottled: 249 to 272% against 41 to 59%). Headless Edge's virtual time never starts animations, so a first check with it proved nothing and was redone in real time.
+
+**Not checked:** the meter itself in the game (the capture into the WPF window, which the cap should cut by the same factor, is not measured); whether the 10 to 15 fps drops come back.
+
+**Next:** the PR, a standard audit, Codex and CI; then the merge with Harry's go-ahead, and a check in game.
+
 ## 2026-10-30 — Nightmare and Ascension out of their caps
 
 **What:** the roster's Nightmare and Ascension cells write the count's cap after it, dimmed (`RosterText.OutOf`, the caps from `RosterRules`): "6 (+1) /14" with an extra, "2/3" without, estimated ones marked ≈ as before.

@@ -16,6 +16,8 @@
 <body>
     <div id="app"></div>
     <script src="_framework/blazor.webview.js"></script>
+    <!-- Animations at most 60 frames a second, whatever the screen's refresh rate. -->
+    <script src="js/frame-cap.js"></script>
     <!-- Rows that glide when one player overtakes another (the overlay's "Bar effects"). -->
     <script src="js/overlay-fx.js"></script>
     <!-- The overlay's height, so its window is as tall as its content (only the bar area scrolls, never the notices). -->

@@ -256,6 +256,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**The effects' lag was put down to the development builds without asking whether it came without them** (Harry, 2026-10-30: "no, it lagged when claude wasn't even open"; before #64).
+- What: Harry reported the bar effects at 10 to 15 fps at times. A compiler server was found running at normal priority after a build meant to be at idle priority (the C# compiler server starts itself at normal priority whatever starts it, and is reused by later builds), and the lag was called "likely" those builds. The lag had come with no build running.
+- Why: the lesson below (builds stuttered the overlay on 2026-10-28) made the development work itself the first suspect, and a real fault in it was taken as the cause without one question: had it happened while nothing was building?
+- Guard: before naming a cause for something the player saw, ask when it happened and whether the suspect was there; a fault found on the way is fixed in its own right (builds while the game runs now also set `UseSharedCompilation=false` and `MSBUILDDISABLENODEREUSE=1`, so no compiler server or reused build node runs at normal priority), not offered as the explanation.
+
+**A virtual-time headless check proved nothing** (2026-10-30, found while checking #64's frame cap).
+- What: the first check of the frame cap loaded its page in headless Edge with `--virtual-time-budget`: every animation still read "running" at time 0 and no transition had moved, since virtual time produced no frames, so neither the cap nor the animations ever ran.
+- Why: the flag was taken as "the page runs for that long", without first checking a value that must change.
+- Guard: the check now runs in real time and reads the page over the DevTools protocol on 127.0.0.1; a check of anything time-based first asserts that time moved (here, the timeline's time and an animation's current time both advance) before reading what it is for.
+
 **Builds and tests run while the player was in game made the overlay stutter** (Harry, 2026-10-28: "why are the skill effect animations on the dps bar for each player so laggy now ... it used to be smooth like 60fps"; "smooth now" once they had stopped).
 - What: fourteen mutation builds and test runs ran back to back on Harry's PC, at normal priority, while AION 2 and the meter were running; the bars' effects dropped frames until they finished.
 - Why: the rule was about windows and focus ("ask before anything that opens windows"); builds and tests open none, so they ran whenever ready, and the game, the meter's WebView2 and the compilers shared the processor.
