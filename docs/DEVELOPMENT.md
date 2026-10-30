@@ -62,7 +62,7 @@ Windows are named by their page's `data-window` attribute (`overlay`, `settings`
 
 ## Checking the animation frame cap
 
-`scripts/Test-FrameCap.ps1` checks what `wwwroot/js/frame-cap.js` does, in headless Edge in real time (no window; a throwaway profile with sync off, in a new folder in the user's temp directory, deleted after), reading two synthetic pages over the DevTools protocol on 127.0.0.1: driven animations keep their timing, one the page paused stays put, transitions and one-off animations end and fire their events, a delayed one is picked up, and on a screen faster than 70 Hz a looping animation and bars whose width transitions restart ten times a second change at most 70 times a second (skipped, saying so, on a slower screen). It exits 1 when a check fails. `RazorMarkupTests` pins the script's text only; run this after changing it. CI does not run it.
+`scripts/Test-FrameCap.ps1` checks what `wwwroot/js/frame-cap.js` does, in headless Edge in real time (no window; a throwaway profile with sync off, in a new folder in the user's temp directory, deleted after), reading two synthetic pages over the DevTools protocol on 127.0.0.1: driven animations keep their timing, one the page paused stays put, transitions and one-off animations end and fire their events, a delayed one is picked up, and on a screen faster than 70 Hz a looping animation changes at most 70 times a second and bars whose width transitions restart ten times a second at most 80 (60 steps and up to one more change at each restart; skipped, saying so, on a slower screen). It exits 1 when a check fails. `RazorMarkupTests` pins the script's text only; run this after changing it. CI does not run it.
 
 ```powershell
 & "<checkout>\scripts\Test-FrameCap.ps1"

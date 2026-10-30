@@ -266,6 +266,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**A rate check's limit sat at the rate's own ceiling** (found 2026-10-31, measuring #70 against main).
+- What: `Test-FrameCap.ps1` failed a run of bars whose width transitions restart ten times a second at 70.5 changes a second, against a limit of 70; old and new scripts alike ranged from about 50 to 70 over repeated runs. Such bars change at each of the cap's 60 steps a second and once more at a restart taken over a frame in, so up to about 70: the limit was the ceiling, not a margin above it.
+- Why: #64 set the limit from the two or three runs then measured (56 to 61), not from what the mechanism allows, and a check run a few times did not show its spread.
+- Guard: the bars' limit is 80, explained in the script from the mechanism (60 steps and up to 10 restarts a second), still far below an uncapped page's 241. Set a limit from what the mechanism can produce, and run a timing check several times before trusting its margin.
+
 **The player's progress and play times went into the public docs** (Codex P1 and the deep audit on #66; #65's already merged).
 - What: #66's WORKLOG entry quoted the player's message naming a character's class and its corridor progress, and gave the times of a login and two Abyss entries read from the meter's log; ARCHITECTURE gave the number of corridors run. #65's entry, merged a few hours before without a review (the player asked to skip CI and reviews), quoted two of the roster's cells, the player's Nightmare and Ascension values. The repository is public, and AGENTS.md forbids personal progress and private logs in it.
 - Why: the "Why" of an entry quotes the player's request verbatim, and requests that report a problem carry their own numbers; times read from the log were written as evidence of what was found. The rule was known, and was applied to code and fixtures, not to quotations and findings in the docs. #65 had no reviewer to catch it.

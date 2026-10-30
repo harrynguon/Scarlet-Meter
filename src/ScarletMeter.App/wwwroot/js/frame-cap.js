@@ -20,23 +20,36 @@
     let started = false;
 
     // Takes over any animation running on its own (newly started, or played again), paused where it is; when advance
-    // is set, moves every driven one on to the timeline's time. True while any is still driven.
+    // is set, moves every driven one on to the timeline's time. True while any is still driven. Everything is read
+    // first, then everything written, each animation's writes in the same order as before: an animation's state read
+    // after another's was written makes the browser bring styles up to date there and then, once per animation, and
+    // nothing written here changes what another animation reads (deep review of the overlay's load, 2026-10-31).
     function step(now, advance) {
         let driving = false;
+        const steps = [];
         for (const animation of document.getAnimations()) {
             if (animation.timeline !== document.timeline) continue;
             try {
+                let takeOver = false;
                 if (animation.playState === 'running' && animation.playbackRate === 1
                     && typeof animation.currentTime === 'number') {
                     origins.set(animation, now - animation.currentTime);
-                    animation.pause();
+                    takeOver = true;
                 } else if (animation.playState !== 'paused' || !origins.has(animation)) {
                     continue;
                 }
                 driving = true;
+                const end = advance && animation.effect ? animation.effect.getComputedTiming().endTime : Infinity;
+                steps.push({ animation, takeOver, end });
+            } catch {
+                letGo(animation);
+            }
+        }
+        for (const { animation, takeOver, end } of steps) {
+            try {
+                if (takeOver) animation.pause();
                 if (!advance) continue;
                 const time = now - origins.get(animation);
-                const end = animation.effect ? animation.effect.getComputedTiming().endTime : Infinity;
                 if (time >= end) {
                     origins.delete(animation);
                     animation.finish();
@@ -44,11 +57,16 @@
                 }
                 animation.currentTime = time;
             } catch {
-                origins.delete(animation);
-                try { animation.play(); } catch { /* left as it is */ }
+                letGo(animation);
             }
         }
         return driving;
+    }
+
+    // An animation that failed to be driven: let go, to run as it would without the cap.
+    function letGo(animation) {
+        origins.delete(animation);
+        try { animation.play(); } catch { /* left as it is */ }
     }
 
     // On a frame where the next 60th of a second is due (within a millisecond, as frame times jitter), moves every

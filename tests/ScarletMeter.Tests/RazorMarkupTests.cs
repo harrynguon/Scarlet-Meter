@@ -70,12 +70,26 @@ public sealed partial class RazorMarkupTests
         var code = Regex.Replace(cap, @"(?m)//.*$", string.Empty);
         Assert.Contains("const interval = 1000 / 60;", code);
         Assert.Contains("if (animation.timeline !== document.timeline) continue;", code);
-        Assert.Matches(@"animation\.playState === 'running' && animation\.playbackRate === 1\s*&& typeof animation\.currentTime === 'number'\) \{\s*origins\.set\(animation, now - animation\.currentTime\);\s*animation\.pause\(\);", code);
-        Assert.Contains("} else if (animation.playState !== 'paused' || !origins.has(animation)) {", code);
-        Assert.Matches(@"driving = true;\s*if \(!advance\) continue;", code);
-        Assert.Matches(@"if \(time >= end\) \{\s*origins\.delete\(animation\);\s*animation\.finish\(\);", code);
-        Assert.Contains("animation.currentTime = time;", code);
-        Assert.Matches(@"catch \{\s*origins\.delete\(animation\);\s*try \{ animation\.play\(\); \} catch \{", code);
+        // Every read first (each animation's state and end), then every write, each animation's in the old order (a state
+        // read after another's write brings styles up to date there and then, once per animation).
+        var step = Regex.Match(code, @"(?s)function step\(now, advance\) \{(?<body>.*?)\n    \}").Groups["body"].Value;
+        var reads = step.IndexOf("for (const animation of document.getAnimations())", StringComparison.Ordinal);
+        var writes = step.IndexOf("for (const { animation, takeOver, end } of steps)", StringComparison.Ordinal);
+        Assert.True(reads >= 0 && writes > reads, "a read pass, then a write pass");
+        var readPass = step[reads..writes];
+        var writePass = step[writes..];
+        foreach (var write in new[] { @"\.pause\(\)", @"\.finish\(\)", @"\.currentTime\s*=(?!=)", @"\.play\(\)" })
+            Assert.DoesNotMatch(write, readPass);
+        foreach (var read in new[] { ".playState", "getComputedTiming", "getAnimations" })
+            Assert.DoesNotContain(read, writePass);
+        Assert.Matches(@"animation\.playState === 'running' && animation\.playbackRate === 1\s*&& typeof animation\.currentTime === 'number'\) \{\s*origins\.set\(animation, now - animation\.currentTime\);\s*takeOver = true;", readPass);
+        Assert.Contains("} else if (animation.playState !== 'paused' || !origins.has(animation)) {", readPass);
+        Assert.Matches(@"driving = true;\s*const end = advance && animation\.effect \? animation\.effect\.getComputedTiming\(\)\.endTime : Infinity;\s*steps\.push\(\{ animation, takeOver, end \}\);", readPass);
+        Assert.Matches(@"if \(takeOver\) animation\.pause\(\);\s*if \(!advance\) continue;\s*const time = now - origins\.get\(animation\);", writePass);
+        Assert.Matches(@"if \(time >= end\) \{\s*origins\.delete\(animation\);\s*animation\.finish\(\);", writePass);
+        Assert.Contains("animation.currentTime = time;", writePass);
+        Assert.Equal(2, Regex.Matches(step, @"catch \{\s*letGo\(animation\);\s*\}").Count); // a failing read or write lets that one go
+        Assert.Matches(@"function letGo\(animation\) \{\s*origins\.delete\(animation\);\s*try \{ animation\.play\(\); \} catch \{", code);
         Assert.Contains("next = now - next > interval ? now + interval : next + interval;", code);
         Assert.Contains("looping = step(time, true);", code);
         Assert.Matches(@"\} else if \(started\) \{\s*started = false;\s*looping = step\(time, false\);", code);

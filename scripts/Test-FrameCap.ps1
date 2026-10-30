@@ -9,8 +9,9 @@ Edge (no window, a throwaway profile with sync off), and their results are read 
 127.0.0.1:
 - an infinite animation is driven and keeps its timing; one the page paused stays where it is; a width transition
   reaches its end and fires transitionend; a one-off animation fires animationend; a delayed one is picked up;
-- on a screen faster than 70 Hz, an infinite animation and bars whose width transitions restart ten times a second
-  (as the meter's do) change at most 70 times a second; on a slower screen there is nothing to cap and this is
+- on a screen faster than 70 Hz, an infinite animation changes at most 70 times a second, and bars whose width
+  transitions restart ten times a second (as the meter's do) at most 80: their 60 steps and up to one more change at
+  each restart, a new transition being taken over a frame in; on a slower screen there is nothing to cap and this is
   skipped, saying so.
 The pages and profile live in a new folder in the user's temp directory, deleted after. Exits 1 when a check fails.
 Edge comes from its standard install folder, or -Edge (an absolute path).
@@ -138,7 +139,7 @@ try {
         Write-Host "skip the rate: this screen draws $($r.frames) frames a second, so there is nothing to cap"
     } else {
         Check ($r.loops -le 70) "an infinite animation changes at most 70 times a second ($($r.loops) at $($r.frames) frames a second)"
-        Check ($r.widths -le 70) "bars whose transitions restart change at most 70 times a second ($($r.widths) at $($r.frames) frames a second)"
+        Check ($r.widths -le 80) "bars whose transitions restart change at most 80 times a second ($($r.widths) at $($r.frames) frames a second)"
     }
 } finally {
     Start-Sleep -Milliseconds 500

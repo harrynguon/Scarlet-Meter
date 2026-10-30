@@ -2,6 +2,22 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-10-31 — The frame cap reads first, then writes
+
+**What:** `frame-cap.js`'s step reads every animation's state, and when it ends, before it writes any; then it makes the writes, each animation's in the order they had (pause on taking over, then finish or the new time). A failing read or write still lets that animation go (`letGo`). `Test-FrameCap.ps1` allows restarting bars up to 80 changes a second (LESSONS).
+
+**Why:** part of Harry's request for "an extremely thorough check" of the meter's load with no change in what it does. The overlay review found that reading an animation's state after another's write makes the browser bring styles up to date there and then, so a step with N animations did about N style updates instead of one. Nothing a step writes changes what another animation reads: every value is set before the frame's own style update, as before.
+
+**Checks (in headless Edge, no window, at idle priority, a profile with sync off; Harry was playing another game, so nothing of the meter was launched):**
+- **Step time:** the synthetic eight-bar overlay (71 animations, widths changing ten times a second), the step timed in the page, three rounds of each script: 1.393, 1.271 and 1.288 ms a step before, 0.207, 0.214 and 0.239 ms after, about 66 ms of the page's main thread a second less at 60 steps. The browser processes' CPU swung from 34 to 67% of a core between runs, too much to show the difference.
+- **Behaviour:** `Test-FrameCap.ps1` passes its eight checks.
+- **Restarting bars:** across repeated runs their rate ranged from about 50 to 70 with either script (old 49.5 to 65, new 51.5 to 70.5). That is the mechanism's own spread, so the limit moved from 70 to 80.
+- **Tests:** `RazorMarkupTests` now pins the two passes: no write in the read pass, no read in the write pass, the order within the writes, and both catches letting go. Fail-first on a scratch copy, controls passing before and after: 5 of 5 caught. `scripts/Build.ps1` Debug 926/926.
+
+**Not checked:** the meter itself in WebView2 (the same engine as headless Edge); the gain on the player's GPU-composited overlay.
+
+**Next:** the PR, a standard audit, Codex and CI; then the merge with Harry's go-ahead.
+
 ## 2026-10-31 — Dimensional Invasion keys on the overlay
 
 **What:**
