@@ -32,6 +32,7 @@ $required = @(
     'wwwroot\css\app.css',
     'wwwroot\css\views.css',
     'wwwroot\css\alerts.css',
+    'wwwroot\js\frame-cap.js',
     'wwwroot\js\overlay-fx.js',
     'wwwroot\images\avatar.png',
     'wwwroot\_framework\blazor.webview.js',

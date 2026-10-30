@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The frame cap was measured with one long animation, not the meter's restarting transitions** (standard audit on #64, fixed before merge).
+- What: the cap took animations over only on frames where a step was due, so each newly started one ran at the screen's rate for up to three frames at 240 Hz. The bars' width transitions restart ten times a second, and with the cap they changed 63 to 74 times a second, not about 60. One error inside the loop would also have stopped it for good, freezing every animation it held.
+- Why: the rate was measured on a single infinite animation, which starts once. The meter's own pattern, a transition replaced every 100 ms, was in the CPU benchmark but its rate was never counted. The script's only test pinned its text.
+- Guard: new animations are taken over on the frame after they start, and a failing one is let go. `scripts/Test-FrameCap.ps1` measures the rate for both a looping animation and restarting bars in headless Edge, and fails when either passes 70 a second on a fast screen. When a cap or limit is checked, measure it with the pattern the product actually produces, not only the simplest one.
+
 **The roster's caps were measured without an estimate's mark** (standard audit on #63, fixed before merge).
 - What: the widest Ascension value was taken as "3 (+3) /3", from Harry's mock-up; an estimated count with an extra, "≈ 3 (+3) /3", which any alt shows after a weekly reset, is wider, so the docs claimed 23 and 6 px to spare at 896 where there are 21 and 4. The table still fit.
 - Why: Nightmare's widest value was listed with its ≈ and Ascension's was copied from the example asked for; the width lesson below (every column's widest form) was applied by eye, one mark at a time, not by combining the marks a cell can carry.
@@ -255,6 +260,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - Guard: `SettingsTests.AFileSavedWithAByteOrderMarkLoads`. Seed test files the way people actually write them.
 
 ## In the process
+
+**The effects' lag was put down to the development builds without asking whether it came without them** (Harry, 2026-10-30: "no, it lagged when claude wasn't even open"; before #64).
+- What: Harry reported the bar effects at 10 to 15 fps at times. A compiler server was found running at normal priority after a build meant to be at idle priority (the C# compiler server starts itself at normal priority whatever starts it, and is reused by later builds), and the lag was called "likely" those builds. The lag had come with no build running.
+- Why: the lesson below (builds stuttered the overlay on 2026-10-28) made the development work itself the first suspect, and a real fault in it was taken as the cause without one question: had it happened while nothing was building?
+- Guard: before naming a cause for something the player saw, ask when it happened and whether the suspect was there; a fault found on the way is fixed in its own right (builds while the game runs now also set `UseSharedCompilation=false` and `MSBUILDDISABLENODEREUSE=1`, so no compiler server or reused build node runs at normal priority), not offered as the explanation.
+
+**A virtual-time headless check proved nothing** (2026-10-30, found while checking #64's frame cap).
+- What: the first check of the frame cap loaded its page in headless Edge with `--virtual-time-budget`: every animation still read "running" at time 0 and no transition had moved, since virtual time produced no frames, so neither the cap nor the animations ever ran.
+- Why: the flag was taken as "the page runs for that long", without first checking a value that must change.
+- Guard: the check now runs in real time and reads the page over the DevTools protocol on 127.0.0.1; a check of anything time-based first asserts that time moved (here, the timeline's time and an animation's current time both advance) before reading what it is for.
 
 **Builds and tests run while the player was in game made the overlay stutter** (Harry, 2026-10-28: "why are the skill effect animations on the dps bar for each player so laggy now ... it used to be smooth like 60fps"; "smooth now" once they had stopped).
 - What: fourteen mutation builds and test runs ran back to back on Harry's PC, at normal priority, while AION 2 and the meter were running; the bars' effects dropped frames until they finished.

@@ -21,8 +21,8 @@ public sealed partial class RazorMarkupTests
         Assert.Empty(Offending(line => RelativeScriptPath().IsMatch(line)));
 
     // Every <script> in index.html (whatever its attributes' order) loads one of the app's own files, which exists,
-    // and none is inline; the overlay's effects and size scripts reach nothing outside the page: no requests, no
-    // calls into .NET, no eval.
+    // and none is inline; the app's own scripts (every one in wwwroot/js, so a new one is checked too) reach nothing
+    // outside the page: no requests, no calls into .NET, no eval.
     [Fact]
     public void ThePagesLoadOnlyTheAppsOwnScripts()
     {
@@ -37,6 +37,7 @@ public sealed partial class RazorMarkupTests
             Assert.True(src.Success, $"script without src: {tag.Value}");
             sources.Add(src.Groups[1].Value);
         }
+        Assert.Contains("js/frame-cap.js", sources);
         Assert.Contains("js/overlay-fx.js", sources);
         Assert.Contains("js/overlay-size.js", sources);
         foreach (var source in sources)
@@ -46,12 +47,42 @@ public sealed partial class RazorMarkupTests
             if (!source.StartsWith("_framework/", StringComparison.Ordinal))
                 Assert.True(File.Exists(Path.Combine(wwwroot, source.Replace('/', Path.DirectorySeparatorChar))), source);
         }
-        foreach (var script in new[] { "overlay-fx.js", "overlay-size.js" })
+        foreach (var script in Directory.GetFiles(Path.Combine(wwwroot, "js"), "*.js"))
         {
-            var text = File.ReadAllText(Path.Combine(wwwroot, "js", script));
+            var text = File.ReadAllText(script);
             foreach (var reach in new[] { "fetch(", "XMLHttpRequest", "WebSocket", "sendBeacon", "DotNet.", "eval(", "Function(" })
                 Assert.DoesNotContain(reach, text);
         }
+    }
+
+    // The page's animations (the bar effects, the bars' and rows' glides, the notices) step at most 60 times a second
+    // whatever the screen's refresh rate (Harry, 2026-10-30: "how about also capping the meter to 60fps?"): js/frame-cap.js
+    // pauses each running animation on the document's timeline where it is, on the first frame after it starts, and
+    // moves it on from the timeline's time every 60th of a second, finishes a finite one when its time is up (so its end
+    // events fire), leaves alone what was paused before it took over, lets go of one it fails to drive, and runs only
+    // while it drives something, woken by an animation or transition starting. This pins the script's text;
+    // scripts/Test-FrameCap.ps1 checks what it does in headless Edge (on a 240 Hz screen an animation's value changed
+    // 241 times a second without it, about 61 with it, and the bars' restarting width transitions about 61).
+    [Fact]
+    public void AnimationsStepAtMostSixtyTimesASecond()
+    {
+        var cap = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "js", "frame-cap.js"));
+        var code = Regex.Replace(cap, @"(?m)//.*$", string.Empty);
+        Assert.Contains("const interval = 1000 / 60;", code);
+        Assert.Contains("if (animation.timeline !== document.timeline) continue;", code);
+        Assert.Matches(@"animation\.playState === 'running' && animation\.playbackRate === 1\s*&& typeof animation\.currentTime === 'number'\) \{\s*origins\.set\(animation, now - animation\.currentTime\);\s*animation\.pause\(\);", code);
+        Assert.Contains("} else if (animation.playState !== 'paused' || !origins.has(animation)) {", code);
+        Assert.Matches(@"driving = true;\s*if \(!advance\) continue;", code);
+        Assert.Matches(@"if \(time >= end\) \{\s*origins\.delete\(animation\);\s*animation\.finish\(\);", code);
+        Assert.Contains("animation.currentTime = time;", code);
+        Assert.Matches(@"catch \{\s*origins\.delete\(animation\);\s*try \{ animation\.play\(\); \} catch \{", code);
+        Assert.Contains("next = now - next > interval ? now + interval : next + interval;", code);
+        Assert.Contains("looping = step(time, true);", code);
+        Assert.Matches(@"\} else if \(started\) \{\s*started = false;\s*looping = step\(time, false\);", code);
+        Assert.Contains("if (looping) requestAnimationFrame(frame);", code);
+        Assert.Matches(@"function wake\(\) \{\s*started = true;", code);
+        Assert.Contains("document.addEventListener('animationstart', wake, true);", code);
+        Assert.Contains("document.addEventListener('transitionrun', wake, true);", code);
     }
 
     // The window is as tall as the page's content: after each render the page measures it with the bar area at its rows

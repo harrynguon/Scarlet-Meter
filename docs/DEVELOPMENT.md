@@ -60,6 +60,14 @@ Windows are named by their page's `data-window` attribute (`overlay`, `settings`
 
 `-BrowserArguments` adds Chromium switches for the run's WebView2 browsers. An automated check of the boss-timers window must never load aion2timers.com, which bars AI agents and crawlers from its API: pass `-BrowserArguments '--no-proxy-server --host-resolver-rules="MAP *.aion2timers.com ~NOTFOUND, MAP aion2timers.com ~NOTFOUND"'` (without `--no-proxy-server` a proxy would resolve the host itself), so the window shows the browser's own error page and nothing is requested from the site. Its page is not a meter page, so the script does not drive it; use UI Automation for its toolbar, and never invoke "Open in browser", which hands the site to the default browser, which has none of these switches.
 
+## Checking the animation frame cap
+
+`scripts/Test-FrameCap.ps1` checks what `wwwroot/js/frame-cap.js` does, in headless Edge in real time (no window; a throwaway profile with sync off, in a new folder in the user's temp directory, deleted after), reading two synthetic pages over the DevTools protocol on 127.0.0.1: driven animations keep their timing, one the page paused stays put, transitions and one-off animations end and fire their events, a delayed one is picked up, and on a screen faster than 70 Hz a looping animation and bars whose width transitions restart ten times a second change at most 70 times a second (skipped, saying so, on a slower screen). It exits 1 when a check fails. `RazorMarkupTests` pins the script's text only; run this after changing it. CI does not run it.
+
+```powershell
+& "<checkout>\scripts\Test-FrameCap.ps1"
+```
+
 ## Publish
 
 ```powershell
