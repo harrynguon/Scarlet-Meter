@@ -4,6 +4,7 @@ using AionDpsMeter.Services.Models;
 using AionDpsMeter.Services.PacketCapture;
 using AionDpsMeter.Services.PacketProcessing.Routing;
 using AionDpsMeter.Services.Services.Entity;
+using AionDpsMeter.Services.Services.Session;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ScarletMeter.Engine;
@@ -15,20 +16,26 @@ namespace ScarletMeter.Tests;
 /// <summary>
 /// A player's class follows their own skills (<see cref="ClassSkills"/>): upstream keeps the class of the first skill it
 /// saw from a player id, so a player handed an id another class had used showed that class, live and in saved fights.
-/// Live, <see cref="ClassSkillTap"/> moves the class once most of the player's class-skill hits since their current name
-/// say another; details and saved fights take the class whose skills did most of the player's damage. Skill codes are
-/// real ones from upstream's skills.json (Earth's Retribution and a Cleric heal, Deadshot, a Chanter's and a
-/// Gladiator's, a Spiritmaster's); players, names and numbers are made up.
+/// Live, <see cref="ClassSkillTap"/> moves the class once most of the player's uses of class skills since their current
+/// name say another, a run of hits with one skill counting once; details and saved fights take the class whose skills
+/// did most of the player's damage. Skill codes are real ones from upstream's skills.json (two Cleric skills and a Cleric
+/// heal, two Ranger, Chanter and Gladiator skills each, a Spiritmaster's); players, names and numbers are made up.
 /// </summary>
 public sealed class ClassSkillsTests
 {
     private const int Cleric = 17;
     private const int Ranger = 14;
-    private const int ClericSkill = 17_010_000;  // Earth's Retribution
-    private const int ClericHeal = 17_120_000;   // in healing_skill_ids.json
-    private const int RangerSkill = 14_010_000;  // Deadshot
-    private const int ChanterSkill = 18_010_000;
-    private const int GladiatorSkill = 11_010_000;
+    private const int Chanter = 18;
+    private const int ClericSkill = 17_010_000;   // Earth's Retribution
+    private const int ClericSkill2 = 17_020_000;  // Thunder and Lightning
+    private const int ClericHeal = 17_120_000;    // in healing_skill_ids.json
+    private const int ClericHeal2 = 17_100_000;   // in healing_skill_ids.json too
+    private const int RangerSkill = 14_010_000;   // Deadshot
+    private const int RangerSkill2 = 14_020_000;  // Snipe
+    private const int ChanterSkill = 18_010_000;  // Onslaught
+    private const int ChanterSkill2 = 18_020_000; // Resonance Crush
+    private const int GladiatorSkill = 11_010_000;  // Rending Blow
+    private const int GladiatorSkill2 = 11_020_000; // Keen Strike
     private const int SpiritmasterSkill = 16_010_000;
     private const int TargetId = 900;
     private const int PlayerId = 4321;
@@ -97,52 +104,99 @@ public sealed class ClassSkillsTests
         Assert.False(ClassSkillTap.TryReadHit(Damage(TargetId, PlayerId, ClericSkill, switchValue: switchValue), out _, out _));
         Assert.False(ClassSkillTap.TryReadHit(Damage(PlayerId, PlayerId, ClericSkill), out _, out _)); // the actor is the target
         Assert.False(ClassSkillTap.TryReadHit(MapLoad(20), out _, out _));
-        // Thirteen bytes follow the skill code here: up to its end the record still reads, one byte short it does not.
-        var whole = Damage(TargetId, PlayerId, ClericSkill);
-        Assert.True(ClassSkillTap.TryReadHit(whole[..^13], out _, out _));
-        Assert.False(ClassSkillTap.TryReadHit(whole[..^14], out _, out _));
         Assert.False(ClassSkillTap.TryReadHit([], out _, out _));
+
+        // A record of another kind shaped like a damage record (its length varint is one byte here).
+        var whole = Damage(TargetId, PlayerId, ClericSkill);
+        Assert.Equal((byte)0x04, whole[1]);
+        Assert.False(ClassSkillTap.TryReadHit([whole[0], 0x05, .. whole[2..]], out _, out _));
+    }
+
+    // Upstream drops a record that does not read whole (DamagePacketProcessor throws), so it counts for nothing here.
+    [Fact]
+    public void ARecordCountsOnlyWhenItReadsWholeAsUpstreamReadsIt()
+    {
+        var whole = Damage(TargetId, PlayerId, ClericSkill); // after the skill: a byte, the type, 8, a varint, the damage (2)
+        Assert.True(ClassSkillTap.TryReadHit(whole, out _, out _));
+        Assert.False(ClassSkillTap.TryReadHit(whole[..^1], out _, out _));  // the damage cut
+        Assert.False(ClassSkillTap.TryReadHit(whole[..^3], out _, out _));  // no damage, no varint before it
+        Assert.False(ClassSkillTap.TryReadHit(whole[..^13], out _, out _)); // nothing after the skill
+        Assert.False(ClassSkillTap.TryReadHit(whole[..^14], out _, out _)); // the skill's last byte missing
+        // Switch value 4's block is eight bytes; 5 to 7's needs twelve bytes left, of which upstream reads eleven.
+        Assert.False(ClassSkillTap.TryReadHit(Damage(TargetId, PlayerId, ClericSkill, specialLength: 7), out _, out _));
+        Assert.False(ClassSkillTap.TryReadHit(Damage(TargetId, PlayerId, ClericSkill, switchValue: 5, specialLength: 8), out _, out _));
+        Assert.True(ClassSkillTap.TryReadHit(Damage(TargetId, PlayerId, ClericSkill, switchValue: 5, specialLength: 11), out _, out _));
+        // The damage as upstream reads it, five bytes whatever they hold: one past 32 bits, which upstream wraps, still reads.
+        Assert.True(ClassSkillTap.TryReadHit([.. whole[..^2], 0xFF, 0xFF, 0xFF, 0xFF, 0x7F], out _, out _));
+        Assert.False(ClassSkillTap.TryReadHit([.. whole[..^2], 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01], out _, out _));
     }
 
     [Fact]
-    public void AReusedIdTakesItsNewPlayersClassAtTheirSecondClassSkillHit()
+    public void AReusedIdTakesItsNewPlayersClassAtTheirSecondClassSkill()
     {
         var (entities, _, tap) = Tap();
         var player = entities.GetOrCreateSessionPlayer(PlayerId, ClassById(Ranger)); // upstream, at a ranger's first hit
-        Read(tap, RangerSkill, 5);
+        Read(tap, RangerSkill, RangerSkill2, RangerSkill);
         entities.SetSessionPlayerName(PlayerId, "Synthia", 3_000); // the id's new player, named; upstream keeps the class
 
-        Read(tap, ClericSkill);
-        Assert.Equal(Ranger, ClassOf(player)); // one hit each since the name: the class held stands
-        Read(tap, ClericSkill);
+        Read(tap, ClericSkill, ClericSkill, ClericSkill); // one skill on three targets: one use, as many as the class held
+        Assert.Equal(Ranger, ClassOf(player));
+        Read(tap, ClericSkill2);
         Assert.Equal(Cleric, ClassOf(player));
         Assert.Same(GameDataProvider.Instance.Classes.GetById(Cleric), player.CharacterClass); // upstream's own class object
     }
 
     [Fact]
-    public void AnotherClassesSkillNowAndThenChangesNothing()
+    public void OneSkillOfAnotherClassOnAnyNumberOfTargetsChangesNothing()
     {
         var (entities, _, tap) = Tap();
-        var player = entities.GetOrCreateSessionPlayer(PlayerId, ClassById(18));
-        Read(tap, ChanterSkill, 20);
-        Read(tap, GladiatorSkill, 2);
-        Assert.Equal(18, ClassOf(player));
+        var player = entities.GetOrCreateSessionPlayer(PlayerId, ClassById(Chanter));
+        Read(tap, ChanterSkill, ChanterSkill2, ChanterSkill, GladiatorSkill, GladiatorSkill);
+        Assert.Equal(Chanter, ClassOf(player));
 
         entities.SetSessionPlayerName(PlayerId, "Synthia", 3_000); // just named: the count starts again
-        Read(tap, GladiatorSkill);
-        Assert.Equal(18, ClassOf(player));
+        Read(tap, GladiatorSkill, GladiatorSkill, GladiatorSkill, GladiatorSkill, GladiatorSkill);
+        Assert.Equal(Chanter, ClassOf(player));
+        Read(tap, ChanterSkill, GladiatorSkill);
+        Assert.Equal(Chanter, ClassOf(player));
+    }
+
+    // The least that moves a class wrongly, as documented: two other skills of one class in a row right after a name
+    // change; two of the player's own then move it back.
+    [Fact]
+    public void TwoSkillsOfAnotherClassRightAfterANameMoveItAndTwoOfItsOwnMoveItBack()
+    {
+        var (entities, _, tap) = Tap();
+        var player = entities.GetOrCreateSessionPlayer(PlayerId, ClassById(Chanter));
+        Read(tap, ChanterSkill, ChanterSkill2);
+        entities.SetSessionPlayerName(PlayerId, "Synthia", 3_000);
+        Read(tap, GladiatorSkill, GladiatorSkill2);
+        Assert.Equal(11, ClassOf(player));
         Read(tap, ChanterSkill);
-        Read(tap, GladiatorSkill);
-        Assert.Equal(18, ClassOf(player));
+        Assert.Equal(11, ClassOf(player));
+        Read(tap, ChanterSkill2);
+        Assert.Equal(Chanter, ClassOf(player));
+    }
+
+    // A name ends the run of hits too: the first skill after it is a use even when it was the last one before.
+    [Fact]
+    public void TheFirstSkillAfterANameCountsEvenWhenItWasTheLastBefore()
+    {
+        var (entities, _, tap) = Tap();
+        var player = entities.GetOrCreateSessionPlayer(PlayerId, ClassById(Chanter));
+        Read(tap, ChanterSkill2, ChanterSkill);
+        entities.SetSessionPlayerName(PlayerId, "Synthia", 3_000);
+        Read(tap, ChanterSkill, GladiatorSkill, GladiatorSkill2);
+        Assert.Equal(Chanter, ClassOf(player));
     }
 
     [Fact]
-    public void WithoutANewNameTheOtherClassNeedsMoreHitsThanTheClassHeld()
+    public void WithoutANewNameTheOtherClassNeedsMoreUsesThanTheClassHeld()
     {
         var (entities, _, tap) = Tap();
         var player = entities.GetOrCreateSessionPlayer(PlayerId, ClassById(Ranger));
-        Read(tap, RangerSkill, 3); // 4 with the class held's head start
-        Read(tap, ClericSkill, 4);
+        Read(tap, RangerSkill, RangerSkill2, RangerSkill); // 4 with the class held's head start
+        Read(tap, ClericSkill, ClericSkill2, ClericSkill, ClericSkill2);
         Assert.Equal(Ranger, ClassOf(player));
         Read(tap, ClericSkill);
         Assert.Equal(Cleric, ClassOf(player));
@@ -153,7 +207,7 @@ public sealed class ClassSkillsTests
     {
         var (entities, _, tap) = Tap();
         var player = entities.GetOrCreateSessionPlayer(PlayerId, ClassById(10));
-        Read(tap, 10_000_001, 3);
+        Read(tap, 10_000_001, 10_000_002, 10_000_001);
         Assert.Equal(10, ClassOf(player));
         Read(tap, SpiritmasterSkill);
         Assert.Equal(16, ClassOf(player));
@@ -165,8 +219,8 @@ public sealed class ClassSkillsTests
         var (entities, _, tap) = Tap();
         var player = entities.GetOrCreateSessionPlayer(PlayerId, ClassById(Ranger));
         entities.SetSessionPlayerName(PlayerId, "Synthia", 3_000);
-        Read(tap, ClericHeal, 5);
-        Read(tap, 3_000_123, 5);
+        Read(tap, ClericHeal, ClericHeal2, ClericHeal);
+        Read(tap, 3_000_123, 3_000_124, 3_000_123);
         Assert.Equal(Ranger, ClassOf(player));
 
         tap.Read(Damage(TargetId, 77, ClericSkill), PacketOpcodes.Damage);
@@ -180,13 +234,13 @@ public sealed class ClassSkillsTests
         var player = entities.GetOrCreateSessionPlayer(PlayerId, ClassById(Ranger));
         entities.SetSessionPlayerName(PlayerId, "Synthia", 3_000);
         pause.Paused = true;
-        Read(tap, ClericSkill, 5);
+        Read(tap, ClericSkill, ClericSkill2, ClericSkill, ClericSkill2);
         Assert.Equal(Ranger, ClassOf(player));
 
         pause.Paused = false; // what was not read is not counted
         Read(tap, ClericSkill);
         Assert.Equal(Ranger, ClassOf(player));
-        Read(tap, ClericSkill);
+        Read(tap, ClericSkill2);
         Assert.Equal(Cleric, ClassOf(player));
     }
 
@@ -197,14 +251,14 @@ public sealed class ClassSkillsTests
         var (entities, _, tap) = Tap(logger);
         entities.GetOrCreateSessionPlayer(PlayerId, ClassById(Ranger));
         entities.SetSessionPlayerName(PlayerId, "Synthia", 3_000);
-        Read(tap, ClericSkill, 4);
+        Read(tap, ClericSkill, ClericSkill2, ClericSkill, ClericSkill2);
         var (level, message) = Assert.Single(logger.Entries);
         Assert.Equal(LogLevel.Information, level);
         Assert.Equal($"Player {PlayerId} is now class {Cleric}, as most of their skills say; upstream had {Ranger}.", message);
     }
 
     // Through upstream's real pipeline: a ranger's hit makes upstream track the id as a Ranger, the id's new player is
-    // named, and their Cleric hits move the class, so the overlay's row shows a Cleric.
+    // named, and their Cleric skills move the class, so the overlay's row shows a Cleric.
     [Fact]
     public void TheOverlayShowsAReusedIdsNewPlayerWithTheirOwnClass()
     {
@@ -217,11 +271,12 @@ public sealed class ClassSkillsTests
         stream.AddData("synthetic", Damage(TargetId, PlayerId, RangerSkill), 0);
         Assert.Equal(Ranger, ClassOf(combat.Entities.GetPlayerEntity(PlayerId)));
         combat.Entities.SetSessionPlayerName(PlayerId, "Synthia", 3_000);
-        stream.AddData("synthetic", [.. Damage(TargetId, PlayerId, ClericSkill), .. Damage(TargetId, PlayerId, ClericSkill)], 0);
+        stream.AddData("synthetic",
+            [.. Damage(TargetId, PlayerId, ClericSkill), .. Damage(TargetId, PlayerId, ClericSkill), .. Damage(TargetId, PlayerId, ClericSkill2)], 0);
 
         var row = Assert.Single(combat.Engine.GetSnapshot().Players);
         Assert.Equal(((long)PlayerId, "Synthia", Cleric, "Cleric"), (row.Id, row.Name, row.ClassId, row.ClassName));
-        Assert.Equal(3_000, row.TotalDamage); // upstream counted all three hits
+        Assert.Equal(4_000, row.TotalDamage); // upstream counted all four hits
     }
 
     // A fight saved with upstream's stale class reads with the class the player's saved skills say, in the rows and the
@@ -251,6 +306,23 @@ public sealed class ClassSkillsTests
         Assert.Equal((Cleric, "Cleric"), (fight.Details[8].Player.ClassId, fight.Details[8].Player.ClassName));
     }
 
+    // A saved fight whose start or end is damaged opens with its rows only (no details), and those rows still take the
+    // class from the players' saved skills.
+    [Fact]
+    public void AFightWithoutDetailsStillReadsItsPlayersClassesFromTheirSkills()
+    {
+        var snapshot = new HistorySessionSnapshot
+        {
+            SessionId = Guid.NewGuid(),
+            PlayerStats = [new PlayerStats { PlayerId = 8, PlayerName = "Beta", IsIdentified = true, ClassId = Ranger, ClassName = "Ranger", TotalDamage = 8_000 }],
+            SkillStatsByPlayer = new Dictionary<long, IReadOnlyCollection<SkillStats>> { [8] = [Skill(ClericSkill, 8_000)] },
+        };
+        var fight = UpstreamMapping.ToHistoryFight(snapshot, includeDetails: false);
+        Assert.Empty(fight.Details);
+        var row = Assert.Single(fight.Players);
+        Assert.Equal((Cleric, "Cleric"), (row.ClassId, row.ClassName));
+    }
+
     private static (EntityTracker Entities, PauseState Pause, ClassSkillTap Tap) Tap(ILogger<ClassSkillTap>? logger = null)
     {
         var entities = new EntityTracker();
@@ -258,9 +330,10 @@ public sealed class ClassSkillsTests
         return (entities, pause, new ClassSkillTap(entities, pause, logger ?? new RecordingLogger<ClassSkillTap>()));
     }
 
-    private static void Read(ClassSkillTap tap, int skillCode, int times = 1)
+    // One damage record from the player for each skill code, in order.
+    private static void Read(ClassSkillTap tap, params int[] skillCodes)
     {
-        for (var n = 0; n < times; n++) tap.Read(Damage(TargetId, PlayerId, skillCode), PacketOpcodes.Damage);
+        foreach (var skillCode in skillCodes) tap.Read(Damage(TargetId, PlayerId, skillCode), PacketOpcodes.Damage);
     }
 
     private static CharacterClass ClassById(int id) => GameDataProvider.Instance.Classes.GetById(id)!;

@@ -106,13 +106,14 @@ internal static class SyntheticRecords
 
     // A damage record (04 38) as upstream's DamagePacketProcessor reads one (v1.11.5.341): the target, the switch value,
     // a flag and the actor as varints, the skill code (u32), a byte, the damage type (varint), the special block (eight
-    // bytes for switch value 4, twelve for 5 to 7), a varint, then the damage (varint). Made-up bytes are zero.
-    public static byte[] Damage(int targetId, int actorId, int skillCode, long damage = 1_000, uint switchValue = 4)
+    // bytes for switch value 4, twelve for 5 to 7, unless told), a varint, then the damage (varint). Made-up bytes are zero.
+    public static byte[] Damage(int targetId, int actorId, int skillCode, long damage = 1_000, uint switchValue = 4, int? specialLength = null)
     {
         List<byte> body = [.. VarInt((uint)targetId), .. VarInt(switchValue), 0x00, .. VarInt((uint)actorId)];
         var skill = new byte[4];
         BinaryPrimitives.WriteInt32LittleEndian(skill, skillCode);
-        body.AddRange([.. skill, 0x00, 0x01, .. new byte[(switchValue & 0x0F) == 4 ? 8 : 12], 0x00, .. VarInt((uint)damage)]);
+        var special = specialLength ?? ((switchValue & 0x0F) == 4 ? 8 : 12);
+        body.AddRange([.. skill, 0x00, 0x01, .. new byte[special], 0x00, .. VarInt((uint)damage)]);
         return Frame(PacketOpcodes.Damage, Convert.ToHexString([.. body]));
     }
 
