@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using AionDpsMeter.Services.PacketCapture;
+using AionDpsMeter.Services.PacketProcessing.Routing;
 using K4os.Compression.LZ4;
 using ScarletMeter.Engine.Abyss;
 using ScarletMeter.Engine.Maps;
@@ -8,8 +9,8 @@ namespace ScarletMeter.Tests;
 
 /// <summary>
 /// Synthetic game records and the stream they travel in, for the tests of the records upstream does not decode (the
-/// entry list with Odyle energy, the map loaded, the Abyss's artifact holders): framing, LZ4 bundles and bringing
-/// upstream's reassembly into step. Never captured bytes.
+/// entry list with Odyle energy, the map loaded, the Abyss's artifact holders) and of its damage records (a player's
+/// class from their skills): framing, LZ4 bundles and bringing upstream's reassembly into step. Never captured bytes.
 /// </summary>
 internal static class SyntheticRecords
 {
@@ -102,4 +103,23 @@ internal static class SyntheticRecords
     // The record on entering the Abyss (05 e3): one war, then the artifacts.
     public static byte[] AbyssEntry(byte[] war, byte[] artifacts) =>
         Frame(AbyssArtifactRecords.EntryOpcode, Convert.ToHexString([.. war, .. artifacts]));
+
+    // A damage record (04 38) as upstream's DamagePacketProcessor reads one (v1.11.5.341): the target, the switch value,
+    // a flag and the actor as varints, the skill code (u32), a byte, the damage type (varint), the special block (eight
+    // bytes for switch value 4, twelve for 5 to 7), a varint, then the damage (varint). Made-up bytes are zero.
+    public static byte[] Damage(int targetId, int actorId, int skillCode, long damage = 1_000, uint switchValue = 4)
+    {
+        List<byte> body = [.. VarInt((uint)targetId), .. VarInt(switchValue), 0x00, .. VarInt((uint)actorId)];
+        var skill = new byte[4];
+        BinaryPrimitives.WriteInt32LittleEndian(skill, skillCode);
+        body.AddRange([.. skill, 0x00, 0x01, .. new byte[(switchValue & 0x0F) == 4 ? 8 : 12], 0x00, .. VarInt((uint)damage)]);
+        return Frame(PacketOpcodes.Damage, Convert.ToHexString([.. body]));
+    }
+
+    // A little-endian base-128 varint, as the game writes them.
+    private static IEnumerable<byte> VarInt(uint value)
+    {
+        for (; value >= 0x80; value >>= 7) yield return (byte)(value | 0x80);
+        yield return (byte)value;
+    }
 }

@@ -19,10 +19,22 @@ internal static class UpstreamMapping
     /// Upstream's player totals as a row. Rates and DPS are upstream's own figures; the class name is Global's
     /// (<see cref="GlobalNames"/>).
     /// </summary>
-    public static PlayerRow ToPlayerRow(PlayerStats s) => new(
-        s.PlayerId, s.PlayerName ?? string.Empty, s.IsUser, s.IsIdentified, s.ClassId, GlobalNames.Of(s.ClassName),
-        s.ServerName ?? string.Empty, s.CombatPower, s.TotalDamage, s.DamagePerSecond, s.DamagePercentage,
-        s.CriticalRate, s.PlayerDeaths);
+    public static PlayerRow ToPlayerRow(PlayerStats s) => ToPlayerRow(s, skills: null);
+
+    /// <summary>
+    /// Upstream's player totals as a row, with the class the player's <paramref name="skills"/> in the fight say where
+    /// they say another than upstream's (<see cref="ClassSkills.ClassFor"/>): upstream's can be another player's, one
+    /// who had the player's id before them.
+    /// </summary>
+    public static PlayerRow ToPlayerRow(PlayerStats s, IEnumerable<SkillStats?>? skills)
+    {
+        var classId = ClassSkills.ClassFor(s.ClassId, skills);
+        return new(
+            s.PlayerId, s.PlayerName ?? string.Empty, s.IsUser, s.IsIdentified, classId,
+            classId == s.ClassId ? GlobalNames.Of(s.ClassName) : ClassNameOf(classId),
+            s.ServerName ?? string.Empty, s.CombatPower, s.TotalDamage, s.DamagePerSecond, s.DamagePercentage,
+            s.CriticalRate, s.PlayerDeaths);
+    }
 
     /// <summary>
     /// A tracked player as the character the game named as the user's, or null when upstream has not marked it as the
@@ -36,14 +48,16 @@ internal static class UpstreamMapping
 
     /// <summary>
     /// A class's AION 2 Global name by upstream's class id, from upstream's game data (classes.json, loaded once and only
-    /// read), as <see cref="ToIdentity"/> names a class upstream knows; empty for an id the data does not have.
+    /// read), as <see cref="ToIdentity"/> names a class upstream knows: a player's class from the login record and from
+    /// their skills is named with it; empty for an id the data does not have.
     /// </summary>
     public static string ClassNameOf(int classId) => GlobalNames.Of(GameDataProvider.Instance.Classes.GetById(classId)?.Name);
 
     /// <summary>
-    /// One player's details from the parts upstream computes. <paramref name="hitsNewestFirst"/> is the player's
-    /// whole hit list, newest first, as upstream returns it; only the newest <see cref="PlayerDetails.CombatLogLimit"/>
-    /// become the log.
+    /// One player's details from the parts upstream computes, their class as their <paramref name="skills"/> say it
+    /// (<see cref="ToPlayerRow(PlayerStats, IEnumerable{SkillStats?}?)"/>). <paramref name="hitsNewestFirst"/> is the
+    /// player's whole hit list, newest first, as upstream returns it; only the newest
+    /// <see cref="PlayerDetails.CombatLogLimit"/> become the log.
     /// </summary>
     public static PlayerDetails ToDetails(
         PlayerStats stats,
@@ -53,7 +67,7 @@ internal static class UpstreamMapping
         IEnumerable<BuffStats?> buffs,
         (IReadOnlyList<DpsDataPoint> Points, IReadOnlyList<BuffTimelineEntry> BuffTimeline, double TotalSec) graph,
         IReadOnlyList<PlayerDamage?> hitsNewestFirst) => new(
-            ToPlayerRow(stats),
+            ToPlayerRow(stats, skills),
             fightDuration,
             new HitRates(stats.HitCount, stats.CriticalRate, stats.BackAttackRate, stats.FrontAttackRate,
                 stats.PerfectRate, stats.DoubleDamageRate, stats.ParryRate),
@@ -147,7 +161,8 @@ internal static class UpstreamMapping
     /// <summary>
     /// A saved or running fight with its players' details. The entry's totals and player count are computed
     /// from the snapshot's players the way upstream computes them when it saves a fight (the total saturating
-    /// rather than overflowing). Pass a snapshot cleaned by <see cref="SavedFightSanitizer"/>. With
+    /// rather than overflowing). Each player's class is the one their saved skills say, so a fight saved under another
+    /// player's class reads with the right one. Pass a snapshot cleaned by <see cref="SavedFightSanitizer"/>. With
     /// <paramref name="includeDetails"/> false (a saved fight whose start or end is damaged, so nothing in it can
     /// be timed) only the rows are returned. A player whose details still fail to build is reported through
     /// <paramref name="playerFailed"/> and left out of the details, so one damaged player does not cost the fight.
@@ -188,7 +203,8 @@ internal static class UpstreamMapping
             }
         }
 
-        return new HistoryFight(entry, players.Select(ToPlayerRow).ToList(), details);
+        return new HistoryFight(
+            entry, players.Select(p => ToPlayerRow(p, Lookup(snapshot.SkillStatsByPlayer, p.PlayerId))).ToList(), details);
     }
 
     /// <summary>

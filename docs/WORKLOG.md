@@ -2,6 +2,26 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-11-02 — A player's class follows their own skills
+
+**What:** `ClassSkills` (pure) reads a class from a class skill's id. `ClassSkillTap`, a reader beside upstream's pipeline, moves a tracked player's class on the live meter once most of their class-skill hits since their current name say another. `UpstreamMapping` gives details and saved fights the class whose skills did most of the player's damage in the fight (ARCHITECTURE.md "Player classes").
+
+**Why:** Harry: "last fight a cleric … had an icon of a ranger, but he was a cleric … we had a ranger in our previous run, who was kicked". Upstream keeps the class of the first skill it sees from a player id and never replaces it; the game hands ids on. The saved fights showed the same Cleric correct under one id in the run before and as a Ranger under another in the next run's boss fights, every hit a Cleric skill.
+
+Before choosing the live rule, a read-only count over a copy of the player's saved fights (deleted after; counts only, no names) checked two things:
+- **Wrong classes:** about one row in seventy had a class that was not their skills', most with no class at all. In every one the class skills named a single class.
+- **Stray skills:** a few players used up to 3% of another class's skills, Gladiator ones mostly, so a rule that moved the class at one hit would have flipped their icons. Hence the majority, and the count's restart at a new name with the held class one hit ahead.
+
+**Checks (SDK 10.0.402, at idle priority with no shared compiler server; a game was running, so nothing was launched):**
+- `ClassSkillsTests`, 28 cases: the class of a skill id at the range's edges; the damage rule (stale, none, the spirit's, strays, ties both ways, damaged and saturating rows); the record reader against upstream's checks (switch values, actor as target, a record cut at the skill code); the tap's count (a reused id moving at its new player's second class-skill hit, strays not moving it before or after a new name, a majority needed without one, the spirit's class giving way, heals, theostones, untracked players, the Abyss pause, the log line with no name); a reused id through upstream's real pipeline shown as its new player's class in the overlay; a fight saved under the stale class read with the skills' class, live details too.
+- Fail-first on the worktree, controls passing before and after (28 tests each), each restored file marked changed: 14 of 14 caught. The tap not registered; saved rows, and details, without skills; the count not restarted at a new name; a move at any other class's hit; no head start for the class held; heals counted; reading while paused; in the reader, the actor as target, any switch value and no length check; ties going to the first class; sums wrapping; the spirit's ids counted.
+- `MapProbeTests.TheEngineHasOneTapWithItsReaders` counted three readers and failed on the first full run, as meant: it now counts four, the class reader among them.
+- `scripts/Build.ps1` Debug and Release, 959/959 each; upstream's own warnings only.
+
+**Not checked:** in the game (HANDOFF, "Players' classes follow their skills"); whether other ids a party sees can change hands without a name change, which the count's restart would not see.
+
+**Next:** the audit, the PR, Codex and CI, then Harry's go-ahead to merge.
+
 ## 2026-10-31 — The frame cap reads first, then writes
 
 **What:** `frame-cap.js`'s step reads every animation's state, and when it ends, before it writes any; then it makes the writes, each animation's in the order they had (pause on taking over, then finish or the new time). A failing read or write still lets that animation go (`letGo`). `Test-FrameCap.ps1` allows restarting bars up to 80 changes a second (LESSONS), checks that a restarted transition is taken over on its first frame, and waits for Edge's DevTools port itself rather than only its file (LESSONS).

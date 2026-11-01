@@ -64,6 +64,10 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ### Fixed
 
+- A player could show with another player's class and icon, often someone who had left the party, in the meter and
+  in History, because the game hands a leaving player's id to someone new. A player's class now follows their own
+  skills, within a couple of them, and fights already saved show each player's class from their skills too.
+  ([#71](https://github.com/harrynguon/Scarlet-Meter/pull/71))
 - On a narrow meter, a fight's state and time no longer run under the buttons at the top: the state shortens or
   steps aside, and the time stays whole, even past an hour. To keep room for them the meter can no longer be made
   narrower than 320 px (it was 300). Pointing at a shortened title shows it whole.
