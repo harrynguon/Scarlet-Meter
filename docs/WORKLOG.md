@@ -44,7 +44,9 @@ Before choosing the live rule, a read-only count over a copy of the player's sav
 
 **Not checked:** in the game (HANDOFF, "Players' classes follow their skills"); whether other ids a party sees can change hands without a name change, which the count's restart would not see.
 
-**Next:** CI and a fresh Codex review on the fixes, then Harry's go-ahead to merge.
+**After the fixes:** Codex reviewed cb985c4 with no findings; CI passed on it. Harry: "Yes, merge it".
+
+**Next:** CI on this entry, then the merge; then main into the cube branch, and the check in game.
 
 ## 2026-10-31 — The frame cap reads first, then writes
 
