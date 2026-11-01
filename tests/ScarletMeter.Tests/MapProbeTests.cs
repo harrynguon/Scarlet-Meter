@@ -337,16 +337,18 @@ public sealed partial class MapProbeTests
         Assert.Equal(new OdyleEnergy(30, 880), odyle.Odyle);
     }
 
-    // The engine's graph has the one tap and its three readers, the same instances the engine reads from.
+    // The engine's graph has the one tap and its four readers, the same instances the engine reads from (the class
+    // reader is read by no one else).
     [Fact]
     public void TheEngineHasOneTapWithItsReaders()
     {
         using var host = new TestEngineHost(CaptureMode.None);
         var readers = host.Services.GetServices<IRecordReader>().ToList();
-        Assert.Equal(3, readers.Count);
+        Assert.Equal(4, readers.Count);
         Assert.Same(host.Services.GetRequiredService<EntryListTap>(), Assert.Single(readers.OfType<EntryListTap>()));
         Assert.Same(host.Services.GetRequiredService<MapLoadTap>(), Assert.Single(readers.OfType<MapLoadTap>()));
         Assert.Same(host.Services.GetRequiredService<AbyssArtifactTap>(), Assert.Single(readers.OfType<AbyssArtifactTap>()));
+        Assert.Single(readers.OfType<ClassSkillTap>());
         Assert.Same(host.Services.GetRequiredService<RecordTap>(), host.Services.GetRequiredService<RecordTap>());
     }
 

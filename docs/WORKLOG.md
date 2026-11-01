@@ -2,6 +2,52 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-11-02 — A player's class follows their own skills
+
+**What:** `ClassSkills` (pure) reads a class from a class skill's id. `ClassSkillTap`, a reader beside upstream's pipeline, moves a tracked player's class on the live meter once most of their uses of class skills since their current name say another (a run of hits with one skill is one use). `UpstreamMapping` gives details and saved fights the class whose skills did most of the player's damage in the fight (ARCHITECTURE.md "Player classes").
+
+**Why:** Harry asked why a Cleric in the last fight had a Ranger's icon, a ranger having left the party before. Upstream keeps the class of the first skill it sees from a player id and never replaces it; the game hands ids on. The saved fights showed that player with their own class under one id earlier and with a Ranger's under another later, every hit a Cleric skill.
+
+Before choosing the live rule, a read-only count over a copy of the player's saved fights (deleted after; counts only, no names) checked two things:
+- **Wrong classes:** about one row in seventy had a class that was not their skills', most with no class at all. In every one the class skills named a single class.
+- **Stray skills:** a few players used up to 3% of another class's skills, Gladiator ones mostly, so a rule that moved the class at one hit would have flipped their icons. Hence the majority, and the count's restart at a new name with the held class one use ahead.
+
+**Checks on a7f98c6 (SDK 10.0.402, at idle priority with no shared compiler server; a game was running, so nothing was launched):**
+- `ClassSkillsTests`, 28 cases, among them a reused id through upstream's real pipeline shown as its new player's class in the overlay, and a fight saved under the stale class read with the skills' class, live details too.
+- Fail-first on the worktree, controls passing before and after, each restored file marked changed: 14 of 14 caught.
+- `MapProbeTests.TheEngineHasOneTapWithItsReaders` counted three readers and failed on the first full run, as meant: it now counts four, the class reader among them.
+- `scripts/Build.ps1` Debug and Release, 959/959 each; upstream's own warnings only. CI passed on a7f98c6 (runs 41311267328, push, and 41311283533, pull_request).
+
+**Review (deep audit on a7f98c6, approve with nits):**
+1. Minor, fixed: counted by record, one skill of another class on two targets right after a name change moved the class until two of the player's own moved it back, which the tap's comment said could not happen (LESSONS). A run of one skill's hits is now one use; the documented bound (two different skills of one other class in a row right after a name) is pinned by a test.
+2. Minor, fixed: ARCHITECTURE said the roster's class comes from the login record first; it takes upstream's class, which the tap moves, and the login record's only while upstream has none or the spirit's. Reworded.
+3. Minor, documented: the overlay's rule (uses since the name) and the details' (one fight's damage) can differ for one player, as after a name change or an id changing hands within a fight. ARCHITECTURE says when.
+4. Nit, fixed: no test covered a saved fight with a damaged start or end, whose rows are mapped without details; `AFightWithoutDetailsStillReadsItsPlayersClassesFromTheirSkills`.
+5. Nit, fixed: the reader's opcode check was untested; a damage-shaped record with another opcode now gives no hit.
+6. Nit, fixed: a record cut after the skill counted, where upstream drops it. The reader now reads the rest as upstream does (a byte, the type, the special block, two varints of up to five bytes), so it counts no record upstream drops; its explicit block-length check was dropped as never decisive, since the varints after the block need the bytes anyway.
+7. Nit, documented: upstream's `LinkSessionToGlobalPlayer` copies a session's class into a new global identity; added to the upstream candidate (ARCHITECTURE, HANDOFF).
+8. Nit, done: the quote of Harry's message and the run description are shortened here; the aggregates stay without totals.
+
+**Codex:** reviewed a7f98c6, no findings.
+
+**Checks after the fixes:**
+- `ClassSkillsTests`, 32 cases.
+- Fail-first again, controls passing before and after (32 tests each): 22 of 22 caught. The 14 above, rewritten for uses, and:
+  - the damaged-window rows without skills;
+  - every hit counted as a use;
+  - a run kept across a name;
+  - any opcode;
+  - the tail not read;
+  - the block always eight bytes;
+  - varints of four bytes, and of any length.
+- `scripts/Build.ps1` Debug 963/963. In Release, `HistoryTests.SavedBossFightsAreListedNewestFirstWithTheirTotals` listed 2 of its 3 saved fights once, a test this change does not reach (no stream, no class). It then passed five times alone, and the full Release suite passed 963/963. Added to HANDOFF's list of tests that failed once.
+
+**Not checked:** in the game (HANDOFF, "Players' classes follow their skills"); whether other ids a party sees can change hands without a name change, which the count's restart would not see.
+
+**After the fixes:** Codex reviewed cb985c4 with no findings; CI passed on it. Harry: "Yes, merge it".
+
+**Next:** CI on this entry, then the merge; then main into the cube branch, and the check in game.
+
 ## 2026-10-31 — The frame cap reads first, then writes
 
 **What:** `frame-cap.js`'s step reads every animation's state, and when it ends, before it writes any; then it makes the writes, each animation's in the order they had (pause on taking over, then finish or the new time). A failing read or write still lets that animation go (`letGo`). `Test-FrameCap.ps1` allows restarting bars up to 80 changes a second (LESSONS), checks that a restarted transition is taken over on its first frame, and waits for Edge's DevTools port itself rather than only its file (LESSONS).
