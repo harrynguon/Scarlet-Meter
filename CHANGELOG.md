@@ -64,6 +64,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ### Fixed
 
+- When the connection to the game loses packets, the meter's log no longer fills with thousands of "TCP GAP" lines a
+  second (one session's log reached 186 MB): it keeps the first five of such a burst, then writes how many more came
+  once a minute until they stop. ([#73](https://github.com/harrynguon/Scarlet-Meter/pull/73))
 - A player could show with another player's class and icon, often someone who had left the party, in the meter and
   in History, because the game hands a leaving player's id to someone new. A player's class now follows their own
   skills, within a couple of them, and fights already saved show each player's class from their skills too.
