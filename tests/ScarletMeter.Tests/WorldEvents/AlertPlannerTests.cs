@@ -239,8 +239,17 @@ public sealed class AlertPlannerTests
         var quiet = At("2026-10-23T00:10:00Z"); // nothing within five minutes, nothing open
         Assert.Empty(AlertPlanner.Plan(EventCatalog.Global, enabled, quiet, Asia).Alerts);
 
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 100; i++) AlertPlanner.Plan(EventCatalog.Global, enabled, quiet, Asia);
-        Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
+        // A one-off allocation of the runtime's own on this thread can land inside a pass: in full test runs, about
+        // two in five, always 1,944 bytes and with no collection meanwhile (LESSONS). An allocation of the planner's
+        // would show in every pass, so one clean pass of three is the test.
+        long allocated = 0;
+        for (var pass = 0; pass < 3; pass++)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < 100; i++) AlertPlanner.Plan(EventCatalog.Global, enabled, quiet, Asia);
+            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            if (allocated == 0) break;
+        }
+        Assert.Equal(0, allocated);
     }
 }

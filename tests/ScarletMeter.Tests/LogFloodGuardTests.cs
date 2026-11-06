@@ -28,6 +28,8 @@ public sealed class LogFloodGuardTests
     [Fact]
     public void ABurstWritesItsFirstFiveThenACountAMinuteLater()
     {
+        // The PC's time zone is not UTC, so a summary stamped in UTC would stand out among the file's local times.
+        clock.SetLocalTimeZone(TimeZoneInfo.CreateCustomTimeZone("Synthetic+13", TimeSpan.FromHours(13), "Synthetic+13", "Synthetic+13"));
         using var guard = NewGuard();
         var gaps = new List<LogEvent>();
         for (var i = 0; i < 1000; i++)
@@ -51,6 +53,7 @@ public sealed class LogFloodGuardTests
         Assert.Equal(LogEventLevel.Warning, summary.Level);
         Assert.Equal(CaptureCategory, Category(summary));
         Assert.Equal(clock.GetUtcNow(), summary.Timestamp);
+        Assert.Equal(TimeSpan.FromHours(13), summary.Timestamp.Offset);
     }
 
     [Fact]
@@ -232,6 +235,40 @@ public sealed class LogFloodGuardTests
     }
 
     [Fact]
+    public void AFileThatFailsWhenTheLogClosesDoesNotStopTheShutdown()
+    {
+        // The last count fails (a new day's file that cannot be created, a full disk): the line is lost, nothing
+        // escapes the host's disposal, and the file is still closed.
+        var failing = new FailingSink();
+        var guard = new LogFloodGuard(failing, MeterLog.TcpGaps, clock);
+        for (var i = 0; i < 8; i++) guard.Emit(Gap(i));
+        failing.Failing = true;
+
+        guard.Dispose();
+        Assert.Equal(1, failing.Disposals);
+        Assert.DoesNotContain(failing.Events, e => e.Properties.ContainsKey("Count"));
+    }
+
+    [Fact]
+    public void AStepInTheSystemsClockNeitherHoldsACountBackNorEndsABurst()
+    {
+        var timers = new ManualTimers(clock);
+        using var guard = new LogFloodGuard(file, MeterLog.TcpGaps, timers);
+        for (var i = 0; i < 6; i++) guard.Emit(Gap(i));
+
+        // The wall clock jumps two minutes ahead: a burst is still one minute of quiet away, so the next gap counts.
+        timers.WallShift = TimeSpan.FromMinutes(2);
+        guard.Emit(Gap(6));
+        Assert.Equal(5, Gaps().Count);
+
+        // Then an hour back: the count still comes out a minute after it began.
+        timers.WallShift = TimeSpan.FromHours(-1);
+        clock.Advance(Minute);
+        timers.Fire();
+        Assert.Equal(2, Scalar<int>(Assert.Single(Summaries()), "Count"));
+    }
+
+    [Fact]
     public void GapsFromManyThreadsAreEachWrittenOrCountedOnce()
     {
         // The fake clock runs due timers whenever it is read or moved, on whichever thread does it, so the timer's
@@ -342,23 +379,28 @@ public sealed class LogFloodGuardTests
     }
 
     /// <summary>A file that throws while <see cref="Failing"/> is set, and keeps what it is given otherwise.</summary>
-    private sealed class FailingSink : ILogEventSink
+    private sealed class FailingSink : ILogEventSink, IDisposable
     {
         public bool Failing { get; set; }
 
         public List<LogEvent> Events { get; } = [];
+
+        public int Disposals { get; private set; }
 
         public void Emit(LogEvent logEvent)
         {
             if (Failing) throw new IOException("The disk is full (synthetic).");
             Events.Add(logEvent);
         }
+
+        public void Dispose() => Disposals++;
     }
 
     /// <summary>
     /// The fake clock's time, with one timer that fires only when the test calls <see cref="Fire"/>: never, as on a
     /// starved thread pool, or early, as a callback queued before the timer was changed. <see cref="Due"/> is the
-    /// last due time set, null when the timer was stopped.
+    /// last due time set, null when the timer was stopped. <see cref="WallShift"/> moves the wall clock alone, as a
+    /// change to the system's time does; the timestamps follow the fake clock.
     /// </summary>
     private sealed class ManualTimers(FakeTimeProvider clock) : TimeProvider
     {
@@ -366,7 +408,13 @@ public sealed class LogFloodGuardTests
 
         public TimeSpan? Due { get; private set; }
 
-        public override DateTimeOffset GetUtcNow() => clock.GetUtcNow();
+        public TimeSpan WallShift { get; set; }
+
+        public override DateTimeOffset GetUtcNow() => clock.GetUtcNow() + WallShift;
+
+        public override long GetTimestamp() => clock.GetTimestamp();
+
+        public override long TimestampFrequency => clock.TimestampFrequency;
 
         public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
 

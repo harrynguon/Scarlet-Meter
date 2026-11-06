@@ -29,10 +29,12 @@ internal sealed class LogFloodGuard : ILogEventSink, IDisposable
     private readonly ITimer timer;
     private readonly Lock gate = new();
 
+    // Intervals are measured on the provider's timestamps (monotonic), not its wall clock, so a step in the system's
+    // time neither holds a count back nor ends a burst; the wall clock only stamps the summary line.
     private int keptInBurst;
-    private DateTimeOffset? lastSeen;        // clock time of the burst's latest event, written or counted
+    private long? lastSeen;                  // timestamp of the burst's latest event, written or counted
     private int counted;                     // events counted, not written, since the last summary
-    private DateTimeOffset countingSince;    // clock time of the first of them
+    private long countingSince;              // timestamp of the first of them
     private DateTimeOffset firstCounted;     // the first and latest one's own timestamps, for the summary
     private DateTimeOffset lastCounted;
     private LogEventLevel countedLevel;
@@ -70,14 +72,15 @@ internal sealed class LogFloodGuard : ILogEventSink, IDisposable
             // The clock is read first, before any state: a clock may run due timers when read (a test's fake one
             // does), and the lock lets the callback in on this thread, so it must find the state whole.
             var now = time.GetUtcNow();
+            var tick = time.GetTimestamp();
             if (disposed) return;
-            if (lastSeen is { } last && now - last >= rule.Interval)
+            if (lastSeen is { } last && time.GetElapsedTime(last, tick) >= rule.Interval)
             {
                 // A quiet interval ended the last burst; its count is normally out already (the timer's).
                 WriteSummary(now);
                 keptInBurst = 0;
             }
-            lastSeen = now;
+            lastSeen = tick;
 
             if (keptInBurst < rule.Kept)
             {
@@ -89,7 +92,7 @@ internal sealed class LogFloodGuard : ILogEventSink, IDisposable
             var starting = counted == 0;
             if (starting)
             {
-                countingSince = now;
+                countingSince = tick;
                 firstCounted = logEvent.Timestamp;
                 countedLevel = logEvent.Level;
                 countedCategory = logEvent.Properties.GetValueOrDefault("SourceContext");
@@ -97,12 +100,16 @@ internal sealed class LogFloodGuard : ILogEventSink, IDisposable
             counted++;
             lastCounted = logEvent.Timestamp;
             // The timer is late (a starved thread pool): the flood itself brings the summary out on time.
-            if (now - countingSince >= rule.Interval) WriteSummary(now);
+            if (time.GetElapsedTime(countingSince, tick) >= rule.Interval) WriteSummary(now);
             else if (starting) timer.Change(rule.Interval, Timeout.InfiniteTimeSpan);
         }
     }
 
-    /// <summary>Writes what is still counted, then closes the sink behind it. Safe to call more than once.</summary>
+    /// <summary>
+    /// Writes what is still counted, then closes the sink behind it. Safe to call more than once. A file that fails
+    /// on that last line costs the line, not the shutdown: the failure goes to Serilog's own diagnostic log, as in
+    /// the timer's callback, and the file is closed regardless.
+    /// </summary>
     public void Dispose()
     {
         lock (gate)
@@ -113,6 +120,10 @@ internal sealed class LogFloodGuard : ILogEventSink, IDisposable
             try
             {
                 WriteSummary(now);
+            }
+            catch (Exception ex)
+            {
+                SelfLog.WriteLine("The log flood guard could not write its last summary: {0}", ex);
             }
             finally
             {
@@ -131,8 +142,9 @@ internal sealed class LogFloodGuard : ILogEventSink, IDisposable
             lock (gate)
             {
                 var now = time.GetUtcNow(); // first, as in Emit
+                var tick = time.GetTimestamp();
                 if (disposed || counted == 0) return;
-                var left = countingSince + rule.Interval - now;
+                var left = rule.Interval - time.GetElapsedTime(countingSince, tick);
                 if (left > TimeSpan.Zero) timer.Change(left, Timeout.InfiniteTimeSpan); // early: wait out the rest
                 else WriteSummary(now);
             }

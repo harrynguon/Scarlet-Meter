@@ -40,6 +40,11 @@ public sealed class MeterLogTests : IDisposable
                 if (i != 20) continue;
                 capture.LogWarning("Capture was locked onto port {Port} without a server-time record.", 443);
                 other.LogWarning("[TCP GAP] from another category");
+                // The levels kept from App's earlier configuration: Information up, EF Core's SQL lines left out.
+                other.LogInformation("Synthetic information line");
+                other.LogDebug("Synthetic debug line");
+                host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Microsoft.EntityFrameworkCore.Database.Command")
+                    .LogInformation("Executed DbCommand (synthetic)");
             }
         } // Disposing the host closes the log, which writes the count still held.
 
@@ -52,6 +57,9 @@ public sealed class MeterLogTests : IDisposable
             .Select(l => l[(l.IndexOf("Expected:", StringComparison.Ordinal))..].Replace(" Diff:1460", "", StringComparison.Ordinal)));
         Assert.Contains(lines, l => l.Contains("[WRN] Capture was locked onto port 443 without", StringComparison.Ordinal));
         Assert.Contains(lines, l => l.Contains("[WRN] [TCP GAP] from another category", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.Contains("[INF] Synthetic information line", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, l => l.Contains("Synthetic debug line", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, l => l.Contains("Executed DbCommand", StringComparison.Ordinal));
         var summary = Assert.Single(lines, l => l.Contains(" more not written", StringComparison.Ordinal));
         Assert.Matches(
             @"\[WRN\] \[TCP GAP\] 45 more not written, from \d\d:\d\d:\d\d\.\d{3} to \d\d:\d\d:\d\d\.\d{3} " +
