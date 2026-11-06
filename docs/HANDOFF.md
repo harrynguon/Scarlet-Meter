@@ -38,6 +38,7 @@ Record the tested commit, observation date and Windows configuration. Pending:
 - [ ] A boss's HP bar starts full and reaches zero at its kill (upstream v1.11.5.341 fixed the max HP of some bosses); note any boss whose bar does not.
 - [ ] A summon's damage (a Spiritmaster's spirit, for example) lands on its owner's row, not on an unnamed player: v1.11.5.341 rewrote how a summon's owner is read.
 - [ ] After a session, `logs/scarlet-*.log` holds no stream of `PacketParseException` errors from mob packets.
+- [ ] Upstream's TCP gap warnings stay few (ARCHITECTURE.md "Log"): after a session, each burst of them shows as at most five `[TCP GAP] Expected:` lines, then `[TCP GAP] <n> more not written, from … to …` lines about a minute apart until it ends, and the day's log stays small (an unguarded flood once made it 186 MB). Note how often the counts come and how large they are, never the log's contents.
 - [ ] Reset clears the fight; a new pull starts fresh. With a summon out across the reset, its damage still lands on its owner's row, not on an unnamed player.
 - [ ] Without Npcap (or with it uninstalled), a normal launch shows the "Install Npcap" dialog and exits.
 - [ ] Close the window during a fight: no crash, a completed boss fight appears in `combat-history.db`.

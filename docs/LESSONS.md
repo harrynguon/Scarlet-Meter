@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The log's gap counts could be written twice when reading the clock ran their timer** (2026-11-07, the TCP gap guard; caught by its own thread test before commit).
+- What: `LogFloodGuard`'s summary took the count, then read the clock for the line's time, then cleared the count. The tests' `FakeTimeProvider` runs due timers whenever it is read, on the thread reading it, and the guard's lock lets that thread back in, so the timer's callback found the count still there and wrote it, and the summary under way wrote it again: four threads' 20,000 gaps were reported as up to 20,136, in three runs of four.
+- Why: the lock was taken to make each step whole, but a lock its own thread can enter again does not keep out a callback that thread makes itself, and a clock read did not look like something that could call back. The system clock never does, so the meter itself would likely not have shown it; a provider that does is allowed.
+- Guard: the guard reads the clock once, first, on every entry (emit, timer, close) and finishes its state change before calling the timer or the file; `GapsFromManyThreadsAreEachWrittenOrCountedOnce` runs eight rounds, every gap written or counted once, and fails with the old order put back. When a lock that admits its own thread guards state, finish the change before calling anything that is not yours, the clock included.
+
 **A player showed with another player's class** (Harry, 2026-11-02: a Cleric with a Ranger's icon, after a ranger had left the party).
 - What: upstream keeps the class of the first skill it sees from a player id and never replaces it, and the game hands ids on, so a player given an id another class had used showed that class, in the overlay and in every fight saved meanwhile, while their name and combat power were their own. Scarlet showed upstream's class as it was. A read of the player's saved fights found the same in about one row in seventy, most of them with no class at all.
 - Why: the class was taken as a fact about the player, when upstream holds it as a fact about an id it first saw; nothing asked what happens to a value upstream sets once per id when the id changes hands. Every test gave a player one class and one id for good, and the demo's roster never reuses an id.

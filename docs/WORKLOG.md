@@ -2,6 +2,22 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-11-07 — Upstream's TCP gap warnings no longer flood the log
+
+**What:** `Logging/LogFloodGuard`, a Serilog sink before the log file, with one rule (`MeterLog.TcpGaps`): upstream's capture-device warning per TCP sequence gap. A burst's first five are written, the rest counted and written as one `[TCP GAP] <n> more not written, from … to …` line a minute after the first counted one, the last count when the log closes; a minute without a gap ends the burst. Every other event passes untouched. `MeterLog` is the configuration `App` had inline (same levels, file and retention), now with the guard around the file sink; `UpstreamLogs` (engine contracts) names upstream's category and the warning's start as strings, so the app still references no upstream type. ARCHITECTURE.md "Log". No file under `upstream/` and no boundary seam changed.
+
+**Why:** in the player's portable copy one session wrote about two million `[TCP GAP]` lines in about five and a half minutes (a 186 MB daily log, against about 100 KB on an ordinary day); thousands of writes a second cost disk and processor while the game runs. Found while diagnosing an unrelated roster issue in another session.
+
+**Checks (SDK 10.0.402, at idle priority with no shared compiler server; no game running at the time, nothing launched):**
+- `LogFloodGuardTests` (11) and `MeterLogTests` (4), on synthetic events only: a burst limited and counted, a flood counted each minute until it stops, an isolated gap written, other events passed in order, the count at close, late, early and stray timer callbacks, a file that throws on the timer's thread, four writing threads (eight rounds), and the real log through upstream's `ILogger<CaptureDevice>` read back from the file, the count written when the host closed it.
+- Fail-first, scratch runner (each mutation compiled and failed its named test; restored files marked changed; control at the end): 18 of 18 caught, the control 15 of 15 passing.
+- The thread test first failed on the guard as written: a count reported twice (LESSONS, "The log's gap counts could be written twice…"). Fixed before commit; that order is mutation M6, caught.
+- `scripts/Build.ps1 -SkipTests`, Debug (0 warnings) and Release (upstream's five own warnings only), and the whole suite through the test executable: 978/978 in each. `Build.ps1`'s own test step could not start in this session's environment (`dotnet test`'s named pipe to the test host was refused, with or without its sandbox, and the test executable could not create folders under `%TEMP%`, so `TEMP` pointed at a folder beside the worktree); CI runs the script whole.
+
+**Not checked:** a real flood in the game (HANDOFF, "Next: in-game acceptance"). Why the gaps come is not known; upstream's handling of a gap is unchanged, and it still formats each warning on the capture thread before the guard drops it.
+
+**Next:** the PR's audit and review; offer upstream the gap warning at Debug or limited in `CaptureDevice` (ARCHITECTURE "What breaks on an upstream update" says when to retire the rule).
+
 ## 2026-11-02 — A player's class follows their own skills
 
 **What:** `ClassSkills` (pure) reads a class from a class skill's id. `ClassSkillTap`, a reader beside upstream's pipeline, moves a tracked player's class on the live meter once most of their uses of class skills since their current name say another (a run of hits with one skill is one use). `UpstreamMapping` gives details and saved fights the class whose skills did most of the player's damage in the fight (ARCHITECTURE.md "Player classes").

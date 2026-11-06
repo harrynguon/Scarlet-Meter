@@ -4,13 +4,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ScarletMeter.App.Alerts;
+using ScarletMeter.App.Logging;
 using ScarletMeter.App.Roster;
 using ScarletMeter.App.Settings;
 using ScarletMeter.App.Updates;
 using ScarletMeter.App.Windows;
 using ScarletMeter.Engine;
 using Serilog;
-using Serilog.Events;
 
 namespace ScarletMeter.App;
 
@@ -86,14 +86,8 @@ public partial class App : Application
             Args = args,
             ContentRootPath = AppContext.BaseDirectory, // never the working directory
         });
-        builder.Services.AddSerilog(configuration => configuration
-            .MinimumLevel.Information()
-            // EF Core logs every SQL command at Information, which buries the capture lines.
-            .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
-            .WriteTo.File(
-                Path.Combine(options.DataDirectory, "logs", "scarlet-.log"),
-                rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: 14));
+        // The daily file log, with upstream's flood of TCP gap warnings limited (Logging/MeterLog).
+        builder.Services.AddSerilog(configuration => MeterLog.Configure(configuration, options.DataDirectory, TimeProvider.System));
         builder.Services.AddScarletEngine(options);
         builder.Services.AddSingleton(services => new SettingsStore(options.DataDirectory, services.GetRequiredService<ILogger<SettingsStore>>()));
         builder.Services.AddSingleton<SettingsService>();
