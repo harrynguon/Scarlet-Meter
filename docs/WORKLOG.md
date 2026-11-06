@@ -17,11 +17,11 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 - Fail-first, by mutation runs with passing controls before and after:
   - First round, 10 mutations, with a stricter name reader (only letters and digits, not all digits, at most 72 bytes): 8 caught. The two missed were in that filter and could not be caught: upstream's names hold only letters, digits and `?`, so the exact comparison already rejects anything the filter did. The filter was removed.
   - Second round, on the simpler reader: 8/8 caught. They covered the short name kept, the id refused, no name check, ids past the open slots, Korean ids by name too, the name not kept, the name cleaned as upstream does, and the name read past its length.
-- The session's sandbox refused writes to `%TEMP%`, so tests ran with `TEMP` set to the worktree's ignored `bin` folder.
+- The session's sandbox refused writes to `%TEMP%`, so tests ran with `TEMP` set to the worktree's ignored `bin` folder. It also refused the named pipe `dotnet test` opens to its test host, so `scripts/Build.ps1` failed there with no test run ("Access to the path is denied" in `NamedPipeClientStream`). Instead, `scripts/Build.ps1 -SkipTests` (restore with the audit, build) passed in Debug and Release, and the same test executable run directly passed 966/966 in each. CI runs `dotnet test` as usual.
 
 **Not checked:** in the game (HANDOFF, "One roster row per character in a party"); whether Global's party lists always give such a server or only sometimes (no capture was read). Upstream's own rows keep the party list's short name: a player's details show it after the name.
 
-**Next:** Build.ps1, the deep audit, the PR, Codex and CI; then Harry's go-ahead to merge.
+**Next:** the deep audit, Codex and CI on #72; then Harry's go-ahead to merge.
 
 ## 2026-11-02 — A player's class follows their own skills
 
