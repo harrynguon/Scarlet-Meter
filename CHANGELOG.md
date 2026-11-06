@@ -64,6 +64,10 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ### Fixed
 
+- One of your characters could show twice in Characters, the second row under a server name such as "PER", with no
+  class or level, after you logged in or changed map while in a party. Your login now decides your character's server,
+  so its counts stay on its own row. A row left from before can be removed with its ×.
+  ([#PR](https://github.com/harrynguon/Scarlet-Meter/pull/PR))
 - A player could show with another player's class and icon, often someone who had left the party, in the meter and
   in History, because the game hands a leaving player's id to someone new. A player's class now follows their own
   skills, within a couple of them, and fights already saved show each player's class from their skills too.

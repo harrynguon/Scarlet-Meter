@@ -476,7 +476,8 @@ public sealed class EntryListTests
 
     // The server id after the name goes with the character when upstream knows it and named the character's server by it:
     // SIE is both 1001 and 2002, so only the id tells the side. An id upstream does not know, or one whose short name is not
-    // the character's (the identity read from another record), is not taken.
+    // the character's (the identity read from another record), is not taken; nor a Global one while upstream named a
+    // server and the record names someone else (the next tests).
     [Fact]
     public void TheServerIdGoesWithTheCharacterWhenUpstreamAgrees()
     {
@@ -492,9 +493,59 @@ public sealed class EntryListTests
         Assert.Equal(Alpha, tap.Character);
         tap.Observe(EntryListRecordWriter.SelfRecord(7, "Alpha", 2999, 16, 41_000)); // not a server upstream knows
         Assert.Equal(Alpha, tap.Character);
-        tap.Observe(EntryListRecordWriter.SelfRecord(7, "Alpha", 1503, 16, 41_000)); // a Global server, but upstream named SIE
+        tap.Observe(EntryListRecordWriter.SelfRecord(7, "Other", 1503, 16, 41_000)); // a Global server, upstream named SIE, another name
         Assert.Equal(Alpha, tap.Character);
         Assert.Equal(5, raised.Count);
+    }
+
+    // Upstream takes no short name from a Global id, and keeps one it had: its party list names a member's server from the
+    // top of the member's id, and matches the member to the character by name alone (EntityTracker.TryFallbackLinkByName),
+    // so the character can carry a Korean server's short name its login never gave it (Harry, 2026-11-07: one character on
+    // two roster rows, the second under such a name, with no class or level). A Global id that exists then goes with the
+    // character, which goes without that short name, when the record's name as written is upstream's for it; a record
+    // naming someone else, or a name upstream decodes into another ("Del.ta", which it makes "Delta": nothing is guessed),
+    // leaves the identity as it was, with no server id. Made-up names and ids, PER being upstream's short name for 1013.
+    [Fact]
+    public void AGlobalServerIdGoesWithTheCharacterTheRecordNamesWhateverServerUpstreamKeptForIt()
+    {
+        var linked = new CharacterIdentity("Delta", "PER", 0, string.Empty, 30_000);
+        var tap = NewTap(new() { [9] = linked }, new FakeTimeProvider(Start));
+        List<CharacterProgress> raised = [];
+        tap.ProgressObserved += (_, progress) => raised.Add(progress);
+
+        tap.Observe(EntryListRecordWriter.SelfRecord(9, "Delta", 1503, 30, 30_000, level: 45, gearScore: 2_040));
+        var own = new CharacterIdentity("Delta", string.Empty, 17, "Cleric", 30_000, 1503, 45, 2_040);
+        Assert.Equal(own, tap.Character);
+        Assert.Equal(own, raised[^1].Character);
+        Assert.True(own.IsSameCharacter(new CharacterIdentity("Delta", string.Empty, 17, "Cleric", 30_000))); // the row it had
+
+        foreach (var (name, serverId) in new[] { ("Other", 1503), ("Del.ta", 1503), ("Delta", 1511), ("Delta", 1002), ("Delta", 0) })
+        {
+            tap.Observe(EntryListRecordWriter.SelfRecord(9, name, serverId, 30, 30_000, level: 45, gearScore: 2_040));
+            Assert.Equal(linked, tap.Character); // another name, one decoded into another, past the open slots, NEZ, none
+        }
+        Assert.Equal(6, raised.Count);
+    }
+
+    // The record's name is kept as written, UTF-8 text, to compare with upstream's: upstream's decoding keeps only letters,
+    // digits and "?" and gives those back unchanged, so the two are equal only for a name upstream would have read the
+    // same, and a name it decodes otherwise ("A.pha", which it makes "Apha") never matches. None without a real name or
+    // when cut inside it; the bytes after the name are read as before.
+    [Fact]
+    public void TheRecordKeepsItsNameAsWritten()
+    {
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 6C 70 68 61 E9 03 1F 00 00 00"), out var read));
+        Assert.Equal(("Alpha", 1001, 31u), (read.Name, read.ServerId, read.ClassCode));
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 2E 70 68 61 E9 03 1F 00 00 00"), out read));
+        Assert.Equal(("A.pha", 1001, 31u), (read.Name, read.ServerId, read.ClassCode));
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "Zoë", 1503, 30, 0), out read));
+        Assert.Equal(("Zoë", 1503), (read.Name, read.ServerId));
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 37 05 41 6C 70"), out read));
+        Assert.Equal((null, 0), (read.Name, read.ServerId)); // cut inside the name
+        Assert.True(SelfRecords.TryRead(EntryListRecordWriter.SelfRecord(7, "$Kc03", 1001, 30, 0), out read));
+        Assert.Null(read.Name); // a placeholder names no one
+        Assert.True(SelfRecords.TryRead(Frame(0x3633, "07 00 00 00 00 36 05 41 6C 70 68 61 E9 03"), out read));
+        Assert.Null(read.Name); // no name flag
     }
 
     // Upstream's list of servers is Korea's, so it names no Global server and a Global character's short name is empty
@@ -948,6 +999,35 @@ public sealed class EntryListTests
         var progress = Assert.Single(raised);
         Assert.Equal(new CharacterIdentity("Synthia", ServerMap.GetName(serverId), 17, "Cleric", 1_234_567, serverId, 45, 2_040), progress.Character);
         Assert.Equal(progress.Character, engine.Character);
+    }
+
+    // Through the real graph, what Harry's roster showed (2026-11-07): on a Global server, a party list naming a member
+    // like the character, with an id whose top bits are a Korean server's (1013, PER to upstream), gives upstream's
+    // character that short name, matched by name alone; the next login record keeps it, since upstream writes none for a
+    // Global id. The engine's character is still the login's, on its own server, so the roster keeps one row and the
+    // counts are not dropped as another character's.
+    [Fact]
+    public void APartyListsServerForTheCharactersNameLeavesTheCharacterOnItsOwn()
+    {
+        using var host = new TestEngineHost(CaptureMode.None);
+        var engine = host.Services.GetRequiredService<ICombatEngine>();
+        var stream = host.Services.GetRequiredService<TcpStreamBuffer>();
+        List<CharacterProgress> raised = [];
+        engine.ProgressObserved += (_, progress) => raised.Add(progress);
+        var login = EntryListRecordWriter.SelfRecord(4321, "Synthia", 1503, 30, 1_234_567, level: 45, gearScore: 2_040);
+        var own = new CharacterIdentity("Synthia", string.Empty, 17, "Cleric", 1_234_567, 1503, 45, 2_040);
+
+        Synchronise(stream);
+        stream.AddData("synthetic", [.. EntryListRecordWriter.List([Odyle]), .. login], 0);
+        Assert.Equal(own, Assert.Single(raised).Character);
+        stream.AddData("synthetic", Party("Synthia", 1013, 77, combatPower: 999_999), 0);
+        Assert.Equal("PER", host.Services.GetRequiredService<EntityTracker>().GetPlayerEntity(4321)?.ServerName); // upstream's link
+
+        stream.AddData("synthetic", login, 0);
+        Assert.Equal(2, raised.Count);
+        Assert.Equal(own, raised[^1].Character);
+        Assert.Equal(own, engine.Character);
+        Assert.True(raised[^1].Entries.ContainsKey(EntryIds.OdyleEnergy)); // the same character: its counts kept
     }
 
     // The tap depends on upstream's pipeline, so even resolved first it is built, and listens to the stream, after it.

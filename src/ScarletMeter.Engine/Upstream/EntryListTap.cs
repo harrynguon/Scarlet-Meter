@@ -261,7 +261,7 @@ internal sealed class EntryListTap : IRecordReader
             return;
         }
         unnamedSelfLogged = false;
-        var character = WithProfile(WithClass(WithServerId(named, read.ServerId), read.ClassCode), read);
+        var character = WithProfile(WithClass(WithServerId(named, read), read.ClassCode), read);
         var now = clock.GetUtcNow();
         CharacterProgress progress;
         var dropped = false;
@@ -294,18 +294,28 @@ internal sealed class EntryListTap : IRecordReader
     }
 
     // The character with the record's server id, once it checks out. An id upstream knows must be the one it gave the
-    // character its short name by: upstream read the same two bytes for the name, so a mismatch means the identity came
-    // from another record. An id upstream does not know (every Global server's: its list is Korea's) must be a server that
-    // exists, and upstream must have named none for the character (Harry's roster, 2026-10-27: without this no Global
-    // character ever had a server id, nor so a class, level or gear score from its login). On Global that is the whole
-    // check: upstream names no server for any character there, so it cannot tell an identity from another record (one
-    // whose name upstream's reader refused, an older user under a reused entity id) as the name match does elsewhere.
-    private static CharacterIdentity WithServerId(CharacterIdentity character, int serverId) =>
-        serverId > 0 && (ServerMap.IsValidId(serverId)
-            ? ServerMap.GetName(serverId) == character.Server
-            : string.IsNullOrEmpty(character.Server) && GameServers.Exists(serverId))
-            ? character with { ServerId = serverId }
+    // character its short name by: upstream read the same two bytes and wrote that name, so a mismatch means the identity
+    // came from another record. An id upstream does not know (every Global server's: its list is Korea's) must be a server
+    // that exists (Harry's roster, 2026-10-27: before this no Global character ever had a server id, nor so a class, level
+    // or gear score from its login), and then upstream either named no server for the character, or named one this record
+    // cannot have given it: upstream writes no short name for an id it does not know, and keeps one it had, such as the
+    // one its party list gives a member of the same name (EntityTracker.TryFallbackLinkByName matches by name alone;
+    // Harry's roster, 2026-11-07: one character on two rows, the second under a Korean server's short name). That
+    // character is taken, without the short name, only when the record's name, as written, is upstream's for it
+    // (SelfRecord.Name: upstream's decoding gives back unchanged every name it can have); an identity from another record
+    // (one whose name upstream's reader refused, an older user under a reused entity id) keeps the short name, as it was,
+    // and gets no server id.
+    private static CharacterIdentity WithServerId(CharacterIdentity character, SelfRecord read)
+    {
+        var serverId = read.ServerId;
+        if (serverId <= 0) return character;
+        if (ServerMap.IsValidId(serverId)) return ServerMap.GetName(serverId) == character.Server ? character with { ServerId = serverId } : character;
+        if (!GameServers.Exists(serverId)) return character;
+        if (string.IsNullOrEmpty(character.Server)) return character with { ServerId = serverId };
+        return string.Equals(read.Name, character.Name, StringComparison.Ordinal)
+            ? character with { Server = string.Empty, ServerId = serverId }
             : character;
+    }
 
     // The character with the record's class, while upstream knows no player class for it (it learns a class only from a
     // character's skills, in a fight): only from a record whose server id checked out, so the class is read from where the

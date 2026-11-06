@@ -1,3 +1,4 @@
+using System.Text;
 using ScarletMeter.Engine.Records;
 
 namespace ScarletMeter.Engine.Entries;
@@ -5,17 +6,20 @@ namespace ScarletMeter.Engine.Entries;
 /// <summary>
 /// What the player's own character record says, as far as the reader takes it (<see cref="SelfRecords.TryRead"/>): the
 /// entity id, whether the record carries no real name, and after a real name the server id, the class code, the level
-/// and the gear score, each 0 when the record ends before it or (level and gear score) it is not one.
+/// and the gear score, each 0 when the record ends before it or (level and gear score) it is not one. The name is the
+/// record's bytes as UTF-8 text, or null with no real name or one cut short; it is only compared with upstream's, never
+/// logged. Upstream's decoding keeps nothing but letters, digits and <c>?</c> and gives such bytes back unchanged, so the
+/// two are equal only when upstream would have named the character this from these bytes.
 /// </summary>
-internal readonly record struct SelfRecord(int EntityId, bool Unnamed, int ServerId = 0, uint ClassCode = 0, int Level = 0, int GearScore = 0);
+internal readonly record struct SelfRecord(int EntityId, bool Unnamed, int ServerId = 0, uint ClassCode = 0, int Level = 0, int GearScore = 0, string? Name = null);
 
 /// <summary>
 /// The player's own character record (<c>33 36</c>) as far as the entry list's owner and the roster need it, in the layout
 /// upstream's PlayerInfoProcessor reads (v1.11.5.341): <c>&lt;entity varint&gt; &lt;u32&gt; &lt;u8: bit 0, a name
 /// follows&gt; &lt;name length varint&gt; &lt;UTF-8 name&gt; &lt;server id u16&gt; &lt;class code u32&gt; &lt;u8&gt;
 /// &lt;level u32&gt; &lt;gear score u32&gt; &lt;a second gear score u32, the same or higher&gt; …</c>. Upstream decodes the
-/// name itself; this only tells
-/// whether the record names a character at all, and reads the two bytes after the name that upstream takes as the server
+/// name itself; this tells whether the record names a character at all, keeps the name as written to compare with
+/// upstream's (<see cref="SelfRecord.Name"/>), and reads the two bytes after the name that upstream takes as the server
 /// id (and turns into a short name), the four after them, the character's class, of which upstream reads the first byte
 /// (its PlayerInfoProcessor's jobCode) and never uses it, and the level and the gear score (the equipment's item level),
 /// which upstream does not read (A2Tools' <c>self_profile</c> and its masked-identity scan in its stream_processor.rs,
@@ -62,6 +66,7 @@ internal static class SelfRecords
             read = read with { Unnamed = true };
             return true;
         }
+        read = read with { Name = Encoding.UTF8.GetString(body.Slice(name, (int)length)) };
         var after = body[(name + (int)length)..];
         if (after.Length < 2) return true;
         read = read with { ServerId = after[0] | (after[1] << 8) };

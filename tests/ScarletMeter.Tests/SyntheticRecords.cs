@@ -9,8 +9,9 @@ namespace ScarletMeter.Tests;
 
 /// <summary>
 /// Synthetic game records and the stream they travel in, for the tests of the records upstream does not decode (the
-/// entry list with Odyle energy, the map loaded, the Abyss's artifact holders) and of its damage records (a player's
-/// class from their skills): framing, LZ4 bundles and bringing upstream's reassembly into step. Never captured bytes.
+/// entry list with Odyle energy, the map loaded, the Abyss's artifact holders), of its damage records (a player's class
+/// from their skills) and of its party list (the server it gives a member of the same name as the character): framing,
+/// LZ4 bundles and bringing upstream's reassembly into step. Never captured bytes.
 /// </summary>
 internal static class SyntheticRecords
 {
@@ -115,6 +116,29 @@ internal static class SyntheticRecords
         var special = specialLength ?? ((switchValue & 0x0F) == 4 ? 8 : 12);
         body.AddRange([.. skill, 0x00, 0x01, .. new byte[special], 0x00, .. VarInt((uint)damage)]);
         return Frame(PacketOpcodes.Damage, Convert.ToHexString([.. body]));
+    }
+
+    // A party list (02 97) with one member, as upstream's PartyProcessor reads one (v1.11.5.341): the party's key, name,
+    // size and dungeon, two bytes, the leader's id (u64), a byte of bits, two bytes and the member count; then the member's
+    // presence mask (any but 0 is a member; 0x20 adds no field), slot, id (u64: the server id in its top 16 bits, the
+    // character id in its low 32), name (a length byte, then UTF-8), a u32, the level and gear score (u32 each), its login
+    // bit (taken from the header's byte of bits, so no byte of its own), its role, combat power (u64), no tickets and two
+    // bytes. Made-up bytes are zero, with a few to spare at the end.
+    public static byte[] Party(string name, int serverId, uint characterId, int level = 45, long combatPower = 50_000)
+    {
+        var id = ((ulong)(ushort)serverId << 48) | characterId;
+        var nameBytes = System.Text.Encoding.UTF8.GetBytes(name);
+        var u64 = new byte[8];
+        var u32 = new byte[4];
+        List<byte> body = [0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        BinaryPrimitives.WriteUInt64LittleEndian(u64, id);
+        body.AddRange([.. u64, 0x00, 0x00, 0x00, .. VarInt(1)]);
+        body.AddRange([0x20, 0x01, .. u64, (byte)nameBytes.Length, .. nameBytes, 0x00, 0x00, 0x00, 0x00]);
+        BinaryPrimitives.WriteInt32LittleEndian(u32, level);
+        body.AddRange([.. u32, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        BinaryPrimitives.WriteInt64LittleEndian(u64, combatPower);
+        body.AddRange([.. u64, .. VarInt(0), 0x00, 0x00, .. new byte[8]]);
+        return Frame(PacketOpcodes.PartyInfo, Convert.ToHexString([.. body]));
     }
 
     // A little-endian base-128 varint, as the game writes them.

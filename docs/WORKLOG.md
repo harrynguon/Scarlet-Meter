@@ -2,6 +2,27 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-11-07 — A character's server comes from its login, not a party list
+
+**What:** `SelfRecords` keeps the login record's name as written (`SelfRecord.Name`). For a Global server id that exists, upstream having named a server for the character, `EntryListTap.WithServerId` now takes the id when that name is upstream's for the character, and drops upstream's short name (ARCHITECTURE.md "Whose they are"). Ids upstream knows keep their rule.
+
+**Why:** Harry, of the roster: "WHY are there two listings under one name?" One character showed twice, the second row under the short name PER, with no class or level.
+
+**Evidence** (read-only, on the player's own copy; nothing from it is in this repository):
+- The second row's key was PER and the name, with no server id, class, level or gear score, last seen at one login. The meter's log shows that login's counts matched to the character named, and after the next server change, dropped as another character's.
+- In upstream, only the party list gives a character a server it did not read from the login: `PartyProcessor` takes a member's server from the top 16 bits of its id, `RegisterOrUpdateGlobalPlayer` keeps it, and `TryFallbackLinkByName` hands it to the session player of the same name. `PlayerInfoProcessor` writes no short name for a Global id, so it stays. The tap then refused the Global id, since upstream had named a server, and the identity (name, PER) became a new roster key.
+
+**Checks:**
+- `EntryListTests`, 137/137, three of them new: the rule with a made-up lookup (`AGlobalServerIdGoesWithTheCharacterTheRecordNamesWhateverServerUpstreamKeptForIt`), the name as written (`TheRecordKeepsItsNameAsWritten`), and through upstream's real pipeline a login, a synthetic party list naming a member like the character with id 1013's top bits, and a second login (`APartyListsServerForTheCharactersNameLeavesTheCharacterOnItsOwn`). One existing line changed: a Global id while upstream named SIE is still refused, now for a record naming someone else.
+- Fail-first, by mutation runs with passing controls before and after:
+  - First round, 10 mutations, with a stricter name reader (only letters and digits, not all digits, at most 72 bytes): 8 caught. The two missed were in that filter and could not be caught: upstream's names hold only letters, digits and `?`, so the exact comparison already rejects anything the filter did. The filter was removed.
+  - Second round, on the simpler reader: 8/8 caught. They covered the short name kept, the id refused, no name check, ids past the open slots, Korean ids by name too, the name not kept, the name cleaned as upstream does, and the name read past its length.
+- The session's sandbox refused writes to `%TEMP%`, so tests ran with `TEMP` set to the worktree's ignored `bin` folder.
+
+**Not checked:** in the game (HANDOFF, "One roster row per character in a party"); whether Global's party lists always give such a server or only sometimes (no capture was read). Upstream's own rows keep the party list's short name: a player's details show it after the name.
+
+**Next:** Build.ps1, the deep audit, the PR, Codex and CI; then Harry's go-ahead to merge.
+
 ## 2026-11-02 — A player's class follows their own skills
 
 **What:** `ClassSkills` (pure) reads a class from a class skill's id. `ClassSkillTap`, a reader beside upstream's pipeline, moves a tracked player's class on the live meter once most of their uses of class skills since their current name say another (a run of hits with one skill is one use). `UpstreamMapping` gives details and saved fights the class whose skills did most of the player's damage in the fight (ARCHITECTURE.md "Player classes").
