@@ -302,7 +302,7 @@ internal sealed class EntryListTap : IRecordReader
     // one its party list gives a member of the same name (EntityTracker.TryFallbackLinkByName matches by name alone;
     // Harry's roster, 2026-11-07: one character on two rows, the second under a Korean server's short name). That
     // character is taken, without the short name, only when the record's name, as written, is upstream's for it
-    // (SelfRecord.Name: upstream's decoding gives back unchanged every name it can have); an identity from another record
+    // (SelfRecord.Name: equal only when upstream would decode the record's bytes to the same name); an identity from another record
     // (one whose name upstream's reader refused, an older user under a reused entity id) keeps the short name, as it was,
     // and gets no server id.
     private static CharacterIdentity WithServerId(CharacterIdentity character, SelfRecord read)

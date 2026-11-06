@@ -519,12 +519,12 @@ public sealed class EntryListTests
         Assert.Equal(own, raised[^1].Character);
         Assert.True(own.IsSameCharacter(new CharacterIdentity("Delta", string.Empty, 17, "Cleric", 30_000))); // the row it had
 
-        foreach (var (name, serverId) in new[] { ("Other", 1503), ("Del.ta", 1503), ("Delta", 1511), ("Delta", 1002), ("Delta", 0) })
+        foreach (var (name, serverId) in new[] { ("Other", 1503), ("delta", 1503), ("Del.ta", 1503), ("Delta", 1511), ("Delta", 1002), ("Delta", 0) })
         {
             tap.Observe(EntryListRecordWriter.SelfRecord(9, name, serverId, 30, 30_000, level: 45, gearScore: 2_040));
-            Assert.Equal(linked, tap.Character); // another name, one decoded into another, past the open slots, NEZ, none
+            Assert.Equal(linked, tap.Character); // another name, another case, one decoded into another, past the open slots, NEZ, none
         }
-        Assert.Equal(6, raised.Count);
+        Assert.Equal(7, raised.Count);
     }
 
     // The record's name is kept as written, UTF-8 text, to compare with upstream's: upstream's decoding keeps only letters,

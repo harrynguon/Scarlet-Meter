@@ -9,7 +9,7 @@ namespace ScarletMeter.Engine.Entries;
 /// and the gear score, each 0 when the record ends before it or (level and gear score) it is not one. The name is the
 /// record's bytes as UTF-8 text, or null with no real name or one cut short; it is only compared with upstream's, never
 /// logged. Upstream's decoding keeps nothing but letters, digits and <c>?</c> and gives such bytes back unchanged, so the
-/// two are equal only when upstream would have named the character this from these bytes.
+/// two are equal only when upstream would decode these bytes to the same name.
 /// </summary>
 internal readonly record struct SelfRecord(int EntityId, bool Unnamed, int ServerId = 0, uint ClassCode = 0, int Level = 0, int GearScore = 0, string? Name = null);
 
