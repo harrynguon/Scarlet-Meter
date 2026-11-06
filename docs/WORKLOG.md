@@ -23,9 +23,11 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 
 The audit's own mutations: 3 caught, 5 survived (the ones above). After the fixes: the six new mutations (each fix put back, the levels changed) caught 6 of 6, control 17 of 17; the first 18, their texts brought up to the changed code, run again: 18 of 18 caught, control 17 of 17.
 
-**Codex:** on 18f07be, completed with no findings (a thumbs-up, no inline comments or reviews). After the audit's fixes, `@codex review` again: pending.
+**Codex:** on 18f07be (the guard, opened), completed with no findings (a thumbs-up, no inline comments or reviews); on fea9cb7 (the audit's fixes, `@codex review`), completed with no findings, no inline comments; on 5248dcf (the merge with main below, `@codex review`), completed with no findings, no inline comments. No other comments or reviews on the PR.
 
-**CI:** 1a6f50b, runs 42236037660 (push) and 42236042729 (pull_request), success. After the audit's fixes: pending.
+**CI:** 1a6f50b, runs 42236037660 (push) and 42236042729 (pull_request), success; fea9cb7, run 42240783463 (push), success; the head that carries this entry is checked before the merge, as recorded on the PR.
+
+**Merged with main (#72, 92de552):** CHANGELOG, WORKLOG and LESSONS kept both sides' entries, this PR's first; ARCHITECTURE and HANDOFF merged on their own; the upstream pin unchanged. On the merged tree, Debug and Release (0 warnings) and the whole suite through the test executable, twice each: 983/983.
 
 **Go-ahead:** Harry, forwarded by the session that started this one: "and for this and the subchat, automatically fix the codex review comments, re-push, re-review, and clean up branches, and update my cube copy etc" (the cube copy is that session's to rebuild).
 
