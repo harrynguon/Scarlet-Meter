@@ -35,7 +35,9 @@ The auditor's own checks: EntryListTests 137/137 in a clone; seven mutations, si
 
 **Not checked:** in the game (HANDOFF, "One roster row per character in a party"); whether Global's party lists always give such a server or only sometimes, and whether the other-player record ever names the user's own entity (no capture was read). Upstream's own rows keep the short name upstream has: a player's details show it after the name.
 
-**Next:** Codex and CI on the fixes; then the merge, main into the cube branch and the cube copy rebuilt.
+**Codex and CI on the fixes:** Codex reviewed 5eabe73 with no findings (no inline comments or reviews); CI passed on it.
+
+**Next:** CI on this entry, then the merge; main into the cube branch and the cube copy rebuilt; the check in game.
 
 ## 2026-11-02 — A player's class follows their own skills
 
