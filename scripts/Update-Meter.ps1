@@ -19,7 +19,9 @@ builds and tests, and updates <checkout>\portable\ScarletMeter in place, keeping
 4. Removes the temporary worktree, and a branch it created this run without committing to. A branch holding the
    pin move stays: it joins main through a pull request with the docs (docs/DEVELOPMENT.md).
 
-Close the meter first: the script refuses while ScarletMeter.exe runs from the portable copy, before building.
+Close the meter first: the script refuses while ScarletMeter.exe runs from the portable copy, before building. It
+refuses then, too, a portable folder where Windows would start the meter below Medium integrity, where it cannot
+start (Publish-Portable.ps1 says more).
 It changes none of this checkout's files and no data; besides the live copy's program files, it leaves only the
 local branch (and, on a checkout whose upstream/ was never initialised, git's submodule settings in .git/config).
 When the new release changed something Scarlet's engine uses, the build or the tests fail, the live copy is left
@@ -116,6 +118,7 @@ elseif ($pinnedCommit) {
 }
 # Refused now rather than after minutes of building; Publish-Portable.ps1 checks again before the swap.
 Assert-MeterNotRunningFrom @($portable.Live, $portable.Old, $portable.Staging) 'run Update-Meter.ps1 again'
+Assert-PortableRootStartsAtMedium $portable.Root
 Write-Host "Updating from RATmeter $(if ($current) { $current } else { 'an unknown release' }) to $Tag."
 
 if (Get-GitLine $repoRoot @('status', '--porcelain')) {
