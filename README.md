@@ -235,11 +235,13 @@ Install Npcap as in step 1 of [Download and run](#download-and-run).
 **Double-clicking `ScarletMeter.exe` does nothing: no window, no message, no new log.**
 Windows may be starting it at Low integrity, which it does when the folder carries a Low integrity label (some
 sandboxes and developer tools give one to the folders they work in). From there the meter cannot unpack its files,
-and it stops at once. In a terminal, `icacls "<folder>\ScarletMeter.exe"` then shows `Low Mandatory Level`. Give the
-folder that holds your `ScarletMeter` folder Windows' usual Medium label, which every file in it then takes:
-`icacls "<that folder>" /setintegritylevel "(OI)(CI)M"`; or extract the zip again into a folder without the label,
-such as Documents. If Windows also asks before every start, the label may be why: in one case that stopped too.
-Building from source, `Publish-Portable.ps1` refuses such a folder and says so.
+and it stops at once. In a terminal, `icacls "<folder>\ScarletMeter.exe"` then shows `Low Mandatory Level` (in your
+Windows language). Extract the zip again into a folder without the label, such as Documents; or give the folder that
+holds your `ScarletMeter` folder a Medium label, the level of a file without one, which every file in it then takes:
+`icacls "<that folder>" /setintegritylevel "(OI)(CI)M"` (a copy labelled Medium may then start at Medium even when
+run as administrator, which the meter does not need unless Npcap was installed for administrators only). If Windows
+also asks before every start, the label may be why: in one case that stopped too. Building from source,
+`Publish-Portable.ps1` and `Update-Meter.ps1` refuse such a folder and say so.
 
 **Are the numbers the same as RATmeter's?**
 They come from the same decoder (included unmodified), so they should match; what differs is the overlay and the

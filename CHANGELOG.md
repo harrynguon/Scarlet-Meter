@@ -64,9 +64,10 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ### Fixed
 
-- Building your own portable copy with `Publish-Portable.ps1` in a folder where Windows would start the meter at Low
-  integrity (a label some sandboxes give folders) now stops and says how to fix the folder, instead of making a copy
-  that does nothing when you start it. Q&A in the README covers a copy that does nothing when started.
+- Building or updating your own portable copy (`Publish-Portable.ps1`, `Update-Meter.ps1`) in a folder where Windows
+  would start the meter at Low integrity (a label some sandboxes give folders) now stops before it builds and says how
+  to fix the folder, instead of making a copy that does nothing when you start it. The README's Q&A covers a copy
+  that does nothing when started.
   ([#74](https://github.com/harrynguon/Scarlet-Meter/pull/74))
 - When the connection to the game loses packets, the meter's log no longer fills with thousands of "TCP GAP" lines a
   second (one session's log reached 186 MB): it keeps the first five of such a burst, then writes how many more came

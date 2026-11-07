@@ -55,7 +55,7 @@ A portable build from `Publish-Portable.ps1` (the live copy and its `-Zip` zip) 
 
 The live copy's data sits inside the checkout, in `portable\ScarletMeter\data`, which `.gitignore` excludes (`portable/`); `Publish-Portable.ps1` refuses any other output root inside the checkout. Never `git add -f` anything under `portable\`, and never run `git clean -x` or `-X`, which deletes ignored files and so the player's history and settings.
 
-`Publish-Portable.ps1` also refuses an output folder whose files Windows would start below Medium integrity (a Low label, which some sandboxes give the folders they may write to), since the meter cannot start there. The fix it names gives that one folder Windows' usual Medium label, the level of every other program the player runs: it grants the meter nothing more than a copy anywhere else has, and Low-level processes, such as a sandbox's, can no longer write into the copy or its data.
+`Publish-Portable.ps1` (and `Update-Meter.ps1`, before its build) also refuses an output folder whose files Windows would start below Medium integrity (a Low label, which some sandboxes give the folders they may write to), since the meter cannot start there. The fix it names gives that one folder a Medium label, the level of a file without one and of the player's other programs: it grants the meter nothing more than a copy anywhere else has (if anything less: a copy labelled Medium may start at Medium even when run as administrator), and Low-level processes, such as a sandbox's, can no longer write into the copy or its data.
 
 ## Game terms
 

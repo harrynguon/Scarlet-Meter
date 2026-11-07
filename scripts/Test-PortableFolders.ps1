@@ -11,8 +11,10 @@ drive-relative or nested output root; finishing and undoing a cut-short update; 
 open file keeping its markers; earlier stamped builds and zips; the zip's contents; a ScarletMeter.exe running from
 the copy (a hidden, renamed ping.exe stands in); a second run at once (a child PowerShell process, no window);
 failed swaps, including one whose undo also fails (a stand-in for the library's move makes chosen moves fail);
-integrity labels, read by SID from made-up SDDL and from files and folders labelled with icacls; and
-Publish-Portable.ps1 refusing an output root labelled Low before it builds (a child PowerShell process).
+integrity labels, read by SID from made-up SDDL and from files and folders labelled with icacls, with an unreadable
+or unknown label only a warning; and Publish-Portable.ps1 refusing an output root labelled Low, or one not made yet
+under such a folder, before it builds or changes anything (a child PowerShell process that cannot build, with a
+control labelled Medium that gets as far as the build).
 Prints ok or FAIL per case and throws when any failed. Paths derive from this script's location and the platform's
 temp folder. Targets Windows PowerShell 5.1 and pwsh.
 
@@ -347,15 +349,17 @@ try {
     $after = Invoke-LockInChild $f.Root
     Check 'and allowed once the first has ended' ($after -eq 'acquired') "child said: $after"
 
-    # Integrity labels, read by SID: none is Medium; an inherit-only label is not the object's own, and files made in
-    # a folder take only an object-inherit one; flags are read in pairs ("CIOIID" holds no IO); an unknown SID is no level.
+    # Integrity labels, read by SID: none is Medium; an inherit-only label is not the object's own, and files made a
+    # level down in a folder take only an object-inherit one that propagates (not NP); flags are read in pairs
+    # ("CIOIID" holds no IO); an unknown SID is no level.
     $labels = @(
         @('', $false, 0x2000), @('S:(ML;;NW;;;LW)', $false, 0x1000), @('S:AI(ML;ID;NW;;;ME)', $false, 0x2000),
         @('S:(ML;;NW;;;HI)', $false, 0x3000), @('S:(ML;;NW;;;S-1-16-0)', $false, 0), @('S:(ML;;NW;;;S-1-16-8448)', $false, 0x2100),
         @('S:(AU;SA;FA;;;WD)(ML;;NW;;;LW)', $false, 0x1000),
         @('S:(ML;OICIIO;NW;;;LW)', $false, 0x2000), @('S:(ML;OICIIO;NW;;;LW)', $true, 0x1000),
         @('S:(ML;CI;NW;;;LW)', $false, 0x1000), @('S:(ML;CI;NW;;;LW)', $true, 0x2000),
-        @('S:AI(ML;CIOIID;NW;;;LW)', $false, 0x1000), @('S:AI(ML;CIOIID;NW;;;LW)', $true, 0x1000)
+        @('S:AI(ML;CIOIID;NW;;;LW)', $false, 0x1000), @('S:AI(ML;CIOIID;NW;;;LW)', $true, 0x1000),
+        @('S:(ML;OICINP;NW;;;LW)', $false, 0x1000), @('S:(ML;OICINP;NW;;;LW)', $true, 0x2000)
     )
     foreach ($case in $labels) {
         $got = ConvertFrom-IntegrityLabelSddl $case[0] -FilesInside:$case[1]
@@ -364,8 +368,9 @@ try {
     $got = ConvertFrom-IntegrityLabelSddl 'S:(ML;;NW;;;XX)'
     Check 'an unknown label SID is no level' ($null -eq $got) "got $got"
 
-    # The labels Windows gives, read back: files labelled Low and Medium, and files made in folders whose label they
-    # inherit (object-inherit) or do not (container-inherit only).
+    # The labels Windows gives, read back: files labelled Low and Medium, and files made a level down in folders whose
+    # label they inherit (object-inherit, also inherit-only) or do not (container-inherit only, no-propagate), as the
+    # build's exe is made in ScarletMeter.staging; the check on such a folder refuses exactly when that file is Low.
     $f = New-Root 'labels'
     $file = Join-Path $f.Root 'low.exe'
     Write-Text $file 'x'
@@ -378,29 +383,51 @@ try {
     Set-IntegrityLabel $file 'M'
     $message = Get-Throws { Assert-PortableStartsAtMedium $file 'D:\Games' }
     Check 'a file labelled Medium reads Medium and is let through' ((Get-IntegrityLevel $file) -eq 0x2000 -and $null -eq $message) "level $(Get-IntegrityLevel $file), message: $message"
-    foreach ($case in @(@('oici-low', '(OI)(CI)L', 0x1000), @('oici-medium', '(OI)(CI)M', 0x2000), @('ci-low', '(CI)L', 0x2000))) {
+    $labelled = @(@('oici-low', '(OI)(CI)L', 0x1000), @('oici-medium', '(OI)(CI)M', 0x2000), @('ci-low', '(CI)L', 0x2000),
+        @('oiciio-low', '(OI)(CI)(IO)L', 0x1000), @('oinp-low', '(OI)(NP)L', 0x2000))
+    foreach ($case in $labelled) {
         $folder = Join-Path $f.Root $case[0]
         [void][IO.Directory]::CreateDirectory($folder)
         Set-IntegrityLabel $folder $case[1]
-        $made = Join-Path $folder 'made.exe'
+        $made = Join-Path $folder 'ScarletMeter.staging\ScarletMeter.exe'
         Write-Text $made 'x'
         $inside = Get-IntegrityLevel $folder -FilesInside
         $real = Get-IntegrityLevel $made
-        Check "a folder labelled $($case[1]) gives the files made in it level $($case[2]), as Windows does" ($inside -eq $case[2] -and $real -eq $case[2]) "read $inside, the file has $real"
+        $refused = $null -ne (Get-Throws { Assert-PortableStartsAtMedium $folder 'D:\Games' -FilesInside })
+        Check "a folder labelled $($case[1]) gives the files made a level down level $($case[2]), as Windows does, and is refused only when Low" ($inside -eq $case[2] -and $real -eq $case[2] -and $refused -eq ($case[2] -lt 0x2000)) "read $inside, the file has $real, refused: $refused"
     }
 
-    # Publish-Portable.ps1 refuses an output root whose files would be labelled Low, before it builds anything. The
-    # child cannot build, so only the check before building can give this refusal (the built exe's check never runs).
+    # A label it cannot read, or one it does not know, is a warning and no refusal: a drive without labels starts
+    # everything at Medium. (A stand-in for the library's Get-IntegrityLevel gives the unknown label.)
+    $script:warned = @()
+    $message = Get-Throws { $script:warned = @(Assert-PortableStartsAtMedium (Join-Path $f.Root 'missing.exe') 'D:\Games' 3>&1) }
+    Check 'a label it cannot read is a warning, not a refusal' ($null -eq $message -and $script:warned.Count -eq 1 -and "$($script:warned[0])" -like 'Could not read the integrity label of *') "message: $message, warned: $($script:warned -join ' | ')"
+    $realLevel = ${function:Get-IntegrityLevel}
+    ${function:Get-IntegrityLevel} = { $null }
+    try { $message = Get-Throws { $script:warned = @(Assert-PortableStartsAtMedium $file 'D:\Games' 3>&1) } }
+    finally { ${function:Get-IntegrityLevel} = $realLevel }
+    Check 'a label it does not know is a warning, not a refusal' ($null -eq $message -and $script:warned.Count -eq 1 -and "$($script:warned[0])" -like '*an integrity label this script does not know*') "message: $message, warned: $($script:warned -join ' | ')"
+
+    # Publish-Portable.ps1 refuses an output root whose files would be labelled Low before it builds or changes
+    # anything: a cut-short update in it (a marked .old, no live copy), which the run would otherwise put back, stays.
+    # The child cannot build, so only the check before building can give this refusal (the built exe's never runs).
     $f = New-Root 'low-root'
     Set-IntegrityLabel $f.Root '(OI)(CI)L'
+    New-FakeCopy $f.Old 'v1' '{ "cut": "short" }'
     $said = Invoke-PublishInChild $f.Root
-    Check 'Publish-Portable refuses an output root labelled Low before building' ($said -like '*refused: Windows would start the meter in * at Low integrity*' -and -not (Test-Path -LiteralPath $f.Staging)) "child said: $said"
+    Check 'Publish-Portable refuses an output root labelled Low before building or changing anything' ($said -like '*refused: Windows would start the meter in * at Low integrity*' -and -not (Test-Path -LiteralPath $f.Staging) -and -not (Test-Path -LiteralPath $f.Live) -and (Read-Text (Join-Path $f.Old 'data\settings.json')) -eq '{ "cut": "short" }') "child said: $said"
+    # A root not made yet takes the label of the folder above it, and is refused the same way.
+    $f = New-Root 'low-parent'
+    Set-IntegrityLabel $f.Root '(OI)(CI)L'
+    $missing = Join-Path $f.Root 'portable'
+    $said = Invoke-PublishInChild $missing
+    Check 'and a root not made yet, under a folder labelled Low' ($said -like '*refused: Windows would start the meter in * at Low integrity*' -and -not (Test-Path -LiteralPath (Join-Path $missing 'ScarletMeter.staging'))) "child said: $said"
     # The control: a root labelled Medium passes that check and stops where the build would start, at the missing
-    # dotnet.exe, so the case above cannot pass by a build that a later check refused.
+    # dotnet.exe, so the cases above cannot pass by a build that a later check refused.
     $f = New-Root 'medium-root'
     Set-IntegrityLabel $f.Root '(OI)(CI)M'
     $said = Invoke-PublishInChild $f.Root
-    Check 'and lets a root labelled Medium through to the build' ($said -like 'refused:*no-dotnet*' -and $said -notlike '*integrity*' -and -not (Test-Path -LiteralPath $f.Staging)) "child said: $said"
+    Check 'and lets a root labelled Medium through to the build' ($said -like 'refused:*no-dotnet*' -and -not (Test-Path -LiteralPath $f.Staging)) "child said: $said"
 
     # A swap that fails at step 3 (a file held open in the new build) is undone with the player's files back.
     $f = New-Root 'failed-swap'

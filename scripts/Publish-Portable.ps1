@@ -19,8 +19,8 @@ player's is ever deleted, and only folders this script made are renamed or delet
 Refuses while ScarletMeter.exe runs from the copy (close the meter first) and while another run updates the same
 output root. Refuses, too, a folder where Windows would start the meter below Medium integrity (a Low integrity
 label, which some sandboxes give folders): the meter cannot start there and shows nothing. The output root is checked
-before building, the built exe before it replaces the live copy, and the message says how to give the folder Windows'
-usual Medium label.
+before anything is built or changed (made first when it does not exist yet), the built exe before it replaces the
+live copy, and the message says how to give the folder a Medium label.
 
 With -Zip it also writes the build, without the player's files, to "<output root>\ScarletMeter-win-x64.zip",
 replacing the previous zip: for handing the meter on, not needed to run it. Without -Zip a zip an earlier run left
@@ -90,8 +90,9 @@ try {
     # --- Before building: the meter is closed, it could start here, a cut-short update is resolved, the folders are ours ---
 
     & $running
-    # A root whose label new files inherit is refused before the build; the built exe itself is checked below.
-    if (Test-Path -LiteralPath $OutputRoot) { Assert-PortableStartsAtMedium $OutputRoot $OutputRoot -FilesInside }
+    # Before anything here changes: a root whose label the build would inherit is refused (one not made yet is made
+    # first, as the build would); the built exe itself is checked below.
+    Assert-PortableRootStartsAtMedium $OutputRoot
     if (Test-Path -LiteralPath $OutputRoot) {
         $restored = Restore-InterruptedPortableUpdate $folders
         if ($restored) { Write-Host $restored }

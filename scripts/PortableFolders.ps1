@@ -411,15 +411,16 @@ function Exit-PortableLock($Mutex) {
 $IntegrityMedium = 0x2000
 
 # The integrity level that a mandatory label in SDDL (the "S:" part Get-IntegrityLabelSddl returns) gives the object
-# itself, or with -FilesInside the files made in that folder, which inherit only an object-inherit (OI) label. With
-# no label that applies, Medium; $null for a label SID this does not know. ACE flags are two-letter codes, read in
-# pairs ("CIOIID" holds no IO).
+# itself, or with -FilesInside the files made in folders made in that folder (the build's exe is a level down, in
+# ScarletMeter.staging), which inherit only an object-inherit (OI) label that propagates (no NP: that one reaches
+# only the folder's own files). With no label that applies, Medium; $null for a label SID this does not know. ACE
+# flags are two-letter codes, read in pairs ("CIOIID" holds no IO).
 function ConvertFrom-IntegrityLabelSddl([string]$Sddl, [switch]$FilesInside) {
     $named = @{ LW = 0x1000; ME = 0x2000; MP = 0x2100; HI = 0x3000; SI = 0x4000 }
     foreach ($ace in [regex]::Matches($Sddl, '\(ML;([A-Z]*);[^;()]*;[^;()]*;[^;()]*;([^;()]+)\)')) {
         $flags = @([regex]::Matches($ace.Groups[1].Value, '..') | ForEach-Object { $_.Value })
         # An inherit-only label is not the object's own.
-        if ($FilesInside) { if ($flags -notcontains 'OI') { continue } }
+        if ($FilesInside) { if ($flags -notcontains 'OI' -or $flags -contains 'NP') { continue } }
         elseif ($flags -contains 'IO') { continue }
         $sid = $ace.Groups[2].Value
         if ($named.ContainsKey($sid)) { return $named[$sid] }
@@ -482,14 +483,14 @@ namespace ScarletMeterScripts
 }
 
 # The integrity level Windows gives a program started from the file at $Path (or, with -FilesInside, from a file made
-# in that folder), for a user at Medium or above: Medium, or the label's level when it is lower.
+# in a folder made in that folder), for a user at Medium: Medium, or the label's level when it is lower.
 function Get-IntegrityLevel([string]$Path, [switch]$FilesInside) {
     ConvertFrom-IntegrityLabelSddl (Get-IntegrityLabelSddl $Path) -FilesInside:$FilesInside
 }
 
-# Refuses when Windows would start the meter at $Path (with -FilesInside: from a file made in that folder) below
-# Medium, saying how to give $OutputRoot Windows' usual Medium label. A label it cannot read, or one it does not know,
-# is only a warning: a drive without labels (FAT) starts every program at Medium.
+# Refuses when Windows would start the meter at $Path (with -FilesInside: from a file made in a folder made in that
+# folder) below Medium, saying how to give $OutputRoot a Medium label. A label it cannot read, or one it does not
+# know, is only a warning: a drive without labels (FAT) starts every program at Medium.
 function Assert-PortableStartsAtMedium([string]$Path, [string]$OutputRoot, [switch]$FilesInside) {
     $help = 'If the meter does not start from there, see docs/DEVELOPMENT.md, "Portable build".'
     try { $level = Get-IntegrityLevel $Path -FilesInside:$FilesInside }
@@ -499,7 +500,16 @@ function Assert-PortableStartsAtMedium([string]$Path, [string]$OutputRoot, [swit
     $name = if ($level -ge 0x1000) { 'Low' } else { 'Untrusted' }
     throw ("Windows would start the meter in $OutputRoot at $name integrity, where it cannot start: it cannot unpack " +
         "its files into your temp folder, and shows nothing. The folder carries a $name integrity label, which some " +
-        "sandboxes give the folders they may write to. The live copy was not changed. Give the folder Windows' usual " +
-        "Medium label, then run this script again: icacls ""$OutputRoot"" /setintegritylevel ""(OI)(CI)M"" " +
-        '(or publish with -OutputRoot and another absolute folder).')
+        "sandboxes give the folders they may write to. The live copy was not replaced. Give the folder a Medium " +
+        "label (the level of a file without one), then run again: icacls ""$OutputRoot"" /setintegritylevel " +
+        '"(OI)(CI)M". (Publish-Portable.ps1 also takes -OutputRoot with another absolute folder.)')
+}
+
+# Refuses, before anything is built, an output root whose build would start below Medium: the label the build's
+# files would inherit from it (Assert-PortableStartsAtMedium -FilesInside). A root not made yet is made first, as the
+# build would make it, so it takes the label of the folders above it, and the fix the refusal names has a folder to
+# apply to. Publish-Portable.ps1 checks the built exe itself again before the swap.
+function Assert-PortableRootStartsAtMedium([string]$Root) {
+    [void][IO.Directory]::CreateDirectory($Root)
+    Assert-PortableStartsAtMedium $Root $Root -FilesInside
 }
