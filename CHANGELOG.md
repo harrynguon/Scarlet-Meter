@@ -64,6 +64,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ### Fixed
 
+- When the connection to the game loses packets, the meter's log no longer fills with thousands of "TCP GAP" lines a
+  second (one session's log reached 186 MB): it keeps the first five of such a burst, then writes how many more came
+  once a minute until they stop. ([#73](https://github.com/harrynguon/Scarlet-Meter/pull/73))
 - One of your characters could show twice in Characters, the second row under a server name such as "PER", with no
   class or level, after you logged in or changed map while in a party. Your login now decides your character's server,
   so its counts stay on its own row. A row left from before can be removed with its ×.

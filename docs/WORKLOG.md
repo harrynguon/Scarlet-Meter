@@ -2,6 +2,39 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-11-07 — Upstream's TCP gap warnings no longer flood the log
+
+**What:** `Logging/LogFloodGuard`, a Serilog sink before the log file, with one rule (`MeterLog.TcpGaps`): upstream's capture-device warning per TCP sequence gap. A burst's first five are written, the rest counted and written as one `[TCP GAP] <n> more not written, from … to …` line a minute after the first counted one, the last count when the log closes; a minute without a gap ends the burst. Every other event passes untouched. `MeterLog` is the configuration `App` had inline (same levels, file and retention), now with the guard around the file sink; `UpstreamLogs` (engine contracts) names upstream's category and the warning's start as strings, so the app still references no upstream type. ARCHITECTURE.md "Log". No file under `upstream/` and no boundary seam changed.
+
+**Why:** in the player's portable copy one session wrote about two million `[TCP GAP]` lines in about five and a half minutes (a 186 MB daily log, against about 100 KB on an ordinary day); thousands of writes a second cost disk and processor while the game runs. Found while diagnosing an unrelated roster issue in another session.
+
+**Checks (SDK 10.0.402, at idle priority with no shared compiler server; no game running at the time, nothing launched):**
+- `LogFloodGuardTests` (13) and `MeterLogTests` (4), on synthetic events only: a burst limited and counted, a flood counted each minute until it stops, an isolated gap written, other events passed in order, the count at close, late, early and stray timer callbacks, a file that throws on the timer's thread or as the log closes, a step in the system's time, four writing threads (eight rounds), and the real log through upstream's `ILogger<CaptureDevice>` read back from the file, the count written when the host closed it. (The first commit had 11 and 4; the audit's fixes added the rest.)
+- Fail-first, scratch runner (each mutation compiled and failed its named test; restored files marked changed; control at the end): 18 of 18 caught, the control 15 of 15 passing.
+- The thread test first failed on the guard as written: a count reported twice (LESSONS, "The log's gap counts could be written twice…"). Fixed before commit; that order is mutation M6, caught.
+- `scripts/Build.ps1 -SkipTests`, Debug and Release (0 errors; upstream's own warnings only), and the whole suite through the test executable: 978/978 in each on the first commit, 980/980 after the audit's fixes (Release in two runs of two; Debug in fifteen of sixteen runs after the test fix below, the other the `AbyssPauseTests` flake noted there). `Build.ps1`'s own test step could not start in this session's environment (`dotnet test`'s named pipe to the test host was refused, with or without its sandbox, and the test executable could not create folders under `%TEMP%`, so `TEMP` pointed at a folder beside the worktree); CI runs the script whole.
+- `AlertPlannerTests.PlanningWithoutAlertsAllocatesNothing` (an older test) failed in about two of five full local runs once these tests were in, always by 1,944 bytes with no collection during its loop, and never without them. It now wants one clean pass of three (LESSONS); a planner mutated to allocate per plan still fails it (2,400 bytes), and sixteen full runs since showed it no more. Seen once each in some forty full runs, under this machine's load and not investigated here: `AbyssPauseTests.ADisposedPauseFollowsNothing`, `HistoryTests.DamagedModeEndsWhenUpstreamCanReadEveryRowAgain`, and `PlayerDetailsTests.SkillsCarryTotalsSharesHitRangeAndRates` (that one in a run without this PR's tests).
+
+**Review (deep audit on 1a6f50b, approve with nits; deep because of the lock and timer):**
+1. Minor, fixed: the count written when the log closes could throw out of the host's disposal (a new day's file that cannot be opened, a full disk), since Serilog disposes its sinks without a catch (LESSONS). The close now catches it into `SelfLog` and still closes the file; `AFileThatFailsWhenTheLogClosesDoesNotStopTheShutdown`.
+2. Nit, fixed in part: the levels carried over from App (Information up, EF Core's SQL lines left out) were in no test; `MeterLogTests` now writes an Information line (kept), a Debug line and an EF Core command line (both left out). The 14-day retention is left untested: it is Serilog's, unchanged, and a test would need fifteen days of files.
+3. Nit, fixed in part: a summary stamped in UTC instead of local time passed (offsets are ignored by equality); the burst test now runs in a +13 zone and checks the offset. Not taken: the timer's callback ignoring `disposed` (after a close nothing is ever counted, so it cannot write) and a close without the lock (a late callback at worst writes to a closed file, which Serilog reports to `SelfLog`).
+4. Nit, fixed: minutes were measured on the wall clock, so a step back in the system's time held a count for the size of the step and a step forward ended a burst early. They are now measured on the provider's monotonic timestamps; `AStepInTheSystemsClockNeitherHoldsACountBackNorEndsABurst`.
+
+The audit's own mutations: 3 caught, 5 survived (the ones above). After the fixes: the six new mutations (each fix put back, the levels changed) caught 6 of 6, control 17 of 17; the first 18, their texts brought up to the changed code, run again: 18 of 18 caught, control 17 of 17.
+
+**Codex:** on 18f07be (the guard, opened), completed with no findings (a thumbs-up, no inline comments or reviews); on fea9cb7 (the audit's fixes, `@codex review`), completed with no findings, no inline comments; on 5248dcf (the merge with main below, `@codex review`), completed with no findings, no inline comments. No other comments or reviews on the PR.
+
+**CI:** 1a6f50b, runs 42236037660 (push) and 42236042729 (pull_request), success; fea9cb7, run 42240783463 (push), success; the head that carries this entry is checked before the merge, as recorded on the PR.
+
+**Merged with main (#72, 92de552):** CHANGELOG, WORKLOG and LESSONS kept both sides' entries, this PR's first; ARCHITECTURE and HANDOFF merged on their own; the upstream pin unchanged. On the merged tree, Debug and Release (0 warnings) and the whole suite through the test executable, twice each: 983/983.
+
+**Go-ahead:** Harry, forwarded by the session that started this one: "and for this and the subchat, automatically fix the codex review comments, re-push, re-review, and clean up branches, and update my cube copy etc" (the cube copy is that session's to rebuild).
+
+**Not checked:** a real flood in the game (HANDOFF, "Next: in-game acceptance"). Why the gaps come is not known; upstream's handling of a gap is unchanged, and it still formats each warning on the capture thread before the guard drops it.
+
+**Next:** offer upstream the gap warning at Debug or limited in `CaptureDevice` (ARCHITECTURE "What breaks on an upstream update" says when to retire the rule).
+
 ## 2026-11-07 — A character's server comes from its login, not a party list
 
 **What:** `SelfRecords` keeps the login record's name as written (`SelfRecord.Name`). For a Global server id that exists, upstream having named a server for the character, `EntryListTap.WithServerId` now takes the id when that name is upstream's for the character, and drops upstream's short name (ARCHITECTURE.md "Whose they are"). Ids upstream knows keep their rule.
