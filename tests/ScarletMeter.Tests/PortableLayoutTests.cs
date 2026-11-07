@@ -47,6 +47,33 @@ public sealed class PortableLayoutTests : IDisposable
         Assert.Contains("PortableFolders.ps1", publish, StringComparison.Ordinal);
     }
 
+    // Publish-Portable.ps1 refuses a folder where Windows would start the meter below Medium integrity, where it
+    // cannot start: the output root before the build, and the built exe inside the block that drops a failed staging
+    // folder, before the swap makes it the live copy. Test-PortableFolders.ps1 checks the refusal itself; this pins
+    // where the script asks for it, which only a full build would reach.
+    [Fact]
+    public void PublishPortableChecksTheIntegrityLevelBeforeBuildingAndBeforeTheSwap()
+    {
+        var publish = File.ReadAllText(Path.Combine(RepositoryRoot(), "scripts", "Publish-Portable.ps1"));
+        int At(string text, int from = 0)
+        {
+            var index = publish.IndexOf(text, from, StringComparison.Ordinal);
+            Assert.True(index >= 0, $"Publish-Portable.ps1 no longer holds: {text}");
+            return index;
+        }
+
+        var rootCheck = At("{ Assert-PortableStartsAtMedium $OutputRoot $OutputRoot -FilesInside }");
+        var build = At("& (Join-Path $PSScriptRoot 'Build.ps1') -Configuration Release");
+        Assert.True(rootCheck < build, "the output root is not checked before the build");
+
+        var layout = At("& (Join-Path $PSScriptRoot 'Test-PublishLayout.ps1') -PublishDirectory $folders.Staging", build);
+        var exeCheck = At("Assert-PortableStartsAtMedium (Join-Path $folders.Staging 'ScarletMeter.exe') $OutputRoot", build);
+        var dropStaging = At("# The live copy is untouched; drop the half-made staging folder", build);
+        var swap = At("Invoke-PortableSwap $folders", build);
+        Assert.True(layout < exeCheck && exeCheck < dropStaging && dropStaging < swap,
+            "the built exe is not checked between the layout check and the staging folder's catch, before the swap");
+    }
+
     public void Dispose() => directory.Dispose();
 
     // The directory holding ScarletMeter.slnx, above the test assembly (never the working directory).

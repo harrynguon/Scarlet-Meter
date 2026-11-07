@@ -9,8 +9,10 @@ was refused. Covers the first copy; an update that replaces the build's files an
 backup beside it, notes) over; a clash with the new build; refusing folders the script did not make, links, a
 drive-relative or nested output root; finishing and undoing a cut-short update; leftovers; a delete cut short by an
 open file keeping its markers; earlier stamped builds and zips; the zip's contents; a ScarletMeter.exe running from
-the copy (a hidden, renamed ping.exe stands in); a second run at once (a child PowerShell process, no window); and
-failed swaps, including one whose undo also fails (a stand-in for the library's move makes chosen moves fail).
+the copy (a hidden, renamed ping.exe stands in); a second run at once (a child PowerShell process, no window);
+failed swaps, including one whose undo also fails (a stand-in for the library's move makes chosen moves fail);
+integrity labels, read by SID from made-up SDDL and from files and folders labelled with icacls; and
+Publish-Portable.ps1 refusing an output root labelled Low before it builds (a child PowerShell process).
 Prints ok or FAIL per case and throws when any failed. Paths derive from this script's location and the platform's
 temp folder. Targets Windows PowerShell 5.1 and pwsh.
 
@@ -99,6 +101,30 @@ function Invoke-LockInChild([string]$Root) {
     $preference = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try { (@(& (Get-Process -Id $PID).Path -NoProfile -NonInteractive -EncodedCommand $encoded 2>$null) -join ' ').Trim() }
+    finally { $ErrorActionPreference = $preference }
+}
+
+# Gives $Path the mandatory label $Level ("L", "M", or with inheritance "(OI)(CI)L"), as a sandbox or the fix does.
+$icacls = Join-Path ([Environment]::GetFolderPath('System')) 'icacls.exe'
+function Set-IntegrityLabel([string]$Path, [string]$Level) {
+    $preference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { $said = @(& $icacls $Path /setintegritylevel $Level 2>&1) } finally { $ErrorActionPreference = $preference }
+    if ($LASTEXITCODE) { throw "icacls could not label $Path $Level`: $($said -join ' ')" }
+}
+
+# Runs Publish-Portable.ps1 -SkipTests on $Root in a child PowerShell process, as Invoke-LockInChild does, and
+# returns everything it printed on one line, ending "published" or "refused: <message>". The child cannot build: its
+# SCARLET_DOTNET names a dotnet.exe that does not exist, so a run that gets past the checks made before building
+# fails at Build.ps1 with that instead (and never spends minutes building).
+function Invoke-PublishInChild([string]$Root) {
+    $publish = Join-Path $PSScriptRoot 'Publish-Portable.ps1'
+    $noDotnet = Join-Path $work 'no-dotnet\dotnet.exe'
+    $code = "`$env:SCARLET_DOTNET = '$($noDotnet.Replace("'", "''"))'; try { & '$($publish.Replace("'", "''"))' -OutputRoot '$($Root.Replace("'", "''"))' -SkipTests *>&1 | Out-String; 'published' } catch { 'refused: ' + `$_.Exception.Message }"
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))
+    $preference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { ((@(& (Get-Process -Id $PID).Path -NoProfile -NonInteractive -EncodedCommand $encoded 2>&1) -join ' ') -replace '\s+', ' ').Trim() }
     finally { $ErrorActionPreference = $preference }
 }
 
@@ -320,6 +346,61 @@ try {
     Check 'a second run on the same output root is refused' ($while -like 'refused: Another Publish-Portable.ps1*') "child said: $while"
     $after = Invoke-LockInChild $f.Root
     Check 'and allowed once the first has ended' ($after -eq 'acquired') "child said: $after"
+
+    # Integrity labels, read by SID: none is Medium; an inherit-only label is not the object's own, and files made in
+    # a folder take only an object-inherit one; flags are read in pairs ("CIOIID" holds no IO); an unknown SID is no level.
+    $labels = @(
+        @('', $false, 0x2000), @('S:(ML;;NW;;;LW)', $false, 0x1000), @('S:AI(ML;ID;NW;;;ME)', $false, 0x2000),
+        @('S:(ML;;NW;;;HI)', $false, 0x3000), @('S:(ML;;NW;;;S-1-16-0)', $false, 0), @('S:(ML;;NW;;;S-1-16-8448)', $false, 0x2100),
+        @('S:(AU;SA;FA;;;WD)(ML;;NW;;;LW)', $false, 0x1000),
+        @('S:(ML;OICIIO;NW;;;LW)', $false, 0x2000), @('S:(ML;OICIIO;NW;;;LW)', $true, 0x1000),
+        @('S:(ML;CI;NW;;;LW)', $false, 0x1000), @('S:(ML;CI;NW;;;LW)', $true, 0x2000),
+        @('S:AI(ML;CIOIID;NW;;;LW)', $false, 0x1000), @('S:AI(ML;CIOIID;NW;;;LW)', $true, 0x1000)
+    )
+    foreach ($case in $labels) {
+        $got = ConvertFrom-IntegrityLabelSddl $case[0] -FilesInside:$case[1]
+        Check "the label '$($case[0])'$(if ($case[1]) { ' for files inside' }) is level $($case[2])" ($null -ne $got -and $got -eq $case[2]) "got $got"
+    }
+    $got = ConvertFrom-IntegrityLabelSddl 'S:(ML;;NW;;;XX)'
+    Check 'an unknown label SID is no level' ($null -eq $got) "got $got"
+
+    # The labels Windows gives, read back: files labelled Low and Medium, and files made in folders whose label they
+    # inherit (object-inherit) or do not (container-inherit only).
+    $f = New-Root 'labels'
+    $file = Join-Path $f.Root 'low.exe'
+    Write-Text $file 'x'
+    Set-IntegrityLabel $file 'L'
+    Check 'a file labelled Low reads Low' ((Get-IntegrityLevel $file) -eq 0x1000) "got $(Get-IntegrityLevel $file)"
+    $message = Get-Throws { Assert-PortableStartsAtMedium $file 'D:\Games' }
+    Check 'and is refused, saying how to give the output root Medium' ($message -and $message.Contains('at Low integrity') -and $message.Contains('icacls "D:\Games" /setintegritylevel "(OI)(CI)M"')) "message: $message"
+    $file = Join-Path $f.Root 'medium.exe'
+    Write-Text $file 'x'
+    Set-IntegrityLabel $file 'M'
+    $message = Get-Throws { Assert-PortableStartsAtMedium $file 'D:\Games' }
+    Check 'a file labelled Medium reads Medium and is let through' ((Get-IntegrityLevel $file) -eq 0x2000 -and $null -eq $message) "level $(Get-IntegrityLevel $file), message: $message"
+    foreach ($case in @(@('oici-low', '(OI)(CI)L', 0x1000), @('oici-medium', '(OI)(CI)M', 0x2000), @('ci-low', '(CI)L', 0x2000))) {
+        $folder = Join-Path $f.Root $case[0]
+        [void][IO.Directory]::CreateDirectory($folder)
+        Set-IntegrityLabel $folder $case[1]
+        $made = Join-Path $folder 'made.exe'
+        Write-Text $made 'x'
+        $inside = Get-IntegrityLevel $folder -FilesInside
+        $real = Get-IntegrityLevel $made
+        Check "a folder labelled $($case[1]) gives the files made in it level $($case[2]), as Windows does" ($inside -eq $case[2] -and $real -eq $case[2]) "read $inside, the file has $real"
+    }
+
+    # Publish-Portable.ps1 refuses an output root whose files would be labelled Low, before it builds anything. The
+    # child cannot build, so only the check before building can give this refusal (the built exe's check never runs).
+    $f = New-Root 'low-root'
+    Set-IntegrityLabel $f.Root '(OI)(CI)L'
+    $said = Invoke-PublishInChild $f.Root
+    Check 'Publish-Portable refuses an output root labelled Low before building' ($said -like '*refused: Windows would start the meter in * at Low integrity*' -and -not (Test-Path -LiteralPath $f.Staging)) "child said: $said"
+    # The control: a root labelled Medium passes that check and stops where the build would start, at the missing
+    # dotnet.exe, so the case above cannot pass by a build that a later check refused.
+    $f = New-Root 'medium-root'
+    Set-IntegrityLabel $f.Root '(OI)(CI)M'
+    $said = Invoke-PublishInChild $f.Root
+    Check 'and lets a root labelled Medium through to the build' ($said -like 'refused:*no-dotnet*' -and $said -notlike '*integrity*' -and -not (Test-Path -LiteralPath $f.Staging)) "child said: $said"
 
     # A swap that fails at step 3 (a file held open in the new build) is undone with the player's files back.
     $f = New-Root 'failed-swap'
