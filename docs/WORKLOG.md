@@ -36,7 +36,11 @@ The auditor also found the SDDL forms (`S:P`, `S:AI`, ID, IO, NP, several ACEs, 
 
 **Not checked:** the refusal on a real Publish-Portable run that reaches the built exe (only a full build in a labelled folder would; its place is pinned and the function tested); a drive without labels (FAT), which should warn and go on; a start as administrator from a copy labelled Medium.
 
-**Next:** CI on the fixes, `@codex review` and its result, then Harry's go-ahead to merge; after the merge, main into the cube branch and the cube copy rebuilt.
+**Codex and CI on cb3d952 (the review's fixes):** the reply on Codex's P1 thread says where it was fixed; `@codex review` completed with no findings and no inline comments. CI runs 42325710224 (push) and 42325713599 (pull_request), success. No other comments or reviews on the PR.
+
+**Merge:** Harry: "Yes, merge it", after the audit's fixes and with Codex and CI still to finish on cb3d952, which both then passed. The commit carrying this entry adds only these lines; its CI is checked before the squash merge.
+
+**Next:** nothing in this repository. Not checked anywhere yet: a full Publish-Portable run into a labelled folder, refused at the built exe.
 
 ## 2026-11-07 — Upstream's TCP gap warnings no longer flood the log
 
