@@ -18,9 +18,12 @@
     kind, not every second. It is always rendered (empty when nothing is due), because a live region inserted already
     filled is often not announced. While Held (the row stands aside for a boss fight) it shows nothing and its live
     region is empty, so what came due meanwhile is announced when the fight ends.
-    Before the events come the chosen field bosses' notices (FieldBosses/FieldBossService, its planner in WorldEvents): a
+    The chosen field bosses' notices (FieldBosses/FieldBossService, its planner in WorldEvents) have a row of their own
+    under the icons, drawn only while a boss is within the player's lead time of its respawn or up, so the icons keep one
+    line (Harry, 2026-11-08: ahead of the icons, two notices pushed the last icon onto a line of its own). Each is a
     skull, the boss's short name and, before a respawn, the time to it, gold as an event's Soon; teal and "up" once it is
-    up, for a quarter of an hour. Clicking one opens the Field bosses window. They stand aside for a boss fight too.
+    up, for a quarter of an hour. Clicking one opens the Field bosses window. They stand aside for a boss fight too. The
+    icons' detail lines come under both rows.
     After the events come the soul notices (Pets/PetService.Notices): a paw, the pet's name, the souls since the notice
     appeared and the pet's level and souls toward the next ("+1 · Lv 2 41/75"), for a few seconds after a pet below level 3
     is given a soul; at the row's end, so the event icons do not move as they come and go. Clicking one opens the Pet souls
@@ -36,52 +39,61 @@ else if (EventRowLayout.Icons(View) is var icons && (icons.Count > 0 || FieldBos
 {
     var zone = TimeZoneInfo.Local;
     <div class="alerts" role="group" aria-label="Events and notices">
-        <div class="ev-row">
-            @foreach (var boss in FieldBosses)
-            {
-                var notice = FieldBossText.Notice(boss);
-                <button type="button" class="ev fb @(boss.Kind == FieldBossAlertKind.Soon ? "soon" : "open")" @key="@($"fb-{boss.Boss.Id}")"
-                        aria-label="@notice" @onclick="OpenFieldBosses">
-                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="@EventGlyphs.FieldBoss" /></svg>
-                    <span class="ev-name">@FieldBossText.Short(boss.Boss.Name)</span>
-                    <span class="ev-time">@(boss.Kind == FieldBossAlertKind.Soon ? EventText.IconTime(boss.At - Now) : "up")</span>
-                    <span class="ev-tip" aria-hidden="true">
-                        <span class="ev-tip-head"><b>@boss.Boss.Name</b> · @(boss.Kind == FieldBossAlertKind.Soon ? $"respawns {EventText.LocalTime(boss.At, zone)}" : "up")</span>
-                        <span class="ev-tip-where">@FieldBossMaps.NameOf(boss.Boss.MapId) · @FieldBossText.Source(boss.Timer, Now)</span>
-                    </span>
-                </button>
-            }
-            @foreach (var icon in icons)
-            {
-                var status = EventRowLayout.Status(icon, Now, View.ServerOffset, zone);
-                <button type="button" class="ev @icon.State.ToString().ToLowerInvariant()" @key="icon.Rule.Id"
-                        aria-expanded="@(IsOpen(icon) ? "true" : "false")" aria-label="@($"{icon.Rule.Name}, {status}")"
-                        @onclick="() => Toggle(icon.Rule.Id)">
-                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="@EventGlyphs.For(icon.Rule.Id)" /></svg>
-                    @if (icon.Until is { } until)
-                    {
-                        <span class="ev-time">@EventText.IconTime(until - Now)</span>
-                    }
-                    <span class="ev-tip" aria-hidden="true">
-                        <span class="ev-tip-head"><b>@icon.Rule.Name</b> · @status</span>
-                        <span class="ev-tip-where">@icon.Rule.Location</span>
-                    </span>
-                </button>
-            }
-            @foreach (var soul in Pets)
-            {
-                <button type="button" class="ev pet @(PetRules.IsMax(soul.Progress) ? "max" : "")" @key="@($"pet-{soul.Pet.Id}")"
-                        aria-label="@PetText.Notice(soul)" @onclick="OpenPets">
-                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="@EventGlyphs.Pet" /></svg>
-                    <span class="ev-name">@soul.Pet.Name</span>
-                    <span class="ev-time">@PetText.Gained(soul.Amount) · @PetText.Level(soul.Progress) @PetText.Progress(soul.Progress)</span>
-                    <span class="ev-tip" aria-hidden="true">
-                        <span class="ev-tip-head"><b>@soul.Pet.Name</b> · @PetText.Gained(soul.Amount)</span>
-                        <span class="ev-tip-where">@PetText.Level(soul.Progress) · @(PetRules.IsMax(soul.Progress) ? "level 3 reached" : $"{PetText.Progress(soul.Progress)} souls")</span>
-                    </span>
-                </button>
-            }
-        </div>
+        @if (icons.Count > 0 || Pets.Count > 0)
+        {
+            <div class="ev-row">
+                @foreach (var icon in icons)
+                {
+                    var status = EventRowLayout.Status(icon, Now, View.ServerOffset, zone);
+                    <button type="button" class="ev @icon.State.ToString().ToLowerInvariant()" @key="icon.Rule.Id"
+                            aria-expanded="@(IsOpen(icon) ? "true" : "false")" aria-label="@($"{icon.Rule.Name}, {status}")"
+                            @onclick="() => Toggle(icon.Rule.Id)">
+                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="@EventGlyphs.For(icon.Rule.Id)" /></svg>
+                        @if (icon.Until is { } until)
+                        {
+                            <span class="ev-time">@EventText.IconTime(until - Now)</span>
+                        }
+                        <span class="ev-tip" aria-hidden="true">
+                            <span class="ev-tip-head"><b>@icon.Rule.Name</b> · @status</span>
+                            <span class="ev-tip-where">@icon.Rule.Location</span>
+                        </span>
+                    </button>
+                }
+                @foreach (var soul in Pets)
+                {
+                    <button type="button" class="ev pet @(PetRules.IsMax(soul.Progress) ? "max" : "")" @key="@($"pet-{soul.Pet.Id}")"
+                            aria-label="@PetText.Notice(soul)" @onclick="OpenPets">
+                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="@EventGlyphs.Pet" /></svg>
+                        <span class="ev-name">@soul.Pet.Name</span>
+                        <span class="ev-time">@PetText.Gained(soul.Amount) · @PetText.Level(soul.Progress) @PetText.Progress(soul.Progress)</span>
+                        <span class="ev-tip" aria-hidden="true">
+                            <span class="ev-tip-head"><b>@soul.Pet.Name</b> · @PetText.Gained(soul.Amount)</span>
+                            <span class="ev-tip-where">@PetText.Level(soul.Progress) · @(PetRules.IsMax(soul.Progress) ? "level 3 reached" : $"{PetText.Progress(soul.Progress)} souls")</span>
+                        </span>
+                    </button>
+                }
+            </div>
+        }
+        @if (FieldBosses.Count > 0)
+        {
+            @* The field bosses' own row, only while one is due, so the icons above keep one line. *@
+            <div class="ev-row fb-row" role="group" aria-label="Field bosses">
+                @foreach (var boss in FieldBosses)
+                {
+                    var notice = FieldBossText.Notice(boss);
+                    <button type="button" class="ev fb @(boss.Kind == FieldBossAlertKind.Soon ? "soon" : "open")" @key="@($"fb-{boss.Boss.Id}")"
+                            aria-label="@notice" @onclick="OpenFieldBosses">
+                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="@EventGlyphs.FieldBoss" /></svg>
+                        <span class="ev-name">@FieldBossText.Short(boss.Boss.Name)</span>
+                        <span class="ev-time">@(boss.Kind == FieldBossAlertKind.Soon ? EventText.IconTime(boss.At - Now) : "up")</span>
+                        <span class="ev-tip" aria-hidden="true">
+                            <span class="ev-tip-head"><b>@boss.Boss.Name</b> · @(boss.Kind == FieldBossAlertKind.Soon ? $"respawns {EventText.LocalTime(boss.At, zone)}" : "up")</span>
+                            <span class="ev-tip-where">@FieldBossMaps.NameOf(boss.Boss.MapId) · @FieldBossText.Source(boss.Timer, Now)</span>
+                        </span>
+                    </button>
+                }
+            </div>
+        }
         @foreach (var shown in EventRowLayout.Opened(icons, open))
         {
             @* Keyed to the event's state and occurrence, so when it moves from Soon to Open its progress line starts

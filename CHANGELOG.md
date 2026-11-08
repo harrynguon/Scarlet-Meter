@@ -22,11 +22,12 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
   map, read when you open it (M) in the game, and from NotMeter's shared timers (what its users' maps show, a public file
   per region), so they show with the game closed too, for the server you last played on (or one you enter). If you start
   the meter while already in the game, your map's times show after your next zone change or teleport, and the window
-  says so. Ring a boss's bell and the meter's event row shows it from 10 minutes (your choice, 1 to 60) before it
-  respawns, then that it is up. "Read other players' shared timers" turns the shared timers off; nothing about you is
-  sent. aion2timers.com opens from the window now. Your map's list has been seen read in the game; the rest is not yet
-  checked there. ([#75](https://github.com/harrynguon/Scarlet-Meter/pull/75),
-  [#77](https://github.com/harrynguon/Scarlet-Meter/pull/77))
+  says so. Ring a boss's bell and a row under the meter's event icons shows it from 10 minutes (your choice, 1 to 60)
+  before it respawns, then that it is up; with no boss due the row is gone, so the notices no longer push the event
+  icons onto a second line. "Read other players' shared timers" turns the shared timers off; nothing about you is sent.
+  aion2timers.com opens from the window now. Your map's list has been seen read in the game; the rest is not yet checked
+  there. ([#75](https://github.com/harrynguon/Scarlet-Meter/pull/75),
+  [#77](https://github.com/harrynguon/Scarlet-Meter/pull/77), [#78](https://github.com/harrynguon/Scarlet-Meter/pull/78))
 
 - Your Dimensional Invasion reward keys on the meter, left of the Shugo Festival keys: the keys left out of 7, which
   your characters on a server share, as the game's dialog writes them ("3/7"), once the game sends them; until then,

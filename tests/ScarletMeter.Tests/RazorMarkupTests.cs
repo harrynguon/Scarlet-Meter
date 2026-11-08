@@ -434,6 +434,40 @@ public sealed partial class RazorMarkupTests
         Assert.True(roster > 0 && timers > roster, "the roster starts before the field-boss timers");
     }
 
+    // The field bosses' notices have their own row under the event icons, drawn only while one is due (Harry, 2026-11-08:
+    // ahead of the icons, two of them pushed the last icon onto a line of its own). The icons' row closes before it opens,
+    // and the rows stack (.alerts is a column), so a notice never shares a line with the icons; with no boss due its row is
+    // not drawn. The icons' detail lines come after both rows; the soul notices stay at the end of the icons' row.
+    [Fact]
+    public void TheFieldBossNoticesHaveTheirOwnRowUnderTheEventIcons()
+    {
+        var row = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Components", "EventRow.razor"));
+        Assert.Matches(@"(?s)@if \(icons\.Count > 0 \|\| Pets\.Count > 0\)\s*\{\s*<div class=""ev-row"">\s*@foreach \(var icon in icons\)", row);
+        Assert.Matches(@"(?s)@if \(FieldBosses\.Count > 0\)\s*\{\s*(@\*[^*]*\*@\s*)?<div class=""ev-row fb-row"" role=""group"" aria-label=""Field bosses"">\s*"
+            + @"@foreach \(var boss in FieldBosses\)", row);
+
+        int At(string text)
+        {
+            var at = row.IndexOf(text, StringComparison.Ordinal);
+            Assert.True(at >= 0, $"EventRow.razor has {text}");
+            return at;
+        }
+
+        var icons = At(@"<div class=""ev-row"">");
+        var bosses = At(@"<div class=""ev-row fb-row""");
+        Assert.True(icons < At("@foreach (var icon in icons)") && At("@foreach (var soul in Pets)") < bosses
+            && bosses < At("@foreach (var boss in FieldBosses)") && At("@foreach (var boss in FieldBosses)") < At("@foreach (var shown in EventRowLayout.Opened(icons, open))"),
+            "the icons' row (events, then soul notices), then the bosses' row, then the detail lines");
+        Assert.Single(Regex.Matches(row, @"@foreach \(var boss in FieldBosses\)"));
+        var between = row[icons..bosses];
+        Assert.Equal(Regex.Matches(between, "<div").Count, Regex.Matches(between, "</div>").Count); // the icons' row is closed
+
+        // The two rows stack rather than sit side by side.
+        var alerts = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "alerts.css"));
+        var column = Regex.Match(alerts, @"(?m)^\.alerts \{(?<body>[^}]*)\}").Groups["body"].Value;
+        Assert.Matches(@"(?m)^\s*flex-direction:\s*column;", column);
+    }
+
     // A chosen field boss's notice in the event row (Harry, 2026-11-08: Eternal Gartua): a real button naming the boss and
     // its respawn for screen readers, its skull drawn from path data bound as an attribute (never raw HTML), gold before
     // the respawn and teal once up, its short name kept from widening a narrow meter, and a click that opens the Field

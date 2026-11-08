@@ -2,6 +2,31 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-11-08 — Field-boss timers: the notices get a row of their own under the event icons (#78)
+
+**What:** `Components/EventRow.razor` draws the chosen field bosses' notices in a row of their own (`ev-row fb-row`, a group named "Field bosses") under the event icons, only while there is a notice, instead of first in the icons' row; the icons' row (events, then soul notices) is drawn only when it has something. The icons' detail lines come under both rows. When a notice shows is unchanged: the planner's Soon from the player's lead time before the respawn, then Up for a quarter of an hour. `alerts.css` only has its comments updated (the boss row reuses `.ev-row`). ARCHITECTURE, HANDOFF, README, CHANGELOG and LESSONS updated.
+
+**Why:** Harry, with a screenshot of the overlay (two notices, "Gartua 27:18" and "Lagta 28:06", ahead of seven event icons, the last icon wrapped onto a line of its own): "appearance isn't the best with the field boss timers at the front … perhaps put the field boss timers on a second row (if a boss is coming up, otherwise hide it and keep to one row …)". Their times (over 27 minutes) show a lead time of about half an hour, so the notices were within it.
+
+**Checks (Windows PowerShell 5.1, SDK 10.0.402, at idle priority with no shared compiler server or reused build nodes, AION2 running; nothing launched, no window opened):**
+- Fail first: `RazorMarkupTests.TheFieldBossNoticesHaveTheirOwnRowUnderTheEventIcons` written before the change and run on main's markup: failed (the only failure of the class's 34 tests), then passed with the change.
+- Debug build: 0 errors; the whole suite through `dotnet exec`: 1,099 tests, all passing. Release build of the solution: 0 errors, upstream's five usual warnings only.
+- A static mock of the row from the branch's real `app.css` and `alerts.css` (event icons as plain circles, the real skull, made-up times), rendered by headless Edge: before, at 400 px, two notices ahead of seven icons wrap the last icon as in Harry's screenshot; after, the icons keep one line with the notices on the row under them; with no notice, one row; three notices fit one line at 320 px. The real component was not rendered (no smoke run while the game runs).
+
+**Review:**
+- CI passed on both commits (1,099 tests).
+- Codex reviewed df8b664: completed, no findings, no inline comments.
+- Standard audit: ready with four nits, all fixed in the follow-up commit.
+  1. HANDOFF's pet render item still placed a boss notice in the icons' row: reworded.
+  2. The test pinned the markup but not that `.alerts` stacks its rows: it now checks `flex-direction: column`, and fails with `row` put in (run on the follow-up commit).
+  3. The CHANGELOG and README lines ran past the files' wrap, and "the event icons keep one line" overpromised (the icons can still wrap by themselves at 320 px): re-wrapped, and reworded to "the notices no longer push the event icons onto a second line".
+  4. This entry still listed the reviews as next.
+- The audit also noted that the bosses' row stays for the quarter of an hour a boss is up, as before (#75). That is unchanged here.
+
+**Not checked:** the meter itself (a smoke run or the game): that the window grows by the row when a notice appears and shrinks back when it goes, and the tips of the boss row (they open above it, over the icons).
+
+**Next:** merge with Harry's go-ahead (given) and rebuild both portable copies.
+
 ## 2026-11-08 — Field-boss timers: the last played server when none is saved, a held map said, fewer log lines (#77)
 
 **What:** `FieldBossService.Start` takes, when no server is saved, the server of the character the roster saw played last (`RosterRules.LastPlayedServer`, given by the app as a function, so the service stays apart from the roster) and saves it; the game naming a character on another server replaces it as before. `FieldBossView.MapHeldAt` carries a reading held for the game to name the character, and the window's "Your map" line (`FieldBossText.MapLine`) says it waits for a zone change or teleport. The service logs its held and not-kept notes once until a reading is kept, and `FieldBossMapTap` logs the same map and count once in ten minutes (`LogEvery`).
