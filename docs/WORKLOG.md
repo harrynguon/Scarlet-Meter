@@ -33,6 +33,7 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 7. Nit, fixed: the row's group was labelled "World events" with the soul notices in it: "Events and notices".
 
 **Checks after the fixes** (same conditions): Debug build, 0 errors; the whole suite through `dotnet exec`, 1,091/1,091; fail-first for the four new guards (the count logged, the empty pickup raised, the retry's mark, the roster's sentence), each caught by its test; controls of the pet classes, 58 tests, passing before and after; the worktree clean of mutations.
+
 **CI and Codex on 306ff57:** runs 42465757346 and 42465759104, build-and-test, success. Codex's review of 306ff57 (asked for with `@codex review`): completed, no findings (a thumbs-up). Both of its comments on 2225b2d were answered on the PR with their fixes.
 
 ## 2026-11-08 — Field-boss timers: the world map's boss list, NotMeter's shared timers, notices and a window (#75)
