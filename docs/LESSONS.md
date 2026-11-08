@@ -296,6 +296,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**A queued save was decided against settings the queue had not reached yet** (Codex P2 on #75's review fixes, fixed before merge).
+- What: the fix that posts the character's server to the UI thread kept a check before posting: no save when the settings already hold that server. With the settings on A, the game naming B and then A before the UI thread ran the saves queued B's save and dropped A's (the settings still said A), so B landed last and stayed, and later namings of A changed nothing (the service had already noted A).
+- Why: the ordering fix moved the save onto a queue but left a decision beside it that read the state before the queue's earlier entries had applied; its test named two servers, neither of them the one the settings held.
+- Guard: every change of character is posted, and nothing is compared before its turn (`FieldBossServiceTests.ACharacterNamedBackBeforeTheSavesRunIsTheLastSaved` names B then A over settings on A, and failed with the old check). When work is queued to keep its order, decide each item when it runs, not when it is queued, and test a sequence that returns to the current state.
+
 **A mutation of a timeout hung the mutation run, and stopping it left the file mutated** (2026-11-08, the field-boss timers' review fixes).
 - What: under a mutation that doubled the feed client's ten-second timeout, its test advanced the fake clock ten seconds and then awaited the read, which never ended: the run hung past its ten minutes. Stopping the run killed the runner before its `finally` restored the file, so the mutation stayed in the worktree until `git status` showed it.
 - Why: the test awaited a result the code under test was supposed to produce, with no bound of its own, so a broken timeout was a hang, not a failure; and the runner's restore lived only in the process that was stopped.
