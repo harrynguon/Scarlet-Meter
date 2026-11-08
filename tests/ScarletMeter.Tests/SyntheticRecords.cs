@@ -66,6 +66,44 @@ internal static class SyntheticRecords
 
     public static byte[] Hex(string hex) => Convert.FromHexString(hex.Replace(" ", string.Empty, StringComparison.Ordinal));
 
+    // One boss of the world map's boss list (01 91) in A2Tools' documented shape: the up byte, the world-map id as a
+    // varint, a made-up position (three f32) when up, the extra byte some bosses carry (0x10, the value in A2Tools' sample)
+    // when asked, then the time (u64, Unix ms).
+    public static byte[] FieldBossEntry(int id, bool up, long timeMs, bool extraByte = false, byte extra = 0x10)
+    {
+        var bytes = new List<byte> { up ? (byte)1 : (byte)0 };
+        for (var value = (uint)id; ; value >>= 7)
+        {
+            var b = (byte)(value & 0x7F);
+            if (value >> 7 == 0) { bytes.Add(b); break; }
+            bytes.Add((byte)(b | 0x80));
+        }
+        if (up)
+        {
+            var position = new byte[12];
+            BinaryPrimitives.WriteSingleLittleEndian(position, 1234.5f);
+            BinaryPrimitives.WriteSingleLittleEndian(position.AsSpan(4), -56.25f);
+            BinaryPrimitives.WriteSingleLittleEndian(position.AsSpan(8), 7.0f);
+            bytes.AddRange(position);
+        }
+        if (extraByte) bytes.Add(extra);
+        var time = new byte[8];
+        BinaryPrimitives.WriteInt64LittleEndian(time, timeMs);
+        bytes.AddRange(time);
+        return [.. bytes];
+    }
+
+    // The world map's boss list (01 91): the u16 before the map id (0 for the player's own map), the map id (u32), the count
+    // as a varint (single-byte counts here), the entries, then any trailing bytes.
+    public static byte[] FieldBossMap(ushort header, int mapId, byte[][] entries, byte[]? trailing = null, int? count = null)
+    {
+        var body = new byte[7];
+        BinaryPrimitives.WriteUInt16LittleEndian(body, header);
+        BinaryPrimitives.WriteInt32LittleEndian(body.AsSpan(2), mapId);
+        body[6] = (byte)(count ?? entries.Length);
+        return Frame(FieldBossMapRecords.Opcode, Convert.ToHexString([.. body, .. entries.SelectMany(entry => entry), .. trailing ?? []]));
+    }
+
     // An artifact war in A2Tools' documented shape: a made-up byte, the event id, two made-up bytes, the holding's start
     // (Unix ms) and, when given, its reset.
     public static byte[] ArtifactWar(int eventId, long sinceMs, long? untilMs)

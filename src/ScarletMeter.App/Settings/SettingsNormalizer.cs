@@ -1,5 +1,6 @@
 using ScarletMeter.App.Updates;
 using ScarletMeter.WorldEvents;
+using ScarletMeter.WorldEvents.FieldBosses;
 
 namespace ScarletMeter.App.Settings;
 
@@ -65,9 +66,31 @@ public static class SettingsNormalizer
             Alerts = NormalizeAlerts(input.Alerts, repairs),
             Updates = NormalizeUpdates(input.Updates, repairs),
             BossTimers = input.BossTimers ?? new BossTimersSettings(),
+            FieldBosses = NormalizeFieldBosses(input.FieldBosses, repairs),
             Windows = windows,
         };
         return (settings, repairs);
+    }
+
+    // The lead time is clamped; bosses are kept only if the catalog knows them, once each, in the catalog's order; a
+    // server that cannot be one is dropped (the next character named sets it again).
+    private static FieldBossSettings NormalizeFieldBosses(FieldBossSettings? input, List<string> repairs)
+    {
+        var fieldBosses = input ?? new FieldBossSettings();
+        var lead = Math.Clamp(fieldBosses.LeadMinutes, FieldBossSettings.MinLeadMinutes, FieldBossSettings.MaxLeadMinutes);
+        if (lead != fieldBosses.LeadMinutes) repairs.Add($"Field boss lead time set to {lead} minutes.");
+
+        var saved = fieldBosses.Bosses ?? [];
+        var bosses = FieldBossCatalog.All.Select(boss => boss.Id).Where(id => saved.Contains(id)).ToList();
+        if (saved.Any(id => FieldBossCatalog.Find(id) is null)) repairs.Add("Unknown field bosses were removed from the notice list.");
+
+        var server = fieldBosses.ServerId;
+        if (server is { } id && !FieldBossSettings.IsServerId(id))
+        {
+            repairs.Add("The field boss timers' server was not a server and was cleared.");
+            server = null;
+        }
+        return fieldBosses with { LeadMinutes = lead, Bosses = bosses, ServerId = server };
     }
 
     // Lead time and offset are clamped (the offset to whole minutes, as the schedule module requires); event

@@ -113,7 +113,12 @@ and adds it up per player and per fight.
 - **Out of your way**: one row below the bars, never over one; it steps aside during boss fights, and a **bell** in
   the header turns it off in one click. It never scrolls, the meter grows to fit instead. Times follow the Global
   preset and are not yet verified in game.
-- **Boss timers**: the hourglass in the header opens [aion2timers.com](https://www.aion2timers.com/world-boss-timer/)'s
+- **Field-boss timers**: the hourglass in the header opens every field boss of Verteron, Altgard and the Abyss, up or
+  when it respawns, from your own world map (read when you open it in the game) and NotMeter's shared timers (a public
+  file of what other players' maps show), so they show with the game closed too. Ring a boss's bell for a notice in the
+  event row before it respawns ("Gartua 9:59"), then while it is up. Nothing about you is sent; the shared timers can be
+  turned off in the window.
+- **Boss timers**: "Open aion2timers.com" in the Field bosses window opens [aion2timers.com](https://www.aion2timers.com/world-boss-timer/)'s
   world-boss timers in a small window of their own, in or out of game. The site remembers your server and faction
   there; links to other sites open in your browser (one every few seconds at most; a site link that redirects
   elsewhere stays put). It sits behind the game unless you pin it on top.

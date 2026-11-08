@@ -296,6 +296,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**A merge rule was tested with its two inputs in one order** (2026-11-08, the field-boss timers; caught by its fail-first run before commit).
+- What: `FieldBossBoard.Merge` counts an observation dated after now (another PC's clock ahead) as made now, so it cannot outrank the player's own map read a moment ago. The test merged the future-dated observation first and the player's map second; the merge compares the incoming observation's time against the held one's, so the rule decides only when the future-dated one comes second, and removing it passed.
+- Why: the test was written for the claim (the player's map wins) rather than for the comparison, which treats the held and the incoming observation differently.
+- Guard: the test merges both orders, and the mutation now fails it (`FieldBossTimerTests.AnObservationDatedAheadOfNowCannotOutrankThePlayersMap`). When a rule compares two inputs that the code handles differently, test each input in either place.
+
+**Tests run from the built test executable in a folder labelled Low failed as if the change were wrong** (2026-11-08, the field-boss timers; caught before commit).
+- What: the first run of the new tests used `ScarletMeter.Tests.exe` from the worktree's `bin` folder. The worktree lies under the folder a sandbox gave a Low integrity label (above, "A portable copy rebuilt in a folder labelled Low…"), so Windows started the runner at Low, where it cannot write to the user's temp folder: a settings round trip read back an empty boss list (the store logs a failed save, it does not throw), and the engine host could not make its folder (`UnauthorizedAccessException`). Both looked like bugs in the new code.
+- Why: the earlier lesson guarded the portable copy, not the test runner, which is an app host built in the same tree.
+- Guard: run the tests through `dotnet` (`Build.ps1`'s `dotnet test`, or `dotnet exec` on `ScarletMeter.Tests.dll`), which starts at the SDK's own level; DEVELOPMENT.md says so. When a test fails on a file or folder it should own, check the process's integrity level before the code.
+
 **A test that a refusal comes before the build passed on one that came after it** (2026-11-07, the integrity check; caught by its fail-first run before commit).
 - What: the case that `Publish-Portable.ps1` refuses a root labelled Low before building ran the script in a child process and looked for the refusal and for no "Build succeeded" in its output. With the check before the build removed, the child built the whole meter, the check on the built exe refused with the same message, and the build's output was lost: the child collected it with `Out-String`, which emits nothing once the script throws. The case passed.
 - Why: it tested "before" by the absence of the step's output, and two checks gave the same message, so nothing told which one had refused; a broken check would also have spent minutes building in CI.

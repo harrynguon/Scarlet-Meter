@@ -28,6 +28,9 @@ public interface IMeterWindows
     /// <summary>Opens the boss-timers window (aion2timers.com, <see cref="BossTimersWindow"/>), or brings it forward.</summary>
     void OpenBossTimers();
 
+    /// <summary>Opens the field-boss timers (the player's own map and the shared timers, Pages/FieldBossesPage), or brings them forward.</summary>
+    void OpenFieldBosses();
+
     /// <summary>Puts text on the clipboard.</summary>
     void CopyText(string text);
 
@@ -95,6 +98,7 @@ public sealed class MeterWindows : IMeterWindows
     public static readonly ToolWindowSpec History = new(WindowKeys.History, typeof(FightHistoryPage), "Scarlet Meter · History", 860, 620, 560, 360);
     public static readonly ToolWindowSpec PlayerDetails = new(WindowKeys.PlayerDetails, typeof(PlayerDetailsPage), "Scarlet Meter · Player details", 980, 600, 620, 360);
     public static readonly ToolWindowSpec Roster = new(WindowKeys.Roster, typeof(RosterPage), "Scarlet Meter · Characters", 920, 480, 560, 280);
+    public static readonly ToolWindowSpec FieldBosses = new(WindowKeys.FieldBosses, typeof(FieldBossesPage), "Scarlet Meter · Field bosses", 620, 720, 460, 360);
 
     private readonly IServiceProvider services;
     private readonly SettingsService settings;
@@ -159,6 +163,8 @@ public sealed class MeterWindows : IMeterWindows
     public void OpenHistory() => Open(History);
 
     public void OpenRoster() => Open(Roster);
+
+    public void OpenFieldBosses() => Open(FieldBosses);
 
     public void OpenPlayerDetails(long playerId, Guid? fightId = null)
     {

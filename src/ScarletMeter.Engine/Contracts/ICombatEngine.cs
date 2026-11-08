@@ -147,6 +147,14 @@ public interface ICombatEngine : IDisposable
     event EventHandler<AbyssArtifacts>? ArtifactsObserved;
 
     /// <summary>
+    /// The field bosses on a map, each time the player opens the world map in the game on their home map or in the Abyss:
+    /// which are up and when the dead ones come back. It is the world's on the server it was read on; the record does not
+    /// say which server, so a subscriber puts it on <see cref="Character"/>'s. Raised on a capture thread, never on the UI
+    /// thread. The demo sends none.
+    /// </summary>
+    event EventHandler<FieldBossMap>? FieldBossMapObserved;
+
+    /// <summary>
     /// The game moved to a new connection: a server change (into or out of a dungeon or the Abyss) or a switch of
     /// character. Raised on a capture thread just before the first record read of the new connection, once the engine's
     /// own values have taken the move (<see cref="MapId"/> forgotten, <see cref="Character"/> unconfirmed): whatever a

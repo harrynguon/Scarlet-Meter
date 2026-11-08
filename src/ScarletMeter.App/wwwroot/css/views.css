@@ -501,3 +501,108 @@ tr.child td {
     font-size: 11px;
     line-height: 1.45;
 }
+/* The field-boss timers (Pages/FieldBossesPage): the server and where the timers came from, then a row per boss on the
+   map's tab. A boss up reads teal (--good) and one respawning within the notice's lead time gold (--soon), as the overlay's
+   notices do. */
+.fb-head {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin: 6px 0 12px;
+    font-size: 12.5px;
+}
+
+.fb-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.fb-line > .muted:first-child {
+    min-width: 92px;
+}
+
+.fb-server {
+    width: 76px;
+    padding: 2px 6px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--text);
+    font: inherit;
+}
+
+.fb-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+}
+
+.fb-table th {
+    position: sticky;
+    top: 0;
+    padding: 5px 6px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-align: left;
+}
+
+.fb-table td {
+    padding: 4px 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    white-space: nowrap;
+}
+
+.fb-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.fb-table td.fb-name {
+    white-space: normal;
+}
+
+.fb-table tr.up .fb-state { color: var(--good); }
+.fb-table tr.soon .fb-state,
+.fb-table tr.soon .num { color: var(--soon); }
+
+.fb-bell-col {
+    width: 28px;
+}
+
+.fb-bell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: none;
+    color: rgba(235, 233, 242, 0.35);
+    cursor: pointer;
+}
+
+.fb-bell:hover,
+.fb-bell:focus-visible { color: var(--text); }
+
+.fb-bell.on {
+    color: var(--soon);
+    border-color: rgba(220, 198, 140, 0.32);
+    background: rgba(220, 198, 140, 0.1);
+}
+
+.fb-bell svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}

@@ -32,6 +32,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     private readonly EntryListTap entries;
     private readonly MapLoadTap maps;
     private readonly AbyssArtifactTap artifacts;
+    private readonly FieldBossMapTap fieldBosses;
     private readonly AbyssPause pause;
     private readonly DummyFightFilter dummies;
     private readonly CaptureLockGuard lockGuard;
@@ -52,6 +53,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         EntryListTap entries,
         MapLoadTap maps,
         AbyssArtifactTap artifacts,
+        FieldBossMapTap fieldBosses,
         AbyssPause pause,
         DummyFightFilter dummies,
         CaptureLockGuard lockGuard,
@@ -66,6 +68,7 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
         this.entries = entries;
         this.maps = maps;
         this.artifacts = artifacts;
+        this.fieldBosses = fieldBosses;
         this.pause = pause;
         this.dummies = dummies;
         this.lockGuard = lockGuard;
@@ -116,6 +119,12 @@ internal sealed class UpstreamCombatEngine : ICombatEngine
     {
         add => artifacts.Observed += value;
         remove => artifacts.Observed -= value;
+    }
+
+    public event EventHandler<FieldBossMap>? FieldBossMapObserved
+    {
+        add => fieldBosses.Observed += value;
+        remove => fieldBosses.Observed -= value;
     }
 
     public event EventHandler? ConnectionStarted

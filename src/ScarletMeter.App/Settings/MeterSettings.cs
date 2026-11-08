@@ -25,6 +25,8 @@ public sealed record MeterSettings
 
     public BossTimersSettings BossTimers { get; init; } = new();
 
+    public FieldBossSettings FieldBosses { get; init; } = new();
+
     /// <summary>Saved window positions and sizes, keyed by <see cref="WindowKeys"/>.</summary>
     public IReadOnlyDictionary<string, WindowPlacement> Windows { get; init; } = new Dictionary<string, WindowPlacement>();
 
@@ -32,11 +34,54 @@ public sealed record MeterSettings
     // update that changes nothing is recognised as such. A test checks every property takes part.
     public bool Equals(MeterSettings? other) => other is not null
         && Version == other.Version && Fight == other.Fight && Appearance == other.Appearance && Overlay == other.Overlay
-        && Alerts == other.Alerts && Updates == other.Updates && BossTimers == other.BossTimers
+        && Alerts == other.Alerts && Updates == other.Updates && BossTimers == other.BossTimers && FieldBosses == other.FieldBosses
         && Windows.Count == other.Windows.Count
         && Windows.All(pair => other.Windows.TryGetValue(pair.Key, out var placement) && placement == pair.Value);
 
-    public override int GetHashCode() => HashCode.Combine(Version, Fight, Appearance, Overlay, Alerts, Updates, BossTimers, Windows.Count);
+    public override int GetHashCode() =>
+        HashCode.Combine(Version, Fight, Appearance, Overlay, Alerts, Updates, HashCode.Combine(BossTimers, FieldBosses), Windows.Count);
+}
+
+/// <summary>
+/// Field-boss timers (FieldBosses/FieldBossService, the Field bosses window): which bosses get a notice in the overlay and how
+/// long before they respawn, whether to read other players' shared timers, and whose server's timers to show.
+/// </summary>
+public sealed record FieldBossSettings
+{
+    public const int MinLeadMinutes = 1;
+    public const int MaxLeadMinutes = 60;
+
+    /// <summary>Show a notice in the overlay's event row for the chosen bosses, before they respawn and once they are up.</summary>
+    public bool Enabled { get; init; } = true;
+
+    /// <summary>How long before a chosen boss respawns its notice appears.</summary>
+    public int LeadMinutes { get; init; } = 10;
+
+    /// <summary>The bosses with notices, by world-map id (WorldEvents' FieldBossCatalog), in the catalog's order; none by default.</summary>
+    public IReadOnlyList<int> Bosses { get; init; } = [];
+
+    /// <summary>
+    /// Read NotMeter's shared timers (what other players' meters read off their world maps, a public file per Global region on
+    /// GitHub), so the timers show without opening the map, and with the game closed. Asked only while the Field bosses window
+    /// is open or a boss is chosen above.
+    /// </summary>
+    public bool SharedTimers { get; init; } = true;
+
+    /// <summary>
+    /// The game server whose timers are shown: the server of the character the game last named, or one the player chose in
+    /// the window; null until either. Kept so the timers show with the game closed.
+    /// </summary>
+    public int? ServerId { get; init; }
+
+    /// <summary>Whether <paramref name="id"/> could be a game server: faction 1 or 2, a region from 0 (Korea and Taiwan) to 5, a slot from 1.</summary>
+    public static bool IsServerId(int id) => id / 1000 is 1 or 2 && id / 100 % 10 <= 5 && id % 100 != 0;
+
+    // Value equality including the boss list.
+    public bool Equals(FieldBossSettings? other) => other is not null
+        && Enabled == other.Enabled && LeadMinutes == other.LeadMinutes && SharedTimers == other.SharedTimers
+        && ServerId == other.ServerId && Bosses.SequenceEqual(other.Bosses);
+
+    public override int GetHashCode() => HashCode.Combine(Enabled, LeadMinutes, SharedTimers, ServerId, Bosses.Count);
 }
 
 /// <summary>
@@ -256,9 +301,10 @@ public static class WindowKeys
     public const string PlayerDetails = "details";
     public const string BossTimers = "timers";
     public const string Roster = "roster";
+    public const string FieldBosses = "fieldbosses";
 
     public static IReadOnlySet<string> All { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
-        Overlay, Settings, History, PlayerDetails, BossTimers, Roster,
+        Overlay, Settings, History, PlayerDetails, BossTimers, Roster, FieldBosses,
     };
 }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using ScarletMeter.App.Alerts;
 using ScarletMeter.App.Combat;
+using ScarletMeter.App.FieldBosses;
 using ScarletMeter.App.Formatting;
 using ScarletMeter.App.Roster;
 using ScarletMeter.App.Settings;
@@ -89,6 +90,10 @@ public partial class MeterPage : IAsyncDisposable
     // The last known Odyle energy and Shugo keys, until the game sends its own this run.
     [Inject]
     private RosterService Roster { get; set; } = default!;
+
+    // The chosen field bosses' notices in the event row; their countdowns tick with the refresh loop's renders.
+    [Inject]
+    private FieldBossService FieldBosses { get; set; } = default!;
 
     // Reads the panel's height after each render (js/overlay-size.js).
     [Inject]

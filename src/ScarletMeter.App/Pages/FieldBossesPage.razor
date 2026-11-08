@@ -1,0 +1,190 @@
+@using System.Globalization
+@using ScarletMeter.App.Alerts
+@using ScarletMeter.App.FieldBosses
+@using ScarletMeter.WorldEvents.FieldBosses
+@implements IDisposable
+@*
+    The field-boss timers (Windows/MeterWindows.FieldBosses, the hourglass in the overlay's header): a tab per map the game
+    lists field bosses for, and a row per boss with what the meter knows of it on the timers' server: up (since when), the
+    respawn time and the time to it, or no timer yet, and where that came from (the player's own map, or NotMeter's shared
+    timers) and how long ago. The bell on a row gives that boss a notice in the overlay's event row. The timers come from
+    FieldBosses/FieldBossService; while this window is open it keeps the shared timers current (Watch), and the countdowns
+    tick once a second. The server is the one the game last named a character on, or one chosen here.
+*@
+@{
+    var now = Clock.GetUtcNow();
+    var view = Service.View(now);
+    var options = Settings.Current.FieldBosses;
+    var map = ShownMap(view);
+    var chosen = options.Bosses.ToHashSet();
+}
+<div class="tool fieldbosses" data-window="fieldbosses">
+    <nav class="tabs" role="tablist" aria-label="Maps">
+        @foreach (var id in FieldBossMaps.All)
+        {
+            <button type="button" role="tab" class="tab @(id == map ? "active" : "")" aria-selected="@(id == map ? "true" : "false")"
+                    @onclick="() => shownMap = id">@FieldBossMaps.NameOf(id)</button>
+        }
+    </nav>
+    <div class="tab-body">
+        <div class="fb-head">
+            <div class="fb-line">
+                <span class="muted">Server</span>
+                @if (view.ServerId is { } server)
+                {
+                    <b>@FieldBossText.Server(server)</b>
+                }
+                else
+                {
+                    <span>not known yet: log in with the meter running, or enter its number</span>
+                }
+                <input class="fb-server" type="number" min="1001" max="2599" placeholder="1503" aria-label="Server number"
+                       value="@serverInput" @onchange="e => serverInput = e.Value?.ToString() ?? string.Empty" />
+                <button type="button" class="btn small" @onclick="UseServer">Show</button>
+            </div>
+            <div class="fb-line">
+                <span class="muted">Shared timers</span>
+                <span>@FeedLine(view.Feed, options, now)</span>
+                @if (options.SharedTimers && view.ServerId is { } feedServer && NotMeterFieldBossFeed.Region(feedServer) is not null)
+                {
+                    <button type="button" class="btn small" @onclick="Service.RefreshNow" disabled="@view.Feed.Reading">Refresh</button>
+                }
+            </div>
+            <div class="fb-line">
+                <span class="muted">Your map</span>
+                <span>@(view.MapReadAt is { } read ? $"read {FieldBossText.Ago(now - read)}" : "not read this run: open the world map (M) in the game to read it")</span>
+            </div>
+        </div>
+        <table class="fb-table">
+            <thead>
+                <tr>
+                    <th class="fb-bell-col"><span class="sr-only">Notice</span></th>
+                    <th>Boss</th>
+                    <th>State</th>
+                    <th class="num">In</th>
+                    <th>From</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var boss in FieldBossCatalog.OnMap(map))
+                {
+                    var timer = view.Board.GetValueOrDefault(boss.Id);
+                    var on = chosen.Contains(boss.Id);
+                    <tr class="@RowClass(timer, now)" @key="boss.Id">
+                        <td class="fb-bell-col">
+                            <button type="button" class="fb-bell @(on ? "on" : "")" aria-pressed="@(on ? "true" : "false")"
+                                    title="@(on ? "Notice in the overlay: on" : "Notice in the overlay: off")" aria-label="@($"Notice for {boss.Name}")"
+                                    @onclick="() => ToggleBoss(boss.Id)">
+                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 11V7.4a4 4 0 0 1 8 0V11l1.3 1.4H2.7ZM6.5 13.8a1.6 1.6 0 0 0 3 0" /></svg>
+                            </button>
+                        </td>
+                        <td class="fb-name">@boss.Name</td>
+                        <td class="fb-state">@FieldBossText.State(timer, now)</td>
+                        <td class="num">@FieldBossText.Countdown(timer, now)</td>
+                        <td class="muted">@(timer is null ? string.Empty : FieldBossText.Source(timer, now))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <section>
+            <h2>Notices</h2>
+            <ToggleSetting Label="Show notices in the overlay" Description="For the bosses with a bell: before they respawn, and for a quarter of an hour once they are up."
+                           Value="@options.Enabled" ValueChanged="v => Change(f => f with { Enabled = v })" />
+            <RangeSetting Label="Notice before a respawn" Value="@options.LeadMinutes" Min="@FieldBossSettings.MinLeadMinutes" Max="@FieldBossSettings.MaxLeadMinutes" Step="1"
+                          Format="@(v => $"{v:0} min")" ValueChanged="v => Change(f => f with { LeadMinutes = (int)Math.Round(v) })" />
+            <ToggleSetting Label="Read other players' shared timers" Description="NotMeter publishes what its users' meters read off their maps, a public file per region on GitHub: the timers then show without opening the map, and with the game closed. Nothing about you is sent."
+                           Value="@options.SharedTimers" ValueChanged="v => Change(f => f with { SharedTimers = v })" />
+        </section>
+        <section>
+            <h2>More timers</h2>
+            <p class="muted">aion2timers.com's world-boss timers open in a window of their own.</p>
+            <button type="button" class="btn" @onclick="Windows.OpenBossTimers">Open aion2timers.com</button>
+        </section>
+    </div>
+</div>
+
+@code {
+    [Inject] private FieldBossService Service { get; set; } = default!;
+
+    [Inject] private SettingsService Settings { get; set; } = default!;
+
+    [Inject] private TimeProvider Clock { get; set; } = default!;
+
+    [Inject] private IMeterWindows Windows { get; set; } = default!;
+
+    // The map tab the player chose; until then the home map of the server's side.
+    private int? shownMap;
+    private string serverInput = string.Empty;
+    private IDisposable? watch;
+    private ITimer? tick;
+    private volatile bool disposed;
+
+    protected override void OnInitialized()
+    {
+        Service.Changed += OnChanged;
+        Settings.Changed += OnSettingsChanged;
+        watch = Service.Watch();
+        // The countdowns: once a second.
+        tick = Clock.CreateTimer(_ => OnChanged(this, EventArgs.Empty), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    private int ShownMap(FieldBossView view) =>
+        shownMap ?? (view.ServerId is { } server ? FieldBossMaps.HomeOf(server) : null) ?? FieldBossMaps.Verteron;
+
+    // A row's class: "up" for a boss up now, "soon" for one respawning within the notice's lead time.
+    private string RowClass(FieldBossTimer? timer, DateTimeOffset now)
+    {
+        if (timer is null) return string.Empty;
+        var state = timer.StateAt(now);
+        if (state.Status == FieldBossStatus.Up) return "up";
+        var lead = TimeSpan.FromMinutes(Settings.Current.FieldBosses.LeadMinutes);
+        return state is { Status: FieldBossStatus.Respawning, At: { } back } && back - now <= lead ? "soon" : string.Empty;
+    }
+
+    // What the shared timers last did, in words.
+    private static string FeedLine(FieldBossFeedState feed, FieldBossSettings options, DateTimeOffset now)
+    {
+        if (!options.SharedTimers) return "off";
+        if (feed.ServerId is not { } server) return "waiting for the server";
+        if (NotMeterFieldBossFeed.Region(server) is null) return "published for Global servers only";
+        if (feed.Reading && feed.ReadAt is null) return "reading…";
+        if (feed.ReadAt is not { } read) return "not read yet";
+        var when = FieldBossText.Ago(now - read);
+        return feed.Problem is { } problem ? $"{problem} (tried {when})" : $"from NotMeter, read {when}";
+    }
+
+    private void ToggleBoss(int id) => Change(f =>
+    {
+        var bosses = f.Bosses.Contains(id) ? f.Bosses.Where(b => b != id).ToList() : [.. f.Bosses, id];
+        return f with { Bosses = bosses };
+    });
+
+    private void Change(Func<FieldBossSettings, FieldBossSettings> change) =>
+        Settings.Update(s => s with { FieldBosses = change(s.FieldBosses) });
+
+    private void UseServer()
+    {
+        if (int.TryParse(serverInput.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) && FieldBossSettings.IsServerId(id))
+        {
+            Service.ChooseServer(id);
+            shownMap = null;
+        }
+        serverInput = string.Empty;
+    }
+
+    private void OnChanged(object? sender, EventArgs e)
+    {
+        if (!disposed) _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OnSettingsChanged(object? sender, MeterSettings changed) => OnChanged(sender, EventArgs.Empty);
+
+    public void Dispose()
+    {
+        disposed = true;
+        Service.Changed -= OnChanged;
+        Settings.Changed -= OnSettingsChanged;
+        tick?.Dispose();
+        watch?.Dispose();
+    }
+}
