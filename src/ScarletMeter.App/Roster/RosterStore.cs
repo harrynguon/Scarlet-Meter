@@ -62,22 +62,7 @@ public sealed class RosterStore
             logger.LogWarning(load.Error, "The character roster could not be fully loaded ({Outcome}).", load.Outcome);
         else if (load.Status == StoredFileStatus.ReadOnly)
             logger.LogWarning("The character roster comes from a newer Scarlet Meter (version {Version}); it is shown but not overwritten.", load.Version);
-        var problem = load.Outcome switch
-        {
-            StoredFileOutcome.Read or StoredFileOutcome.NoFile => null,
-            StoredFileOutcome.MissingBackupRead => "Your character roster file was missing, so the previous save was restored.",
-            StoredFileOutcome.Newer or StoredFileOutcome.MissingBackupNewer =>
-                "Your character roster comes from a newer version of Scarlet Meter. It is shown, and changes are not saved.",
-            StoredFileOutcome.Inaccessible or StoredFileOutcome.MissingBackupInaccessible or StoredFileOutcome.UnreadableBackupInaccessible =>
-                $"Your character roster file could not be opened{KeptNote(kept)}. Changes are not saved until the meter restarts with the file free.",
-            StoredFileOutcome.MissingBackupNotKeptAside or StoredFileOutcome.UnreadableNotKeptAside or StoredFileOutcome.UnreadableBackupNotKeptAside =>
-                $"Your character roster file could not be read or set aside{KeptNote(kept)}. Changes are not saved until the meter restarts with the file free.",
-            StoredFileOutcome.MissingBackupUnreadable =>
-                $"The previous save of your character roster could not be read, so a new roster was started. It was kept as {kept}.",
-            StoredFileOutcome.UnreadableBackupRead =>
-                $"Your character roster file could not be read, so the previous save was restored. The unreadable file was kept as {kept}.",
-            _ => $"Your character roster file could not be read and there was no usable previous save, so a new roster was started. The unreadable file was kept as {kept}.",
-        };
+        var problem = StoredFileNotice.For(load.Outcome, kept, "character roster", "a new roster was started");
 
         var (roster, repairs) = RosterNormalizer.Normalize(load.Value, now);
         foreach (var repair in repairs) logger.LogInformation("Character roster repaired: {Repair}", repair);
@@ -88,6 +73,4 @@ public sealed class RosterStore
 
     /// <summary>Writes the roster atomically, keeping the previous file as the backup. Throws on I/O failure.</summary>
     public void Save(RosterFile roster) => file.Save(roster);
-
-    private static string KeptNote(string? kept) => kept is null ? string.Empty : $" (an unreadable one was kept as {kept})";
 }

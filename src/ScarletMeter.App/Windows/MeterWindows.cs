@@ -31,6 +31,9 @@ public interface IMeterWindows
     /// <summary>Opens the field-boss timers (the player's own map and the shared timers, Pages/FieldBossesPage), or brings them forward.</summary>
     void OpenFieldBosses();
 
+    /// <summary>Opens the pet souls (each pet's level and souls on a server, Pages/PetsPage), or brings them forward.</summary>
+    void OpenPets();
+
     /// <summary>Puts text on the clipboard.</summary>
     void CopyText(string text);
 
@@ -99,6 +102,7 @@ public sealed class MeterWindows : IMeterWindows
     public static readonly ToolWindowSpec PlayerDetails = new(WindowKeys.PlayerDetails, typeof(PlayerDetailsPage), "Scarlet Meter · Player details", 980, 600, 620, 360);
     public static readonly ToolWindowSpec Roster = new(WindowKeys.Roster, typeof(RosterPage), "Scarlet Meter · Characters", 920, 480, 560, 280);
     public static readonly ToolWindowSpec FieldBosses = new(WindowKeys.FieldBosses, typeof(FieldBossesPage), "Scarlet Meter · Field bosses", 620, 720, 460, 360);
+    public static readonly ToolWindowSpec Pets = new(WindowKeys.Pets, typeof(PetsPage), "Scarlet Meter · Pet souls", 600, 680, 440, 320);
 
     private readonly IServiceProvider services;
     private readonly SettingsService settings;
@@ -165,6 +169,8 @@ public sealed class MeterWindows : IMeterWindows
     public void OpenRoster() => Open(Roster);
 
     public void OpenFieldBosses() => Open(FieldBosses);
+
+    public void OpenPets() => Open(Pets);
 
     public void OpenPlayerDetails(long playerId, Guid? fightId = null)
     {

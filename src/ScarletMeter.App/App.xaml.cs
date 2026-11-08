@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using ScarletMeter.App.Alerts;
 using ScarletMeter.App.FieldBosses;
 using ScarletMeter.App.Logging;
+using ScarletMeter.App.Pets;
 using ScarletMeter.App.Roster;
 using ScarletMeter.App.Settings;
 using ScarletMeter.App.Updates;
@@ -105,6 +106,10 @@ public partial class App : Application
         builder.Services.AddSingleton(services => new FieldBossFeedClient(
             FieldBossFeedClient.CreateDefaultHandler(), services.GetRequiredService<TimeProvider>(), services.GetRequiredService<ILogger<FieldBossFeedClient>>()));
         builder.Services.AddSingleton<FieldBossService>();
+        // Pet souls: their own file, demo-pets.json in demo mode, as the roster's.
+        builder.Services.AddSingleton(services => new PetStore(options.DataDirectory, options.Capture == CaptureMode.Demo,
+            services.GetRequiredService<ILogger<PetStore>>()));
+        builder.Services.AddSingleton<PetService>();
         builder.Services.AddUpstreamReleaseChecker();
         builder.Services.AddSingleton<UpdateNotice>();
         builder.Services.AddWpfBlazorWebView();
@@ -114,9 +119,11 @@ public partial class App : Application
         // Settings load before the engine resolves, so upstream sees the saved fight rules from the first hit.
         host.Services.GetRequiredService<SettingsService>();
         engine = host.Services.GetRequiredService<ICombatEngine>();
-        // Before capture starts, so the first login's counts reach the roster, and the character's server the field-boss timers.
+        // Before capture starts, so the first login's counts reach the roster, the character's server the field-boss timers,
+        // and the pet collection the pet souls.
         host.Services.GetRequiredService<RosterService>().Start();
         host.Services.GetRequiredService<FieldBossService>().Start();
+        host.Services.GetRequiredService<PetService>().Start();
         engine.Start();
 
         var windows = host.Services.GetRequiredService<MeterWindows>();

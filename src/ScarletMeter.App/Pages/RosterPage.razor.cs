@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using ScarletMeter.App.Formatting;
 using ScarletMeter.App.Roster;
 using ScarletMeter.App.Settings;
+using ScarletMeter.App.Windows;
 
 namespace ScarletMeter.App.Pages;
 
@@ -63,6 +64,9 @@ public partial class RosterPage : IDisposable
     [Inject] private TimeProvider Clock { get; set; } = default!;
 
     [Inject] private ILogger<RosterPage> Logger { get; set; } = default!;
+
+    // The head's Pet souls button: each server's pets sit with its characters' progress.
+    [Inject] private IMeterWindows Windows { get; set; } = default!;
 
     protected override void OnInitialized()
     {

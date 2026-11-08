@@ -235,7 +235,7 @@ public sealed partial class RazorMarkupTests
         // The row shows nothing and announces nothing while held, before its other branch.
         var strip = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Components", "EventRow.razor"));
         Assert.Contains(@"<span class=""sr-only"" role=""status"">@(Held ? string.Empty : Announcement)</span>", strip);
-        Assert.Matches(@"(?s)@if \(Held\)\s*\{\s*@\*[^*]*\*@\s*\}\s*else if \(EventRowLayout\.Icons\(View\) is var icons && \(icons\.Count > 0 \|\| FieldBosses\.Count > 0\)\)", strip);
+        Assert.Matches(@"(?s)@if \(Held\)\s*\{\s*@\*[^*]*\*@\s*\}\s*else if \(EventRowLayout\.Icons\(View\) is var icons && \(icons\.Count > 0 \|\| FieldBosses\.Count > 0 \|\| Pets\.Count > 0\)\)", strip);
 
         // The window layer asks the gate before every restore for an event, and acts on the one that waited.
         var windows = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Windows", "MeterWindows.cs"));
@@ -452,6 +452,48 @@ public sealed partial class RazorMarkupTests
         Assert.DoesNotContain("MarkupString", page, StringComparison.Ordinal);
     }
 
+    // A soul notice in the event row (Harry, 2026-11-08: the card NotMeter shows when a pet below level 3 gets a soul): a
+    // real button naming the pet, its souls and progress for screen readers, its paw drawn from path data bound as an
+    // attribute (never raw HTML), at the row's end so the event icons never move as it comes and goes, left out of the
+    // spoken summary (it would speak at every kill), its name kept from widening a narrow meter, and a click that opens the
+    // Pet souls window. The window opens from the Characters window's head too (the overlay's header has no room), and its
+    // page binds nothing as raw HTML.
+    [Fact]
+    public void TheSoulNoticesAreButtonsAtTheEventRowsEnd()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        var row = File.ReadAllText(Path.Combine(app, "Components", "EventRow.razor"));
+        Assert.Matches(@"<button type=""button"" class=""ev pet @\(PetRules\.IsMax\(soul\.Progress\) \? ""max"" : """"\)"" @key=""@\(\$""pet-\{soul\.Pet\.Id\}""\)""\s*"
+            + @"aria-label=""@PetText\.Notice\(soul\)"" @onclick=""OpenPets"">", row);
+        Assert.Contains(@"<svg viewBox=""0 0 16 16"" aria-hidden=""true""><path d=""@EventGlyphs.Pet"" /></svg>", row);
+        Assert.Contains(@"<span class=""ev-name"">@soul.Pet.Name</span>", row);
+        Assert.True(row.IndexOf("@foreach (var soul in Pets)", StringComparison.Ordinal) > row.IndexOf("@foreach (var icon in icons)", StringComparison.Ordinal),
+            "the soul notices come after the events");
+        var announcement = Regex.Match(row, @"private string Announcement =>[^;]*;").Value;
+        Assert.NotEmpty(announcement);
+        Assert.DoesNotContain("Pets", announcement, StringComparison.Ordinal);
+
+        var alerts = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "alerts.css"));
+        Assert.Matches(@"(?m)^\.ev\.pet \{", alerts);
+        Assert.Matches(@"(?m)^\.ev\.pet\.max \{", alerts);
+
+        var roster = File.ReadAllText(Path.Combine(app, "Pages", "RosterPage.razor"));
+        Assert.Contains(@"<button type=""button"" class=""btn small"" @onclick=""Windows.OpenPets"">Pet souls</button>", roster);
+        var meter = File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor"));
+        Assert.DoesNotContain("Windows.OpenPets\" title", meter, StringComparison.Ordinal); // no header button: no room (TheOverlaysLeastWidthHoldsItsHeader)
+
+        var windows = File.ReadAllText(Path.Combine(app, "Windows", "MeterWindows.cs"));
+        Assert.Contains(@"public static readonly ToolWindowSpec Pets = new(WindowKeys.Pets, typeof(PetsPage), ""Scarlet Meter · Pet souls""", windows);
+        Assert.Contains("public void OpenPets() => Open(Pets);", windows);
+        Assert.Contains(App.Settings.WindowKeys.Pets, App.Settings.WindowKeys.All);
+
+        var page = File.ReadAllText(Path.Combine(app, "Pages", "PetsPage.razor"));
+        Assert.Contains(@"<div class=""tool pets"" data-window=""pets"">", page);
+        Assert.Contains("Service.Changed -= OnChanged;", page);
+        Assert.Contains("Settings.Changed -= OnSettingsChanged;", page);
+        Assert.DoesNotContain("MarkupString", page, StringComparison.Ordinal);
+    }
+
     // Nothing in the event row blinks or loops (Harry: the pulsing dot was "too distracting"): the only animations are
     // the detail line's one-time entrance, its progress line's width transition and a tip's fade.
     [Fact]
@@ -477,7 +519,8 @@ public sealed partial class RazorMarkupTests
         Assert.Contains("@foreach (var icon in icons)", row);
         Assert.Contains("@foreach (var shown in EventRowLayout.Opened(icons, open))", row);
         Assert.Contains("@foreach (var boss in FieldBosses)", row); // the field bosses' notices (TheFieldBossNoticesAreButtonsInTheEventRow)
-        Assert.Equal(3, Regex.Matches(row, @"@foreach\b").Count);
+        Assert.Contains("@foreach (var soul in Pets)", row); // the soul notices (TheSoulNoticesAreButtonsAtTheEventRowsEnd)
+        Assert.Equal(4, Regex.Matches(row, @"@foreach\b").Count);
         Assert.Matches(@"<button type=""button"" class=""ev @icon\.State\.ToString\(\)\.ToLowerInvariant\(\)"" @key=""icon\.Rule\.Id""\s*"
             + @"aria-expanded=""@\(IsOpen\(icon\) \? ""true"" : ""false""\)"" aria-label=""@\(\$""\{icon\.Rule\.Name\}, \{status\}""\)""\s*"
             + @"@onclick=""\(\) => Toggle\(icon\.Rule\.Id\)"">", row);
@@ -486,7 +529,9 @@ public sealed partial class RazorMarkupTests
         // The icon's time is IconTime's (minutes and seconds; AlertTests), never another countdown's; so is a field boss's.
         Assert.Contains(@"<span class=""ev-time"">@EventText.IconTime(until - Now)</span>", row);
         Assert.Contains(@"<span class=""ev-time"">@(boss.Kind == FieldBossAlertKind.Soon ? EventText.IconTime(boss.At - Now) : ""up"")</span>", row);
-        Assert.Equal(2, Regex.Matches(row, @"class=""ev-time""").Count);
+        // A soul notice's "time" is its souls and progress, no countdown.
+        Assert.Contains(@"<span class=""ev-time"">@PetText.Gained(soul.Amount) · @PetText.Level(soul.Progress) @PetText.Progress(soul.Progress)</span>", row);
+        Assert.Equal(3, Regex.Matches(row, @"class=""ev-time""").Count);
         Assert.Contains(@"<span class=""ev-tip"" aria-hidden=""true"">", row);
         // A click toggles the line and tells the page, which renders and so measures the new height at once.
         Assert.Matches(@"private Task Toggle\(string id\)\s*\{\s*open = EventRowLayout\.Toggle\(open, id\);\s*return LinesChanged\.InvokeAsync\(\);\s*\}", row);
@@ -499,7 +544,8 @@ public sealed partial class RazorMarkupTests
         var meter = File.ReadAllText(Path.Combine(pages, "MeterPage.razor"));
         Assert.Matches(@"(?m)^\s*var now = Clock\.GetUtcNow\(\);", meter);
         Assert.Matches(@"(?m)^\s*<EventRow View=""Alerts\.Current"" Now=""now"" Held=""NoticesHeld"" LinesChanged=""StateHasChanged""\s+"
-            + @"FieldBosses=""FieldBosses\.Plan\(now\)\.Alerts"" OpenFieldBosses=""Windows\.OpenFieldBosses"" />", meter);
+            + @"FieldBosses=""FieldBosses\.Plan\(now\)\.Alerts"" OpenFieldBosses=""Windows\.OpenFieldBosses""\s+"
+            + @"Pets=""Pets\.Notices\(now\)"" OpenPets=""Windows\.OpenPets"" />", meter);
         var sources = Directory.EnumerateFiles(app, "*", SearchOption.AllDirectories)
             .Where(path => path.EndsWith(".cs", StringComparison.Ordinal) || path.EndsWith(".razor", StringComparison.Ordinal))
             .Where(path => !Regex.IsMatch(path, @"[\\/](bin|obj)[\\/]"))

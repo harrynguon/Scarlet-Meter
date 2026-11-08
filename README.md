@@ -118,6 +118,12 @@ and adds it up per player and per fight.
   file of what other players' maps show), so they show with the game closed too. Ring a boss's bell for a notice in the
   event row before it respawns ("Gartua 9:59"), then while it is up. Nothing about you is sent; the shared timers can be
   turned off in the window.
+- **Pet souls**: when a kill gives a soul to a pet below level 3, a notice at the end of the event row shows its name,
+  the souls and where it stands ("Sparkie +1 · Lv 2 41/75"). The Pet souls window (Characters, "Pet souls", or a click
+  on a notice) lists every pet on your server with its level, its souls toward the next level, the souls still needed
+  for level 3 and the souls you picked up this session. The game sends every pet's count when you log in with the meter
+  running, and the meter counts each soul after that; counts are kept per server, as the game keeps them. Not yet
+  checked in the game.
 - **Boss timers**: "Open aion2timers.com" in the Field bosses window opens [aion2timers.com](https://www.aion2timers.com/world-boss-timer/)'s
   world-boss timers in a small window of their own, in or out of game. The site remembers your server and faction
   there; links to other sites open in your browser (one every few seconds at most; a site link that redirects
@@ -155,6 +161,7 @@ opacity, a background picture, class colours, hidden names and a show/hide hotke
 | World-event and field-boss alerts | Yes | No |
 | Odyle energy and Shugo Festival keys beside the ping | Yes | No |
 | Every character's Odyle energy and entries at a glance | Yes | No |
+| Pet souls: each pet's level and souls, a notice per soul | Yes | No |
 | Pauses itself in the Abyss | Yes | No |
 | Ignores other players' training-dummy fights | Yes | No |
 | Demo mode with made-up fights | Yes | No |

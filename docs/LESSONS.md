@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The log said how many pets the player has** (Codex P1 and the deep audit on #76, fixed before merge).
+- What: the pet tap logged each login's collection as "read (N pets with a level, M with soul points)". How many pets a player owns is their progress, which AGENTS.md says is never logged; the log is kept 14 days and is what players attach to a report. SECURITY.md, ARCHITECTURE.md and HANDOFF.md described the line as intended.
+- Why: the rule was applied to the values in the records (no pet's level or souls, no ids) and not to a count of them, which read as a harmless diagnostic, as "the list read (N counts)" lines elsewhere do; the test looked for a pet id and one value, so any number else passed.
+- Guard: the line is "The pet collection was read." and `PetRecordsTests.ARecordThatDoesNotReadIsLoggedOnceUntilOneReads` allows no digit in any pet line but the opcode's bytes. Before logging anything about the player's own records, ask whether the number would tell someone how far along they are; a count of their things is.
+
 **A portable copy rebuilt in a folder labelled Low would not start, and said nothing** (Harry, 2026-11-07: "the dps meter … wont start up now", after their copy was rebuilt).
 - What: the folder that holds the player's repositories had been given a Low integrity label by a sandbox (its ACL entries name Codex's sandbox group), and every file made below it inherits that label. Windows starts a program at the lower of the user's level and its file's label, so the rebuilt `ScarletMeter.exe` started at Low. A Low program cannot write to the user's temp folder, where a single-file build unpacks its native libraries the first time it starts, so the .NET launcher exited before any of the meter's code ran: no window, no log line, no crash or Defender event. The previous build had kept starting because its libraries were unpacked days before, at Medium. A copied `whoami.exe` reported Low from inside the folder and Medium from System32. Windows' prompt each time the meter started, which Harry had asked about since about a week before, also stopped once the copy's folder had a Medium label.
 - Why: `Publish-Portable.ps1` checked the build's layout, not whether Windows would let it start, and the copy was not launched after the rebuild because the player was in game. A label shows neither in Explorer nor in the build's output, and the meter cannot report a failure that happens before its code runs.
@@ -295,6 +300,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - Guard: `SettingsTests.AFileSavedWithAByteOrderMarkLoads`. Seed test files the way people actually write them.
 
 ## In the process
+
+**A total added up by hand went into a comment and into the test of the code it described** (2026-11-08, the pet souls; caught by that test before commit).
+- What: `PetRules.ToMax`'s comment said a pet needs 155 souls from nothing to level 3, and its test expected 155; the costs are 5, 25 and 75, so 105, which the code returned. The test failed, and the comment was the one wrong.
+- Why: the sum was made once, in the head, and copied into both; a test written from the same belief as the comment confirms the comment, not the rule.
+- Guard: `PetRulesTests.EachLevelHasItsCost` pins `Needed` as the game's three costs and the totals worked from them; the docs give the costs beside the total (ARCHITECTURE.md, "Pet souls"). Write a test's expected numbers from the source's figures, not from the comment being tested.
+
+**A guard against a late record was tested only at its edge** (2026-11-08, the pet souls; caught by the fail-first run before commit).
+- What: `PetRules` ignores a level-up for a level the pet already has, so a late one never takes a pet back down. Its test sent one for the pet's own level, where the rule's arithmetic changes nothing anyway, so removing the guard left every test green; a level-up for a level below the pet's would have lowered it.
+- Why: the case was written as "already reached" and tested at equality, the one value where the guarded and unguarded paths agree.
+- Guard: `ALevelUpTakesItsCostUnlessTheSoulsGotThereFirst` also sends a level-up for level 2 to a pet at level 3 and checks it stays (it failed with the guard removed). For a "never go back" rule, test a value past the edge, not only at it.
 
 **A queued save was decided against settings the queue had not reached yet** (Codex P2 on #75's review fixes, fixed before merge).
 - What: the fix that posts the character's server to the UI thread kept a check before posting: no save when the settings already hold that server. With the settings on A, the game naming B and then A before the UI thread ran the saves queued B's save and dropped A's (the settings still said A), so B landed last and stayed, and later namings of A changed nothing (the service had already noted A).

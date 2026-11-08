@@ -4,6 +4,7 @@ using AionDpsMeter.Services.PacketProcessing.Routing;
 using K4os.Compression.LZ4;
 using ScarletMeter.Engine.Abyss;
 using ScarletMeter.Engine.Maps;
+using ScarletMeter.Engine.Pets;
 
 namespace ScarletMeter.Tests;
 
@@ -102,6 +103,64 @@ internal static class SyntheticRecords
         BinaryPrimitives.WriteInt32LittleEndian(body.AsSpan(2), mapId);
         body[6] = (byte)(count ?? entries.Length);
         return Frame(FieldBossMapRecords.Opcode, Convert.ToHexString([.. body, .. entries.SelectMany(entry => entry), .. trailing ?? []]));
+    }
+
+    // The pet collection (00 90) in A2Tools' documented shape (pet-souls' manifest.json): four made-up bytes; the levels, a
+    // varint count then each pet's id, four bytes (the id again, as in A2Tools' decoder test), its level; the points, a varint
+    // count then each pet's id and points; then any trailing bytes. levelCount overrides the levels' count.
+    public static byte[] PetCollection((int Pet, int Level)[] levels, (int Pet, int Points)[] points, byte[]? trailing = null, uint? levelCount = null)
+    {
+        var body = new List<byte> { 0x31, 0x02, 0x00, 0x00 };
+        AddVarInt(body, levelCount ?? (uint)levels.Length);
+        foreach (var (pet, level) in levels)
+        {
+            AddU32(body, (uint)pet);
+            AddU32(body, (uint)pet);
+            AddU32(body, (uint)level);
+        }
+        AddVarInt(body, (uint)points.Length);
+        foreach (var (pet, value) in points)
+        {
+            AddU32(body, (uint)pet);
+            AddU32(body, (uint)value);
+        }
+        return Frame(PetRecords.CollectionOpcode, Convert.ToHexString([.. body, .. trailing ?? []]));
+    }
+
+    // Souls picked up (0D 90) in A2Tools' documented shape: a one-byte count, then each pet's id and souls (u32). count
+    // overrides the count; the values are written as given, so a test can send any u32.
+    public static byte[] PetSouls((uint Pet, uint Souls)[] souls, byte? count = null)
+    {
+        var body = new List<byte> { count ?? (byte)souls.Length };
+        foreach (var (pet, amount) in souls)
+        {
+            AddU32(body, pet);
+            AddU32(body, amount);
+        }
+        return Frame(PetRecords.SoulsOpcode, Convert.ToHexString([.. body]));
+    }
+
+    // A level reached (14 90) or a pet unlocked (09 90) in A2Tools' documented shape: two made-up bytes, the pet's id, its level.
+    public static byte[] PetLevel(ushort opcode, uint pet, uint level)
+    {
+        var body = new List<byte> { 0x07, 0x01 };
+        AddU32(body, pet);
+        AddU32(body, level);
+        return Frame(opcode, Convert.ToHexString([.. body]));
+    }
+
+    private static void AddU32(List<byte> bytes, uint value)
+    {
+        var buffer = new byte[4];
+        BinaryPrimitives.WriteUInt32LittleEndian(buffer, value);
+        bytes.AddRange(buffer);
+    }
+
+    // A little-endian base-128 varint, as the game writes a list's count.
+    private static void AddVarInt(List<byte> bytes, uint value)
+    {
+        for (; value >= 0x80; value >>= 7) bytes.Add((byte)(value & 0x7F | 0x80));
+        bytes.Add((byte)value);
     }
 
     // An artifact war in A2Tools' documented shape: a made-up byte, the event id, two made-up bytes, the holding's start

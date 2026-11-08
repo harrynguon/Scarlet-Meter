@@ -7,6 +7,7 @@ using ScarletMeter.App.Alerts;
 using ScarletMeter.App.Combat;
 using ScarletMeter.App.FieldBosses;
 using ScarletMeter.App.Formatting;
+using ScarletMeter.App.Pets;
 using ScarletMeter.App.Roster;
 using ScarletMeter.App.Settings;
 using ScarletMeter.App.Updates;
@@ -94,6 +95,10 @@ public partial class MeterPage : IAsyncDisposable
     // The chosen field bosses' notices in the event row; their countdowns tick with the refresh loop's renders.
     [Inject]
     private FieldBossService FieldBosses { get; set; } = default!;
+
+    // The soul notices in the event row, for a few seconds after a soul; they come and go with the refresh loop's renders.
+    [Inject]
+    private PetService Pets { get; set; } = default!;
 
     // Reads the panel's height after each render (js/overlay-size.js).
     [Inject]
