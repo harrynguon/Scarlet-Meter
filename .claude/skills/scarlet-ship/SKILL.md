@@ -31,7 +31,7 @@ Update the docs the change touches (ARCHITECTURE for structure, DEVELOPMENT for 
 
 ## 4. Pull request
 
-Commit (message ends with the Co-Authored-By line the session's attribution asks for), push, and `gh pr create -R harrynguon/Scarlet-Meter --base main --head <branch>` with a body listing the checks actually run and ending with the session's PR attribution line.
+Commit (message ends with the Co-Authored-By line the session's attribution asks for), push, and `gh pr create -R harrynguon/Scarlet-Meter --base main --head <branch> --draft` with a body listing the checks actually run and ending with the session's PR attribution line. A change a player would notice then gets its CHANGELOG line (or its edit of an unreleased one) with the new PR's link and the WORKLOG heading its number, pushed, and only then `gh pr ready <number> -R harrynguon/Scarlet-Meter`: Codex reviews a PR when it is opened for review or marked ready, so opened ready it reviewed a commit without the line and flagged it on #76 and #77 (LESSONS).
 
 - Write multi-line messages with `git commit -F -` and a quoted heredoc from Bash. Windows PowerShell 5.1 splits a native argument at embedded double quotes, so `-m` with a here-string that holds `"` commits nothing.
 - A PR that needs another open PR's code is stacked: `--base <that branch>`, so its diff shows only its own change. When the base PR merges, GitHub deletes its branch (the repository deletes head branches on merge) and retargets this one to `main`; then bring it onto `main` (`git rebase --onto origin/main <old base> <branch>`, since a squash merge shares no commits with the old base), rerun the checks and let CI pass before merging.

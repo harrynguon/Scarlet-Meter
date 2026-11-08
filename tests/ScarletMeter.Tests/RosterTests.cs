@@ -552,14 +552,16 @@ public sealed class RosterTests : IDisposable
         Assert.Equal([alpha], store.Load(Monday).File.Characters);
     }
 
-    // The server the field-boss timers start on when none is saved: the character seen last among those whose server has a
-    // side; none when none has.
+    // The server the field-boss timers start on when none is saved: the character seen last among those whose server id the
+    // timers take; a later one with an id they would refuse (a side but no such region) does not hide an earlier one's (the
+    // audit on #77); none when none has.
     [Fact]
     public void TheLastPlayedServerIsTheLatestCharactersWithASide()
     {
         RosterCharacter Seen(int server, int hours) => new() { Name = $"C{server}{hours}", Server = "S", ServerId = server, LastSeen = Monday.AddHours(hours) };
         Assert.Equal(2012, RosterRules.LastPlayedServer([Seen(1502, 1), Seen(2012, 3), Seen(1502, 2)]));
         Assert.Equal(1502, RosterRules.LastPlayedServer([Seen(1502, 1), Seen(0, 5), Seen(3001, 6)]));
+        Assert.Equal(1502, RosterRules.LastPlayedServer([Seen(1502, 1), Seen(1600, 7), Seen(2000, 8)]));
         Assert.Null(RosterRules.LastPlayedServer([Seen(0, 1)]));
         Assert.Null(RosterRules.LastPlayedServer([]));
     }

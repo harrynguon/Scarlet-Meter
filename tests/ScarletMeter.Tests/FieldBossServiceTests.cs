@@ -128,6 +128,49 @@ public sealed class FieldBossServiceTests : IDisposable
             FieldBossText.MapLine(new FieldBossView(Server, new Dictionary<int, FieldBossTimer>(), FieldBossFeedState.None, null), Start));
     }
 
+    // A held reading past HoldFor is no longer said to wait: the next naming would drop it, so a zone change would bring
+    // nothing (the audit on #77: the window said to change zone after fifteen minutes).
+    [Fact]
+    public void AReadingHeldTooLongIsNoLongerSaidToWait()
+    {
+        using var settings = NewSettings(f => f with { ServerId = Server });
+        using var service = NewService(settings);
+        service.Start();
+        service.TakeMap(Map(Start, new FieldBossOnMap(Gartua, false, Start.AddMinutes(90))));
+        clock.Advance(FieldBossService.HoldFor);
+        Assert.Equal(Start, service.View(clock.GetUtcNow()).MapHeldAt);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        var view = service.View(clock.GetUtcNow());
+        Assert.Null(view.MapHeldAt);
+        Assert.Equal("not read this run: open the world map (M) in the game to read it", FieldBossText.MapLine(view, clock.GetUtcNow()));
+    }
+
+    // The not-kept note comes back once a reading is kept, also one kept after a hold; the held note once for each hold.
+    [Fact]
+    public void TheNotesComeBackAfterAReadingIsKept()
+    {
+        using var settings = NewSettings(f => f with { ServerId = Server });
+        var log = new RecordingLogger<FieldBossService>();
+        using var service = NewService(settings, log: log);
+        service.Start();
+        int Notes(string text) => log.Entries.Count(entry => entry.Message.Contains(text, StringComparison.Ordinal));
+
+        engine.Character = Character(0);
+        service.TakeMap(Map(clock.GetUtcNow()));
+        engine.Character = null;
+        service.TakeMap(Map(clock.GetUtcNow()));
+        service.TakeProgress(Progress(Server));
+        engine.Character = Character(0);
+        service.TakeMap(Map(clock.GetUtcNow()));
+        Assert.Equal(2, Notes("not known; not kept"));
+
+        engine.Character = null;
+        service.TakeMap(Map(clock.GetUtcNow()));
+        service.TakeConnectionStarted();
+        service.TakeMap(Map(clock.GetUtcNow()));
+        Assert.Equal(3, Notes("held until the game names them"));
+    }
+
     // The settings change for the character's server is made off the capture thread; wait for it.
     private static void WaitForServer(SettingsService settings, int? server) =>
         Assert.True(SpinWait.SpinUntil(() => settings.Current.FieldBosses.ServerId == server, TimeSpan.FromSeconds(5)), $"the server never became {server}");

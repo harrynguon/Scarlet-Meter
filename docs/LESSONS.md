@@ -306,6 +306,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**Codex reviewed each PR before its changelog line was in** (Codex P1 on #76 and on #77, both fixed before merge).
+- What: the changelog line needs its PR's link, so it was added in the commit after the PR was opened; Codex reviews a PR as it is opened and reviewed the first commit, so both times its P1 was the missing (or unedited) line, already on its way.
+- Why: the ship skill's order (open, then add the line) met Codex's trigger (a review when a PR is opened for review) and nobody put the two side by side; the second time, the line was also left unedited on purpose until the number came.
+- Guard: the scarlet-ship skill opens the PR as a draft, adds the line with its link, and marks it ready (`gh pr ready`), which is when Codex reviews it. When a reviewer runs on a trigger, make the change whole before the trigger.
+
 **A total added up by hand went into a comment and into the test of the code it described** (2026-11-08, the pet souls; caught by that test before commit).
 - What: `PetRules.ToMax`'s comment said a pet needs 155 souls from nothing to level 3, and its test expected 155; the costs are 5, 25 and 75, so 105, which the code returned. The test failed, and the comment was the one wrong.
 - Why: the sum was made once, in the head, and copied into both; a test written from the same belief as the comment confirms the comment, not the rule.

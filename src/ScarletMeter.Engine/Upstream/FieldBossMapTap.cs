@@ -16,19 +16,22 @@ namespace ScarletMeter.Engine.Upstream;
 /// Runs on the capture thread, inside upstream's PacketAccumulator callback (see <see cref="RecordTap"/>, which contains
 /// anything that escapes). The log says which map was read and how many bosses it listed, never their times. The game
 /// sends the list every few seconds while the map is open (Harry's log, 2026-11-08: a line every three seconds), so a line
-/// is written when it says something new, or <see cref="LogEvery"/> after the same one. A subscriber's failure is logged
-/// each time, so the rest of a bundle is still read.
+/// is written the first time it is said, and again only <see cref="LogEvery"/> after it last was, whatever came between (two
+/// lines taking turns stay quiet too: the audit on #77). A subscriber's failure is logged each time, so the rest of a bundle
+/// is still read.
 /// </remarks>
 internal sealed class FieldBossMapTap : IRecordReader
 {
-    /// <summary>How long the same line waits before it is written again.</summary>
+    /// <summary>How long a line waits before it is written again.</summary>
     public static readonly TimeSpan LogEvery = TimeSpan.FromMinutes(10);
+
+    // The most lines remembered; past it they are forgotten and written afresh (there are a few maps and counts).
+    private const int MaxNotes = 64;
 
     private readonly TimeProvider clock;
     private readonly ILogger<FieldBossMapTap> logger;
-    // The last line written and when. Touched only on the reading thread.
-    private string? lastNote;
-    private DateTimeOffset lastNoteAt;
+    // Each line written, by its key, and when. Touched only on the reading thread.
+    private readonly Dictionary<string, DateTimeOffset> written = new(StringComparer.Ordinal);
 
     public FieldBossMapTap(TimeProvider clock, ILogger<FieldBossMapTap> logger)
     {
@@ -86,12 +89,12 @@ internal sealed class FieldBossMapTap : IRecordReader
         }
     }
 
-    // Whether a line, by its key, says something new: another line, or the same one LogEvery after it was last written.
+    // Whether a line, by its key, is to be written: never written, or last written LogEvery ago or more.
     private bool IsNew(string key, DateTimeOffset now)
     {
-        if (key == lastNote && now - lastNoteAt < LogEvery) return false;
-        lastNote = key;
-        lastNoteAt = now;
+        if (written.TryGetValue(key, out var at) && now - at < LogEvery) return false;
+        if (written.Count >= MaxNotes) written.Clear();
+        written[key] = now;
         return true;
     }
 }

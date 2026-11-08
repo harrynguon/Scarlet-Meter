@@ -143,7 +143,9 @@ public sealed class FieldBossService : IDisposable
                 if (mapReadAt.TryGetValue(id, out var at)) mapAt = at;
             }
             var shown = feedState.ServerId == server ? feedState : feedState with { ServerId = server, Timers = [], ReadAt = null, Problem = null };
-            return new FieldBossView(server, FieldBossBoard.Merge(observations, now), shown, mapAt, held?.At);
+            // A held reading past HoldFor is no longer waiting: the next naming drops it (the audit on #77), so it is not said.
+            var heldAt = held is { At: var at2 } && now - at2 <= HoldFor ? at2 : (DateTimeOffset?)null;
+            return new FieldBossView(server, FieldBossBoard.Merge(observations, now), shown, mapAt, heldAt);
         }
     }
 
@@ -193,12 +195,11 @@ public sealed class FieldBossService : IDisposable
         lock (gate)
         {
             if (disposed) return;
-            // The game sends the list every few seconds while the map is open, so each note is written once until a reading is
-            // kept (Harry's log, 2026-11-08: two lines every three seconds).
+            // The game sends the list every few seconds while the map is open, so the not-kept note is written once until a
+            // reading is kept (Apply), and the held one once for each hold (Harry's log, 2026-11-08: two lines every three seconds).
             if (who is { ServerId: > 0 } named)
             {
                 Apply(named.ServerId, map);
-                unplacedLogged = false;
             }
             else if (who is not null)
             {
@@ -268,9 +269,10 @@ public sealed class FieldBossService : IDisposable
     }
 
     // Under the gate: a map's bosses as observations on a server, each replacing that boss's older one. Bosses the catalog does
-    // not place on this map are left out.
+    // not place on this map are left out. A reading kept, directly or after a hold, lets the not-kept note be written again.
     private void Apply(int serverId, FieldBossMap map)
     {
+        unplacedLogged = false;
         if (!mapTimers.TryGetValue(serverId, out var bosses)) mapTimers[serverId] = bosses = [];
         foreach (var boss in map.Bosses)
         {

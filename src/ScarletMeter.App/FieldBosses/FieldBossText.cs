@@ -48,13 +48,13 @@ public static class FieldBossText
     }
 
     /// <summary>
-    /// The window's "Your map" line: when the map was last read on the server shown, or that a newer reading waits for the game
-    /// to name the character (a meter started mid-session: Harry, 2026-11-08, read "not read this run" after opening the
-    /// map), or how to read it.
+    /// The window's "Your map" line: that a reading waits for the game to name the character (a meter started mid-session:
+    /// Harry, 2026-11-08, read "not read this run" after opening the map), else when the map was last read on the server
+    /// shown, or how to read it. A held reading is always the newest: the naming that keeps a reading ends the hold.
     /// </summary>
     public static string MapLine(FieldBossView view, DateTimeOffset now)
     {
-        if (view.MapHeldAt is { } held && (view.MapReadAt is not { } kept || held > kept))
+        if (view.MapHeldAt is { } held)
             return $"read {Ago(now - held)}, waiting for the game to name your character: change zone or teleport once";
         return view.MapReadAt is { } read ? $"read {Ago(now - read)}" : "not read this run: open the world map (M) in the game to read it";
     }
