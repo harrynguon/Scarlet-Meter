@@ -73,7 +73,9 @@ public static class NotMeterFieldBossFeed
     /// list the server yet), or false with a one-sentence reason when the file is not NotMeter's global field-boss file or
     /// does not read. Entries for a boss the catalog does not know, on another map than its own, or with an observation or a
     /// time outside the bounds (<see cref="MaxPast"/>, <see cref="MaxAhead"/>, <see cref="MaxObservedAhead"/>) are left
-    /// out; of two for the same boss, the newer stands.
+    /// out; of two for the same boss, the newer stands. An observation dated after the file was generated
+    /// (<c>generatedAt</c>, NotMeter's own clock) or after <paramref name="now"/> is taken as made then, so a reporter's
+    /// fast clock cannot make it outrank the player's own map read since.
     /// </summary>
     public static bool TryRead(ReadOnlyMemory<byte> utf8Json, int serverId, DateTimeOffset now, out IReadOnlyList<FieldBossTimer> timers, out string? problem)
     {
@@ -93,8 +95,8 @@ public static class NotMeterFieldBossFeed
         {
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object
-                || String(root, "schema") != Schema
-                || String(root, "serviceRegion") != "WW"
+                || !StringIs(root, "schema", Schema)
+                || !StringIs(root, "serviceRegion", "WW")
                 || !root.TryGetProperty("servers", out var servers) || servers.ValueKind != JsonValueKind.Array)
             {
                 problem = "The shared timers file is not NotMeter's global field boss file.";
@@ -105,6 +107,12 @@ public static class NotMeterFieldBossFeed
                 problem = "The shared timers file lists more servers than expected.";
                 return false;
             }
+            // No observation is later than the file that lists it (NotMeter's own clock, generatedAt, Unix seconds), nor than
+            // now: an entry dated ahead (its reporter's clock was fast) is taken as made then, fixed here once, so it can never
+            // outrank the player's own map read since (Codex and the deep audit on #75: capped at each merge's now instead,
+            // it kept moving ahead of any earlier map reading).
+            var latest = now;
+            if (Seconds(root, "generatedAt") is { } generated && generated < latest && generated > now - MaxPast) latest = generated;
             var found = new Dictionary<int, FieldBossTimer>();
             foreach (var server in servers.EnumerateArray())
             {
@@ -116,7 +124,7 @@ public static class NotMeterFieldBossFeed
                     if (!map.TryGetProperty("entries", out var entries) || entries.ValueKind != JsonValueKind.Array || entries.GetArrayLength() > MaxEntries) continue;
                     foreach (var entry in entries.EnumerateArray())
                     {
-                        if (Entry(entry, mapId, now) is { } timer
+                        if (Entry(entry, mapId, now, latest) is { } timer
                             && (!found.TryGetValue(timer.BossId, out var held) || timer.ObservedAt > held.ObservedAt))
                             found[timer.BossId] = timer;
                     }
@@ -127,20 +135,48 @@ public static class NotMeterFieldBossFeed
         }
     }
 
-    // One entry as an observation, or null when it names no boss of this map or a time is out of bounds.
-    private static FieldBossTimer? Entry(JsonElement entry, int mapId, DateTimeOffset now)
+    // One entry as an observation, or null when it names no boss of this map or a time is out of bounds. Its observation time
+    // is capped at `latest` (the file's generation, or now).
+    private static FieldBossTimer? Entry(JsonElement entry, int mapId, DateTimeOffset now, DateTimeOffset latest)
     {
         if (entry.ValueKind != JsonValueKind.Object) return null;
         if (Int(entry, "bossCode") is not { } code || FieldBossCatalog.FindByNpcCode(code) is not { } boss || boss.MapId != mapId) return null;
-        if (Instant(entry, "observedAtMs") is not { } observed || observed < now - MaxPast || observed > now + MaxObservedAhead) return null;
+        if (Instant(entry, "observedAtMs") is not { } stated || stated < now - MaxPast || stated > now + MaxObservedAhead) return null;
+        var observed = stated > latest ? latest : stated;
         var up = entry.TryGetProperty("spawned", out var spawned) && spawned.ValueKind == JsonValueKind.True;
         if (up) return new FieldBossTimer(boss.Id, true, null, observed, FieldBossSource.NotMeter);
         DateTimeOffset? back = Instant(entry, "targetAt") is { } target && target >= now - MaxPast && target <= now + MaxAhead ? target : null;
         return new FieldBossTimer(boss.Id, false, back, observed, FieldBossSource.NotMeter);
     }
 
-    private static string? String(JsonElement element, string name) =>
-        element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+    // Whether a string property is exactly `expected`. A string that is not valid UTF-16 (a lone surrogate escape), which
+    // GetString and ValueEquals both throw on, is simply not equal (deep audit on #75).
+    private static bool StringIs(JsonElement element, string name, string expected)
+    {
+        if (!element.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.String) return false;
+        try
+        {
+            return value.ValueEquals(expected);
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    // A Unix time in whole seconds, or null when absent, not a whole number, 0 or out of DateTimeOffset's range.
+    private static DateTimeOffset? Seconds(JsonElement element, string name)
+    {
+        if (!element.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Number || !value.TryGetInt64(out var seconds) || seconds <= 0) return null;
+        try
+        {
+            return DateTimeOffset.FromUnixTimeSeconds(seconds);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return null;
+        }
+    }
 
     private static int? Int(JsonElement element, string name) =>
         element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number) ? number : null;

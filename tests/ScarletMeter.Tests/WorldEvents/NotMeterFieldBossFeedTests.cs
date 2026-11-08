@@ -17,14 +17,14 @@ public sealed class NotMeterFieldBossFeedTests
     private const long Minute = 60_000;
 
     // A file in NotMeter's published shape, one server with the given maps of entries (each an anonymous object).
-    private static byte[] File(int serverId, object[] maps, string schema = NotMeterFieldBossFeed.Schema, string serviceRegion = "WW", int extraServers = 0) =>
+    private static byte[] File(int serverId, object[] maps, string schema = NotMeterFieldBossFeed.Schema, string serviceRegion = "WW", int extraServers = 0, long? generatedAt = null) =>
         Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
             schema,
             version = 1,
             serviceRegion,
             globalRegion = "as",
-            generatedAt = NowMs / 1000,
+            generatedAt = generatedAt ?? NowMs / 1000,
             servers = new object[] { new { serverId, maps } }
                 .Concat(Enumerable.Range(0, extraServers).Select(n => (object)new { serverId = 9000 + n, maps = Array.Empty<object>() })).ToArray(),
         }));
@@ -87,6 +87,46 @@ public sealed class NotMeterFieldBossFeedTests
         var farAhead = Assert.Single(Read(File(1503, [Map(1010, DeadEntry(2101074, NowMs + 9L * 24 * 60 * Minute, NowMs))])));
         Assert.Null(farAhead.Time);
         Assert.Null(Assert.Single(Read(File(1503, [Map(1010, DeadEntry(2101074, 0, NowMs))]))).Time);
+    }
+
+    // A reporter whose clock ran fast dates its entry ahead: it is taken as made when the file was generated (NotMeter's own
+    // clock), or now when that is later, so the player's own map read after the file still wins, at every merge after it
+    // (Codex and the deep audit on #75: capped at each merge's now instead, it kept outranking an earlier map reading).
+    [Fact]
+    public void AnEntryDatedAheadIsTakenAsMadeWhenTheFileWasGenerated()
+    {
+        var generated = Now.AddMinutes(-3);
+        var shared = Assert.Single(Read(File(1503, [Map(1010, UpEntry(2101074, NowMs + 20 * Minute))], generatedAt: generated.ToUnixTimeSeconds())));
+        Assert.Equal(generated, shared.ObservedAt);
+
+        var own = new FieldBossTimer(101021, false, Now.AddMinutes(30), Now.AddMinutes(-1), FieldBossSource.Map);
+        foreach (var later in new[] { Now, Now.AddSeconds(1), Now.AddMinutes(30) })
+        {
+            Assert.Same(own, FieldBossBoard.Merge([shared, own], later)[101021]);
+            Assert.Same(own, FieldBossBoard.Merge([own, shared], later)[101021]);
+        }
+        // An Up notice runs from that time, not from the fast clock's.
+        Assert.Empty(FieldBossAlertPlanner.Plan(FieldBossBoard.Merge([shared], Now.AddMinutes(13)), new HashSet<int> { 101021 }, Now.AddMinutes(13), TimeSpan.FromMinutes(10)).Alerts);
+
+        // Without a usable generation time, the cap is now; one older than the bounds is not used.
+        Assert.Equal(Now, Assert.Single(Read(File(1503, [Map(1010, UpEntry(2101074, NowMs + 20 * Minute))], generatedAt: 0))).ObservedAt);
+        Assert.Equal(Now, Assert.Single(Read(File(1503, [Map(1010, UpEntry(2101074, NowMs + 20 * Minute))], generatedAt: Now.AddDays(-15).ToUnixTimeSeconds()))).ObservedAt);
+        // An entry dated before the file keeps its own time.
+        Assert.Equal(Now.AddMinutes(-5), Assert.Single(Read(File(1503, [Map(1010, UpEntry(2101074, NowMs - 5 * Minute))], generatedAt: generated.ToUnixTimeSeconds()))).ObservedAt);
+    }
+
+    // Text that is not valid UTF-16 or UTF-8 where the schema or region goes is simply not NotMeter's file: no exception
+    // (deep audit on #75: GetString threw).
+    [Fact]
+    public void BrokenTextInTheSchemaIsNotNotMetersFile()
+    {
+        var loneSurrogate = Encoding.UTF8.GetBytes("""{ "schema": "\ud800", "serviceRegion": "WW", "servers": [] }""");
+        Assert.False(NotMeterFieldBossFeed.TryRead(loneSurrogate, 1503, Now, out _, out var problem));
+        Assert.NotNull(problem);
+        var regionSurrogate = Encoding.UTF8.GetBytes("{ \"schema\": \"" + NotMeterFieldBossFeed.Schema + "\", \"serviceRegion\": \"\\udfff\", \"servers\": [] }");
+        Assert.False(NotMeterFieldBossFeed.TryRead(regionSurrogate, 1503, Now, out _, out _));
+        byte[] badUtf8 = [.. Encoding.UTF8.GetBytes("{ \"schema\": \""), 0xC3, 0x28, .. Encoding.UTF8.GetBytes("\", \"serviceRegion\": \"WW\", \"servers\": [] }")];
+        Assert.False(NotMeterFieldBossFeed.TryRead(badUtf8, 1503, Now, out _, out _));
     }
 
     // Two entries for one boss: the newer observation stands.

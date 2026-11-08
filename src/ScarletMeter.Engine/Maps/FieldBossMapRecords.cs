@@ -46,9 +46,11 @@ internal static class FieldBossMapRecords
     private const int PositionBytes = 12;
 
     /// <summary>
-    /// The map in one record, or null when it is another kind, or does not read cleanly: a count of 0 or past 200, an up
-    /// byte other than 0 or 1, an id that is not a varint or past <see cref="int.MaxValue"/>, or an entry whose time is
-    /// neither 0 nor within <see cref="MaxPast"/> and <see cref="MaxAhead"/> of <paramref name="now"/> at either place.
+    /// The map in one record, or null when it is another kind, or does not read cleanly: a map id of 0 or past
+    /// <see cref="int.MaxValue"/>, a count of 0 or past 200, an up byte other than 0 or 1, a boss id that is not a varint or
+    /// past <see cref="int.MaxValue"/>, or an entry whose time is neither 0 nor within <see cref="MaxPast"/> and
+    /// <see cref="MaxAhead"/> of <paramref name="now"/> at either place. The two id bounds are Scarlet's: A2Tools takes any
+    /// map id and any boss id that fits a u32; no id it documents comes near either.
     /// </summary>
     public static FieldBossMapRecord? Read(ReadOnlySpan<byte> record, DateTimeOffset now)
     {

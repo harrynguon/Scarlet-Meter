@@ -212,7 +212,106 @@ public sealed class FieldBossServiceTests : IDisposable
         Assert.Empty(service.Plan(Start).Alerts);
     }
 
+    // Turned off, the shared timers' last read is no longer shown or used for a notice; back on, it is read again (deep
+    // audit on #75: the requests stopped but the last read stayed).
+    [Fact]
+    public void TurningTheSharedTimersOffDropsWhatTheyGave()
+    {
+        var feed = new FakeFeed(respawn: Start.AddMinutes(8));
+        using var settings = NewSettings(f => f with { ServerId = Server, Bosses = [Gartua] });
+        using var service = NewService(settings, feed);
+        service.Start();
+        Assert.True(SpinWait.SpinUntil(() => service.Plan(Start).Alerts.Count == 1, TimeSpan.FromSeconds(5)));
+
+        settings.Update(s => s with { FieldBosses = s.FieldBosses with { SharedTimers = false } });
+        Assert.Empty(service.View(Start).Board);
+        Assert.Empty(service.Plan(Start).Alerts);
+
+        settings.Update(s => s with { FieldBosses = s.FieldBosses with { SharedTimers = true } });
+        Assert.Single(service.Plan(Start).Alerts);
+    }
+
+    // A read for the server before a change that comes back after the new server's read is not taken: the timers stay the
+    // new server's, and the new read's place is kept (deep audit on #75: no test held a read back).
+    [Fact]
+    public void AReadForTheServerBeforeAChangeIsNotTaken()
+    {
+        var feed = new FakeFeed(respawn: Start.AddMinutes(90), holdFirst: true);
+        using var settings = NewSettings(f => f with { ServerId = Server });
+        using var service = NewService(settings, feed);
+        service.Start();
+        using var watch = service.Watch();
+        feed.WaitFor(1); // the Asia read, held
+
+        settings.Update(s => s with { FieldBosses = s.FieldBosses with { ServerId = 2205 } });
+        feed.WaitFor(2); // the NA West read, answered
+        Assert.True(SpinWait.SpinUntil(() => service.View(Start).Board.ContainsKey(101006), TimeSpan.FromSeconds(5)));
+
+        feed.ReleaseFirst();
+        Thread.Sleep(100);
+        var view = service.View(Start);
+        Assert.Equal(2205, view.Feed.ServerId);
+        Assert.Equal([101006], view.Board.Keys);
+        // Taken, the stale read (the client gives it up as cancelled at once) would have dropped the new read's place and
+        // asked again: two requests, never three.
+        Assert.Equal(2, feed.Requests.Count);
+        Assert.Equal(new Uri("https://raw.githubusercontent.com/Not4You-Dev/NotMeter-Cache/main/presence/notmeter-field-boss-public-ww-naw.json"), feed.Requests.Last().Uri);
+    }
+
+    // The server of the character the game named is saved on the thread Start ran on (the UI thread in the app), in order,
+    // never on the capture thread or the thread pool (deep audit on #75).
+    [Fact]
+    public void TheCharactersServerIsSavedOnTheThreadStartRanOn()
+    {
+        var posts = new QueuedContext();
+        using var settings = NewSettings();
+        using var service = NewService(settings);
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(posts);
+        try
+        {
+            service.Start();
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+
+        service.TakeProgress(Progress(Server));
+        service.TakeProgress(Progress(1505));
+        Assert.Null(settings.Current.FieldBosses.ServerId); // nothing yet: both are posted
+        Assert.Equal(2, posts.Count);
+        posts.RunAll();
+        Assert.Equal(1505, settings.Current.FieldBosses.ServerId); // in the order the game named them
+    }
+
     // ---------- The feed client ----------
+
+    // The production handler follows no redirect and keeps no cookie (SECURITY.md, "Network").
+    [Fact]
+    public void TheDefaultHandlerFollowsNoRedirectAndKeepsNoCookie()
+    {
+        using var handler = Assert.IsType<SocketsHttpHandler>(FieldBossFeedClient.CreateDefaultHandler());
+        Assert.False(handler.AllowAutoRedirect);
+        Assert.False(handler.UseCookies);
+    }
+
+    // A file that does not come within ten seconds is given up, with the reason.
+    [Fact]
+    public async Task AReadThatDoesNotAnswerInTenSecondsIsGivenUp()
+    {
+        var feed = new FakeFeed { Hang = true };
+        using var client = new FieldBossFeedClient(feed, clock, NullLogger<FieldBossFeedClient>.Instance);
+        var read = client.FetchAsync(Server, TestContext.Current.CancellationToken);
+        feed.WaitFor(1);
+        clock.Advance(FieldBossFeedClient.RequestTimeout - TimeSpan.FromSeconds(1));
+        Assert.False(read.IsCompleted);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        // Awaited with a real-time bound (a TimeoutException), so a timeout that does not fire fails the test rather than
+        // hanging the run, as it once hung a mutation run.
+        var result = await read.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal("The shared timers did not answer within 10 seconds.", result.Problem);
+    }
 
     // One GET of the region's file with a fixed User-Agent and nothing else about the player; the ETag the next time, and a
     // 304 read again from the last file.
@@ -253,21 +352,58 @@ public sealed class FieldBossServiceTests : IDisposable
         Assert.Equal(before, feed.Requests.Count);
     }
 
-    // A stand-in for raw.githubusercontent.com: records each request and answers with a made-up file in NotMeter's shape.
-    private sealed class FakeFeed(DateTimeOffset? respawn = null, DateTimeOffset? observed = null, string? etag = null) : HttpMessageHandler
+    // A synchronization context that queues what is posted until the test runs it, as a UI thread's dispatcher would.
+    private sealed class QueuedContext : SynchronizationContext
     {
+        private readonly Queue<(SendOrPostCallback Callback, object? State)> queue = new();
+
+        public int Count { get { lock (queue) return queue.Count; } }
+
+        public override void Post(SendOrPostCallback d, object? state)
+        {
+            lock (queue) queue.Enqueue((d, state));
+        }
+
+        public void RunAll()
+        {
+            while (true)
+            {
+                (SendOrPostCallback Callback, object? State) next;
+                lock (queue)
+                {
+                    if (queue.Count == 0) return;
+                    next = queue.Dequeue();
+                }
+                next.Callback(next.State);
+            }
+        }
+    }
+
+    // A stand-in for raw.githubusercontent.com: records each request and answers with a made-up file in NotMeter's shape,
+    // listing Gartua on Asia's 1503 and Bodyguard Teegant on NA West's 2205. It can hold its first answer until released
+    // (holdFirst), ignoring cancellation as a slow network may, or never answer until cancelled (Hang).
+    private sealed class FakeFeed(DateTimeOffset? respawn = null, DateTimeOffset? observed = null, string? etag = null, bool holdFirst = false) : HttpMessageHandler
+    {
+        private readonly TaskCompletionSource first = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public ConcurrentQueue<(Uri? Uri, Dictionary<string, string> Headers)> Requests { get; } = new();
 
         public HttpStatusCode Status { get; set; } = HttpStatusCode.OK;
 
         public int Padding { get; set; }
 
+        public bool Hang { get; set; }
+
         public void WaitFor(int count) =>
             Assert.True(SpinWait.SpinUntil(() => Requests.Count >= count, TimeSpan.FromSeconds(5)), $"fewer than {count} requests");
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        public void ReleaseFirst() => first.TrySetResult();
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Requests.Enqueue((request.RequestUri, request.Headers.ToDictionary(h => h.Key, h => string.Join(", ", h.Value))));
+            if (Hang) await Task.Delay(Timeout.Infinite, cancellationToken);
+            if (holdFirst && Requests.Count == 1) await first.Task;
             var response = new HttpResponseMessage(Status);
             if (Status == HttpStatusCode.OK)
             {
@@ -281,12 +417,16 @@ public sealed class FieldBossServiceTests : IDisposable
                     globalRegion = "as",
                     generatedAt = seen / 1000,
                     padding = new string('x', Padding),
-                    servers = new[] { new { serverId = Server, maps = new[] { new { mapId = 1010, observedAt = seen / 1000, entries = new[] { new { observedAtMs = seen, bossCode = 2101074, targetAt = back } } } } } },
+                    servers = new[]
+                    {
+                        new { serverId = Server, maps = new[] { new { mapId = 1010, observedAt = seen / 1000, entries = new[] { new { observedAtMs = seen, bossCode = 2101074, targetAt = back } } } } },
+                        new { serverId = 2205, maps = new[] { new { mapId = 1010, observedAt = seen / 1000, entries = new[] { new { observedAtMs = seen, bossCode = 2100079, targetAt = back } } } } },
+                    },
                 });
                 response.Content = new StringContent(file, Encoding.UTF8, "application/json");
                 if (etag is not null) response.Headers.ETag = new System.Net.Http.Headers.EntityTagHeaderValue(etag);
             }
-            return Task.FromResult(response);
+            return response;
         }
     }
 }

@@ -56,6 +56,9 @@ public sealed class FieldBossService : IDisposable
     private int fetchGeneration; // a read whose generation is no longer current is not taken (the server or the demand changed)
     private CancellationTokenSource? fetching;
     private ITimer? timer;
+    // The thread Start ran on (the UI thread in the app), where the server is saved, so the settings' subscribers run there
+    // in the order the game named the characters; null in tests without one, which then save on the thread pool.
+    private SynchronizationContext? settingsContext;
     private bool started;
     private bool disposed;
 
@@ -78,6 +81,7 @@ public sealed class FieldBossService : IDisposable
         {
             if (started || disposed) return;
             started = true;
+            settingsContext = SynchronizationContext.Current;
         }
         engine.FieldBossMapObserved += OnMap;
         engine.ProgressObserved += OnProgress;
@@ -86,10 +90,14 @@ public sealed class FieldBossService : IDisposable
         Reschedule();
     }
 
-    /// <summary>The timers of the settings' server at <paramref name="now"/>.</summary>
+    /// <summary>
+    /// The timers of the settings' server at <paramref name="now"/>: the player's map, and the shared timers' last read only
+    /// while "Read other players' shared timers" is on (deep audit on #75: turned off, the last read was still shown).
+    /// </summary>
     public FieldBossView View(DateTimeOffset now)
     {
-        var server = settings.Current.FieldBosses.ServerId;
+        var options = settings.Current.FieldBosses;
+        var server = options.ServerId;
         lock (gate)
         {
             IEnumerable<FieldBossTimer> observations = [];
@@ -97,7 +105,7 @@ public sealed class FieldBossService : IDisposable
             if (server is { } id)
             {
                 if (mapTimers.TryGetValue(id, out var own)) observations = own.Values;
-                if (feedState.ServerId == id) observations = observations.Concat(feedState.Timers);
+                if (options.SharedTimers && feedState.ServerId == id) observations = observations.Concat(feedState.Timers);
                 if (mapReadAt.TryGetValue(id, out var at)) mapAt = at;
             }
             var shown = feedState.ServerId == server ? feedState : feedState with { ServerId = server, Timers = [], ReadAt = null, Problem = null };
@@ -236,26 +244,38 @@ public sealed class FieldBossService : IDisposable
     }
 
     // The game named a character on a server: when that is another server than the last named this run, it becomes the timers'
-    // server (a server the player chose stays until then). The settings change is made off the capture thread.
+    // server (a server the player chose stays until then). The settings change is made off the capture thread, on the thread
+    // Start ran on (the UI thread), as every other settings change is: the settings' subscribers (the hotkey's among them)
+    // expect it there, and posts keep the order of quick switches (deep audit on #75: a thread-pool update could race one
+    // made on the UI thread and deliver the older settings last).
     private void NoteCharacterServer(int serverId)
     {
+        SynchronizationContext? context;
         lock (gate)
         {
             if (disposed || serverId == characterServer || !FieldBossSettings.IsServerId(serverId)) return;
             characterServer = serverId;
+            context = settingsContext;
         }
         if (settings.Current.FieldBosses.ServerId == serverId) return;
-        _ = Task.Run(() =>
+        if (context is not null) context.Post(_ => SaveServer(serverId), null);
+        else _ = Task.Run(() => SaveServer(serverId));
+    }
+
+    private void SaveServer(int serverId)
+    {
+        try
         {
-            try
+            lock (gate)
             {
-                settings.Update(s => s with { FieldBosses = s.FieldBosses with { ServerId = serverId } });
+                if (disposed) return;
             }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "The field boss timers' server could not be saved.");
-            }
-        });
+            settings.Update(s => s with { FieldBosses = s.FieldBosses with { ServerId = serverId } });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "The field boss timers' server could not be saved.");
+        }
     }
 
     // Starts a read of the shared timers when they are wanted and due, or sets the timer for the next one; cancels a read in
@@ -276,9 +296,10 @@ public sealed class FieldBossService : IDisposable
             {
                 if (fetching is not null)
                 {
+                    // The generation moves first, so a read that a cancellation completes at once is already stale.
+                    fetchGeneration++;
                     fetching.Cancel();
                     fetching = null;
-                    fetchGeneration++;
                     feedState = feedState with { Reading = false };
                 }
                 return;
@@ -291,10 +312,10 @@ public sealed class FieldBossService : IDisposable
                 timer = clock.CreateTimer(_ => Reschedule(), null, readAt + RefreshInterval - now, Timeout.InfiniteTimeSpan);
                 return;
             }
-            fetching?.Cancel();
+            generation = ++fetchGeneration; // first, as above
+            fetching?.Cancel(); // not disposed: its read may still be linking to its token (a source with no timer holds nothing)
             fetching = new CancellationTokenSource();
             token = fetching.Token;
-            generation = ++fetchGeneration;
             var keep = feedState.ServerId == server ? feedState.Timers : [];
             feedState = new FieldBossFeedState(server, keep, feedState.ServerId == server ? feedState.ReadAt : null, feedState.ServerId == server ? feedState.Problem : null, true);
         }

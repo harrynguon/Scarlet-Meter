@@ -296,6 +296,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**A mutation of a timeout hung the mutation run, and stopping it left the file mutated** (2026-11-08, the field-boss timers' review fixes).
+- What: under a mutation that doubled the feed client's ten-second timeout, its test advanced the fake clock ten seconds and then awaited the read, which never ended: the run hung past its ten minutes. Stopping the run killed the runner before its `finally` restored the file, so the mutation stayed in the worktree until `git status` showed it.
+- Why: the test awaited a result the code under test was supposed to produce, with no bound of its own, so a broken timeout was a hang, not a failure; and the runner's restore lived only in the process that was stopped.
+- Guard: the test awaits with a real-time bound (`WaitAsync`, five seconds), so the mutation fails it. After stopping any mutation run, check `git status` and restore the files from git before anything else. A test whose subject is a timeout or a wait must itself wait with a bound.
+
+**The guard against a reporter's fast clock held only at the instant of the map read** (Codex P2 and the deep audit on #75, fixed before merge).
+- What: `FieldBossBoard.Merge` counted a shared observation dated after now as made now, meaning to keep a NotMeter reporter's fast clock from outranking the player's own map. But now moves on every merge (the overlay merges ten times a second), so from the next merge on such an observation was newer than any map reading made before it, and it showed until its stated time passed: the auditor's run had a map read one second earlier lose, and an Up notice dated 23 hours ahead last 23 hours. The test passed because its map reading was taken at exactly the merge's now, and the earlier lesson below, about testing both orders, did not question the rule itself.
+- Why: the cap was put where the comparison happens, against a value that changes between comparisons, instead of where the observation is received; the test checked one instant.
+- Guard: the reader caps each entry's time once, at the file's `generatedAt` (NotMeter's clock) and at the moment it is read (`NotMeterFieldBossFeedTests.AnEntryDatedAheadIsTakenAsMadeWhenTheFileWasGenerated` merges a map read before it at now, a second and half an hour later, in both orders, and checks the Up notice's length); both mutations, removing either cap, fail it. When normalising a value that is compared later, fix it once against a value that does not move, and test at instants after the first.
+
 **A merge rule was tested with its two inputs in one order** (2026-11-08, the field-boss timers; caught by its fail-first run before commit).
 - What: `FieldBossBoard.Merge` counts an observation dated after now (another PC's clock ahead) as made now, so it cannot outrank the player's own map read a moment ago. The test merged the future-dated observation first and the player's map second; the merge compares the incoming observation's time against the held one's, so the rule decides only when the future-dated one comes second, and removing it passed.
 - Why: the test was written for the claim (the player's map wins) rather than for the comparison, which treats the held and the incoming observation differently.
