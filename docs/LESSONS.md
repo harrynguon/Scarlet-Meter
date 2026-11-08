@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The field-boss notices pushed the event icons onto two lines** (Harry, 2026-11-08, with a screenshot: "see how the row of icons turns into two rows now").
+- What: #75 put the chosen bosses' notices first in the event row, ahead of the icons. Each notice is a skull, a name and a time, about four icons wide, so two of them beside seven event icons left no room at the meter's width and the last icon wrapped onto a line of its own, under the notices.
+- Why: the notices were added to the existing row and tested for what each says and does, not for where it sits with the row full. The visual check was put off because the player was in game, and the only render listed in HANDOFF was for the pet notices, so no one saw the row with seven icons and two notices before the player did.
+- Guard: the notices have a row of their own under the icons, drawn only while one is due (`RazorMarkupTests.TheFieldBossNoticesHaveTheirOwnRowUnderTheEventIcons`: the icons' row closes before the bosses' row opens, and the detail lines come after both). When something joins a row of fixed-size items, work out the row's width with every item showing at the default meter width (400 px) before shipping, and give a wide item its own row rather than ahead of the others.
+
 **The field-boss timers showed nothing in a copy updated to them and started mid-session** (Harry, 2026-11-08: "no timer yet, even opened map in game").
 - What: the shared timers wait for a server, which was saved only when the game named a character; a copy updated to the timers had none, and with the meter started while already in the game the game names no character until a zone change. The player's own map read (the log: "map 1010, 24 bosses") but was held for that naming, and the window said "not read this run". The log also had two lines every three seconds: the game sends the list again every few seconds while the map is open.
 - Why: the server's source was designed for a login with the meter running, the case the tests start from; an update to an existing copy (a roster full of characters, no saved server) and a mid-session start were not walked through, and the window's line read only the kept readings. The record was tested one reading at a time, so its resending was never seen.

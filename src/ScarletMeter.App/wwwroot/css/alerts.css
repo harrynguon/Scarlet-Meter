@@ -1,8 +1,9 @@
 /* World events at the bottom of the overlay (Components/EventRow.razor), below the last DPS bar. Uses app.css tokens.
-   One row of icons, one per alerted event, and under it the detail lines of the icons the player clicked. The row never
-   scrolls and keeps its own height (flex: none): resizing the meter sizes only the bar area above it, and the window
-   grows when a detail line opens (Windows/OverlayFit); once it is as tall as the screen the bar area gives way and
-   scrolls instead (app.css, .rows.scrolls). So an icon never covers a bar and is never cut. */
+   One row of icons, one per alerted event; under it, while a chosen field boss is due, a row of their notices (.fb-row,
+   drawn as the icons' row); and under both the detail lines of the icons the player clicked. The rows never scroll and
+   keep their own height (flex: none): resizing the meter sizes only the bar area above them, and the window grows when a
+   row or a detail line appears (Windows/OverlayFit); once it is as tall as the screen the bar area gives way and scrolls
+   instead (app.css, .rows.scrolls). So an icon never covers a bar and is never cut. */
 .alerts {
     display: flex;
     flex-direction: column;
@@ -11,8 +12,8 @@
     padding: 0 6px 6px;
 }
 
-/* The icons wrap onto a second line rather than run out of a narrow meter. The row anchors the tips (position:
-   relative), so every tip starts at the row's left edge and stays inside the window, whichever icon it names. */
+/* A row's icons wrap onto a second line rather than run out of a narrow meter. Each row anchors its tips (position:
+   relative), so every tip starts at its row's left edge and stays inside the window, whichever icon it names. */
 .ev-row {
     position: relative;
     display: flex;
