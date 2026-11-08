@@ -247,7 +247,9 @@ public sealed class FieldBossService : IDisposable
     // server (a server the player chose stays until then). The settings change is made off the capture thread, on the thread
     // Start ran on (the UI thread), as every other settings change is: the settings' subscribers (the hotkey's among them)
     // expect it there, and posts keep the order of quick switches (deep audit on #75: a thread-pool update could race one
-    // made on the UI thread and deliver the older settings last).
+    // made on the UI thread and deliver the older settings last). Every change of character is posted, with nothing compared
+    // before its turn: B then A named while saves wait must end on A, and a check against the settings now (still A) would
+    // have dropped A's save and let B's land last (Codex on #75). A save of the server already set changes nothing.
     private void NoteCharacterServer(int serverId)
     {
         SynchronizationContext? context;
@@ -257,7 +259,6 @@ public sealed class FieldBossService : IDisposable
             characterServer = serverId;
             context = settingsContext;
         }
-        if (settings.Current.FieldBosses.ServerId == serverId) return;
         if (context is not null) context.Post(_ => SaveServer(serverId), null);
         else _ = Task.Run(() => SaveServer(serverId));
     }

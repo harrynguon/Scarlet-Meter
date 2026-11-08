@@ -285,6 +285,31 @@ public sealed class FieldBossServiceTests : IDisposable
         Assert.Equal(1505, settings.Current.FieldBosses.ServerId); // in the order the game named them
     }
 
+    // The settings on A, the game names B then A before the saves run: the last named stands. Compared with the settings
+    // before its turn, A's save was dropped (they still said A) and B's landed last (Codex on #75).
+    [Fact]
+    public void ACharacterNamedBackBeforeTheSavesRunIsTheLastSaved()
+    {
+        var posts = new QueuedContext();
+        using var settings = NewSettings(f => f with { ServerId = Server });
+        using var service = NewService(settings);
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(posts);
+        try
+        {
+            service.Start();
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+
+        service.TakeProgress(Progress(1505));
+        service.TakeProgress(Progress(Server));
+        posts.RunAll();
+        Assert.Equal(Server, settings.Current.FieldBosses.ServerId);
+    }
+
     // ---------- The feed client ----------
 
     // The production handler follows no redirect and keeps no cookie (SECURITY.md, "Network").
