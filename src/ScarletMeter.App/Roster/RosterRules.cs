@@ -133,6 +133,13 @@ public sealed record ContentRule(string Key, string Name, int Cap, int Add, bool
 /// </summary>
 public static class RosterRules
 {
+    /// <summary>
+    /// The server of the character the roster saw played last (latest <see cref="RosterCharacter.LastSeen"/>) among those
+    /// with a server id that has a side, or null when none has: where the field-boss timers start when no server is saved.
+    /// </summary>
+    public static int? LastPlayedServer(IEnumerable<RosterCharacter> characters) =>
+        characters.Where(c => AbyssArtifacts.SideOf(c.ServerId) != ArtifactHolder.Unknown).MaxBy(c => c.LastSeen)?.ServerId;
+
     /// <summary>Basic energy each refill adds.</summary>
     public const int OdyleStep = 15;
 

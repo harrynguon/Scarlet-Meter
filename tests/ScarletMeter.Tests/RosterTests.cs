@@ -552,6 +552,18 @@ public sealed class RosterTests : IDisposable
         Assert.Equal([alpha], store.Load(Monday).File.Characters);
     }
 
+    // The server the field-boss timers start on when none is saved: the character seen last among those whose server has a
+    // side; none when none has.
+    [Fact]
+    public void TheLastPlayedServerIsTheLatestCharactersWithASide()
+    {
+        RosterCharacter Seen(int server, int hours) => new() { Name = $"C{server}{hours}", Server = "S", ServerId = server, LastSeen = Monday.AddHours(hours) };
+        Assert.Equal(2012, RosterRules.LastPlayedServer([Seen(1502, 1), Seen(2012, 3), Seen(1502, 2)]));
+        Assert.Equal(1502, RosterRules.LastPlayedServer([Seen(1502, 1), Seen(0, 5), Seen(3001, 6)]));
+        Assert.Null(RosterRules.LastPlayedServer([Seen(0, 1)]));
+        Assert.Null(RosterRules.LastPlayedServer([]));
+    }
+
     // A count replaces the kept one only when it was read later; an identity without a class, power, level or gear score
     // keeps the kept ones, and one with them replaces them (a level gained, new gear).
     [Fact]

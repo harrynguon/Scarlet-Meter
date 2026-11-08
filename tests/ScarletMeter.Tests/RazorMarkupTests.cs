@@ -447,6 +447,7 @@ public sealed partial class RazorMarkupTests
         Assert.Contains(@"<div class=""tool fieldbosses"" data-window=""fieldbosses"">", page);
         Assert.Matches(@"<button type=""button"" class=""fb-bell @\(on \? ""on"" : """"\)"" aria-pressed=""@\(on \? ""true"" : ""false""\)""", page);
         Assert.Contains("watch = Service.Watch();", page);
+        Assert.Contains("@FieldBossText.MapLine(view, now)", page); // says a held reading waits (FieldBossServiceTests)
         Assert.Contains("watch?.Dispose();", page);
         Assert.Contains("tick?.Dispose();", page);
         Assert.DoesNotContain("MarkupString", page, StringComparison.Ordinal);

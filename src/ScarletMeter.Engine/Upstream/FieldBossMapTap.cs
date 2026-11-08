@@ -14,13 +14,21 @@ namespace ScarletMeter.Engine.Upstream;
 /// </summary>
 /// <remarks>
 /// Runs on the capture thread, inside upstream's PacketAccumulator callback (see <see cref="RecordTap"/>, which contains
-/// anything that escapes). The log says which map was read and how many bosses it listed, never their times. A
-/// subscriber's failure is logged each time, so the rest of a bundle is still read.
+/// anything that escapes). The log says which map was read and how many bosses it listed, never their times. The game
+/// sends the list every few seconds while the map is open (Harry's log, 2026-11-08: a line every three seconds), so a line
+/// is written when it says something new, or <see cref="LogEvery"/> after the same one. A subscriber's failure is logged
+/// each time, so the rest of a bundle is still read.
 /// </remarks>
 internal sealed class FieldBossMapTap : IRecordReader
 {
+    /// <summary>How long the same line waits before it is written again.</summary>
+    public static readonly TimeSpan LogEvery = TimeSpan.FromMinutes(10);
+
     private readonly TimeProvider clock;
     private readonly ILogger<FieldBossMapTap> logger;
+    // The last line written and when. Touched only on the reading thread.
+    private string? lastNote;
+    private DateTimeOffset lastNoteAt;
 
     public FieldBossMapTap(TimeProvider clock, ILogger<FieldBossMapTap> logger)
     {
@@ -53,15 +61,17 @@ internal sealed class FieldBossMapTap : IRecordReader
         var now = clock.GetUtcNow();
         if (FieldBossMapRecords.Read(record, now) is not { } read)
         {
-            logger.LogInformation("A world map's boss list (01 91) did not read; nothing taken from it.");
+            if (IsNew("unread", now)) logger.LogInformation("A world map's boss list (01 91) did not read; nothing taken from it.");
             return;
         }
         if (read.Header != 0)
         {
-            logger.LogInformation("A world map's boss list for map {MapId} came with {Header} before the map id (another server's, from a rift?); not taken.", read.MapId, read.Header);
+            if (IsNew($"header {read.MapId} {read.Header}", now))
+                logger.LogInformation("A world map's boss list for map {MapId} came with {Header} before the map id (another server's, from a rift?); not taken.", read.MapId, read.Header);
             return;
         }
-        logger.LogInformation("Field bosses read from the world map: map {MapId}, {Count} bosses.", read.MapId, read.Bosses.Count);
+        if (IsNew($"read {read.MapId} {read.Bosses.Count}", now))
+            logger.LogInformation("Field bosses read from the world map: map {MapId}, {Count} bosses.", read.MapId, read.Bosses.Count);
         var map = new FieldBossMap(
             read.MapId,
             [.. read.Bosses.Select(boss => new FieldBossOnMap(boss.Id, boss.Up, boss.TimeMs == 0 ? null : DateTimeOffset.FromUnixTimeMilliseconds(boss.TimeMs)))],
@@ -74,5 +84,14 @@ internal sealed class FieldBossMapTap : IRecordReader
         {
             logger.LogWarning(ex, "A field boss map subscriber failed.");
         }
+    }
+
+    // Whether a line, by its key, says something new: another line, or the same one LogEvery after it was last written.
+    private bool IsNew(string key, DateTimeOffset now)
+    {
+        if (key == lastNote && now - lastNoteAt < LogEvery) return false;
+        lastNote = key;
+        lastNoteAt = now;
+        return true;
     }
 }

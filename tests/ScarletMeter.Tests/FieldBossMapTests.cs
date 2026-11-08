@@ -139,6 +139,35 @@ public sealed class FieldBossMapTests
         Assert.Equal([new FieldBossOnMap(101021, false, Now.AddMinutes(1)), new FieldBossOnMap(101003, true, null)], map.Bosses);
     }
 
+    // The game sends the list every few seconds while the map is open (Harry's log, 2026-11-08: a line every three seconds):
+    // the same map with the same count is logged once, another map at once, the same again after LogEvery; every reading
+    // is still raised.
+    [Fact]
+    public void TheSameMapReadAgainIsLoggedOnceInAWhile()
+    {
+        var clock = new FakeTimeProvider(Now);
+        var log = new RecordingLogger<FieldBossMapTap>();
+        var tap = new FieldBossMapTap(clock, log);
+        var raised = 0;
+        tap.Observed += (_, _) => raised++;
+        int Lines() => log.Entries.Count(entry => entry.Message.StartsWith("Field bosses read from the world map", StringComparison.Ordinal));
+        for (var i = 0; i < 3; i++)
+        {
+            tap.Observe(FieldBossMap(0, 1010, [FieldBossEntry(101021, false, NowMs + 90 * Minute)]));
+            clock.Advance(TimeSpan.FromSeconds(3));
+        }
+        Assert.Equal((3, 1), (raised, Lines()));
+        tap.Observe(FieldBossMap(0, 1110, [FieldBossEntry(111021, false, NowMs + 90 * Minute)]));
+        Assert.Equal(2, Lines());
+        tap.Observe(FieldBossMap(0, 1010, [FieldBossEntry(101021, false, NowMs + 90 * Minute)]));
+        Assert.Equal(3, Lines());
+        clock.Advance(FieldBossMapTap.LogEvery);
+        tap.Observe(FieldBossMap(0, 1010, [FieldBossEntry(101021, false, NowMs + 90 * Minute)]));
+        Assert.Equal(4, Lines());
+        for (var i = 0; i < 3; i++) tap.Observe(FieldBossMap(0, 1010, [], count: 3));
+        Assert.Single(log.Entries, entry => entry.Message.Contains("did not read", StringComparison.Ordinal));
+    }
+
     // A subscriber that throws is logged, and the next map is still raised.
     [Fact]
     public void AFailingSubscriberDoesNotStopTheNextMap()

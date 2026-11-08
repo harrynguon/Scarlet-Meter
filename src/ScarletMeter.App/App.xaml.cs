@@ -105,7 +105,11 @@ public partial class App : Application
         // Field-boss timers: the player's own map and NotMeter's shared timers (asked only while wanted).
         builder.Services.AddSingleton(services => new FieldBossFeedClient(
             FieldBossFeedClient.CreateDefaultHandler(), services.GetRequiredService<TimeProvider>(), services.GetRequiredService<ILogger<FieldBossFeedClient>>()));
-        builder.Services.AddSingleton<FieldBossService>();
+        // With no server saved, the timers start on the server of the character the roster saw played last.
+        builder.Services.AddSingleton(services => new FieldBossService(
+            services.GetRequiredService<ICombatEngine>(), services.GetRequiredService<SettingsService>(), services.GetRequiredService<FieldBossFeedClient>(),
+            services.GetRequiredService<TimeProvider>(), services.GetRequiredService<ILogger<FieldBossService>>(),
+            () => RosterRules.LastPlayedServer(services.GetRequiredService<RosterService>().Characters)));
         // Pet souls: their own file, demo-pets.json in demo mode, as the roster's.
         builder.Services.AddSingleton(services => new PetStore(options.DataDirectory, options.Capture == CaptureMode.Demo,
             services.GetRequiredService<ILogger<PetStore>>()));

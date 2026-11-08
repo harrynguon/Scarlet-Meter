@@ -13,10 +13,12 @@ public sealed record FieldBossFeedState(int? ServerId, IReadOnlyList<FieldBossTi
 
 /// <summary>
 /// What the meter knows of a server's field bosses at an instant: the server, each boss's newest observation from the
-/// player's own map and the shared timers (<see cref="FieldBossBoard.Merge"/>), the shared timers' state, and when the
-/// player's map was last read on that server (null when not this run).
+/// player's own map and the shared timers (<see cref="FieldBossBoard.Merge"/>), the shared timers' state, when the
+/// player's map was last read on that server (null when not this run), and when a reading now held for the game to name
+/// the character was made (null when none is held).
 /// </summary>
-public sealed record FieldBossView(int? ServerId, IReadOnlyDictionary<int, FieldBossTimer> Board, FieldBossFeedState Feed, DateTimeOffset? MapReadAt);
+public sealed record FieldBossView(int? ServerId, IReadOnlyDictionary<int, FieldBossTimer> Board, FieldBossFeedState Feed, DateTimeOffset? MapReadAt,
+    DateTimeOffset? MapHeldAt = null);
 
 /// <summary>
 /// The field-boss timers: the player's own world map as the game sends it when they open it
@@ -27,7 +29,11 @@ public sealed record FieldBossView(int? ServerId, IReadOnlyDictionary<int, Field
 /// held, and put on the server of the character the game names next within <see cref="HoldFor"/> on the same connection
 /// (a move drops it), as the roster holds the Abyss's artifact holders. The server of the character the game names is kept
 /// in the settings whenever it changes, so the timers show with the game closed; a server the player chooses in the window
-/// stays until the game names a character on another. The shared timers are read every <see cref="RefreshInterval"/> while
+/// stays until the game names a character on another. With no server saved (a copy that never saw a login with the
+/// timers in it, or a meter started mid-session), <see cref="Start"/> takes the server of the character the roster saw played
+/// last, so the shared timers come at once (Harry, 2026-11-08: "no timer yet, even opened map in game", every character
+/// on one server, the meter started mid-session); the game naming a character on another replaces it as above. A held
+/// reading shows in the view (<see cref="FieldBossView.MapHeldAt"/>), so the window can say what it waits for. The shared timers are read every <see cref="RefreshInterval"/> while
 /// they are wanted: while the Field bosses window is open (<see cref="Watch"/>) or a boss has a notice, with
 /// <see cref="FieldBossSettings.SharedTimers"/> on and a Global server known. Readings of the player's map are kept in memory
 /// for the run.
@@ -45,11 +51,15 @@ public sealed class FieldBossService : IDisposable
     private readonly FieldBossFeedClient feed;
     private readonly TimeProvider clock;
     private readonly ILogger<FieldBossService> logger;
+    // The server of the character played last as the roster knows it, for when no server is saved; none in tests that do not
+    // give one.
+    private readonly Func<int?>? lastPlayedServer;
     private readonly Lock gate = new();
     // Under the gate: each server's bosses as the player's map last showed them, and when the map was last read there.
     private readonly Dictionary<int, Dictionary<int, FieldBossTimer>> mapTimers = [];
     private readonly Dictionary<int, DateTimeOffset> mapReadAt = [];
     private (FieldBossMap Map, DateTimeOffset At)? held;
+    private bool unplacedLogged; // a reading with no server to put it on was logged, until one is kept
     private int characterServer; // the server of the character the game last named this run; 0 before any
     private FieldBossFeedState feedState = FieldBossFeedState.None;
     private int watchers;
@@ -62,19 +72,26 @@ public sealed class FieldBossService : IDisposable
     private bool started;
     private bool disposed;
 
-    public FieldBossService(ICombatEngine engine, SettingsService settings, FieldBossFeedClient feed, TimeProvider clock, ILogger<FieldBossService> logger)
+    /// <param name="lastPlayedServer">The server of the character the roster saw played last, or null; asked once, at
+    /// <see cref="Start"/>, when no server is saved (the app gives <c>RosterRules.LastPlayedServer</c> of the roster).</param>
+    public FieldBossService(ICombatEngine engine, SettingsService settings, FieldBossFeedClient feed, TimeProvider clock, ILogger<FieldBossService> logger,
+        Func<int?>? lastPlayedServer = null)
     {
         this.engine = engine;
         this.settings = settings;
         this.feed = feed;
         this.clock = clock;
         this.logger = logger;
+        this.lastPlayedServer = lastPlayedServer;
     }
 
     /// <summary>Raised when what the timers show may have changed, on any thread.</summary>
     public event EventHandler? Changed;
 
-    /// <summary>Follows the engine and the settings from now on. Later calls, and calls after disposal, do nothing.</summary>
+    /// <summary>
+    /// Follows the engine and the settings from now on, after taking the last played server when none is saved (see the class).
+    /// Called on the UI thread in the app, where settings change. Later calls, and calls after disposal, do nothing.
+    /// </summary>
     public void Start()
     {
         lock (gate)
@@ -83,11 +100,28 @@ public sealed class FieldBossService : IDisposable
             started = true;
             settingsContext = SynchronizationContext.Current;
         }
+        TakeLastPlayedServer();
         engine.FieldBossMapObserved += OnMap;
         engine.ProgressObserved += OnProgress;
         engine.ConnectionStarted += OnConnectionStarted;
         settings.Changed += OnSettingsChanged;
         Reschedule();
+    }
+
+    // With no server saved, the roster's last played one (only an id that can be a server), saved like a server the game names.
+    private void TakeLastPlayedServer()
+    {
+        if (settings.Current.FieldBosses.ServerId is not null || lastPlayedServer is null) return;
+        try
+        {
+            if (lastPlayedServer() is not { } server || !FieldBossSettings.IsServerId(server)) return;
+            settings.Update(s => s.FieldBosses.ServerId is null ? s with { FieldBosses = s.FieldBosses with { ServerId = server } } : s);
+            logger.LogInformation("No field boss server was saved; the server of the character played last is used until the game names one.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "The last played server could not be taken for the field boss timers.");
+        }
     }
 
     /// <summary>
@@ -109,7 +143,7 @@ public sealed class FieldBossService : IDisposable
                 if (mapReadAt.TryGetValue(id, out var at)) mapAt = at;
             }
             var shown = feedState.ServerId == server ? feedState : feedState with { ServerId = server, Timers = [], ReadAt = null, Problem = null };
-            return new FieldBossView(server, FieldBossBoard.Merge(observations, now), shown, mapAt);
+            return new FieldBossView(server, FieldBossBoard.Merge(observations, now), shown, mapAt, held?.At);
         }
     }
 
@@ -159,18 +193,22 @@ public sealed class FieldBossService : IDisposable
         lock (gate)
         {
             if (disposed) return;
+            // The game sends the list every few seconds while the map is open, so each note is written once until a reading is
+            // kept (Harry's log, 2026-11-08: two lines every three seconds).
             if (who is { ServerId: > 0 } named)
             {
                 Apply(named.ServerId, map);
+                unplacedLogged = false;
             }
             else if (who is not null)
             {
-                note = "Field bosses were read from the world map, but the server of the character being played is not known; not kept.";
+                if (!unplacedLogged) note = "Field bosses were read from the world map, but the server of the character being played is not known; not kept.";
+                unplacedLogged = true;
             }
             else
             {
+                if (held is null) note = "Field bosses were read from the world map while the character being played is not sure; held until the game names them (a zone change or a teleport).";
                 held = (map, clock.GetUtcNow());
-                note = "Field bosses were read from the world map while the character being played is not sure; held until the game names them.";
             }
         }
         if (note is not null) logger.LogInformation("{Note}", note);
