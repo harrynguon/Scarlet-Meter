@@ -2,7 +2,7 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
-## 2026-11-08 — Field-boss timers: the notices get a row of their own under the event icons
+## 2026-11-08 — Field-boss timers: the notices get a row of their own under the event icons (#78)
 
 **What:** `Components/EventRow.razor` draws the chosen field bosses' notices in a row of their own (`ev-row fb-row`, a group named "Field bosses") under the event icons, only while there is a notice, instead of first in the icons' row; the icons' row (events, then soul notices) is drawn only when it has something. The icons' detail lines come under both rows. When a notice shows is unchanged: the planner's Soon from the player's lead time before the respawn, then Up for a quarter of an hour. `alerts.css` only has its comments updated (the boss row reuses `.ev-row`). ARCHITECTURE, HANDOFF, README, CHANGELOG and LESSONS updated.
 
