@@ -420,6 +420,20 @@ public sealed partial class RazorMarkupTests
         Assert.Contains("bossTimers?.Close();", windows);
     }
 
+    // The app gives the field-boss timers the roster's last played server: the service takes it as an optional function,
+    // so a registration without it would build and pass every other test while the timers waited for a server again (the
+    // audit on #77). The roster starts before the timers, which ask it at their start.
+    [Fact]
+    public void TheAppGivesTheFieldBossTimersTheLastPlayedServer()
+    {
+        var app = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "App.xaml.cs"));
+        Assert.Matches(@"(?s)AddSingleton\(services => new FieldBossService\(.*?\(\) => RosterRules\.LastPlayedServer\(services\.GetRequiredService<RosterService>\(\)\.Characters\)\)\);", app);
+        Assert.DoesNotContain("AddSingleton<FieldBossService>()", app, StringComparison.Ordinal);
+        var roster = app.IndexOf("GetRequiredService<RosterService>().Start();", StringComparison.Ordinal);
+        var timers = app.IndexOf("GetRequiredService<FieldBossService>().Start();", StringComparison.Ordinal);
+        Assert.True(roster > 0 && timers > roster, "the roster starts before the field-boss timers");
+    }
+
     // A chosen field boss's notice in the event row (Harry, 2026-11-08: Eternal Gartua): a real button naming the boss and
     // its respawn for screen readers, its skull drawn from path data bound as an attribute (never raw HTML), gold before
     // the respawn and teal once up, its short name kept from widening a narrow meter, and a click that opens the Field
@@ -447,6 +461,7 @@ public sealed partial class RazorMarkupTests
         Assert.Contains(@"<div class=""tool fieldbosses"" data-window=""fieldbosses"">", page);
         Assert.Matches(@"<button type=""button"" class=""fb-bell @\(on \? ""on"" : """"\)"" aria-pressed=""@\(on \? ""true"" : ""false""\)""", page);
         Assert.Contains("watch = Service.Watch();", page);
+        Assert.Contains("@FieldBossText.MapLine(view, now)", page); // says a held reading waits (FieldBossServiceTests)
         Assert.Contains("watch?.Dispose();", page);
         Assert.Contains("tick?.Dispose();", page);
         Assert.DoesNotContain("MarkupString", page, StringComparison.Ordinal);

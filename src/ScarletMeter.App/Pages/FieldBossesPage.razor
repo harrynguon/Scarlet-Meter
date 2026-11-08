@@ -52,7 +52,7 @@
             </div>
             <div class="fb-line">
                 <span class="muted">Your map</span>
-                <span>@(view.MapReadAt is { } read ? $"read {FieldBossText.Ago(now - read)}" : "not read this run: open the world map (M) in the game to read it")</span>
+                <span>@FieldBossText.MapLine(view, now)</span>
             </div>
         </div>
         <table class="fb-table">

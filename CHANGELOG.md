@@ -20,10 +20,13 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 - Field-boss timers: the hourglass in the meter's header opens a Field bosses window with every field boss of Verteron,
   Altgard and the Abyss, whether it is up, when it respawns and how long until then. The times come from your own world
   map, read when you open it (M) in the game, and from NotMeter's shared timers (what its users' maps show, a public file
-  per region), so they show with the game closed too, for the server you last logged in on (or one you enter). Ring a
-  boss's bell and the meter's event row shows it from 10 minutes (your choice, 1 to 60) before it respawns, then that it
-  is up. "Read other players' shared timers" turns the shared timers off; nothing about you is sent. aion2timers.com
-  opens from the window now. Not yet checked in the game. ([#75](https://github.com/harrynguon/Scarlet-Meter/pull/75))
+  per region), so they show with the game closed too, for the server you last played on (or one you enter). If you start
+  the meter while already in the game, your map's times show after your next zone change or teleport, and the window
+  says so. Ring a boss's bell and the meter's event row shows it from 10 minutes (your choice, 1 to 60) before it
+  respawns, then that it is up. "Read other players' shared timers" turns the shared timers off; nothing about you is
+  sent. aion2timers.com opens from the window now. Your map's list has been seen read in the game; the rest is not yet
+  checked there. ([#75](https://github.com/harrynguon/Scarlet-Meter/pull/75),
+  [#77](https://github.com/harrynguon/Scarlet-Meter/pull/77))
 
 - Your Dimensional Invasion reward keys on the meter, left of the Shugo Festival keys: the keys left out of 7, which
   your characters on a server share, as the game's dialog writes them ("3/7"), once the game sends them; until then,

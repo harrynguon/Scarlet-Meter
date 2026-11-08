@@ -133,6 +133,15 @@ public sealed record ContentRule(string Key, string Name, int Cap, int Add, bool
 /// </summary>
 public static class RosterRules
 {
+    /// <summary>
+    /// The server of the character the roster saw played last (latest <see cref="RosterCharacter.LastSeen"/>) among those
+    /// with a server id the field-boss timers take (<see cref="Settings.FieldBossSettings.IsServerId"/>, so a later character
+    /// with an id they would refuse does not hide an earlier one's: the audit on #77), or null when none has: where the
+    /// timers start when no server is saved.
+    /// </summary>
+    public static int? LastPlayedServer(IEnumerable<RosterCharacter> characters) =>
+        characters.Where(c => Settings.FieldBossSettings.IsServerId(c.ServerId)).MaxBy(c => c.LastSeen)?.ServerId;
+
     /// <summary>Basic energy each refill adds.</summary>
     public const int OdyleStep = 15;
 

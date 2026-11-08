@@ -4,6 +4,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the product
 
+**The field-boss timers showed nothing in a copy updated to them and started mid-session** (Harry, 2026-11-08: "no timer yet, even opened map in game").
+- What: the shared timers wait for a server, which was saved only when the game named a character; a copy updated to the timers had none, and with the meter started while already in the game the game names no character until a zone change. The player's own map read (the log: "map 1010, 24 bosses") but was held for that naming, and the window said "not read this run". The log also had two lines every three seconds: the game sends the list again every few seconds while the map is open.
+- Why: the server's source was designed for a login with the meter running, the case the tests start from; an update to an existing copy (a roster full of characters, no saved server) and a mid-session start were not walked through, and the window's line read only the kept readings. The record was tested one reading at a time, so its resending was never seen.
+- Guard: with no server saved, the server of the character the roster saw played last is taken at start (`FieldBossServiceTests.WithNoServerSavedTheLastPlayedServerIsTaken`, `RosterTests.TheLastPlayedServerIsTheLatestCharactersWithASide`); a held reading shows in the view and the window says what it waits for, and its note is logged once (`AHeldReadingShowsInTheViewAndIsLoggedOnce`); the tap logs the same map once in ten minutes (`FieldBossMapTests.TheSameMapReadAgainIsLoggedOnceInAWhile`). For a feature that needs a value the game gives at login, walk through an update of an existing copy and a mid-session start before shipping, and test a record sent again and again.
+
 **The log said how many pets the player has** (Codex P1 and the deep audit on #76, fixed before merge).
 - What: the pet tap logged each login's collection as "read (N pets with a level, M with soul points)". How many pets a player owns is their progress, which AGENTS.md says is never logged; the log is kept 14 days and is what players attach to a report. SECURITY.md, ARCHITECTURE.md and HANDOFF.md described the line as intended.
 - Why: the rule was applied to the values in the records (no pet's level or souls, no ids) and not to a count of them, which read as a harmless diagnostic, as "the list read (N counts)" lines elsewhere do; the test looked for a pet id and one value, so any number else passed.
@@ -300,6 +305,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 - Guard: `SettingsTests.AFileSavedWithAByteOrderMarkLoads`. Seed test files the way people actually write them.
 
 ## In the process
+
+**Codex reviewed each PR before its changelog line was in** (Codex P1 on #76 and on #77, both fixed before merge).
+- What: the changelog line needs its PR's link, so it was added in the commit after the PR was opened; Codex reviews a PR as it is opened and reviewed the first commit, so both times its P1 was the missing (or unedited) line, already on its way.
+- Why: the ship skill's order (open, then add the line) met Codex's trigger (a review when a PR is opened for review) and nobody put the two side by side; the second time, the line was also left unedited on purpose until the number came.
+- Guard: the scarlet-ship skill opens the PR as a draft, adds the line with its link, and marks it ready (`gh pr ready`), which is when Codex reviews it. When a reviewer runs on a trigger, make the change whole before the trigger.
 
 **A total added up by hand went into a comment and into the test of the code it described** (2026-11-08, the pet souls; caught by that test before commit).
 - What: `PetRules.ToMax`'s comment said a pet needs 155 souls from nothing to level 3, and its test expected 155; the costs are 5, 25 and 75, so 105, which the code returned. The test failed, and the comment was the one wrong.

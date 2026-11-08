@@ -44,8 +44,132 @@ public sealed class FieldBossServiceTests : IDisposable
         return settings;
     }
 
-    private FieldBossService NewService(SettingsService settings, FakeFeed? feed = null) =>
-        new(engine, settings, new FieldBossFeedClient(feed ?? new FakeFeed(), clock, NullLogger<FieldBossFeedClient>.Instance), clock, NullLogger<FieldBossService>.Instance);
+    private FieldBossService NewService(SettingsService settings, FakeFeed? feed = null, Func<int?>? lastPlayed = null, RecordingLogger<FieldBossService>? log = null) =>
+        new(engine, settings, new FieldBossFeedClient(feed ?? new FakeFeed(), clock, NullLogger<FieldBossFeedClient>.Instance), clock,
+            (Microsoft.Extensions.Logging.ILogger<FieldBossService>?)log ?? NullLogger<FieldBossService>.Instance, lastPlayed);
+
+    // ---------- With no server saved ----------
+
+    // A copy that never saw a login with the timers in it, or a meter started mid-session, starts on the server of the
+    // character the roster saw played last, so the shared timers come at once (Harry, 2026-11-08: "no timer yet"); a saved
+    // server stays, and an id that cannot be a server, none, or a failing roster leaves it unknown. Only a server taken says
+    // so in the log: the settings' own check would clear an id that cannot be a server, and the update keeps a saved one,
+    // but the service decides before either (the fail-first run: with its checks removed, the settings alone held).
+    [Fact]
+    public void WithNoServerSavedTheLastPlayedServerIsTaken()
+    {
+        static int Taken(RecordingLogger<FieldBossService> log) => log.Entries.Count(entry => entry.Message.Contains("character played last is used", StringComparison.Ordinal));
+        var log = new RecordingLogger<FieldBossService>();
+        using (var settings = NewSettings())
+        using (var service = NewService(settings, lastPlayed: () => 1502, log: log))
+        {
+            service.Start();
+            Assert.Equal(1502, settings.Current.FieldBosses.ServerId);
+            Assert.Equal(1502, service.View(Start).ServerId);
+            Assert.Equal(1, Taken(log));
+        }
+        var kept = new RecordingLogger<FieldBossService>();
+        using (var saved = NewSettings(f => f with { ServerId = Server }))
+        using (var service = NewService(saved, lastPlayed: () => 1502, log: kept))
+        {
+            service.Start();
+            Assert.Equal(Server, saved.Current.FieldBosses.ServerId);
+            Assert.Equal(0, Taken(kept));
+        }
+        var refused = new RecordingLogger<FieldBossService>();
+        using var none = NewSettings(f => f with { ServerId = null });
+        using (var service = NewService(none, lastPlayed: () => 3001, log: refused)) service.Start();
+        using (var service = NewService(none, lastPlayed: () => null, log: refused)) service.Start();
+        using (var service = NewService(none, lastPlayed: () => throw new InvalidOperationException("roster"), log: refused)) service.Start();
+        Assert.Null(none.Current.FieldBosses.ServerId);
+        Assert.Equal(0, Taken(refused));
+        Assert.Single(refused.Entries, entry => entry.Message.Contains("could not be taken", StringComparison.Ordinal));
+    }
+
+    // A reading held for the game to name the character shows in the view, so the window says what it waits for rather
+    // than "not read this run" (Harry, 2026-11-08), and its note is logged once though the game sends the list every few
+    // seconds while the map is open; a reading with no server to put it on is logged once too.
+    [Fact]
+    public void AHeldReadingShowsInTheViewAndIsLoggedOnce()
+    {
+        using var settings = NewSettings(f => f with { ServerId = Server });
+        var log = new RecordingLogger<FieldBossService>();
+        using var service = NewService(settings, log: log);
+        service.Start();
+        for (var i = 0; i < 3; i++)
+        {
+            service.TakeMap(Map(clock.GetUtcNow(), new FieldBossOnMap(Gartua, false, Start.AddMinutes(90))));
+            clock.Advance(TimeSpan.FromSeconds(3));
+        }
+        var view = service.View(clock.GetUtcNow());
+        Assert.Equal(Start.AddSeconds(6), view.MapHeldAt);
+        Assert.Null(view.MapReadAt);
+        Assert.Equal("read just now, waiting for the game to name your character: change zone or teleport once", FieldBossText.MapLine(view, clock.GetUtcNow()));
+        Assert.Single(log.Entries, entry => entry.Message.Contains("held until the game names them", StringComparison.Ordinal));
+
+        service.TakeProgress(Progress(Server));
+        view = service.View(clock.GetUtcNow());
+        Assert.Null(view.MapHeldAt);
+        Assert.Equal("read just now", FieldBossText.MapLine(view, clock.GetUtcNow()));
+
+        // A reading held after one was kept (a server change, until the game names the character again) is the one said.
+        clock.Advance(TimeSpan.FromMinutes(5));
+        service.TakeMap(Map(clock.GetUtcNow(), new FieldBossOnMap(Gartua, false, Start.AddMinutes(90))));
+        view = service.View(clock.GetUtcNow());
+        Assert.NotNull(view.MapReadAt);
+        Assert.StartsWith("read just now, waiting for the game", FieldBossText.MapLine(view, clock.GetUtcNow()), StringComparison.Ordinal);
+        service.TakeConnectionStarted();
+
+        engine.Character = Character(0);
+        service.TakeMap(Map(clock.GetUtcNow()));
+        service.TakeMap(Map(clock.GetUtcNow()));
+        Assert.Single(log.Entries, entry => entry.Message.Contains("not known; not kept", StringComparison.Ordinal));
+        Assert.Equal("not read this run: open the world map (M) in the game to read it",
+            FieldBossText.MapLine(new FieldBossView(Server, new Dictionary<int, FieldBossTimer>(), FieldBossFeedState.None, null), Start));
+    }
+
+    // A held reading past HoldFor is no longer said to wait: the next naming would drop it, so a zone change would bring
+    // nothing (the audit on #77: the window said to change zone after fifteen minutes).
+    [Fact]
+    public void AReadingHeldTooLongIsNoLongerSaidToWait()
+    {
+        using var settings = NewSettings(f => f with { ServerId = Server });
+        using var service = NewService(settings);
+        service.Start();
+        service.TakeMap(Map(Start, new FieldBossOnMap(Gartua, false, Start.AddMinutes(90))));
+        clock.Advance(FieldBossService.HoldFor);
+        Assert.Equal(Start, service.View(clock.GetUtcNow()).MapHeldAt);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        var view = service.View(clock.GetUtcNow());
+        Assert.Null(view.MapHeldAt);
+        Assert.Equal("not read this run: open the world map (M) in the game to read it", FieldBossText.MapLine(view, clock.GetUtcNow()));
+    }
+
+    // The not-kept note comes back once a reading is kept, also one kept after a hold; the held note once for each hold.
+    [Fact]
+    public void TheNotesComeBackAfterAReadingIsKept()
+    {
+        using var settings = NewSettings(f => f with { ServerId = Server });
+        var log = new RecordingLogger<FieldBossService>();
+        using var service = NewService(settings, log: log);
+        service.Start();
+        int Notes(string text) => log.Entries.Count(entry => entry.Message.Contains(text, StringComparison.Ordinal));
+
+        engine.Character = Character(0);
+        service.TakeMap(Map(clock.GetUtcNow()));
+        engine.Character = null;
+        service.TakeMap(Map(clock.GetUtcNow()));
+        service.TakeProgress(Progress(Server));
+        engine.Character = Character(0);
+        service.TakeMap(Map(clock.GetUtcNow()));
+        Assert.Equal(2, Notes("not known; not kept"));
+
+        engine.Character = null;
+        service.TakeMap(Map(clock.GetUtcNow()));
+        service.TakeConnectionStarted();
+        service.TakeMap(Map(clock.GetUtcNow()));
+        Assert.Equal(3, Notes("held until the game names them"));
+    }
 
     // The settings change for the character's server is made off the capture thread; wait for it.
     private static void WaitForServer(SettingsService settings, int? server) =>
