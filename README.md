@@ -116,8 +116,8 @@ and adds it up per player and per fight.
 - **Field-boss timers**: the hourglass in the header opens every field boss of Verteron, Altgard and the Abyss, up or
   when it respawns, from your own world map (read when you open it in the game) and NotMeter's shared timers (a public
   file of what other players' maps show), so they show with the game closed too. Ring a boss's bell for a notice in a
-  row under the event icons before it respawns ("Gartua 9:59"), then while it is up; with no boss due, the row is gone. Nothing about you is sent; the shared timers can be
-  turned off in the window.
+  row under the event icons before it respawns ("Gartua 9:59"), then while it is up; with no boss due, the row is gone.
+  Nothing about you is sent; the shared timers can be turned off in the window.
 - **Pet souls**: when a kill gives a soul to a pet below level 3, a notice at the end of the event row shows its name,
   the souls and where it stands ("Sparkie +1 · Lv 2 41/75"). The Pet souls window (Characters, "Pet souls", or a click
   on a notice) lists every pet on your server with its level, its souls toward the next level, the souls still needed

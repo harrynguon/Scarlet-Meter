@@ -129,7 +129,7 @@ Harry asked for a tracker of the souls his pets gather (2026-11-08), like the ca
 - [ ] Characters on two servers (if any): each keeps its own list, the window follows the character played and its server list switches between them.
 - [ ] In a dungeon boss fight the notices stand aside with the event icons; "Show soul notices in the overlay" off hides them, the counts going on.
 - [ ] In the Abyss or a dungeon shared across servers, a soul still counts on your own server's list (the window's server line stays yours). The pets are put on the server the game's record naming the character gives; if that is the instance's rather than your home server's, the window would show a second server: note it (the audit on #76).
-- [ ] Out of game, with Harry's go-ahead (a smoke run or a render): the event row at 320 px and at the default 400 px with two soul notices with long names (14 letters or more) beside an event icon and a field boss's notice. They wrap onto a second line rather than run out of the meter (ARCHITECTURE.md estimates when); see whether that is acceptable or the notices should be narrower. The Pet souls window at its least size (440 by 320) with a long name and every column.
+- [ ] Out of game, with Harry's go-ahead (a smoke run or a render): the event row at 320 px and at the default 400 px with two soul notices with long names (14 letters or more) beside an event icon, and a field boss's notice due (on its own row under them since #78). The soul notices wrap onto a second line rather than run out of the meter (ARCHITECTURE.md estimates when); see whether that is acceptable or the notices should be narrower. The Pet souls window at its least size (440 by 320) with a long name and every column.
 
 ## Next: the boss-timers window
 

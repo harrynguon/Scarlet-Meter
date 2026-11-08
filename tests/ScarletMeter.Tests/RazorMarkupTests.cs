@@ -436,8 +436,8 @@ public sealed partial class RazorMarkupTests
 
     // The field bosses' notices have their own row under the event icons, drawn only while one is due (Harry, 2026-11-08:
     // ahead of the icons, two of them pushed the last icon onto a line of its own). The icons' row closes before it opens,
-    // so a notice never shares a line with the icons, and with no boss due the icons keep one line and nothing else shows.
-    // The icons' detail lines come after both rows; the soul notices stay at the end of the icons' row.
+    // and the rows stack (.alerts is a column), so a notice never shares a line with the icons; with no boss due its row is
+    // not drawn. The icons' detail lines come after both rows; the soul notices stay at the end of the icons' row.
     [Fact]
     public void TheFieldBossNoticesHaveTheirOwnRowUnderTheEventIcons()
     {
@@ -461,6 +461,11 @@ public sealed partial class RazorMarkupTests
         Assert.Single(Regex.Matches(row, @"@foreach \(var boss in FieldBosses\)"));
         var between = row[icons..bosses];
         Assert.Equal(Regex.Matches(between, "<div").Count, Regex.Matches(between, "</div>").Count); // the icons' row is closed
+
+        // The two rows stack rather than sit side by side.
+        var alerts = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "alerts.css"));
+        var column = Regex.Match(alerts, @"(?m)^\.alerts \{(?<body>[^}]*)\}").Groups["body"].Value;
+        Assert.Matches(@"(?m)^\s*flex-direction:\s*column;", column);
     }
 
     // A chosen field boss's notice in the event row (Harry, 2026-11-08: Eternal Gartua): a real button naming the boss and

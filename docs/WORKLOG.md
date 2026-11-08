@@ -13,9 +13,19 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
 - Debug build: 0 errors; the whole suite through `dotnet exec`: 1,099 tests, all passing. Release build of the solution: 0 errors, upstream's five usual warnings only.
 - A static mock of the row from the branch's real `app.css` and `alerts.css` (event icons as plain circles, the real skull, made-up times), rendered by headless Edge: before, at 400 px, two notices ahead of seven icons wrap the last icon as in Harry's screenshot; after, the icons keep one line with the notices on the row under them; with no notice, one row; three notices fit one line at 320 px. The real component was not rendered (no smoke run while the game runs).
 
+**Review:**
+- CI passed on both commits (1,099 tests).
+- Codex reviewed df8b664: completed, no findings, no inline comments.
+- Standard audit: ready with four nits, all fixed in the follow-up commit.
+  1. HANDOFF's pet render item still placed a boss notice in the icons' row: reworded.
+  2. The test pinned the markup but not that `.alerts` stacks its rows: it now checks `flex-direction: column`, and fails with `row` put in (run on the follow-up commit).
+  3. The CHANGELOG and README lines ran past the files' wrap, and "the event icons keep one line" overpromised (the icons can still wrap by themselves at 320 px): re-wrapped, and reworded to "the notices no longer push the event icons onto a second line".
+  4. This entry still listed the reviews as next.
+- The audit also noted that the bosses' row stays for the quarter of an hour a boss is up, as before (#75). That is unchanged here.
+
 **Not checked:** the meter itself (a smoke run or the game): that the window grows by the row when a notice appears and shrinks back when it goes, and the tips of the boss row (they open above it, over the icons).
 
-**Next:** the audit and Codex's review; then, with Harry's go-ahead, merge and rebuild both portable copies.
+**Next:** merge with Harry's go-ahead (given) and rebuild both portable copies.
 
 ## 2026-11-08 — Field-boss timers: the last played server when none is saved, a held map said, fewer log lines (#77)
 
