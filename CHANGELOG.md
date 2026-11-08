@@ -10,6 +10,13 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ### Added
 
+- Pet souls: when a kill gives a soul to a pet below level 3, a notice at the end of the meter's event row shows the
+  pet, the souls and where it stands ("Sparkie +1 · Lv 2 41/75"; "max" when it reaches level 3). The Pet souls window
+  (Characters, "Pet souls", or a click on a notice) lists every pet on your server with its level, its souls toward the
+  next level, the souls still needed for level 3 and the souls picked up this session, with a search, four orders and
+  switches for level-3 and chest-only pets. Log in with the meter running and the game sends every pet's count; each
+  soul after that is counted, kept per server as the game keeps them. Not yet checked in the game.
+  ([#76](https://github.com/harrynguon/Scarlet-Meter/pull/76))
 - Field-boss timers: the hourglass in the meter's header opens a Field bosses window with every field boss of Verteron,
   Altgard and the Abyss, whether it is up, when it respawns and how long until then. The times come from your own world
   map, read when you open it (M) in the game, and from NotMeter's shared timers (what its users' maps show, a public file
