@@ -2,7 +2,7 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
-## 2026-11-08 — Field-boss timers: the last played server when none is saved, a held map said, fewer log lines (#PR)
+## 2026-11-08 — Field-boss timers: the last played server when none is saved, a held map said, fewer log lines (#77)
 
 **What:** `FieldBossService.Start` takes, when no server is saved, the server of the character the roster saw played last (`RosterRules.LastPlayedServer`, given by the app as a function, so the service stays apart from the roster) and saves it; the game naming a character on another server replaces it as before. `FieldBossView.MapHeldAt` carries a reading held for the game to name the character, and the window's "Your map" line (`FieldBossText.MapLine`) says it waits for a zone change or teleport. The service logs its held and not-kept notes once until a reading is kept, and `FieldBossMapTap` logs the same map and count once in ten minutes (`LogEvery`).
 
