@@ -155,6 +155,14 @@ public interface ICombatEngine : IDisposable
     event EventHandler<FieldBossMap>? FieldBossMapObserved;
 
     /// <summary>
+    /// A record about the player's pets: the whole collection at login, souls picked up, a level reached, a pet unlocked
+    /// from a chest (<see cref="PetRecord"/>). A collection is the server's, shared by its characters; the records do not
+    /// say which server, so a subscriber puts each on <see cref="Character"/>'s. Raised on a capture thread, never on the UI
+    /// thread. The demo sends none.
+    /// </summary>
+    event EventHandler<PetRecord>? PetRecordObserved;
+
+    /// <summary>
     /// The game moved to a new connection: a server change (into or out of a dungeon or the Abyss) or a switch of
     /// character. Raised on a capture thread just before the first record read of the new connection, once the engine's
     /// own values have taken the move (<see cref="MapId"/> forgotten, <see cref="Character"/> unconfirmed): whatever a

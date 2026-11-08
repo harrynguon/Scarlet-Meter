@@ -606,3 +606,147 @@ tr.child td {
     stroke-linecap: round;
     stroke-linejoin: round;
 }
+
+/* The pet souls (Pages/PetsPage): the server, where the counts come from and the totals over a bar, the search, order and
+   filters, then a row per pet. Each pet's dot takes its genus's colour (A2Tools' pet-souls colours them alike); a row whose
+   pet was given souls this run is marked at its left, and a pet at level 3 reads teal (--good), as a notice that reaches it. */
+.pet-head {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line);
+    font-size: 12.5px;
+}
+
+.pet-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.pet-line > .muted:first-child {
+    min-width: 64px;
+}
+
+.pet-server,
+.pet-search,
+.pet-sort select {
+    padding: 2px 6px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--text);
+    font: inherit;
+}
+
+.pet-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    margin-top: 4px;
+}
+
+.pet-search {
+    width: 150px;
+}
+
+.pet-sort,
+.pet-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+}
+
+.pet-bar {
+    display: inline-block;
+    position: relative;
+    width: 56px;
+    height: 4px;
+    margin-left: 6px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    vertical-align: middle;
+    overflow: hidden;
+}
+
+.pet-bar > span {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: 2px;
+    background: var(--soon);
+}
+
+.pet-bar.total {
+    display: block;
+    width: auto;
+    margin: 2px 0 0;
+}
+
+.pet-bar.total > span { background: var(--good); }
+
+.pet-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+}
+
+.pet-table th {
+    position: sticky;
+    top: 0;
+    padding: 5px 6px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-align: left;
+}
+
+.pet-table td {
+    padding: 4px 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    white-space: nowrap;
+}
+
+.pet-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.pet-table td.pet-name {
+    white-space: normal;
+}
+
+.pet-table tr.farmed td:first-child { box-shadow: inset 2px 0 0 var(--soon); }
+.pet-table tr.max .pet-souls { color: var(--good); }
+
+.pet-souls { font-variant-numeric: tabular-nums; }
+
+.pet-genus {
+    margin-left: 4px;
+    font-size: 11px;
+}
+
+.pet-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    vertical-align: middle;
+}
+
+.pet-dot.genus-cogni { background: #b99bff; }
+.pet-dot.genus-fera { background: #ff9f66; }
+.pet-dot.genus-natura { background: #74d99a; }
+.pet-dot.genus-varian { background: #5cc9e6; }
+
+.pet-foot {
+    margin-top: 14px;
+    font-size: 11.5px;
+}

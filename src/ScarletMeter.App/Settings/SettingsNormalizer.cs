@@ -67,6 +67,7 @@ public static class SettingsNormalizer
             Updates = NormalizeUpdates(input.Updates, repairs),
             BossTimers = input.BossTimers ?? new BossTimersSettings(),
             FieldBosses = NormalizeFieldBosses(input.FieldBosses, repairs),
+            Pets = input.Pets ?? new PetSettings(),
             Windows = windows,
         };
         return (settings, repairs);

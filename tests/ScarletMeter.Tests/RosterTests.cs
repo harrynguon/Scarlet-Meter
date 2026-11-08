@@ -458,6 +458,9 @@ public sealed class RosterTests : IDisposable
         public event EventHandler<FieldBossMap>? FieldBossMapObserved;
         public void RaiseFieldBossMap(FieldBossMap map) => FieldBossMapObserved?.Invoke(this, map);
         public int FieldBossMapSubscribers => FieldBossMapObserved?.GetInvocationList().Length ?? 0;
+        public event EventHandler<PetRecord>? PetRecordObserved;
+        public void RaisePet(PetRecord record) => PetRecordObserved?.Invoke(this, record);
+        public int PetSubscribers => PetRecordObserved?.GetInvocationList().Length ?? 0;
         public event EventHandler? ConnectionStarted;
         public void RaiseConnection() => ConnectionStarted?.Invoke(this, EventArgs.Empty);
         public int ConnectionSubscribers => ConnectionStarted?.GetInvocationList().Length ?? 0;

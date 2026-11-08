@@ -27,6 +27,8 @@ public sealed record MeterSettings
 
     public FieldBossSettings FieldBosses { get; init; } = new();
 
+    public PetSettings Pets { get; init; } = new();
+
     /// <summary>Saved window positions and sizes, keyed by <see cref="WindowKeys"/>.</summary>
     public IReadOnlyDictionary<string, WindowPlacement> Windows { get; init; } = new Dictionary<string, WindowPlacement>();
 
@@ -35,11 +37,28 @@ public sealed record MeterSettings
     public bool Equals(MeterSettings? other) => other is not null
         && Version == other.Version && Fight == other.Fight && Appearance == other.Appearance && Overlay == other.Overlay
         && Alerts == other.Alerts && Updates == other.Updates && BossTimers == other.BossTimers && FieldBosses == other.FieldBosses
+        && Pets == other.Pets
         && Windows.Count == other.Windows.Count
         && Windows.All(pair => other.Windows.TryGetValue(pair.Key, out var placement) && placement == pair.Value);
 
     public override int GetHashCode() =>
-        HashCode.Combine(Version, Fight, Appearance, Overlay, Alerts, Updates, HashCode.Combine(BossTimers, FieldBosses), Windows.Count);
+        HashCode.Combine(Version, Fight, Appearance, Overlay, Alerts, Updates, HashCode.Combine(BossTimers, FieldBosses, Pets), Windows.Count);
+}
+
+/// <summary>
+/// Pet souls (Pets/PetService, the Pet souls window): whether a soul picked up shows in the overlay, and which pets the window
+/// lists. The counts themselves are the player's progress, kept apart in pets.json (Pets/PetStore).
+/// </summary>
+public sealed record PetSettings
+{
+    /// <summary>Show a notice in the overlay's event row when a soul is picked up for a pet below level 3.</summary>
+    public bool Notices { get; init; } = true;
+
+    /// <summary>The window lists the pets already at level 3 too.</summary>
+    public bool ShowMaxed { get; init; }
+
+    /// <summary>The window lists the pets only Pet Soul Chests raise (no monster drops their souls) too.</summary>
+    public bool ShowChestOnly { get; init; }
 }
 
 /// <summary>
@@ -302,9 +321,10 @@ public static class WindowKeys
     public const string BossTimers = "timers";
     public const string Roster = "roster";
     public const string FieldBosses = "fieldbosses";
+    public const string Pets = "pets";
 
     public static IReadOnlySet<string> All { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
-        Overlay, Settings, History, PlayerDetails, BossTimers, Roster, FieldBosses,
+        Overlay, Settings, History, PlayerDetails, BossTimers, Roster, FieldBosses, Pets,
     };
 }

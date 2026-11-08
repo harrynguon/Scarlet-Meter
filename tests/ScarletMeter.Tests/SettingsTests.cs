@@ -215,7 +215,7 @@ public sealed class SettingsTests : IDisposable
         var sections = typeof(MeterSettings).GetProperties()
             .Where(p => p.Name is not (nameof(MeterSettings.Version) or nameof(MeterSettings.Windows)))
             .ToList();
-        Assert.Equal(7, sections.Count);
+        Assert.Equal(8, sections.Count);
         foreach (var section in sections)
         {
             Assert.True(section.CanWrite && section.PropertyType.IsClass && section.PropertyType.Namespace == typeof(MeterSettings).Namespace,
@@ -295,7 +295,7 @@ public sealed class SettingsTests : IDisposable
         // Adding a property to MeterSettings must extend its Equals; this count is the reminder.
         var properties = typeof(MeterSettings).GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.Name != "EqualityContract").Select(p => p.Name).Order().ToList();
-        Assert.Equal(new[] { "Alerts", "Appearance", "BossTimers", "FieldBosses", "Fight", "Overlay", "Updates", "Version", "Windows" }, properties);
+        Assert.Equal(new[] { "Alerts", "Appearance", "BossTimers", "FieldBosses", "Fight", "Overlay", "Pets", "Updates", "Version", "Windows" }, properties);
 
         var baseline = SettingsNormalizer.Normalize(null).Settings with
         {
@@ -308,6 +308,7 @@ public sealed class SettingsTests : IDisposable
         Assert.NotEqual(baseline, baseline with { Appearance = baseline.Appearance with { RowScale = 1.2 } });
         Assert.NotEqual(baseline, baseline with { Overlay = baseline.Overlay with { ToggleHotkey = "F10" } });
         Assert.NotEqual(baseline, baseline with { FieldBosses = baseline.FieldBosses with { LeadMinutes = 7 } });
+        Assert.NotEqual(baseline, baseline with { Pets = baseline.Pets with { Notices = !baseline.Pets.Notices } });
         // Every FieldBossSettings member, since it has a hand-written Equals too.
         var fieldBossProperties = typeof(FieldBossSettings).GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.Name != "EqualityContract").Select(p => p.Name).Order().ToList();

@@ -51,6 +51,8 @@
                 <option value="@RosterSort.LastSeen">Last played</option>
             </select>
         </label>
+        @* The pet souls (Pages/PetsPage): a server's pets, shared by its characters. The head wraps, so it never widens the window. *@
+        <button type="button" class="btn small" @onclick="Windows.OpenPets">Pet souls</button>
     </div>
     @if (Roster.Notice is { } notice)
     {

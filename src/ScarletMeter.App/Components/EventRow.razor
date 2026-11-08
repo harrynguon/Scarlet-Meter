@@ -1,5 +1,6 @@
 @using ScarletMeter.App.Alerts
 @using ScarletMeter.App.FieldBosses
+@using ScarletMeter.App.Pets
 @using ScarletMeter.WorldEvents
 @using ScarletMeter.WorldEvents.FieldBosses
 @*
@@ -20,13 +21,18 @@
     Before the events come the chosen field bosses' notices (FieldBosses/FieldBossService, its planner in WorldEvents): a
     skull, the boss's short name and, before a respawn, the time to it, gold as an event's Soon; teal and "up" once it is
     up, for a quarter of an hour. Clicking one opens the Field bosses window. They stand aside for a boss fight too.
+    After the events come the soul notices (Pets/PetService.Notices): a paw, the pet's name, the souls since the notice
+    appeared and the pet's level and souls toward the next ("+1 · Lv 2 41/75"), for a few seconds after a pet below level 3
+    is given a soul; at the row's end, so the event icons do not move as they come and go. Clicking one opens the Pet souls
+    window. They are left out of the spoken summary, which would otherwise speak at every kill while farming; each says
+    what it is when focused.
 *@
 <span class="sr-only" role="status">@(Held ? string.Empty : Announcement)</span>
 @if (Held)
 {
     @* Standing aside for a boss fight. *@
 }
-else if (EventRowLayout.Icons(View) is var icons && (icons.Count > 0 || FieldBosses.Count > 0))
+else if (EventRowLayout.Icons(View) is var icons && (icons.Count > 0 || FieldBosses.Count > 0 || Pets.Count > 0))
 {
     var zone = TimeZoneInfo.Local;
     <div class="alerts" role="group" aria-label="World events">
@@ -59,6 +65,19 @@ else if (EventRowLayout.Icons(View) is var icons && (icons.Count > 0 || FieldBos
                     <span class="ev-tip" aria-hidden="true">
                         <span class="ev-tip-head"><b>@icon.Rule.Name</b> · @status</span>
                         <span class="ev-tip-where">@icon.Rule.Location</span>
+                    </span>
+                </button>
+            }
+            @foreach (var soul in Pets)
+            {
+                <button type="button" class="ev pet @(PetRules.IsMax(soul.Progress) ? "max" : "")" @key="@($"pet-{soul.Pet.Id}")"
+                        aria-label="@PetText.Notice(soul)" @onclick="OpenPets">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="@EventGlyphs.Pet" /></svg>
+                    <span class="ev-name">@soul.Pet.Name</span>
+                    <span class="ev-time">@PetText.Gained(soul.Amount) · @PetText.Level(soul.Progress) @PetText.Progress(soul.Progress)</span>
+                    <span class="ev-tip" aria-hidden="true">
+                        <span class="ev-tip-head"><b>@soul.Pet.Name</b> · @PetText.Gained(soul.Amount)</span>
+                        <span class="ev-tip-where">@PetText.Level(soul.Progress) · @(PetRules.IsMax(soul.Progress) ? "level 3 reached" : $"{PetText.Progress(soul.Progress)} souls")</span>
                     </span>
                 </button>
             }
@@ -97,6 +116,12 @@ else if (EventRowLayout.Icons(View) is var icons && (icons.Count > 0 || FieldBos
 
     // A field boss's notice was clicked: the page opens the Field bosses window.
     [Parameter] public EventCallback OpenFieldBosses { get; set; }
+
+    // The soul notices, the latest first (PetService.Notices); none by default.
+    [Parameter] public IReadOnlyList<PetNotice> Pets { get; set; } = [];
+
+    // A soul notice was clicked: the page opens the Pet souls window.
+    [Parameter] public EventCallback OpenPets { get; set; }
 
     // The events whose detail lines are open under the row.
     private IReadOnlySet<string> open = new HashSet<string>(StringComparer.Ordinal);

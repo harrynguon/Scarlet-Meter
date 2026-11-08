@@ -59,7 +59,18 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   b8c63f6bda0c5785279a043311a825280bebebf8 (a time up to eight days ahead; read on 2026-11-08); and the field bosses'
   world-map ids, NPC codes and English names (`ScarletMeter.WorldEvents/FieldBosses/FieldBossCatalog`), from
   `src-tauri/src/capture/field_bosses.rs` at 396cfd5d4a9deb2c55ba13365b2c62fc56cf5ad8 (read on 2026-11-08), taken as facts;
+  and how its plugins' decoders read a record (`ScarletMeter.Engine/Pets/PetRecords`: the body after the two opcode
+  bytes, little-endian numbers, varint list counts, bytes after the last field not read), from
+  `src-tauri/src/plugins/decoder.rs` at 7eba4b36f045626d96c542282079da9ad590e9c1 (read on 2026-11-08);
   GNU GPL v3: its Rust parsing ported to C#. No captured bytes were taken; Scarlet's tests use synthetic records.
+- **A2Tools Plugins, Pet Soul Tracker** (the layouts of the player's four pet records, the collection at login, souls
+  picked up, a level reached and a pet unlocked, `ScarletMeter.Engine/Pets/PetRecords`; and how a server's pet counts
+  follow them, `ScarletMeter.App/Pets/PetRules`), taengu/A2Tools-Plugins, `plugins/pet-souls` (`manifest.json`'s
+  decoders and `plugin.js`) at f206c25c4960d1180d143776e48e4360cdf44f78 (v0.5.4, read on 2026-11-08),
+  https://github.com/taengu/A2Tools-Plugins, GNU GPL v3: the decoders' layouts and the plugin's rules (a pet levelling
+  itself as its souls reach the cost, the souls past it kept; a level-up taking its cost unless reached; an unlock
+  keeping the souls; counts per server) written anew in C#. No captured bytes were taken; Scarlet's tests use synthetic
+  records.
 - **SkeeveAN/Aion-DPS-Meter** (the layout of the game's inventory records and how to find an entry in them by its anchor,
   `ScarletMeter.Engine/Entries/InventoryRecords`), https://github.com/SkeeveAN/Aion-DPS-Meter, `Client/Aion2/Aion2Stock.cs`
   as of 010e994c5 (its only commit, unchanged up to 729cb910494a1a0a7b837b8914c98921ce512fd4, read on 2026-10-27),
@@ -106,6 +117,12 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   Copyright (c) 2026 SkeeveTV (`licenses/MIT.txt`), with the map ids yykk62/AetherDPS's `tools/build-field-bosses.py`
   gives them at 65edf72f08e08942cf3ecb832c9a222f05cd8b62, GNU GPL v3. Names and ids only, no code. One name, the
   Artifact Corridor (503001), comes from the player's own game, not from a source.
+- **Pet catalog** (`ScarletMeter.App/Pets/PetCatalog`): the 207 pets' ids and English names (the game's own
+  `String_str_veh_*` texts) from `plugins/pet-souls/pets.js`, their genus from its `PET_GENUS` (which credits
+  wikily.gg's pet list), and whether monsters drop each one's souls, only chests hold them, or it is not yet released,
+  from its `sources.js` (built from the game client's drop tables), taengu/A2Tools-Plugins at
+  f206c25c4960d1180d143776e48e4360cdf44f78, GNU GPL v3: generated from those files read as text, ids, names and
+  flags only. The genus colours of the Pet souls window follow the plugin's.
 - **Legacy schedule defaults**: adapted from Byanski/aion2timeroverlay at 2a5727ecdf5487e9becb6b3a756819f9d14ff564
   (https://github.com/Byanski/aion2timeroverlay), whose `package.json` declares MIT (author Byanski); the snapshot
   has no separate licence text.

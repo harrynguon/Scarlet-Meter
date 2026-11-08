@@ -179,5 +179,6 @@
         var now = Clock.GetUtcNow();
     }
     <EventRow View="Alerts.Current" Now="now" Held="NoticesHeld" LinesChanged="StateHasChanged"
-              FieldBosses="FieldBosses.Plan(now).Alerts" OpenFieldBosses="Windows.OpenFieldBosses" />
+              FieldBosses="FieldBosses.Plan(now).Alerts" OpenFieldBosses="Windows.OpenFieldBosses"
+              Pets="Pets.Notices(now)" OpenPets="Windows.OpenPets" />
 </div>

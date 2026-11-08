@@ -15,6 +15,8 @@ What ARCHITECTURE.md describes exists: `upstream/` submodule at release v1.11.5.
 
 The character roster (2026-10-27, ARCHITECTURE.md "Character roster") lists every character the player logs in on with Odyle energy, its refill and the Nightmare and Ascension counts, from the game's list of entry counts; not yet tried in the game (below).
 
+The pet souls (2026-11-08, ARCHITECTURE.md "Pet souls") count each server's pets' levels and souls from the game's pet records, with a notice in the overlay's event row for a soul given to a pet below level 3 and a Pet souls window; not yet tried in the game (below).
+
 World-event notices are in the overlay: `src/ScarletMeter.WorldEvents` (ARCHITECTURE.md "World events") holds the schedules and the alert planner, ported from the fork's World Companion, and the overlay shows them as a row of icons that light up with the minutes left ("Overlay notices"), five minutes ahead by default, with an Alerts tab in settings. The times are not verified in the game.
 
 The engine also offers per-player details (`GetPlayerDetails`), boss-fight history (`GetHistory`, `GetHistoryFight`) and a demo mode (`--demo`: synthetic fights through upstream's fight tracking, for UI work without the game); see WORKLOG.md, 2026-10-24. The details and history windows show them. Training-dummy fights the player has not hit (other players' fights nearby, which upstream saves and makes the active fight) are ignored by the overlay, the details and History, once the meter knows the player's character (ARCHITECTURE.md "Training dummies"; WORKLOG.md 2026-10-26); Harry tried a portable copy in game ("ok it works"), and the checks below are still to go through.
@@ -113,6 +115,18 @@ Harry asked for a warning before Eternal Gartua respawns, with the timers visibl
 - [ ] Bell Eternal Gartua and set the lead time (10 minutes by default): the overlay's event row shows a gold skull "Gartua" with the time left from that lead time until the respawn, then teal "Gartua up" for a quarter of an hour. Its tip names the boss, the respawn time, the map and where the timer came from; a click opens the window. In a dungeon boss fight it stands aside with the event icons.
 - [ ] With "Read other players' shared timers" off, the window says "off" and nothing is asked (the log has no "Shared field boss timers not read" lines, and the meter's network use, if watched, has no request to raw.githubusercontent.com).
 - [ ] Enter another server's number in the window: its timers show; logging in on a character of another server switches it back to that one.
+
+## Next: the pet souls
+
+Harry asked for a tracker of the souls his pets gather (2026-11-08), like the card the game shows when a kill gives a soul to a pet below level 3. Wired as ARCHITECTURE.md "Pet souls" describes: the four pet records (A2Tools' Pet Soul Tracker's layouts), each server's counts in `pets.json`, a soul notice at the end of the overlay's event row, and the Pet souls window (Characters, "Pet souls", or a click on a notice). Nothing of it has run with the game yet. In the game (note the commit, date and time zone; never a character's name, and no pet's counts in the repository):
+
+- [ ] Log in with the meter running: the log says "The pet collection was read (… pets with a level, … with soul points)." The Pet souls window names the server and says the counts are "from the game at your login of …". Spot-check three pets against the game's pet window: one at level 3, one part-way, one at level 0 with a few souls. If the log says a pet record "did not read", note which (`00 90`, `0D 90`, `14 90` or `09 90`): the layout may differ from A2Tools'.
+- [ ] Kill a monster that drops a soul for a pet below level 3: the overlay's notice ("+1 · Lv 2 41/75") comes with the game's card and says the same; another soul for it within ten seconds makes "+2"; a kill that gives two pets souls shows two notices. The window's row for the pet moves with it, and "This run" counts it.
+- [ ] A soul that completes a level: the notice shows the new level with the souls past the cost (0 for a single soul); the soul that reaches level 3 shows "max", teal. Compare with the game's own count at the next login (the window says when it was synced).
+- [ ] Open a Pet Soul Chest: the pet's souls rise by the chest's amount; a chest that gives a new pet shows it at its level with the souls it had.
+- [ ] A meter started while already in the game: pick up a soul before any zone change; the log says pet records are held until the game names the character; after a teleport they count. A relog with the meter running puts every count right.
+- [ ] Characters on two servers (if any): each keeps its own list, the window follows the character played and its server list switches between them.
+- [ ] In a dungeon boss fight the notices stand aside with the event icons; "Show soul notices in the overlay" off hides them, the counts going on.
 
 ## Next: the boss-timers window
 

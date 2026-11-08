@@ -17,6 +17,11 @@ public static class EventGlyphs
         + "M4.4 5.6 2.4 2.6M11.6 5.6l2-3M6.1 8.1a.7.7 0 1 0 1.4 0 .7.7 0 1 0-1.4 0M8.5 8.1a.7.7 0 1 0 1.4 0 .7.7 0 1 0-1.4 0"
         + "M7 12.4v-1.2M9 12.4v-1.2";
 
+    /// <summary>A paw, its pad and four toes, for a pet's soul notice (Pets): no catalog event uses it.</summary>
+    public const string Pet = "M5.2 11.4C5.2 9.6 6.6 8.3 8 8.3S10.8 9.6 10.8 11.4C10.8 12.8 9.6 13.4 8 12.8 6.4 13.4 5.2 12.8 5.2 11.4Z"
+        + "M2.4 7.6a1.2 1.2 0 1 0 2.4 0 1.2 1.2 0 1 0-2.4 0M4.8 4.6a1.3 1.3 0 1 0 2.6 0 1.3 1.3 0 1 0-2.6 0"
+        + "M8.6 4.6a1.3 1.3 0 1 0 2.6 0 1.3 1.3 0 1 0-2.6 0M11.2 7.6a1.2 1.2 0 1 0 2.4 0 1.2 1.2 0 1 0-2.4 0";
+
     private static readonly Dictionary<string, string> ById = new(StringComparer.Ordinal)
     {
         // A cat's face with whiskers (Harry: the first one looked like a monster boss).

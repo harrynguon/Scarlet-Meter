@@ -1,0 +1,180 @@
+@using System.Globalization
+@using ScarletMeter.App.FieldBosses
+@using ScarletMeter.App.Pets
+@implements IDisposable
+@*
+    The pet souls (Windows/MeterWindows.Pets, opened from a soul notice in the overlay and from the Characters window): a row
+    per pet on the server shown, with its level, its souls toward the next level and the souls it still needs for level 3,
+    and the souls picked up for it this run. The counts are Pets/PetService's, kept per server (every character on a server
+    shares its pets): from the game's whole collection at login, and each soul since. Special pets (they come at level 3) are
+    never listed; pets at level 3 and pets only Pet Soul Chests raise are listed when the player ticks them (saved), and the
+    search and the order are this window's own. The totals at the top count the pets that can be raised, chest-only ones only
+    when listed (Pets/PetListing).
+*@
+@{
+    var view = Service.View();
+    var options = Settings.Current.Pets;
+    var totals = PetListing.Totals(view.Pets, options.ShowChestOnly);
+    var rows = PetListing.Rows(view.Pets, options.ShowMaxed, options.ShowChestOnly, search, sort);
+}
+<div class="tool pets" data-window="pets">
+    <div class="pet-head">
+        <div class="pet-line">
+            <span class="muted">Server</span>
+            @if (view.ServerId is { } server)
+            {
+                @if (view.Servers.Count > 1)
+                {
+                    <select class="pet-server" aria-label="Server" value="@server.ToString(CultureInfo.InvariantCulture)" @onchange="OnServerChanged">
+                        @foreach (var id in view.Servers)
+                        {
+                            <option value="@id.ToString(CultureInfo.InvariantCulture)">@FieldBossText.Server(id)</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <b>@FieldBossText.Server(server)</b>
+                }
+            }
+            else
+            {
+                <span>not known yet: log in with the meter running</span>
+            }
+        </div>
+        <div class="pet-line">
+            <span class="muted">Counts</span>
+            <span>@PetText.Synced(view.SyncedAt)</span>
+        </div>
+        @if (view.ServerId is not null)
+        {
+            <div class="pet-line">
+                <span class="muted">Level 3</span>
+                <span><b>@totals.AtMax</b> of @totals.Pets pets · <b>@totals.SoulsToGo.ToString("N0", CultureInfo.InvariantCulture)</b> souls to go · <b>@view.SessionSouls</b> picked up this run</span>
+            </div>
+            <span class="pet-bar total" role="presentation"><span style="width:@Compact.Percent(totals.Pets == 0 ? 0 : 100.0 * totals.AtMax / totals.Pets)"></span></span>
+        }
+        <div class="pet-tools">
+            <input class="pet-search" type="search" placeholder="Search pets" aria-label="Search pets" value="@search"
+                   @oninput="e => search = e.Value?.ToString() ?? string.Empty" />
+            <label class="pet-sort">
+                Sort
+                <select value="@sort" @onchange="OnSortChanged">
+                    <option value="@PetSort.ToMax">Nearest level 3</option>
+                    <option value="@PetSort.Session">This run</option>
+                    <option value="@PetSort.Level">Level</option>
+                    <option value="@PetSort.Name">Name</option>
+                </select>
+            </label>
+            <label class="pet-check"><input type="checkbox" checked="@options.ShowMaxed" @onchange="e => Change(p => p with { ShowMaxed = e.Value is true })" /> Level 3 pets</label>
+            <label class="pet-check"><input type="checkbox" checked="@options.ShowChestOnly" @onchange="e => Change(p => p with { ShowChestOnly = e.Value is true })" /> Chest-only pets</label>
+        </div>
+    </div>
+    @if (Service.Notice is { } notice)
+    {
+        <div class="notice">@notice</div>
+    }
+    <div class="tab-body">
+        @if (view.ServerId is null)
+        {
+            <p class="muted">No pet counts yet. Start the meter before you log in, and the game sends every pet's level and souls; each soul you pick up after that shows here.</p>
+        }
+        else if (rows.Count == 0)
+        {
+            <p class="muted">@(search.Trim().Length > 0 ? "No pet matches the search." : "Every pet listed is at level 3.")</p>
+        }
+        else
+        {
+            <table class="pet-table">
+                <thead>
+                    <tr>
+                        <th>Pet</th>
+                        <th class="num">Lv</th>
+                        <th>Souls</th>
+                        <th class="num" title="Souls still needed for level 3">To Lv 3</th>
+                        <th class="num" title="Souls picked up this run">This run</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var pet in rows)
+                    {
+                        var max = PetRules.IsMax(pet.Progress);
+                        <tr class="@(max ? "max" : "") @(pet.Session > 0 ? "farmed" : "")" @key="pet.Info.Id">
+                            <td class="pet-name">
+                                <span class="pet-dot @PetText.GenusClass(pet.Info.Genus)" aria-hidden="true"></span>
+                                <span>@pet.Info.Name</span>
+                                @if (PetText.Genus(pet.Info.Genus) is { Length: > 0 } genus)
+                                {
+                                    <span class="muted pet-genus">@genus</span>
+                                }
+                            </td>
+                            <td class="num">@pet.Progress.Level</td>
+                            <td class="pet-souls">
+                                <span>@PetText.Progress(pet.Progress)</span>
+                                @if (!max)
+                                {
+                                    <span class="pet-bar" role="presentation"><span style="width:@Compact.Percent(100.0 * pet.Progress.Souls / PetRules.NeededAt(pet.Progress.Level))"></span></span>
+                                }
+                            </td>
+                            <td class="num">@(max ? "–" : PetRules.ToMax(pet.Progress).ToString(CultureInfo.InvariantCulture))</td>
+                            <td class="num">@(pet.Session > 0 ? PetText.Gained(pet.Session) : string.Empty)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        <section>
+            <h2>Notices</h2>
+            <ToggleSetting Label="Show soul notices in the overlay" Description="When you pick up a soul for a pet below level 3: its name, its level and its souls toward the next, for a few seconds."
+                           Value="@options.Notices" ValueChanged="v => Change(p => p with { Notices = v })" />
+        </section>
+        <p class="muted pet-foot">
+            Counts are kept per server on this PC, as the game keeps one collection for all your characters on a server. A soul
+            levels a pet as soon as it covers the level's cost (5, 25, then 75); the game's own count at your next login puts right
+            anything missed while the meter was closed.
+        </p>
+    </div>
+</div>
+
+@code {
+    [Inject] private PetService Service { get; set; } = default!;
+
+    [Inject] private SettingsService Settings { get; set; } = default!;
+
+    // The window's own search and order, not saved.
+    private string search = string.Empty;
+    private PetSort sort = PetSort.ToMax;
+    private volatile bool disposed;
+
+    protected override void OnInitialized()
+    {
+        Service.Changed += OnChanged;
+        Settings.Changed += OnSettingsChanged;
+    }
+
+    private void OnSortChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<PetSort>(e.Value?.ToString(), out var chosen) && Enum.IsDefined(chosen)) sort = chosen;
+    }
+
+    private void OnServerChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var id)) Service.ChooseServer(id);
+    }
+
+    private void Change(Func<PetSettings, PetSettings> change) => Settings.Update(s => s with { Pets = change(s.Pets) });
+
+    private void OnChanged(object? sender, EventArgs e)
+    {
+        if (!disposed) _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OnSettingsChanged(object? sender, MeterSettings changed) => OnChanged(sender, EventArgs.Empty);
+
+    public void Dispose()
+    {
+        disposed = true;
+        Service.Changed -= OnChanged;
+        Settings.Changed -= OnSettingsChanged;
+    }
+}

@@ -296,6 +296,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**A total added up by hand went into a comment and into the test of the code it described** (2026-11-08, the pet souls; caught by that test before commit).
+- What: `PetRules.ToMax`'s comment said a pet needs 155 souls from nothing to level 3, and its test expected 155; the costs are 5, 25 and 75, so 105, which the code returned. The test failed, and the comment was the one wrong.
+- Why: the sum was made once, in the head, and copied into both; a test written from the same belief as the comment confirms the comment, not the rule.
+- Guard: `PetRulesTests.EachLevelHasItsCost` pins `Needed` as the game's three costs and the totals worked from them; the docs give the costs beside the total (ARCHITECTURE.md, "Pet souls"). Write a test's expected numbers from the source's figures, not from the comment being tested.
+
+**A guard against a late record was tested only at its edge** (2026-11-08, the pet souls; caught by the fail-first run before commit).
+- What: `PetRules` ignores a level-up for a level the pet already has, so a late one never takes a pet back down. Its test sent one for the pet's own level, where the rule's arithmetic changes nothing anyway, so removing the guard left every test green; a level-up for a level below the pet's would have lowered it.
+- Why: the case was written as "already reached" and tested at equality, the one value where the guarded and unguarded paths agree.
+- Guard: `ALevelUpTakesItsCostUnlessTheSoulsGotThereFirst` also sends a level-up for level 2 to a pet at level 3 and checks it stays (it failed with the guard removed). For a "never go back" rule, test a value past the edge, not only at it.
+
 **A queued save was decided against settings the queue had not reached yet** (Codex P2 on #75's review fixes, fixed before merge).
 - What: the fix that posts the character's server to the UI thread kept a check before posting: no save when the settings already hold that server. With the settings on A, the game naming B and then A before the UI thread ran the saves queued B's save and dropped A's (the settings still said A), so B landed last and stayed, and later namings of A changed nothing (the service had already noted A).
 - Why: the ordering fix moved the save onto a queue but left a decision beside it that read the state before the queue's earlier entries had applied; its test named two servers, neither of them the one the settings held.
