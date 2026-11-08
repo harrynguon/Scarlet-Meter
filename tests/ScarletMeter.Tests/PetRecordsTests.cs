@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using AionDpsMeter.Services.PacketCapture;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -96,14 +97,15 @@ public sealed class PetRecordsTests
         Assert.Equal([new PetSouls(1006, 5)], read.Souls);
     }
 
-    // An entry that gave no souls is left out; a pickup with none left gives nothing, as does one with no entries.
+    // An entry that gave no souls is left out; a pickup with none left, or with no entries, reads as one with no souls (no
+    // misread: the tap neither raises nor logs it, TheTapRaisesEachRecordRead).
     [Fact]
     public void EntriesWithNoSoulsAreLeftOut()
     {
         var read = Assert.IsType<PetSoulsGained>(PetRecords.Read(PetSouls([(1006, 0), (1007, 1)]), Now));
         Assert.Equal([new PetSouls(1007, 1)], read.Souls);
-        Assert.Null(PetRecords.Read(PetSouls([(1006, 0)]), Now));
-        Assert.Null(PetRecords.Read(PetSouls([]), Now));
+        Assert.Empty(Assert.IsType<PetSoulsGained>(PetRecords.Read(PetSouls([(1006, 0)]), Now)).Souls);
+        Assert.Empty(Assert.IsType<PetSoulsGained>(PetRecords.Read(PetSouls([]), Now)).Souls);
     }
 
     // A level reached and a pet unlocked carry the pet and its level after two bytes; only an unlock may be at level 0.
@@ -159,15 +161,20 @@ public sealed class PetRecordsTests
         Assert.Null(PetRecords.Read([0x05], Now));
     }
 
-    // The tap raises each record read, and nothing for one that does not read.
+    // The tap raises each record read, and nothing for one that does not read or a pickup that gave no souls, which it does
+    // not log either (the audit on #76: logged as a misread, zero pickups between real ones would log at every kill).
     [Fact]
     public void TheTapRaisesEachRecordRead()
     {
-        var tap = new PetRecordTap(new FakeTimeProvider(Now), NullLogger<PetRecordTap>.Instance);
+        var log = new RecordingLogger<PetRecordTap>();
+        var tap = new PetRecordTap(new FakeTimeProvider(Now), log);
         var raised = new List<PetRecord>();
         tap.Observed += (_, record) => raised.Add(record);
-        tap.Observe(PetCollection([(1006, 2)], [(1006, 13)]));
+        tap.Observe(PetCollection([(1006, 2)], [(1006, 9)]));
         tap.Observe(PetSouls([(1006, 1)]));
+        tap.Observe(PetSouls([(1006, 0)]));
+        tap.Observe(PetSouls([]));
+        Assert.Single(log.Entries); // the collection's read, nothing for the empty pickups
         tap.Observe(PetSouls([(1006, 1)], count: 3));
         tap.Observe(PetLevel(PetRecords.LevelUpOpcode, 1006, 3));
         tap.Observe(PetLevel(PetRecords.UnlockedOpcode, 1050, 1));
@@ -177,7 +184,8 @@ public sealed class PetRecordsTests
     }
 
     // A kind of record that stops reading is logged once, not at every kill, until one reads again; the log never carries a
-    // pet or a count.
+    // pet or a count, the collection's size included (Codex P1 on #76: how many pets a player has is their progress), so
+    // no line about pets has a digit but the opcode's bytes.
     [Fact]
     public void ARecordThatDoesNotReadIsLoggedOnceUntilOneReads()
     {
@@ -189,8 +197,9 @@ public sealed class PetRecordsTests
         tap.Observe(PetSouls([(1006, 1)]));
         tap.Observe(PetSouls([(1006, 1)], count: 2));
         Assert.Equal(2, log.Entries.Count(entry => entry.Message.Contains("did not read", StringComparison.Ordinal)));
-        tap.Observe(PetCollection([(1006, 2)], [(1006, 13)]));
-        Assert.DoesNotContain(log.Entries, entry => entry.Message.Contains("1006", StringComparison.Ordinal) || entry.Message.Contains("13)", StringComparison.Ordinal));
+        tap.Observe(PetCollection([(1006, 2), (1007, 3), (1008, 1)], [(1006, 9), (1008, 4)]));
+        Assert.Contains(log.Entries, entry => entry.Message == "The pet collection was read.");
+        Assert.All(log.Entries, entry => Assert.DoesNotMatch(@"\d", Regex.Replace(entry.Message, @"\([0-9A-F]{2} [0-9A-F]{2}\)", string.Empty)));
     }
 
     // A subscriber that throws is logged, and the next record is still raised.
@@ -216,7 +225,7 @@ public sealed class PetRecordsTests
         engine.PetRecordObserved += (_, record) => raised.Add(record);
 
         Synchronise(stream);
-        stream.AddData("synthetic", PetCollection([(1006, 2)], [(1006, 13)]), 0);
+        stream.AddData("synthetic", PetCollection([(1006, 2)], [(1006, 9)]), 0);
         stream.AddData("synthetic", Bundle([.. PetSouls([(1006, 1)]), .. PetLevel(PetRecords.LevelUpOpcode, 1006, 3)]), 0);
 
         Assert.Equal([typeof(PetCollectionRead), typeof(PetSoulsGained), typeof(PetLevelReached)], raised.Select(r => r.GetType()));

@@ -301,6 +301,31 @@ public sealed class PetServiceTests : IDisposable
         Assert.Equal((0, 0, 0), (engine.PetSubscribers, engine.Subscribers, engine.ConnectionSubscribers));
     }
 
+    // A save that fails (the file held by a virus scan, a backup or a sync) is logged once and leaves the counts to save:
+    // with no change after it, the save at exit writes them (the audit on #76: with the retry's mark removed every test
+    // passed, and the last counts would have been lost). It says when saving works again.
+    [Fact]
+    public void AFailedSaveIsTriedAgainAtExit()
+    {
+        var store = NewStore();
+        using var settings = NewSettings();
+        var log = new RecordingLogger<PetService>();
+        var service = NewService(store, settings, log);
+        engine.Character = Character(ServerA);
+        using (new FileStream(store.FilePath + ".tmp", FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            service.TakeRecord(Souls(Sparkie));
+            clock.Advance(PetService.SaveDelay);
+            service.TakeRecord(Souls(Sparkie));
+            clock.Advance(PetService.SaveDelay);
+            Assert.False(File.Exists(store.FilePath));
+        }
+        Assert.Single(log.Entries, entry => entry.Message.Contains("could not be saved", StringComparison.Ordinal));
+        service.Dispose();
+        Assert.Equal([new PetEntry(Sparkie, 0, 2)], Saved(store, ServerA)!.Pets);
+        Assert.Single(log.Entries, entry => entry.Message.Contains("works again", StringComparison.Ordinal));
+    }
+
     // Counts saved by an earlier run are where the next run starts.
     [Fact]
     public void ANewRunStartsFromTheSavedCounts()
@@ -489,7 +514,7 @@ public sealed class PetServiceTests : IDisposable
         Assert.Empty(loaded.File.Servers);
         Assert.True(loaded.CanSave);
         Assert.Equal(StoredFileStatus.ResetToDefaults, loaded.Status);
-        Assert.Contains("Your pet souls file could not be read", loaded.Notice, StringComparison.Ordinal);
+        Assert.Contains("Your pet list file could not be read", loaded.Notice, StringComparison.Ordinal);
         Assert.Contains("the counts start again from your next login", loaded.Notice, StringComparison.Ordinal);
     }
 }

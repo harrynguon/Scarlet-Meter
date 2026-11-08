@@ -60,7 +60,8 @@ internal static class PetRecords
 
     /// <summary>
     /// Reads one framed record (its length varint, two opcode bytes, then its body), stamped <paramref name="now"/>, or null
-    /// when it is not a pet record or does not read (see the class). A pickup whose every entry gave 0 souls is none.
+    /// when it is not a pet record or does not read (see the class). A pickup that read but gave no souls (no entries, or
+    /// every entry 0) is one with no souls, not null: it is no misread, and the tap neither raises nor logs it.
     /// </summary>
     public static PetRecord? Read(ReadOnlySpan<byte> record, DateTimeOffset now)
     {
@@ -96,7 +97,7 @@ internal static class PetRecords
         return new PetCollectionRead(levels, points, now);
     }
 
-    // A one-byte count, then pet and souls for each; entries that gave none are left out.
+    // A one-byte count, then pet and souls for each; entries that gave none are left out (possibly all of them).
     private static PetSoulsGained? ReadSouls(ReadOnlySpan<byte> body, DateTimeOffset now)
     {
         if (body.IsEmpty) return null;
@@ -108,7 +109,7 @@ internal static class PetRecords
             if (!TryPet(body, at, out var pet) || !TryNumber(body, at + 4, MaxSoulsAtOnce, out var amount)) return null;
             if (amount > 0) souls.Add(new PetSouls(pet, amount));
         }
-        return souls.Count == 0 ? null : new PetSoulsGained(souls, now);
+        return new PetSoulsGained(souls, now);
     }
 
     // 2 bytes, the pet, its level: a level reached is 1 or more; a pet unlocked may come at any level.

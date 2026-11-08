@@ -12,14 +12,16 @@ internal static class StoredFileNotice
     /// </summary>
     /// <param name="outcome">How the load went.</param>
     /// <param name="kept">The file name an unreadable file was kept as, or null when none was.</param>
-    /// <param name="what">What the file holds, as the sentence names it ("character roster").</param>
+    /// <param name="what">What the file holds, as the sentence names it, a singular noun ("character roster", "pet list"):
+    /// "Your {what} comes from a newer version", "Your {what} file was missing". The roster's sentences are pinned word for
+    /// word (RosterTests.TheRostersFileSentencesAreAsTheyWere).</param>
     /// <param name="startedAfresh">What happens with nothing to restore, as a clause ("a new roster was started").</param>
     public static string? For(StoredFileOutcome outcome, string? kept, string what, string startedAfresh) => outcome switch
     {
         StoredFileOutcome.Read or StoredFileOutcome.NoFile => null,
         StoredFileOutcome.MissingBackupRead => $"Your {what} file was missing, so the previous save was restored.",
         StoredFileOutcome.Newer or StoredFileOutcome.MissingBackupNewer =>
-            $"Your {what} file comes from a newer version of Scarlet Meter. It is shown, and changes are not saved.",
+            $"Your {what} comes from a newer version of Scarlet Meter. It is shown, and changes are not saved.",
         StoredFileOutcome.Inaccessible or StoredFileOutcome.MissingBackupInaccessible or StoredFileOutcome.UnreadableBackupInaccessible =>
             $"Your {what} file could not be opened{KeptNote(kept)}. Changes are not saved until the meter restarts with the file free.",
         StoredFileOutcome.MissingBackupNotKeptAside or StoredFileOutcome.UnreadableNotKeptAside or StoredFileOutcome.UnreadableBackupNotKeptAside =>

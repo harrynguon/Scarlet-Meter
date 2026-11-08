@@ -309,6 +309,36 @@ public sealed class RosterTests : IDisposable
         Assert.Single(Directory.GetFiles(directory.FullPath, "roster.unreadable-*.json"));
     }
 
+    // The roster's sentences about its file, for every way a load can go, word for word as they were before they were shared
+    // with the pets' file (Storage/StoredFileNotice; the audit on #76 found "file" added to the newer-build one, unpinned).
+    [Fact]
+    public void TheRostersFileSentencesAreAsTheyWere()
+    {
+        const string Kept = "roster.unreadable-x.json";
+        static string? Say(StoredFileOutcome outcome, string? kept) => StoredFileNotice.For(outcome, kept, "character roster", "a new roster was started");
+        var expected = new Dictionary<StoredFileOutcome, string?>
+        {
+            [StoredFileOutcome.Read] = null,
+            [StoredFileOutcome.NoFile] = null,
+            [StoredFileOutcome.MissingBackupRead] = "Your character roster file was missing, so the previous save was restored.",
+            [StoredFileOutcome.Newer] = "Your character roster comes from a newer version of Scarlet Meter. It is shown, and changes are not saved.",
+            [StoredFileOutcome.MissingBackupNewer] = "Your character roster comes from a newer version of Scarlet Meter. It is shown, and changes are not saved.",
+            [StoredFileOutcome.Inaccessible] = $"Your character roster file could not be opened (an unreadable one was kept as {Kept}). Changes are not saved until the meter restarts with the file free.",
+            [StoredFileOutcome.MissingBackupInaccessible] = $"Your character roster file could not be opened (an unreadable one was kept as {Kept}). Changes are not saved until the meter restarts with the file free.",
+            [StoredFileOutcome.UnreadableBackupInaccessible] = $"Your character roster file could not be opened (an unreadable one was kept as {Kept}). Changes are not saved until the meter restarts with the file free.",
+            [StoredFileOutcome.MissingBackupNotKeptAside] = $"Your character roster file could not be read or set aside (an unreadable one was kept as {Kept}). Changes are not saved until the meter restarts with the file free.",
+            [StoredFileOutcome.UnreadableNotKeptAside] = $"Your character roster file could not be read or set aside (an unreadable one was kept as {Kept}). Changes are not saved until the meter restarts with the file free.",
+            [StoredFileOutcome.UnreadableBackupNotKeptAside] = $"Your character roster file could not be read or set aside (an unreadable one was kept as {Kept}). Changes are not saved until the meter restarts with the file free.",
+            [StoredFileOutcome.MissingBackupUnreadable] = $"The previous save of your character roster could not be read, so a new roster was started. It was kept as {Kept}.",
+            [StoredFileOutcome.UnreadableBackupRead] = $"Your character roster file could not be read, so the previous save was restored. The unreadable file was kept as {Kept}.",
+            [StoredFileOutcome.UnreadableNoBackup] = $"Your character roster file could not be read and there was no usable previous save, so a new roster was started. The unreadable file was kept as {Kept}.",
+        };
+        Assert.Equal(Enum.GetValues<StoredFileOutcome>().Order(), expected.Keys.Order());
+        foreach (var (outcome, sentence) in expected) Assert.Equal(sentence, Say(outcome, Kept));
+        Assert.Equal("Your character roster file could not be opened. Changes are not saved until the meter restarts with the file free.",
+            Say(StoredFileOutcome.Inaccessible, null));
+    }
+
     // One from a newer build is shown but never overwritten.
     [Fact]
     public void ARosterFromANewerBuildIsReadOnly()

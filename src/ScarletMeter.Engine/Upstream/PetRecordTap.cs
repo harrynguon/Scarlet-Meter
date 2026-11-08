@@ -11,9 +11,11 @@ namespace ScarletMeter.Engine.Upstream;
 /// </summary>
 /// <remarks>
 /// Runs on the capture thread, inside upstream's PacketAccumulator callback (see <see cref="RecordTap"/>, which contains
-/// anything that escapes). The log says when the collection is read and how many pets it lists, and once (until one reads
-/// again) when a kind of record does not read; never a pet's level or souls, and nothing for each pickup, which comes with
-/// every kill while farming. A subscriber's failure is logged each time, so the rest of a bundle is still read.
+/// anything that escapes). The log says when the collection is read, never how many pets it lists (Codex P1 on #76: the
+/// count is the player's progress), and once (until one reads again) when a kind of record does not read; never a pet's
+/// level or souls, and nothing for each pickup, which comes with every kill while farming. A pickup that gave no souls is
+/// no misread: it is neither raised nor logged. A subscriber's failure is logged each time, so the rest of a bundle is still
+/// read.
 /// </remarks>
 internal sealed class PetRecordTap : IRecordReader
 {
@@ -56,8 +58,8 @@ internal sealed class PetRecordTap : IRecordReader
             return;
         }
         if (failing.Remove(opcode)) logger.LogInformation("Pet records ({Opcode}) read again.", Bytes(opcode));
-        if (read is PetCollectionRead collection)
-            logger.LogInformation("The pet collection was read ({Pets} pets with a level, {Points} with soul points).", collection.Levels.Count, collection.Points.Count);
+        if (read is PetSoulsGained { Souls.Count: 0 }) return;
+        if (read is PetCollectionRead) logger.LogInformation("The pet collection was read.");
         try
         {
             Observed?.Invoke(this, read);

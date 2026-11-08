@@ -58,7 +58,7 @@ public sealed class PetStore
             logger.LogWarning(load.Error, "The pet souls could not be fully loaded ({Outcome}).", load.Outcome);
         else if (load.Status == StoredFileStatus.ReadOnly)
             logger.LogWarning("The pet souls come from a newer Scarlet Meter (version {Version}); they are shown but not overwritten.", load.Version);
-        var problem = StoredFileNotice.For(load.Outcome, kept, "pet souls", "the counts start again from your next login");
+        var problem = StoredFileNotice.For(load.Outcome, kept, "pet list", "the counts start again from your next login");
 
         var (pets, repairs) = PetNormalizer.Normalize(load.Value, now);
         foreach (var repair in repairs) logger.LogInformation("Pet souls repaired: {Repair}", repair);
