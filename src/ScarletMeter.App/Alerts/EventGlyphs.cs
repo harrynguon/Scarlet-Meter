@@ -12,6 +12,11 @@ public static class EventGlyphs
     /// <summary>A plain ring, for an id with no drawing of its own.</summary>
     public const string Fallback = "M3.2 8a4.8 4.8 0 1 0 9.6 0 4.8 4.8 0 1 0-9.6 0";
 
+    /// <summary>A horned skull with its teeth, for a field boss's notice (FieldBosses): no catalog event uses it.</summary>
+    public const string FieldBoss = "M4.2 7.4C4.2 5 5.9 3.6 8 3.6S11.8 5 11.8 7.4v2.1L10.4 10.6v1.8H5.6v-1.8L4.2 9.5Z"
+        + "M4.4 5.6 2.4 2.6M11.6 5.6l2-3M6.1 8.1a.7.7 0 1 0 1.4 0 .7.7 0 1 0-1.4 0M8.5 8.1a.7.7 0 1 0 1.4 0 .7.7 0 1 0-1.4 0"
+        + "M7 12.4v-1.2M9 12.4v-1.2";
+
     private static readonly Dictionary<string, string> ById = new(StringComparer.Ordinal)
     {
         // A cat's face with whiskers (Harry: the first one looked like a monster boss).

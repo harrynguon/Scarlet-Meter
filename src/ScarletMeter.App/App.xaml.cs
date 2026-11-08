@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ScarletMeter.App.Alerts;
+using ScarletMeter.App.FieldBosses;
 using ScarletMeter.App.Logging;
 using ScarletMeter.App.Roster;
 using ScarletMeter.App.Settings;
@@ -100,6 +101,10 @@ public partial class App : Application
         builder.Services.AddSingleton<DetailsSelection>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<AlertMonitor>();
+        // Field-boss timers: the player's own map and NotMeter's shared timers (asked only while wanted).
+        builder.Services.AddSingleton(services => new FieldBossFeedClient(
+            FieldBossFeedClient.CreateDefaultHandler(), services.GetRequiredService<TimeProvider>(), services.GetRequiredService<ILogger<FieldBossFeedClient>>()));
+        builder.Services.AddSingleton<FieldBossService>();
         builder.Services.AddUpstreamReleaseChecker();
         builder.Services.AddSingleton<UpdateNotice>();
         builder.Services.AddWpfBlazorWebView();
@@ -109,8 +114,9 @@ public partial class App : Application
         // Settings load before the engine resolves, so upstream sees the saved fight rules from the first hit.
         host.Services.GetRequiredService<SettingsService>();
         engine = host.Services.GetRequiredService<ICombatEngine>();
-        // Before capture starts, so the first login's counts reach the roster.
+        // Before capture starts, so the first login's counts reach the roster, and the character's server the field-boss timers.
         host.Services.GetRequiredService<RosterService>().Start();
+        host.Services.GetRequiredService<FieldBossService>().Start();
         engine.Start();
 
         var windows = host.Services.GetRequiredService<MeterWindows>();

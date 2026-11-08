@@ -449,11 +449,15 @@ public sealed class RosterTests : IDisposable
 
     // ---------- What the service takes ----------
 
-    private sealed class FakeEngine : ICombatEngine
+    // Shared with FieldBossServiceTests, which take the same events.
+    internal sealed class FakeEngine : ICombatEngine
     {
         public event EventHandler<CharacterProgress>? ProgressObserved;
         public event EventHandler<int?>? MapChanged;
         public event EventHandler<AbyssArtifacts>? ArtifactsObserved;
+        public event EventHandler<FieldBossMap>? FieldBossMapObserved;
+        public void RaiseFieldBossMap(FieldBossMap map) => FieldBossMapObserved?.Invoke(this, map);
+        public int FieldBossMapSubscribers => FieldBossMapObserved?.GetInvocationList().Length ?? 0;
         public event EventHandler? ConnectionStarted;
         public void RaiseConnection() => ConnectionStarted?.Invoke(this, EventArgs.Empty);
         public int ConnectionSubscribers => ConnectionStarted?.GetInvocationList().Length ?? 0;

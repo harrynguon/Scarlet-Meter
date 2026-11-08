@@ -54,6 +54,11 @@ https://github.com/harrynguon/Scarlet-Meter with the `upstream/` submodule at th
   which server ids exist, Korea's and Taiwan's and the Global servers NC has opened, by faction, region and slot
   (`ScarletMeter.Engine/Entries/GameServers`), from `exists` in `src-tauri/src/capture/servers.rs`, added in that
   commit (read on 2026-10-27), its rule ported and its open slots taken as facts;
+  and the layout of the world map's field-boss list and how its times are found (`ScarletMeter.Engine/Maps/FieldBossMapRecords`),
+  from `src-tauri/src/capture/boss_map.rs`, added in 9300bc5ff530910f372f6c9e1b37b96394a76403 and last changed in
+  b8c63f6bda0c5785279a043311a825280bebebf8 (a time up to eight days ahead; read on 2026-11-08); and the field bosses'
+  world-map ids, NPC codes and English names (`ScarletMeter.WorldEvents/FieldBosses/FieldBossCatalog`), from
+  `src-tauri/src/capture/field_bosses.rs` at 396cfd5d4a9deb2c55ba13365b2c62fc56cf5ad8 (read on 2026-11-08), taken as facts;
   GNU GPL v3: its Rust parsing ported to C#. No captured bytes were taken; Scarlet's tests use synthetic records.
 - **SkeeveAN/Aion-DPS-Meter** (the layout of the game's inventory records and how to find an entry in them by its anchor,
   `ScarletMeter.Engine/Entries/InventoryRecords`), https://github.com/SkeeveAN/Aion-DPS-Meter, `Client/Aion2/Aion2Stock.cs`

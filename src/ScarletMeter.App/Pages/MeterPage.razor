@@ -35,8 +35,8 @@
                     }
                 </svg>
             </button>
-            @* World-boss timers from aion2timers.com, in a window of their own (Windows/BossTimersWindow). *@
-            <button type="button" class="icon-btn" title="Boss timers (aion2timers.com)" @onclick="Windows.OpenBossTimers">
+            @* The field-boss timers (Pages/FieldBossesPage), which also open aion2timers.com's (Windows/BossTimersWindow). *@
+            <button type="button" class="icon-btn" title="Field boss timers" @onclick="Windows.OpenFieldBosses">
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2h7M4.5 14h7" /><path d="M5.3 2.2c0 3.3 5.4 3 5.4 5.8s-5.4 2.5-5.4 5.8M10.7 2.2c0 3.3-5.4 3-5.4 5.8s5.4 2.5 5.4 5.8" /></svg>
             </button>
             <button type="button" class="icon-btn" title="History" @onclick="Windows.OpenHistory">
@@ -175,5 +175,9 @@
     @* Always rendered, held empty while the notices stand aside for a boss fight (NoticesHeld), so its live region
        survives the fight. A detail line opened or closed renders this page at once, which measures the new height
        for the window (OnAfterRenderAsync). *@
-    <EventRow View="Alerts.Current" Now="Clock.GetUtcNow()" Held="NoticesHeld" LinesChanged="StateHasChanged" />
+    @{
+        var now = Clock.GetUtcNow();
+    }
+    <EventRow View="Alerts.Current" Now="now" Held="NoticesHeld" LinesChanged="StateHasChanged"
+              FieldBosses="FieldBosses.Plan(now).Alerts" OpenFieldBosses="Windows.OpenFieldBosses" />
 </div>

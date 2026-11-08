@@ -1,5 +1,7 @@
 @using ScarletMeter.App.Alerts
+@using ScarletMeter.App.FieldBosses
 @using ScarletMeter.WorldEvents
+@using ScarletMeter.WorldEvents.FieldBosses
 @*
     The overlay's world events: one row of icons at the bottom of the meter, one per alerted event in catalog order
     (Alerts/EventGlyphs; Harry asked for icons in place of the list, 2026-10-26). An icon lights up while its event is
@@ -15,17 +17,34 @@
     kind, not every second. It is always rendered (empty when nothing is due), because a live region inserted already
     filled is often not announced. While Held (the row stands aside for a boss fight) it shows nothing and its live
     region is empty, so what came due meanwhile is announced when the fight ends.
+    Before the events come the chosen field bosses' notices (FieldBosses/FieldBossService, its planner in WorldEvents): a
+    skull, the boss's short name and, before a respawn, the time to it, gold as an event's Soon; teal and "up" once it is
+    up, for a quarter of an hour. Clicking one opens the Field bosses window. They stand aside for a boss fight too.
 *@
 <span class="sr-only" role="status">@(Held ? string.Empty : Announcement)</span>
 @if (Held)
 {
     @* Standing aside for a boss fight. *@
 }
-else if (EventRowLayout.Icons(View) is { Count: > 0 } icons)
+else if (EventRowLayout.Icons(View) is var icons && (icons.Count > 0 || FieldBosses.Count > 0))
 {
     var zone = TimeZoneInfo.Local;
     <div class="alerts" role="group" aria-label="World events">
         <div class="ev-row">
+            @foreach (var boss in FieldBosses)
+            {
+                var notice = FieldBossText.Notice(boss);
+                <button type="button" class="ev fb @(boss.Kind == FieldBossAlertKind.Soon ? "soon" : "open")" @key="@($"fb-{boss.Boss.Id}")"
+                        aria-label="@notice" @onclick="OpenFieldBosses">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="@EventGlyphs.FieldBoss" /></svg>
+                    <span class="ev-name">@FieldBossText.Short(boss.Boss.Name)</span>
+                    <span class="ev-time">@(boss.Kind == FieldBossAlertKind.Soon ? EventText.IconTime(boss.At - Now) : "up")</span>
+                    <span class="ev-tip" aria-hidden="true">
+                        <span class="ev-tip-head"><b>@boss.Boss.Name</b> · @(boss.Kind == FieldBossAlertKind.Soon ? $"respawns {EventText.LocalTime(boss.At, zone)}" : "up")</span>
+                        <span class="ev-tip-where">@FieldBossMaps.NameOf(boss.Boss.MapId) · @FieldBossText.Source(boss.Timer, Now)</span>
+                    </span>
+                </button>
+            }
             @foreach (var icon in icons)
             {
                 var status = EventRowLayout.Status(icon, Now, View.ServerOffset, zone);
@@ -73,6 +92,12 @@ else if (EventRowLayout.Icons(View) is { Count: > 0 } icons)
     // a click alone would re-render only this row, and the page would measure on its next refresh, up to a tick later.
     [Parameter] public EventCallback LinesChanged { get; set; }
 
+    // The chosen field bosses' notices, most urgent first (FieldBossService.Plan); none by default.
+    [Parameter] public IReadOnlyList<FieldBossAlert> FieldBosses { get; set; } = [];
+
+    // A field boss's notice was clicked: the page opens the Field bosses window.
+    [Parameter] public EventCallback OpenFieldBosses { get; set; }
+
     // The events whose detail lines are open under the row.
     private IReadOnlySet<string> open = new HashSet<string>(StringComparer.Ordinal);
 
@@ -85,9 +110,10 @@ else if (EventRowLayout.Icons(View) is { Count: > 0 } icons)
 
     private bool IsOpen(EventIcon icon) => open.Contains(icon.Rule.Id);
 
-    private string Announcement => string.Join("; ", View.Alerts.Take(EventRowLayout.AnnouncedCount).Select(a => a.Kind == AlertKind.Soon
-        ? $"{a.Rule.Name} starts at {EventText.LocalTime(a.Start)}"
-        : $"{a.Rule.Name}: {EventText.OpenLabel(a.Rule)} until {EventText.LocalTime(a.Deadline)}"));
+    private string Announcement => string.Join("; ", FieldBosses.Take(EventRowLayout.AnnouncedCount).Select(FieldBossText.Notice)
+        .Concat(View.Alerts.Take(EventRowLayout.AnnouncedCount).Select(a => a.Kind == AlertKind.Soon
+            ? $"{a.Rule.Name} starts at {EventText.LocalTime(a.Start)}"
+            : $"{a.Rule.Name}: {EventText.OpenLabel(a.Rule)} until {EventText.LocalTime(a.Deadline)}")));
 
     // The detail line's colours: gold before a due start, teal while open, plain while the event is not due.
     private static string Kind(EventIcon icon) => icon.State switch

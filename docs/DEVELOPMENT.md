@@ -20,6 +20,8 @@ If the clone was made without `--recurse-submodules`, `upstream/` is empty: run 
 
 The script uses the `dotnet` on PATH and insists on a .NET 10 SDK. When another SDK is first on PATH, point `SCARLET_DOTNET` at the right `dotnet.exe` (an absolute path) for the session instead of editing PATH.
 
+Run tests through `dotnet` (the script's `dotnet test`, or `dotnet exec "<checkout>\tests\ScarletMeter.Tests\bin\<configuration>\net10.0-windows10.0.20348.0\ScarletMeter.Tests.dll"`, which takes xunit's `-class <full name>` filters), not the built `ScarletMeter.Tests.exe`: in a checkout below a folder with a Low integrity label the exe starts at Low, cannot write to the temp folder, and its file and settings tests fail as if the code were wrong (LESSONS.md).
+
 ## Run
 
 ```powershell

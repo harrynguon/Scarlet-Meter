@@ -102,11 +102,23 @@ Harry asked for a dashboard like other tools' Odyle dashboards, starting with Od
 - [ ] Dimensional Invasion keys (#68): log in with the meter open; the meter shows the keys left of the Shugo keys, out of 7, matching the game's teleport dialog; use a key and see it drop; start the meter mid-session and see the last ones, ≈, rising by one after the daily reset. Narrow the meter below 395 px and see them make room, the rest of the line unchanged; just above it, with ≈ values after a mid-session start, see that the ping is not cut.
 - [ ] Last known Odyle energy and Shugo keys (#60): log in on a character with the meter running (so the roster has its energy and its server's keys), close the meter, play on, and start it again while still in the game. Beside the ping at once: "≈" with the energy and the keys, dimmer and italic, the energy with basic's refills since (+15 every three hours up to its cap) and the keys with +3 at each daily reset up to 21; pointing at each says it is estimated. At your next login or the next change (a raid, a key used) the game's own replace them, plain. Note how far off the estimate was. If you switched character while the meter was closed, the ≈ values are the last character's until the game names the new one; note whether that reads as wrong.
 
+## Next: the field-boss timers
+
+Harry asked for a warning before Eternal Gartua respawns, with the timers visible while the game is closed (2026-11-08). Wired as ARCHITECTURE.md "Field-boss timers" describes: the world map's boss list (`01 91`, A2Tools' layout) read when the player opens the map, NotMeter's public shared timers, the Field bosses window (the hourglass) and notices in the overlay's event row. Nothing of it has run with the game yet. In the game (note the commit, date and time zone; never a character's name):
+
+- [ ] With the meter running and logged in, open the world map (M) in Verteron: the log says "Field bosses read from the world map: map 1010, 24 bosses." (an Altgard character: map 1110), and the Field bosses window's "Your map" line says "read just now". Each boss's state and time match the map's own (a dead boss's respawn, an up boss). If the log says the list "did not read", note it: the layout may differ from A2Tools'.
+- [ ] Open the Abyss's map in the Abyss: map 20, 8 bosses, the scheduled ones with their next spawn or no time.
+- [ ] A meter started while already in the game: open the map before the game names the character (no login or zone change since the start): the log says the bosses are held until the game names them; after the next zone change they show.
+- [ ] Shared timers: with the game closed, open the Field bosses window: the server line names your server (from your last login with the meter running), "Shared timers" says "from NotMeter, read just now", and Eternal Gartua's respawn shows. Compare it with the game's map once in the game, and note how far off it is (seconds).
+- [ ] Bell Eternal Gartua and set the lead time (10 minutes by default): the overlay's event row shows a gold skull "Gartua" with the time left from that lead time until the respawn, then teal "Gartua up" for a quarter of an hour. Its tip names the boss, the respawn time, the map and where the timer came from; a click opens the window. In a dungeon boss fight it stands aside with the event icons.
+- [ ] With "Read other players' shared timers" off, the window says "off" and nothing is asked (the log has no "Shared field boss timers not read" lines, and the meter's network use, if watched, has no request to raw.githubusercontent.com).
+- [ ] Enter another server's number in the window: its timers show; logging in on a character of another server switches it back to that one.
+
 ## Next: the boss-timers window
 
-Wired as ARCHITECTURE.md "Windows" describes (`BossTimersWindow`). Only Harry loads the real site: aion2timers.com bars AI agents, so no automated check opens it. By hand:
+Wired as ARCHITECTURE.md "Windows" describes (`BossTimersWindow`), opened from the Field bosses window's "Open aion2timers.com" since the field-boss timers (the hourglass opened it before). Only Harry loads the real site: aion2timers.com bars AI agents, so no automated check opens it. By hand:
 
-- [ ] The hourglass in the header opens a window beside the meter with aion2timers.com's world-boss timers, readable and dark-framed; clicking it again brings the open window forward.
+- [ ] "Open aion2timers.com" in the Field bosses window (the hourglass in the header) opens a window beside the meter with aion2timers.com's world-boss timers, readable and dark-framed; clicking it again brings the open window forward.
 - [ ] Choose a server and faction on the site, close the window, restart the meter and open it again: the site still has the choice (kept in `data\webview2-timers`).
 - [ ] A link to another site opens in the default browser, not in the window; the site's own links stay in the window; nothing downloads; no site asks for notifications or location.
 - [ ] "Keep on top" keeps the window over the game and stays on after a restart; off, the game can cover it. The window's position and size survive a restart.

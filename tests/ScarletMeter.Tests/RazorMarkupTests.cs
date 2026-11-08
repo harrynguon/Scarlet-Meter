@@ -235,7 +235,7 @@ public sealed partial class RazorMarkupTests
         // The row shows nothing and announces nothing while held, before its other branch.
         var strip = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Components", "EventRow.razor"));
         Assert.Contains(@"<span class=""sr-only"" role=""status"">@(Held ? string.Empty : Announcement)</span>", strip);
-        Assert.Matches(@"(?s)@if \(Held\)\s*\{\s*@\*[^*]*\*@\s*\}\s*else if \(EventRowLayout\.Icons\(View\) is \{ Count: > 0 \} icons\)", strip);
+        Assert.Matches(@"(?s)@if \(Held\)\s*\{\s*@\*[^*]*\*@\s*\}\s*else if \(EventRowLayout\.Icons\(View\) is var icons && \(icons\.Count > 0 \|\| FieldBosses\.Count > 0\)\)", strip);
 
         // The window layer asks the gate before every restore for an event, and acts on the one that waited.
         var windows = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Windows", "MeterWindows.cs"));
@@ -354,13 +354,14 @@ public sealed partial class RazorMarkupTests
     // BossTimersSite's decisions (tested there), browser launches through the gate (BrowserLaunchGateTests) and out of
     // WebView2's callback, and nothing that would let the page reach the meter, the meter's local hosts, this PC's
     // files or other programs; its start and its buttons cannot end the meter (deep audit on PR #29: a click after
-    // the browser process crashed would have). Not owned by the overlay. The header's hourglass opens it.
-    // Source-text guards: the WebView has no test host here.
+    // the browser process crashed would have). Not owned by the overlay. The Field bosses window opens it (the header's
+    // hourglass opens that window, since the field-boss timers). Source-text guards: the WebView has no test host here.
     [Fact]
     public void TheBossTimersWindowIsKeptApartFromTheMeter()
     {
         var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
-        Assert.Contains(@"@onclick=""Windows.OpenBossTimers""", File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor")));
+        Assert.Contains(@"@onclick=""Windows.OpenFieldBosses""", File.ReadAllText(Path.Combine(app, "Pages", "MeterPage.razor")));
+        Assert.Contains(@"@onclick=""Windows.OpenBossTimers""", File.ReadAllText(Path.Combine(app, "Pages", "FieldBossesPage.razor")));
         var window = File.ReadAllText(Path.Combine(app, "Windows", "BossTimersWindow.cs"));
         Assert.Contains("public sealed class BossTimersWindow : Window", window);
         Assert.Contains("public const string ProfileFolder = \"webview2-timers\";", window);
@@ -419,6 +420,38 @@ public sealed partial class RazorMarkupTests
         Assert.Contains("bossTimers?.Close();", windows);
     }
 
+    // A chosen field boss's notice in the event row (Harry, 2026-11-08: Eternal Gartua): a real button naming the boss and
+    // its respawn for screen readers, its skull drawn from path data bound as an attribute (never raw HTML), gold before
+    // the respawn and teal once up, its short name kept from widening a narrow meter, and a click that opens the Field
+    // bosses window; the window's bells are real buttons saying whether they are on.
+    [Fact]
+    public void TheFieldBossNoticesAreButtonsInTheEventRow()
+    {
+        var app = Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App");
+        var row = File.ReadAllText(Path.Combine(app, "Components", "EventRow.razor"));
+        Assert.Matches(@"<button type=""button"" class=""ev fb @\(boss\.Kind == FieldBossAlertKind\.Soon \? ""soon"" : ""open""\)"" @key=""@\(\$""fb-\{boss\.Boss\.Id\}""\)""\s*"
+            + @"aria-label=""@notice"" @onclick=""OpenFieldBosses"">", row);
+        Assert.Contains("var notice = FieldBossText.Notice(boss);", row);
+        Assert.Contains(@"<svg viewBox=""0 0 16 16"" aria-hidden=""true""><path d=""@EventGlyphs.FieldBoss"" /></svg>", row);
+        Assert.Contains(@"<span class=""ev-name"">@FieldBossText.Short(boss.Boss.Name)</span>", row);
+        // Announced with the events, a notice's words changing only when it appears or changes kind.
+        Assert.Contains("FieldBosses.Take(EventRowLayout.AnnouncedCount).Select(FieldBossText.Notice)", row);
+
+        var alerts = File.ReadAllText(Path.Combine(app, "wwwroot", "css", "alerts.css"));
+        var name = Regex.Match(alerts, @"(?m)^\.ev-name \{(?<body>[^}]*)\}").Groups["body"].Value;
+        Assert.Matches(@"max-width:\s*\d+px;", name);
+        Assert.Contains("text-overflow: ellipsis;", name);
+        Assert.Contains("white-space: nowrap;", name);
+
+        var page = File.ReadAllText(Path.Combine(app, "Pages", "FieldBossesPage.razor"));
+        Assert.Contains(@"<div class=""tool fieldbosses"" data-window=""fieldbosses"">", page);
+        Assert.Matches(@"<button type=""button"" class=""fb-bell @\(on \? ""on"" : """"\)"" aria-pressed=""@\(on \? ""true"" : ""false""\)""", page);
+        Assert.Contains("watch = Service.Watch();", page);
+        Assert.Contains("watch?.Dispose();", page);
+        Assert.Contains("tick?.Dispose();", page);
+        Assert.DoesNotContain("MarkupString", page, StringComparison.Ordinal);
+    }
+
     // Nothing in the event row blinks or loops (Harry: the pulsing dot was "too distracting"): the only animations are
     // the detail line's one-time entrance, its progress line's width transition and a tip's fade.
     [Fact]
@@ -443,15 +476,17 @@ public sealed partial class RazorMarkupTests
         var row = File.ReadAllText(Path.Combine(app, "Components", "EventRow.razor"));
         Assert.Contains("@foreach (var icon in icons)", row);
         Assert.Contains("@foreach (var shown in EventRowLayout.Opened(icons, open))", row);
-        Assert.Equal(2, Regex.Matches(row, @"@foreach\b").Count);
+        Assert.Contains("@foreach (var boss in FieldBosses)", row); // the field bosses' notices (TheFieldBossNoticesAreButtonsInTheEventRow)
+        Assert.Equal(3, Regex.Matches(row, @"@foreach\b").Count);
         Assert.Matches(@"<button type=""button"" class=""ev @icon\.State\.ToString\(\)\.ToLowerInvariant\(\)"" @key=""icon\.Rule\.Id""\s*"
             + @"aria-expanded=""@\(IsOpen\(icon\) \? ""true"" : ""false""\)"" aria-label=""@\(\$""\{icon\.Rule\.Name\}, \{status\}""\)""\s*"
             + @"@onclick=""\(\) => Toggle\(icon\.Rule\.Id\)"">", row);
         Assert.Contains(@"<svg viewBox=""0 0 16 16"" aria-hidden=""true""><path d=""@EventGlyphs.For(icon.Rule.Id)"" /></svg>", row);
         Assert.DoesNotContain("MarkupString", row, StringComparison.Ordinal);
-        // The icon's time is IconTime's (minutes and seconds; AlertTests), never another countdown's.
+        // The icon's time is IconTime's (minutes and seconds; AlertTests), never another countdown's; so is a field boss's.
         Assert.Contains(@"<span class=""ev-time"">@EventText.IconTime(until - Now)</span>", row);
-        Assert.Single(Regex.Matches(row, @"class=""ev-time"""));
+        Assert.Contains(@"<span class=""ev-time"">@(boss.Kind == FieldBossAlertKind.Soon ? EventText.IconTime(boss.At - Now) : ""up"")</span>", row);
+        Assert.Equal(2, Regex.Matches(row, @"class=""ev-time""").Count);
         Assert.Contains(@"<span class=""ev-tip"" aria-hidden=""true"">", row);
         // A click toggles the line and tells the page, which renders and so measures the new height at once.
         Assert.Matches(@"private Task Toggle\(string id\)\s*\{\s*open = EventRowLayout\.Toggle\(open, id\);\s*return LinesChanged\.InvokeAsync\(\);\s*\}", row);
@@ -461,8 +496,10 @@ public sealed partial class RazorMarkupTests
         Assert.Contains(@"@key=""@($""{shown.Rule.Id}-{shown.State}-{shown.Alert?.Start.UtcTicks}"")""", row);
 
         var pages = Path.Combine(app, "Pages");
-        Assert.Matches(@"(?m)^\s*<EventRow View=""Alerts\.Current"" Now=""Clock\.GetUtcNow\(\)"" Held=""NoticesHeld"" LinesChanged=""StateHasChanged"" />",
-            File.ReadAllText(Path.Combine(pages, "MeterPage.razor")));
+        var meter = File.ReadAllText(Path.Combine(pages, "MeterPage.razor"));
+        Assert.Matches(@"(?m)^\s*var now = Clock\.GetUtcNow\(\);", meter);
+        Assert.Matches(@"(?m)^\s*<EventRow View=""Alerts\.Current"" Now=""now"" Held=""NoticesHeld"" LinesChanged=""StateHasChanged""\s+"
+            + @"FieldBosses=""FieldBosses\.Plan\(now\)\.Alerts"" OpenFieldBosses=""Windows\.OpenFieldBosses"" />", meter);
         var sources = Directory.EnumerateFiles(app, "*", SearchOption.AllDirectories)
             .Where(path => path.EndsWith(".cs", StringComparison.Ordinal) || path.EndsWith(".razor", StringComparison.Ordinal))
             .Where(path => !Regex.IsMatch(path, @"[\\/](bin|obj)[\\/]"))
