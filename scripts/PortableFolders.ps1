@@ -13,7 +13,8 @@
 # and nothing of theirs is deleted. Only folders this script made are renamed or deleted: the live and old folders
 # carry the portable marker, the staging folder its own marker, and the markers are deleted last, so a delete cut
 # short leaves a folder the next run still recognises. Links are refused. The generic path helpers (final paths,
-# link checks, the running-meter check, the marker-last delete) come from InstallFolders.ps1.
+# link checks, the running-meter check, the marker-last delete) come from InstallFolders.ps1. A folder where Windows
+# would start the meter below Medium integrity, where it cannot start, is refused (Assert-PortableStartsAtMedium).
 
 . (Join-Path $PSScriptRoot 'InstallFolders.ps1')
 
@@ -395,4 +396,120 @@ function Enter-PortableLock([string]$Root) {
 # the same run would succeed; only Publish-Portable.ps1 takes it (Update-Meter.ps1 calls that script, not the lock).
 function Exit-PortableLock($Mutex) {
     if ($Mutex) { try { $Mutex.ReleaseMutex() } finally { $Mutex.Dispose() } }
+}
+
+# --- Integrity level: a copy Windows would start below Medium cannot start ---
+#
+# Windows starts a program at the lower of the user's integrity level and the mandatory label of its file. Some
+# sandboxes give the folders they may write to a Low label, which every file made below them inherits, so a build
+# published there starts at Low. A Low program cannot write to the user's temp folder, where the single-file build
+# unpacks its native libraries the first time it starts, so the .NET launcher exits before any of the meter's code
+# runs: no window, no log, no message (docs/LESSONS.md). Labels are read by their SIDs (S-1-16-<level>), never by
+# the names icacls prints, which Windows translates.
+
+# The level of a standard user's programs, and of a file with no label.
+$IntegrityMedium = 0x2000
+
+# The integrity level that a mandatory label in SDDL (the "S:" part Get-IntegrityLabelSddl returns) gives the object
+# itself, or with -FilesInside the files made in folders made in that folder (the build's exe is a level down, in
+# ScarletMeter.staging), which inherit only an object-inherit (OI) label that propagates (no NP: that one reaches
+# only the folder's own files). With no label that applies, Medium; $null for a label SID this does not know. ACE
+# flags are two-letter codes, read in pairs ("CIOIID" holds no IO).
+function ConvertFrom-IntegrityLabelSddl([string]$Sddl, [switch]$FilesInside) {
+    $named = @{ LW = 0x1000; ME = 0x2000; MP = 0x2100; HI = 0x3000; SI = 0x4000 }
+    foreach ($ace in [regex]::Matches($Sddl, '\(ML;([A-Z]*);[^;()]*;[^;()]*;[^;()]*;([^;()]+)\)')) {
+        $flags = @([regex]::Matches($ace.Groups[1].Value, '..') | ForEach-Object { $_.Value })
+        # An inherit-only label is not the object's own.
+        if ($FilesInside) { if ($flags -notcontains 'OI' -or $flags -contains 'NP') { continue } }
+        elseif ($flags -contains 'IO') { continue }
+        $sid = $ace.Groups[2].Value
+        if ($named.ContainsKey($sid)) { return $named[$sid] }
+        if ($sid -match '\AS-1-16-(\d{1,9})\z') { return [int]$Matches[1] }
+        return $null
+    }
+    $IntegrityMedium
+}
+
+# The mandatory label of a file or folder as SDDL ("S:(ML;...)", or "" when it has none), through
+# GetNamedSecurityInfo with LABEL_SECURITY_INFORMATION, which needs only read access. Throws when Windows cannot read
+# it. The helper type is compiled on first use, so dot-sourcing this file stays quick.
+function Get-IntegrityLabelSddl([string]$Path) {
+    if (-not ('ScarletMeterScripts.IntegrityLabel' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+
+namespace ScarletMeterScripts
+{
+    public static class IntegrityLabel
+    {
+        const int FileObject = 1;           // SE_FILE_OBJECT
+        const int LabelInformation = 0x10;  // LABEL_SECURITY_INFORMATION
+
+        [DllImport("advapi32.dll", CharSet = CharSet.Unicode)]
+        static extern int GetNamedSecurityInfoW(string name, int type, int information, IntPtr owner, IntPtr group,
+            IntPtr dacl, IntPtr sacl, out IntPtr descriptor);
+
+        [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern bool ConvertSecurityDescriptorToStringSecurityDescriptorW(IntPtr descriptor, int revision,
+            int information, out IntPtr text, IntPtr length);
+
+        [DllImport("kernel32.dll")]
+        static extern IntPtr LocalFree(IntPtr memory);
+
+        public static string Sddl(string path)
+        {
+            IntPtr descriptor;
+            int error = GetNamedSecurityInfoW(path, FileObject, LabelInformation, IntPtr.Zero, IntPtr.Zero,
+                IntPtr.Zero, IntPtr.Zero, out descriptor);
+            if (error != 0) throw new Win32Exception(error);
+            if (descriptor == IntPtr.Zero) return "";
+            try
+            {
+                IntPtr text;
+                if (!ConvertSecurityDescriptorToStringSecurityDescriptorW(descriptor, 1, LabelInformation, out text, IntPtr.Zero))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                try { return Marshal.PtrToStringUni(text); }
+                finally { LocalFree(text); }
+            }
+            finally { LocalFree(descriptor); }
+        }
+    }
+}
+'@
+    }
+    [ScarletMeterScripts.IntegrityLabel]::Sddl($Path)
+}
+
+# The integrity level Windows gives a program started from the file at $Path (or, with -FilesInside, from a file made
+# in a folder made in that folder), for a user at Medium: Medium, or the label's level when it is lower.
+function Get-IntegrityLevel([string]$Path, [switch]$FilesInside) {
+    ConvertFrom-IntegrityLabelSddl (Get-IntegrityLabelSddl $Path) -FilesInside:$FilesInside
+}
+
+# Refuses when Windows would start the meter at $Path (with -FilesInside: from a file made in a folder made in that
+# folder) below Medium, saying how to give $OutputRoot a Medium label. A label it cannot read, or one it does not
+# know, is only a warning: a drive without labels (FAT) starts every program at Medium.
+function Assert-PortableStartsAtMedium([string]$Path, [string]$OutputRoot, [switch]$FilesInside) {
+    $help = 'If the meter does not start from there, see docs/DEVELOPMENT.md, "Portable build".'
+    try { $level = Get-IntegrityLevel $Path -FilesInside:$FilesInside }
+    catch { Write-Warning "Could not read the integrity label of $Path ($($_.Exception.Message)). $help"; return }
+    if ($null -eq $level) { Write-Warning "$Path has an integrity label this script does not know. $help"; return }
+    if ($level -ge $IntegrityMedium) { return }
+    $name = if ($level -ge 0x1000) { 'Low' } else { 'Untrusted' }
+    throw ("Windows would start the meter in $OutputRoot at $name integrity, where it cannot start: it cannot unpack " +
+        "its files into your temp folder, and shows nothing. The folder carries a $name integrity label, which some " +
+        "sandboxes give the folders they may write to. The live copy was not replaced. Give the folder a Medium " +
+        "label (the level of a file without one), then run again: icacls ""$OutputRoot"" /setintegritylevel " +
+        '"(OI)(CI)M". (Publish-Portable.ps1 also takes -OutputRoot with another absolute folder.)')
+}
+
+# Refuses, before anything is built, an output root whose build would start below Medium: the label the build's
+# files would inherit from it (Assert-PortableStartsAtMedium -FilesInside). A root not made yet is made first, as the
+# build would make it, so it takes the label of the folders above it, and the fix the refusal names has a folder to
+# apply to. Publish-Portable.ps1 checks the built exe itself again before the swap.
+function Assert-PortableRootStartsAtMedium([string]$Root) {
+    [void][IO.Directory]::CreateDirectory($Root)
+    Assert-PortableStartsAtMedium $Root $Root -FilesInside
 }

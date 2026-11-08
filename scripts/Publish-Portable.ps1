@@ -17,7 +17,10 @@ Every step is a rename on one drive; if one fails, the earlier ones are undone a
 everything is, and an update that was cut short is finished or undone at the start of the next run. Nothing of the
 player's is ever deleted, and only folders this script made are renamed or deleted (scripts\PortableFolders.ps1).
 Refuses while ScarletMeter.exe runs from the copy (close the meter first) and while another run updates the same
-output root.
+output root. Refuses, too, a folder where Windows would start the meter below Medium integrity (a Low integrity
+label, which some sandboxes give folders): the meter cannot start there and shows nothing. The output root is checked
+before anything is built or changed (made first when it does not exist yet), the built exe before it replaces the
+live copy, and the message says how to give the folder a Medium label.
 
 With -Zip it also writes the build, without the player's files, to "<output root>\ScarletMeter-win-x64.zip",
 replacing the previous zip: for handing the meter on, not needed to run it. Without -Zip a zip an earlier run left
@@ -84,9 +87,12 @@ function Get-GitLine([string]$Directory, [string[]]$Arguments) {
 
 $lock = Enter-PortableLock $OutputRoot
 try {
-    # --- Before building: the meter is closed, a cut-short update is resolved, the folders are ours ---
+    # --- Before building: the meter is closed, it could start here, a cut-short update is resolved, the folders are ours ---
 
     & $running
+    # Before anything here changes: a root whose label the build would inherit is refused (one not made yet is made
+    # first, as the build would); the built exe itself is checked below.
+    Assert-PortableRootStartsAtMedium $OutputRoot
     if (Test-Path -LiteralPath $OutputRoot) {
         $restored = Restore-InterruptedPortableUpdate $folders
         if ($restored) { Write-Host $restored }
@@ -121,6 +127,8 @@ try {
             Pop-Location
         }
         & (Join-Path $PSScriptRoot 'Test-PublishLayout.ps1') -PublishDirectory $folders.Staging
+        # Exact where the root's check was not: the label the exe really has decides the level it starts at.
+        Assert-PortableStartsAtMedium (Join-Path $folders.Staging 'ScarletMeter.exe') $OutputRoot
         Assert-NoLinksInside $folders.Staging
         Write-PortableManifest $folders.Staging
         [IO.File]::WriteAllText((Join-Path $folders.Staging $PortableMarker), $PortableMarkerText + "`r`n")
