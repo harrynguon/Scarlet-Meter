@@ -566,13 +566,16 @@ tr.child td {
     white-space: normal;
 }
 
-/* The state counts down ("Respawns in 14:43") in figures of one width, so the words do not shift each second. Where the
-   timers came from gives way first in a narrow window: it wraps, so the clock time beside the state stays on one line. */
+/* The state counts down ("Respawns in 14:43") in figures of one width, so the words do not shift each second. In a narrow
+   window, where the timers came from wraps, and "since" or "seen" goes on a line above its time: at the least size (444 px
+   inside, less the 8 px scrollbar) the widest rows ("Executioner", "Respawns in 23h 59m", "since 12:59pm") needed all of
+   the 400 px the table has, in a headless render (audit on #79), and with these breaks need less. A time never breaks. */
 .fb-table td.fb-state {
     font-variant-numeric: tabular-nums;
 }
 
-.fb-table td.fb-from {
+.fb-table td.fb-from,
+.fb-table td.fb-time {
     white-space: normal;
 }
 

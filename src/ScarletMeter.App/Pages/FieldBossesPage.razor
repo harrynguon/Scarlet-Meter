@@ -84,7 +84,7 @@
                         </td>
                         <td class="fb-name">@boss.Name</td>
                         <td class="fb-state">@FieldBossText.State(timer, now)</td>
-                        <td class="num">@FieldBossText.Time(timer, now)</td>
+                        <td class="num fb-time">@FieldBossText.Time(timer, now)</td>
                         <td class="muted fb-from">@(timer is null ? string.Empty : FieldBossText.Source(timer, now))</td>
                     </tr>
                 }

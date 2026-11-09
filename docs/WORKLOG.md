@@ -13,24 +13,39 @@ Newest first. Each entry: what changed, why, actual checks, unresolved issues, n
   - The state's figures are tabular, and "From" wraps in a narrow window.
 - ARCHITECTURE ("Clock times", the window, the tests), HANDOFF and CHANGELOG updated.
 
-**Why:** Harry, with a screenshot of the window, 2026-11-09: "can you make the pinned bosses be automatically arranged to the top of the list? and i would like it to say 'Respawns in ...' and then the timer/countdown. followed by the exact time on the other column. … also, change all timestamps from 24h to 12hr format like 9:34pm, 9:34am please. there's quite a few occurrences, like 'corridors reset ...' and last played 'sun 8 nov 01:34' in the character dashboard screen."
+**Why:** Harry, with a screenshot of the window, 2026-11-09: "can you make the pinned bosses be automatically arranged to the top of the list? and i would like it to say 'Respawns in ...' and then the timer/countdown. followed by the exact time on the other column. … also, change all timestamps from 24h to 12hr format like 9:34pm, 9:34am please. there's quite a few occurrences, like 'corridors reset ...' and last played '…' in the character dashboard screen." (The last-played time Harry quoted is left out: it is when he played.)
 
 **Checks (Windows PowerShell 5.1, SDK 10.0.402, at idle priority with no shared compiler server or reused build nodes, AION2 running; nothing launched, no window opened):**
 - Fail first, on main's code with the tests changed first:
-  - Each failed naming the old text: five alert tests and one roster test whose expectations were rewritten to the 12-hour clock ("next 02:00" for "next 2:00am", "21:32" for "9:32pm"), `FieldBossTextTests.TheStateSaysWhatTheBossIsDoingWithTheTimeLeftToARespawn` ("Respawns 17:01"), and `RazorMarkupTests.TheFieldBossesWindowListsTheBelledBossesFirstWithTheTimeBesideTheState`.
+  - Each failed naming the old text: five alert tests and one roster test whose expectations were rewritten to the 12-hour clock ("next 02:00" for "next 2:00am", "21:32" for "9:32pm"), `FieldBossTextTests.TheStateSaysWhatTheBossIsDoingWithTheTimeLeftToARespawn` (the old "Respawns" and a clock time), and `RazorMarkupTests.TheFieldBossesWindowListsTheBelledBossesFirstWithTheTimeBesideTheState`.
   - `ClockTextTests.NoTwentyFourHourClockIsLeftInTheApp` listed all eight 24-hour formats (EventText ×4, DetailFormat ×2, RosterText, PetText).
 - Mutations of the new rules, each caught by its test (files restored, hashes compared): midnight as 0, noon as am, no belled-first order, a line under every belled boss, "since" for a time only seen.
 - Debug build: 0 errors. The whole suite through `dotnet exec`: 1,122 tests, passing apart from two. `ChangelogTests` failed before the entries had this PR's link; it passes with them. `EngineRegistrationTests.BossHpBeyondTheIntRangeIsMappedWhole` failed once in the full run and passed three times alone. It touches nothing changed here, so it is a flake to watch.
 - Release build of the solution: 0 errors, upstream's five usual warnings only.
 - A static mock of the window's table and a combat log, from the branch's real `app.css` and `views.css` with made-up times, rendered by headless Edge:
   - At 620 px every row is on one line.
-  - At the least size, 460 px, names and "From" wrap and the times do not.
+  - At 460 px names and "From" wrap and the times do not. That panel was the window's outer width, not its client width (see the review).
   - The first separator, the theme's `--line`, was too faint beside the rows' own lines (pixel 28,28,31), so it was made gold.
   - "12:05:33.128pm" fits the combat log's 96 px time column.
 
-**Not checked:** the meter itself (a smoke run, or the game): the real window's rows moving when a bell is rung, the countdown's ticking, and every other window's times in place.
+**Review:** CI passed on dc387d5. The standard audit's verdict was not ready, for findings 1 and 2; everything below is fixed in the follow-up commit.
+1. **Major: the player's last-played time from his message was in the WORKLOG, CHANGELOG and ARCHITECTURE.** It was quoted, and used as the format's example. Now: made-up examples ("Thu 30 Oct" over "7:00pm"), the value left out of the quotation, and a test case's matching clock time changed. This entry also quoted a test failure's clock time, which showed the PC's time zone; it is gone. LESSONS has an entry, and the scarlet-ship skill's "Document" step has a command listing every added Markdown line with a time or date, to read before the first commit. The first commit (dc387d5) still has the values on the PR's branch; the merge carries only the fixed text.
+2. **Codex's P1** (the same as the audit's finding 2): the window's rework was a second changelog bullet for an unreleased feature. It is now folded into the Field-boss timers entry under Added, with #79's link; the 12-hour line under Changed stays.
+3. **The History window showed the engine's message, with 24-hour times, for a From date after the To date.** It now says it in dates before the query (`DetailFormat.RangeProblem`, checked by `TheConvertedCallersWriteTheTwelveHourClock`).
+4. **The guard was narrower than ARCHITECTURE said.** It now catches "H:mm", "HHmm", `{at:t}` and the other time-carrying standard formats, an hour joined by hand by any name of an hour, and the browser's time formatting in the scripts. Two theories pin what it sees and what it lets be: countdowns, a fight's duration, dates and numbers. The first widened pattern also caught `Compact`'s duration, which is not a clock, and was narrowed. ARCHITECTURE now lists what it catches and what it cannot.
+5. **The window's least width.** Re-rendered at the least client width, 444 px less the 8 px scrollbar, with the widest values ("Executioner", "Respawns in 23h 59m", "since 12:59pm", "NotMeter · 59 min ago"). The table needed all of its 400 px, with no slack. "since" and "seen" now go on a line above the time when space runs out (`.fb-time`), and the widest rows need 369 px.
+6. **The History table's When column is about 19 px wider.** Not fixed; it is a HANDOFF item to look at, since long names already pushed that table wide.
+7. **Comments in `EventRowLayout` and ARCHITECTURE's roster note still showed 24-hour examples.** Updated.
+8. **`DetailFormat.When`, `LogTime` and `PetText.Synced` had no test of their output.** Tested now.
+9. **The guard's exceptions were a whole file and an accidental pass.** Now three named lines: the log's summary, the kept-aside file's UTC stamp and ClockText's own joins. Each must still match, so the list cannot outlive them.
 
-**Next:** the audit and Codex's review; merge with Harry's go-ahead, then rebuild both portable copies.
+**Checks after the review:**
+- Mutations, each caught: "H:mm" in `RosterText`, `{time:t}` in `DetailFormat.When`, the History window's date check skipped, the time cell's class dropped, and a schedule hour joined by hand as `{h}:{m:D2}`. The files were restored and their hashes compared.
+- The whole suite: 1,142 tests, all passing. Release build: 0 errors.
+
+**Not checked:** the meter itself (a smoke run, or the game): the real window's rows moving when a bell is rung, the countdown's ticking, the History table at its least size, and every other window's times in place.
+
+**Next:** Codex's review of the follow-up commit; merge with Harry's go-ahead, then rebuild both portable copies.
 
 ## 2026-11-08 — Field-boss timers: the notices get a row of their own under the event icons (#78)
 

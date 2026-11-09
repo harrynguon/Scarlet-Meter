@@ -437,7 +437,9 @@ public sealed partial class RazorMarkupTests
     // The Field bosses window lists the bosses with a bell first (Harry, 2026-11-09: "make the pinned bosses be
     // automatically arranged to the top of the list"; the order is FieldBossListing's, FieldBossTextTests), the state with
     // the time left ("Respawns in 2h 59m"), then the clock time in a column of its own, right-aligned as numbers are, and a
-    // line under the last belled boss. Where the timers came from wraps in a narrow window rather than widen the table.
+    // line under the last belled boss. Where the timers came from wraps in a narrow window, and "since" or "seen" goes on a
+    // line above its time, rather than widen the table: at the least size the widest rows needed all of its room (audit on
+    // #79, a headless render).
     [Fact]
     public void TheFieldBossesWindowListsTheBelledBossesFirstWithTheTimeBesideTheState()
     {
@@ -447,11 +449,11 @@ public sealed partial class RazorMarkupTests
         Assert.DoesNotContain("FieldBossCatalog.OnMap(map))\n", page.Replace("\r\n", "\n"), StringComparison.Ordinal);
         Assert.Contains(@"@(FieldBossListing.EndsChosen(rows, i, chosen) ? ""fb-chosen-end"" : """")", page);
         Assert.Matches(@"<th>State</th>\s*<th class=""num"">Time</th>\s*<th>From</th>", page);
-        Assert.Matches(@"<td class=""fb-state"">@FieldBossText\.State\(timer, now\)</td>\s*<td class=""num"">@FieldBossText\.Time\(timer, now\)</td>\s*"
+        Assert.Matches(@"<td class=""fb-state"">@FieldBossText\.State\(timer, now\)</td>\s*<td class=""num fb-time"">@FieldBossText\.Time\(timer, now\)</td>\s*"
             + @"<td class=""muted fb-from"">", page);
 
         var css = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "views.css"));
-        Assert.Matches(@"(?m)^\.fb-table td\.fb-from \{\s*white-space: normal;", css);
+        Assert.Matches(@"(?m)^\.fb-table td\.fb-from,\s*\.fb-table td\.fb-time \{\s*white-space: normal;", css);
         Assert.Matches(@"(?m)^\.fb-table tr\.fb-chosen-end td \{\s*border-bottom-color: rgba\(220, 198, 140, 0\.3\);", css);
     }
 

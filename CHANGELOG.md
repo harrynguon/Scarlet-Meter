@@ -18,7 +18,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
   soul after that is counted, kept per server as the game keeps them. Not yet checked in the game.
   ([#76](https://github.com/harrynguon/Scarlet-Meter/pull/76))
 - Field-boss timers: the hourglass in the meter's header opens a Field bosses window with every field boss of Verteron,
-  Altgard and the Abyss, whether it is up, when it respawns and how long until then. The times come from your own world
+  Altgard and the Abyss: whether it is up or how long until it respawns ("Respawns in 2h 59m"), and beside that the
+  clock time ("6:01pm", or "since 2:58pm" for a boss that is up). The bosses with a bell come first, with a line under
+  them, then the rest. The times come from your own world
   map, read when you open it (M) in the game, and from NotMeter's shared timers (what its users' maps show, a public file
   per region), so they show with the game closed too, for the server you last played on (or one you enter). If you start
   the meter while already in the game, your map's times show after your next zone change or teleport, and the window
@@ -27,7 +29,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
   icons onto a second line. "Read other players' shared timers" turns the shared timers off; nothing about you is sent.
   aion2timers.com opens from the window now. Your map's list has been seen read in the game; the rest is not yet checked
   there. ([#75](https://github.com/harrynguon/Scarlet-Meter/pull/75),
-  [#77](https://github.com/harrynguon/Scarlet-Meter/pull/77), [#78](https://github.com/harrynguon/Scarlet-Meter/pull/78))
+  [#77](https://github.com/harrynguon/Scarlet-Meter/pull/77), [#78](https://github.com/harrynguon/Scarlet-Meter/pull/78),
+  [#79](https://github.com/harrynguon/Scarlet-Meter/pull/79))
 
 - Your Dimensional Invasion reward keys on the meter, left of the Shugo Festival keys: the keys left out of 7, which
   your characters on a server share, as the game's dialog writes them ("3/7"), once the game sends them; until then,
@@ -63,11 +66,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 - Every time the meter shows is on the 12-hour clock: "9:34pm", "9:34am". This covers the event notices and their tips,
   the Alerts settings' schedules ("Every 3 h from 2:00am server time"), the Characters window's times and Last played
-  ("Sun 8 Nov" over "1:34am"), the corridors' and Odyle's next times, the fight history and combat log, the Pet souls
+  ("Thu 30 Oct" over "7:00pm"), the corridors' and Odyle's next times, the fight history and combat log, the Pet souls
   window and the Field bosses window. ([#79](https://github.com/harrynguon/Scarlet-Meter/pull/79))
-- The Field bosses window lists the bosses with a bell first, a line under them, then the rest. The state counts down
-  ("Respawns in 2h 59m"), with the respawn's clock time in the column beside it ("6:01pm", or "since 2:58pm" for a boss
-  that is up). ([#79](https://github.com/harrynguon/Scarlet-Meter/pull/79))
 - The bar effects' frame cap does over a third less work each time it moves them on, so fights with effects
   on take a little less of your PC's time. ([#70](https://github.com/harrynguon/Scarlet-Meter/pull/70))
 - The meter does a little less in the background: two of upstream's timers that woke ten times a second each, with

@@ -67,10 +67,10 @@ public static class EventRowLayout
     }
 
     /// <summary>
-    /// What an icon's event is doing, in <paramref name="zone"/>, for its tip and its accessible name: "starts 21:00"
-    /// when due, "portal open until 21:10" or "entry open until 21:03" while open, and otherwise
-    /// <see cref="EventText.Status"/> at <paramref name="now"/> ("next 21:00", "next Sun 21:00", "running, entry
-    /// closed", "started 21:00"). Clock times rather than countdowns, which the icon itself shows.
+    /// What an icon's event is doing, in <paramref name="zone"/>, for its tip and its accessible name: "starts 9:00pm"
+    /// when due, "portal open until 9:10pm" or "entry open until 9:03pm" while open, and otherwise
+    /// <see cref="EventText.Status"/> at <paramref name="now"/> ("next 9:00pm", "next Sun 9:00pm", "running, entry
+    /// closed", "started 9:00pm"). Clock times rather than countdowns, which the icon itself shows.
     /// </summary>
     /// <remarks>
     /// The idle case schedules the rule again at <paramref name="now"/>, with the server offset the monitor planned
@@ -85,7 +85,7 @@ public static class EventRowLayout
 
     /// <summary>
     /// The detail line's countdown, after the event's name: "in 54:53" before a due start; "Portal open · 6:53 left"
-    /// while entry is open; and for an idle event its status with the time to its next start ("next 21:00 · in 2 h 14 m"),
+    /// while entry is open; and for an idle event its status with the time to its next start ("next 9:00pm · in 2 h 14 m"),
     /// or the status alone while a window without open entry runs ("running, entry closed").
     /// </summary>
     public static string When(EventIcon icon, DateTimeOffset now, TimeSpan serverOffset, TimeZoneInfo zone)

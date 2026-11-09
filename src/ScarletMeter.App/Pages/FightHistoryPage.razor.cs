@@ -72,6 +72,11 @@ public partial class FightHistoryPage : IDisposable
     {
         error = null;
         var request = ++listRequest;
+        if (DetailFormat.RangeProblem(fromFilter, toFilter) is { } problem)
+        {
+            error = problem;
+            return;
+        }
         try
         {
             // The "To" date covers that whole day.
