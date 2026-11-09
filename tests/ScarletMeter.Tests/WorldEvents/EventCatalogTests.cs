@@ -23,7 +23,8 @@ public sealed class EventCatalogTests
 
     /// <summary>
     /// presets.mjs at the fork's master, value for value (A2Tools event-timers at b11f345), listed in the fork's order;
-    /// Scarlet's catalog differs only in its order and the siege's name (above).
+    /// Scarlet's catalog differs only in its order, the siege's name (above), and the siege's and the Executors' days since
+    /// the game's update of 2026-11-09 (below).
     /// </summary>
     [Fact]
     public void GlobalPresetMatchesTheFork()
@@ -44,8 +45,32 @@ public sealed class EventCatalogTests
         var order = EventCatalog.Ids.ToList();
         var scarlet = expected
             .Select(rule => rule.Id == EventIds.Siege ? rule with { Name = "Abyss Siege" } : rule)
+            .Select(rule => rule.Id is EventIds.Siege or EventIds.Executors ? rule with { Days = [4, 6] } : rule)
             .OrderBy(rule => order.IndexOf(rule.Id));
         Assert.Equal(scarlet, EventCatalog.Global);
+    }
+
+    // The game's update of 2026-11-09 (its patch notes, Harry, 2026-11-09): the Artifact Siege from three times a week to
+    // Thursdays and Saturdays at 21:00 as before, and the three Artifact Bosses (Executors Kaira, Argo and Tamasa) with it,
+    
+
+    // on the preset's UTC+9. The Legacy preset keeps the fork's three days, for comparison.
+    [Fact]
+    public void TheSiegeAndTheExecutorsAreOnThursdaysAndSaturdays()
+    {
+        foreach (var (id, minute) in new[] { (EventIds.Siege, 0), (EventIds.Executors, 30) })
+        {
+            Assert.Equal([4, 6], Global(id).Days);
+            Assert.Equal([21], Global(id).Hours);
+            Assert.Equal(minute, Global(id).Minute);
+        }
+        Assert.Equal([1, 4, 6], Legacy(EventIds.Siege).Days);
+        Assert.Equal([1, 4, 6], Legacy(EventIds.Executors).Days);
+
+        // From a Monday after the update, the next siege is Thursday's, 12:00 UTC, not that evening's.
+        var monday = new DateTimeOffset(2026, 11, 16, 3, 0, 0, TimeSpan.Zero);
+        var next = EventSchedule.Occurrence(Global(EventIds.Siege), monday, EventCatalog.DefaultServerOffset).Start;
+        Assert.Equal(new DateTimeOffset(2026, 11, 19, 12, 0, 0, TimeSpan.Zero), next);
     }
 
     [Fact]

@@ -45,7 +45,8 @@ public static class EventCatalog
     /// taengu/A2Tools-Plugins' event-timers data. Resets at 07:00 UTC; Kaira and rifts on the server clock; rifts
     /// every three hours from 02:00 server with a ten-minute portal and no longer activity; Shugo and Invasion with
     /// a three-minute entry in a seven- and thirteen-minute window; boss and siege end times unknown (duration 0),
-    /// so they are never shown as active.
+    /// so they are never shown as active. One change of Scarlet's own since the game's update of 2026-11-09 (its patch
+    /// notes): the siege and the Executors on Thursdays and Saturdays only, at the same times (they were Mondays too).
     /// </summary>
     public static IReadOnlyList<EventRule> Global { get; } = [.. Legacy.Select(ToGlobal)];
 
@@ -112,12 +113,14 @@ public static class EventCatalog
         return false;
     }
 
-    // presets.mjs applied to one legacy rule; the A2Tools parameters at the pinned commit.
+    // presets.mjs applied to one legacy rule; the A2Tools parameters at the pinned commit. The siege and the Executors
+    // then keep only Thursday and Saturday (the game's update of 2026-11-09; 0 = Sunday).
     private static EventRule ToGlobal(EventRule rule) => rule.Id switch
     {
         EventIds.Daily or EventIds.Weekly => rule with { Basis = ScheduleBasis.Utc, Hours = [7] },
         EventIds.Kaira => rule with { Basis = ScheduleBasis.Server, DurationMinutes = 0 },
-        EventIds.Nahma or EventIds.Executors or EventIds.Siege => rule with { DurationMinutes = 0 },
+        EventIds.Executors or EventIds.Siege => rule with { Days = [4, 6], DurationMinutes = 0 },
+        EventIds.Nahma => rule with { DurationMinutes = 0 },
         EventIds.Rift => rule with
         {
             Basis = ScheduleBasis.Server,

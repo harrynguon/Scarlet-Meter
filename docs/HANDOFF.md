@@ -161,11 +161,11 @@ Still open: per-event time overrides in settings, for when an in-game check find
 
 The Global preset is not verified against Global Asia / Nezekan; the fork's HANDOFF.md has the evidence so far. For each observation record the tested commit, the date, the exact server time and UTC, the local time zone, the phase seen, and whether it was a calendar countdown or an observed transition. Never record account identifiers; screenshots are not committed. Pending:
 
-- [ ] The server clock is UTC+9 (`EventCatalog.DefaultServerOffset`).
+- [ ] The server clock is UTC+9 (`EventCatalog.DefaultServerOffset`). Evidence so far (#80): Harry's game's countdown to the next Abyss Siege, read after the game's update of 2026-11-09, ended at Thursday's 21:00 server time at UTC+9, within the minute. That is one countdown, not an observed transition.
 - [ ] Spacetime Rift: two consecutive portal openings (02:00 server and every three hours, so 17:00, 20:00, 23:00, 02:00 … UTC) and one portal close, ten minutes after an opening.
 - [ ] Shugo Festival (on the hour, server) and Dimensional Invasion (at half past): the start, the entry closing three minutes later, and the end after seven and thirteen minutes.
 - [ ] Daily reset at 07:00 UTC (16:00 server) and the Wednesday weekly reset at the same time, each as an observed transition, and once outside Australian daylight saving.
-- [ ] Start times of Watcher Kaira (01:00 server and every three hours), Guardian Lord Nahma (Sun and Fri 21:00), the Executors (Mon, Thu and Sat 21:30) and the Abyss Siege (the fork's Artifact Siege; Mon, Thu and Sat 21:00); their end times are unknown and are not shown.
+- [ ] Start times of Watcher Kaira (01:00 server and every three hours), Guardian Lord Nahma (Sun and Fri 21:00), the Executors (Thu and Sat 21:30) and the Abyss Siege (the fork's Artifact Siege; Thu and Sat 21:00; both Mondays too until the game's update of 2026-11-09); their end times are unknown and are not shown.
 - [ ] With the overlay: each enabled event's icon lights gold five minutes before its start and teal from a rift's, Shugo's or Invasion's start until its entry closes, and nothing lights for a reset after its instant or for a boss after its start.
 
 Once a time is verified, correct the Global preset and its regression tests (`EventCatalogTests`, `EventScheduleTests`, `AlertPlannerTests`), record the evidence in WORKLOG.md, and keep players' saved overrides.

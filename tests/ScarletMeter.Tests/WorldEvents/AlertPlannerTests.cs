@@ -85,8 +85,9 @@ public sealed class AlertPlannerTests
     public void ActiveEventsWithoutAnEntryWindowGetNoAlert()
     {
         // Global bosses and sieges have unknown end times (duration 0): Soon before the start, nothing after.
-        Assert.Equal(AlertKind.Soon, Assert.Single(Plan(At("2026-10-26T11:55:00Z"), EventIds.Siege).Alerts).Kind); // Monday 21:00 server
-        Assert.Empty(Plan(At("2026-10-26T12:00:00Z"), EventIds.Siege).Alerts);
+        Assert.Equal(AlertKind.Soon, Assert.Single(Plan(At("2026-10-29T11:55:00Z"), EventIds.Siege).Alerts).Kind); // Thursday 21:00 server
+        Assert.Empty(Plan(At("2026-10-29T12:00:00Z"), EventIds.Siege).Alerts);
+        Assert.Empty(Plan(At("2026-10-26T11:55:00Z"), EventIds.Siege).Alerts); // no siege on Mondays since the game's update of 2026-11-09
 
         // Legacy windows are scheduled as active but have no entry window.
         var legacy = new HashSet<string> { EventIds.Kaira, EventIds.Siege };
