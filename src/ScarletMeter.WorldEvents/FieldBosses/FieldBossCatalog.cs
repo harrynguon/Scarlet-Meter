@@ -124,9 +124,10 @@ public static class FieldBossCatalog
             (111024, 2400855, "Silent Dartan"),
         ];
         // The Abyss's bosses keep a fixed schedule (the world events' Kaira, Nahma and the Executors; Argo, the Spirit King
-        // too since the game's update of 2026-11-09: 10:30 and 22:30 each day, by its patch notes); the map lists them all
-        // the same, each with its next spawn, and no schedule here is used for them. No respawn interval is either: the
-        // same update's 11 hours for Gartua and Lagta (12 before) come with the map's and the shared timers' own times.
+        // too since the game's update of 2026-11-09: 10:30 and 22:30 each day by its patch notes, presumably server time, as
+        // their siege's 21:00 is). The map lists them all the same, each with its next spawn, and no schedule here is used
+        // for them. No respawn interval is either: the same update's 11 hours for Gartua and Lagta (12 before) come with the
+        // map's and the shared timers' own times.
         (int Id, int Npc, string Name)[] abyss =
         [
             (2001, 2600068, "Argo, the Spirit King"),

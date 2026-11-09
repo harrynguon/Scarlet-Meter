@@ -5,10 +5,11 @@ namespace ScarletMeter.WorldEvents;
 /// <summary>
 /// The built-in schedule: nine entries, in display order, as two presets. <see cref="Global"/> is Scarlet's
 /// default. Neither is verified against Global Asia / Nezekan; see docs/ARCHITECTURE.md ("World events") for the
-/// sources and the evidence so far, and docs/SECURITY.md ("Provenance"). Two things differ from the fork, both the
+/// sources and the evidence so far, and docs/SECURITY.md ("Provenance"). Three things differ from the fork. Two are the
 /// player's choice for the overlay's event row (Harry, 2026-10-26): the order (the festivals and rift first, then the
 /// siege, the bosses and the resets; the fork starts with Kaira) and the siege's name, Abyss Siege (the fork's
-/// Artifact Siege).
+/// Artifact Siege). The third is the game's: the siege and the Executors on Thursdays and Saturdays since its update
+/// of 2026-11-09 (<see cref="Global"/>).
 /// </summary>
 public static class EventCatalog
 {

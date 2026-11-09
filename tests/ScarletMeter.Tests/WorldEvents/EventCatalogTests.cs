@@ -52,9 +52,8 @@ public sealed class EventCatalogTests
 
     // The game's update of 2026-11-09 (its patch notes, Harry, 2026-11-09): the Artifact Siege from three times a week to
     // Thursdays and Saturdays at 21:00 as before, and the three Artifact Bosses (Executors Kaira, Argo and Tamasa) with it,
-    
-
-    // on the preset's UTC+9. The Legacy preset keeps the fork's three days, for comparison.
+    // at 21:30 as before. Harry's game's countdown to the next siege, read after the update, ended at Thursday's 21:00
+    // server time on the preset's UTC+9. The Legacy preset keeps the fork's three days, for comparison.
     [Fact]
     public void TheSiegeAndTheExecutorsAreOnThursdaysAndSaturdays()
     {

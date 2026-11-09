@@ -311,6 +311,11 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**A comment replaced by a script was cut in half** (the audit on #80, fixed before merge).
+- What: three comments were rewritten by a PowerShell script that replaced exact text. Each text spanning two lines was written as `@('file', 'first line' + "`r`n" + 'second line', …)`. PowerShell's comma binds tighter than `+`, so each array split the text: the search found only the first line and the replacement was a line break. A test's comment lost a line and kept a whitespace-only one, and this reached a commit. A class summary and a constant's comment were cut the same way on the fix and were seen before the next commit.
+- Why: the script reported one match for each replacement, which read as success. Nothing in the build or the tests reads comments, and CI has no whitespace check; `git diff --check` would have shown each cut line, ending in a space, but was not run.
+- Guard: `SourceTextTests.NoLineEndsInWhitespace` fails on any line of Scarlet's C# or Razor that ends in a space or tab. It failed with a comment cut after its comma, as these were. Multi-line text edits go through the Edit tool, or a script whose texts are built in variables first, never `+` inside an array literal.
+
 **The player's last-played time went into the public docs again** (the audit on #79, fixed before merge).
 - What: Harry's request quoted the Characters window's Last played cell, a date and time from his screen. The WORKLOG's "Why" quoted it verbatim, and CHANGELOG and ARCHITECTURE used that same date and time as their example of the new format. A test case also used that clock time. The commit is on the PR's branch, which GitHub keeps; the merge carries only the fixed text.
 - Why: the rule from #66 (below) was known, but it was applied when reading quotations for counts and names. A date and time quoted as an example of a format did not read as the player's own, because the request was about how times look, not about when he played.

@@ -165,7 +165,7 @@ public sealed class EventScheduleTests
     }
 
     [Fact]
-    public void GlobalAndLegacyAgreeOnBossesAndDisagreeOnResetsAndRiftsAtUtcPlusNine()
+    public void GlobalAndLegacyAgreeOnKairaAndNahmaAndDisagreeOnTheRestAtUtcPlusNine()
     {
         // TIMER-COMPARISON.md: Kaira and Nahma agree at UTC+9 (nine is divisible by three); resets and rifts do not. The
         // siege and the Executors differ too since the game's update of 2026-11-09, which left them off Mondays in the Global
