@@ -1,4 +1,4 @@
-using System.Globalization;
+using ScarletMeter.App.Formatting;
 using ScarletMeter.WorldEvents;
 
 namespace ScarletMeter.App.Alerts;
@@ -34,14 +34,14 @@ public static class EventText
     }
 
     /// <summary>
-    /// A rule's state for the settings list, in <paramref name="zone"/>: "next 21:05" (with the weekday when
-    /// it is not today, "next Sun 21:00"), "portal open now", "entry open now", "running, entry closed", or
-    /// "started 21:00" for a window with no entry (a boss may already be dead).
+    /// A rule's state for the settings list, in <paramref name="zone"/>: "next 9:05pm" (with the weekday when
+    /// it is not today, "next Sun 9:00pm"), "portal open now", "entry open now", "running, entry closed", or
+    /// "started 9:00pm" for a window with no entry (a boss may already be dead).
     /// </summary>
     public static string Status(EventOccurrence occurrence, DateTimeOffset now, TimeZoneInfo zone)
     {
         var start = TimeZoneInfo.ConvertTime(occurrence.Start, zone);
-        var time = start.ToString("HH:mm", CultureInfo.InvariantCulture);
+        var time = ClockText.Time(start.DateTime);
         return occurrence.Phase switch
         {
             EventPhase.PortalOpen => "portal open now",
@@ -53,14 +53,14 @@ public static class EventText
         };
     }
 
-    /// <summary>An instant in the PC's local time ("21:05").</summary>
+    /// <summary>An instant in the PC's local time ("9:05pm").</summary>
     public static string LocalTime(DateTimeOffset instant) => LocalTime(instant, TimeZoneInfo.Local);
 
-    /// <summary>An instant in <paramref name="zone"/> ("21:05").</summary>
+    /// <summary>An instant in <paramref name="zone"/> ("9:05pm").</summary>
     public static string LocalTime(DateTimeOffset instant, TimeZoneInfo zone) =>
-        TimeZoneInfo.ConvertTime(instant, zone).ToString("HH:mm", CultureInfo.InvariantCulture);
+        ClockText.Time(TimeZoneInfo.ConvertTime(instant, zone).DateTime);
 
-    /// <summary>When a rule recurs, for the settings list: "Every 3 h from 02:00 server time · portal 10 min".</summary>
+    /// <summary>When a rule recurs, for the settings list: "Every 3 h from 2:00am server time · portal 10 min".</summary>
     public static string Schedule(EventRule rule)
     {
         var clock = rule.Basis == ScheduleBasis.Utc ? "UTC" : "server time";
@@ -69,9 +69,9 @@ public static class EventText
         if (hours.Count == 24)
             when = $"Every hour at :{rule.Minute:00}";
         else if (hours.Count > 2 && Step(hours) is { } step)
-            when = $"Every {step} h from {hours[0]:00}:{rule.Minute:00}";
+            when = $"Every {step} h from {ClockText.Time(hours[0], rule.Minute)}";
         else
-            when = string.Join(", ", hours.Select(h => $"{h:00}:{rule.Minute:00}"));
+            when = string.Join(", ", hours.Select(h => ClockText.Time(h, rule.Minute)));
 
         var days = rule.Days is { Count: > 0 and < 7 } list ? string.Join(", ", list.Select(d => DayNames[d])) + " " : string.Empty;
         var window = rule.Kind == EventKind.Rift && (rule.EntryMinutes ?? rule.DurationMinutes) > 0

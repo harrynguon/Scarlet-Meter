@@ -2,6 +2,36 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-11-09 — The 12-hour clock everywhere; the Field bosses window's belled bosses first and "Respawns in" (#79)
+
+**What:**
+- `Formatting/ClockText` writes every clock time a player reads on the 12-hour clock ("9:34pm", "12:05am"), the same under any PC language; `Precise` keeps the combat log's milliseconds.
+- `EventText` (`LocalTime`, `Status`, `Schedule`), `RosterText.Time` (and so `At`), `DetailFormat.When` and `LogTime`, and `PetText.Synced` go through it. The field-boss window and notices and the update check's "(checked …)" follow through `EventText.LocalTime`. The log file keeps its 24-hour times.
+- The Field bosses window:
+  - `FieldBossListing.Ordered` puts the belled bosses first, each group in the catalog's order, with a gold line under the last belled one (`EndsChosen`, `.fb-chosen-end`).
+  - `FieldBossText.State` now counts down ("Respawns in 2h 59m", "Respawns in 14:43", "Up"); the new `FieldBossText.Time` gives the clock time for the column beside it, now "Time" ("6:01pm", "since 2:58pm", "seen 2:58pm"). `Countdown` is gone (the state has it).
+  - The state's figures are tabular, and "From" wraps in a narrow window.
+- ARCHITECTURE ("Clock times", the window, the tests), HANDOFF and CHANGELOG updated.
+
+**Why:** Harry, with a screenshot of the window, 2026-11-09: "can you make the pinned bosses be automatically arranged to the top of the list? and i would like it to say 'Respawns in ...' and then the timer/countdown. followed by the exact time on the other column. … also, change all timestamps from 24h to 12hr format like 9:34pm, 9:34am please. there's quite a few occurrences, like 'corridors reset ...' and last played 'sun 8 nov 01:34' in the character dashboard screen."
+
+**Checks (Windows PowerShell 5.1, SDK 10.0.402, at idle priority with no shared compiler server or reused build nodes, AION2 running; nothing launched, no window opened):**
+- Fail first, on main's code with the tests changed first:
+  - Each failed naming the old text: five alert tests and one roster test whose expectations were rewritten to the 12-hour clock ("next 02:00" for "next 2:00am", "21:32" for "9:32pm"), `FieldBossTextTests.TheStateSaysWhatTheBossIsDoingWithTheTimeLeftToARespawn` ("Respawns 17:01"), and `RazorMarkupTests.TheFieldBossesWindowListsTheBelledBossesFirstWithTheTimeBesideTheState`.
+  - `ClockTextTests.NoTwentyFourHourClockIsLeftInTheApp` listed all eight 24-hour formats (EventText ×4, DetailFormat ×2, RosterText, PetText).
+- Mutations of the new rules, each caught by its test (files restored, hashes compared): midnight as 0, noon as am, no belled-first order, a line under every belled boss, "since" for a time only seen.
+- Debug build: 0 errors. The whole suite through `dotnet exec`: 1,122 tests, passing apart from two. `ChangelogTests` failed before the entries had this PR's link; it passes with them. `EngineRegistrationTests.BossHpBeyondTheIntRangeIsMappedWhole` failed once in the full run and passed three times alone. It touches nothing changed here, so it is a flake to watch.
+- Release build of the solution: 0 errors, upstream's five usual warnings only.
+- A static mock of the window's table and a combat log, from the branch's real `app.css` and `views.css` with made-up times, rendered by headless Edge:
+  - At 620 px every row is on one line.
+  - At the least size, 460 px, names and "From" wrap and the times do not.
+  - The first separator, the theme's `--line`, was too faint beside the rows' own lines (pixel 28,28,31), so it was made gold.
+  - "12:05:33.128pm" fits the combat log's 96 px time column.
+
+**Not checked:** the meter itself (a smoke run, or the game): the real window's rows moving when a bell is rung, the countdown's ticking, and every other window's times in place.
+
+**Next:** the audit and Codex's review; merge with Harry's go-ahead, then rebuild both portable copies.
+
 ## 2026-11-08 — Field-boss timers: the notices get a row of their own under the event icons (#78)
 
 **What:** `Components/EventRow.razor` draws the chosen field bosses' notices in a row of their own (`ev-row fb-row`, a group named "Field bosses") under the event icons, only while there is a notice, instead of first in the icons' row; the icons' row (events, then soul notices) is drawn only when it has something. The icons' detail lines come under both rows. When a notice shows is unchanged: the planner's Soon from the player's lead time before the respawn, then Up for a quarter of an hour. `alerts.css` only has its comments updated (the boss row reuses `.ev-row`). ARCHITECTURE, HANDOFF, README, CHANGELOG and LESSONS updated.

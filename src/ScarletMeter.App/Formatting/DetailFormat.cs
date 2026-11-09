@@ -12,11 +12,11 @@ public static class DetailFormat
     /// <summary>A whole number with thousands separators ("1,234,567").</summary>
     public static string Full(long value) => value.ToString("N0", CultureInfo.InvariantCulture);
 
-    /// <summary>A combat-log timestamp with milliseconds.</summary>
-    public static string LogTime(DateTime time) => time.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture);
+    /// <summary>A combat-log timestamp with milliseconds ("9:05:33.120pm").</summary>
+    public static string LogTime(DateTime time) => ClockText.Precise(time);
 
-    /// <summary>A fight's date for lists ("Fri 24 Oct 21:05").</summary>
-    public static string When(DateTime time) => time.ToString("ddd d MMM HH:mm", CultureInfo.InvariantCulture);
+    /// <summary>A fight's date for lists ("Fri 24 Oct 9:05pm").</summary>
+    public static string When(DateTime time) => time.ToString("ddd d MMM ", CultureInfo.InvariantCulture) + ClockText.Time(time);
 
     /// <summary>The flags of a hit as short tags, in RATmeter's order.</summary>
     public static IEnumerable<string> Tags(HitFlags flags)

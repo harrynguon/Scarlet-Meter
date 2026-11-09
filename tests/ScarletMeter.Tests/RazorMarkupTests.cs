@@ -434,6 +434,27 @@ public sealed partial class RazorMarkupTests
         Assert.True(roster > 0 && timers > roster, "the roster starts before the field-boss timers");
     }
 
+    // The Field bosses window lists the bosses with a bell first (Harry, 2026-11-09: "make the pinned bosses be
+    // automatically arranged to the top of the list"; the order is FieldBossListing's, FieldBossTextTests), the state with
+    // the time left ("Respawns in 2h 59m"), then the clock time in a column of its own, right-aligned as numbers are, and a
+    // line under the last belled boss. Where the timers came from wraps in a narrow window rather than widen the table.
+    [Fact]
+    public void TheFieldBossesWindowListsTheBelledBossesFirstWithTheTimeBesideTheState()
+    {
+        var page = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "Pages", "FieldBossesPage.razor"));
+        Assert.Contains("var rows = FieldBossListing.Ordered(FieldBossCatalog.OnMap(map), chosen);", page);
+        Assert.Matches(@"@for \(var i = 0; i < rows\.Count; i\+\+\)\s*\{\s*var boss = rows\[i\];", page);
+        Assert.DoesNotContain("FieldBossCatalog.OnMap(map))\n", page.Replace("\r\n", "\n"), StringComparison.Ordinal);
+        Assert.Contains(@"@(FieldBossListing.EndsChosen(rows, i, chosen) ? ""fb-chosen-end"" : """")", page);
+        Assert.Matches(@"<th>State</th>\s*<th class=""num"">Time</th>\s*<th>From</th>", page);
+        Assert.Matches(@"<td class=""fb-state"">@FieldBossText\.State\(timer, now\)</td>\s*<td class=""num"">@FieldBossText\.Time\(timer, now\)</td>\s*"
+            + @"<td class=""muted fb-from"">", page);
+
+        var css = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ScarletMeter.App", "wwwroot", "css", "views.css"));
+        Assert.Matches(@"(?m)^\.fb-table td\.fb-from \{\s*white-space: normal;", css);
+        Assert.Matches(@"(?m)^\.fb-table tr\.fb-chosen-end td \{\s*border-bottom-color: rgba\(220, 198, 140, 0\.3\);", css);
+    }
+
     // The field bosses' notices have their own row under the event icons, drawn only while one is due (Harry, 2026-11-08:
     // ahead of the icons, two of them pushed the last icon onto a line of its own). The icons' row closes before it opens,
     // and the rows stack (.alerts is a column), so a notice never shares a line with the icons; with no boss due its row is

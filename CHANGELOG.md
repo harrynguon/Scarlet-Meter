@@ -61,6 +61,13 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ### Changed
 
+- Every time the meter shows is on the 12-hour clock: "9:34pm", "9:34am". This covers the event notices and their tips,
+  the Alerts settings' schedules ("Every 3 h from 2:00am server time"), the Characters window's times and Last played
+  ("Sun 8 Nov" over "1:34am"), the corridors' and Odyle's next times, the fight history and combat log, the Pet souls
+  window and the Field bosses window. ([#79](https://github.com/harrynguon/Scarlet-Meter/pull/79))
+- The Field bosses window lists the bosses with a bell first, a line under them, then the rest. The state counts down
+  ("Respawns in 2h 59m"), with the respawn's clock time in the column beside it ("6:01pm", or "since 2:58pm" for a boss
+  that is up). ([#79](https://github.com/harrynguon/Scarlet-Meter/pull/79))
 - The bar effects' frame cap does over a third less work each time it moves them on, so fights with effects
   on take a little less of your PC's time. ([#70](https://github.com/harrynguon/Scarlet-Meter/pull/70))
 - The meter does a little less in the background: two of upstream's timers that woke ten times a second each, with

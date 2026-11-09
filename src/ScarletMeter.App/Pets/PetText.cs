@@ -1,4 +1,5 @@
 using System.Globalization;
+using ScarletMeter.App.Formatting;
 
 namespace ScarletMeter.App.Pets;
 
@@ -29,10 +30,11 @@ public static class PetText
     }
 
     /// <summary>
-    /// Where the counts come from: the game's collection at the last login seen, or, when none was seen, the pickups alone.
+    /// Where the counts come from: the game's collection at the last login seen ("… at your login of 8 Nov 9:05pm …"), or,
+    /// when none was seen, the pickups alone.
     /// </summary>
     public static string Synced(DateTimeOffset? syncedAt) => syncedAt is { } at
-        ? $"from the game at your login of {at.ToLocalTime().ToString("d MMM HH:mm", CultureInfo.InvariantCulture)}, and each soul since"
+        ? $"from the game at your login of {at.ToLocalTime().ToString("d MMM", CultureInfo.InvariantCulture)} {ClockText.Time(at.ToLocalTime().DateTime)}, and each soul since"
         : "from the souls picked up with the meter running only: log in (or relog) with it running and the game sends every count";
 
     /// <summary>A genus for display ("Fera"), or empty for a pet the catalog does not know.</summary>

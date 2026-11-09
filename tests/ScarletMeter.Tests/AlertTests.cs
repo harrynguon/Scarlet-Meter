@@ -188,10 +188,10 @@ public sealed class AlertTests : IDisposable
         var rules = EventCatalog.Default.ToDictionary(r => r.Id);
         Assert.Equal("Portal open", EventText.OpenLabel(rules[EventIds.Rift]));
         Assert.Equal("Entry open", EventText.OpenLabel(rules[EventIds.Shugo]));
-        Assert.Equal("Every 3 h from 02:00 server time · portal 10 min", EventText.Schedule(rules[EventIds.Rift]));
+        Assert.Equal("Every 3 h from 2:00am server time · portal 10 min", EventText.Schedule(rules[EventIds.Rift]));
         Assert.Equal("Every hour at :00 server time · entry 3 min", EventText.Schedule(rules[EventIds.Shugo]));
-        Assert.Equal("Sun, Fri 21:00 server time", EventText.Schedule(rules[EventIds.Nahma]));
-        Assert.Equal("07:00 UTC", EventText.Schedule(rules[EventIds.Daily]));
+        Assert.Equal("Sun, Fri 9:00pm server time", EventText.Schedule(rules[EventIds.Nahma]));
+        Assert.Equal("7:00am UTC", EventText.Schedule(rules[EventIds.Daily]));
     }
 
     // One icon per alerted event in catalog order, the order Harry chose for the row (2026-10-26): the festivals and the
@@ -274,14 +274,14 @@ public sealed class AlertTests : IDisposable
             return EventRowLayout.Status(icon, now, EventCatalog.DefaultServerOffset, TimeZoneInfo.Utc);
         }
 
-        Assert.Equal("starts 01:00", StatusAt(At0056, EventIds.Shugo));
-        Assert.Equal("entry open until 01:03", StatusAt(At0056.AddMinutes(5), EventIds.Shugo));
-        Assert.Equal("portal open until 02:10", StatusAt(new DateTimeOffset(2026, 10, 24, 2, 5, 0, TimeSpan.Zero), EventIds.Rift));
+        Assert.Equal("starts 1:00am", StatusAt(At0056, EventIds.Shugo));
+        Assert.Equal("entry open until 1:03am", StatusAt(At0056.AddMinutes(5), EventIds.Shugo));
+        Assert.Equal("portal open until 2:10am", StatusAt(new DateTimeOffset(2026, 10, 24, 2, 5, 0, TimeSpan.Zero), EventIds.Rift));
         // Not due: the settings list's words, at the instant asked about.
-        Assert.Equal("next 01:30", StatusAt(At0056, EventIds.Invasion));
+        Assert.Equal("next 1:30am", StatusAt(At0056, EventIds.Invasion));
         Assert.Equal("running, entry closed", StatusAt(At0056.AddMinutes(8), EventIds.Shugo)); // 01:04
-        Assert.Equal("next 12:00", StatusAt(At0056, EventIds.Siege));                         // server Sat 21:00
-        Assert.Equal("next Sun 12:00", StatusAt(At0056, EventIds.Nahma));                     // server Sun 21:00
+        Assert.Equal("next 12:00pm", StatusAt(At0056, EventIds.Siege));                         // server Sat 21:00
+        Assert.Equal("next Sun 12:00pm", StatusAt(At0056, EventIds.Nahma));                     // server Sun 21:00
     }
 
     // The row reads its tips and lines with the view's server offset, which must be the player's setting, not the
@@ -292,7 +292,7 @@ public sealed class AlertTests : IDisposable
         var view = AlertMonitor.Compute(Only(EventIds.Siege) with { ServerOffsetHours = 8 }, At0056);
         Assert.Equal(TimeSpan.FromHours(8), view.ServerOffset);
         var siege = Assert.Single(EventRowLayout.Icons(view));
-        Assert.Equal("next 13:00", EventRowLayout.Status(siege, At0056, view.ServerOffset, TimeZoneInfo.Utc));
+        Assert.Equal("next 1:00pm", EventRowLayout.Status(siege, At0056, view.ServerOffset, TimeZoneInfo.Utc));
     }
 
     [Fact]
@@ -314,7 +314,7 @@ public sealed class AlertTests : IDisposable
         Assert.Equal(0, Assert.NotNull(EventRowLayout.Progress(open, at0101.AddMinutes(3), lead))); // never below empty
 
         var idle = IconAt(At0056, EventIds.Invasion);
-        Assert.Equal("next 01:30 · in 34:00", EventRowLayout.When(idle, At0056, offset, TimeZoneInfo.Utc));
+        Assert.Equal("next 1:30am · in 34:00", EventRowLayout.When(idle, At0056, offset, TimeZoneInfo.Utc));
         Assert.Null(EventRowLayout.Progress(idle, At0056, lead));
         var at0104 = At0056.AddMinutes(8); // Shugo's entry closed at 01:03; it runs until 01:07
         Assert.Equal("running, entry closed", EventRowLayout.When(IconAt(at0104, EventIds.Shugo), at0104, offset, TimeZoneInfo.Utc));
@@ -365,23 +365,23 @@ public sealed class AlertTests : IDisposable
         string Status(string id, DateTimeOffset now) => EventText.Status(EventSchedule.Occurrence(rules[id], now, offset), now, utc);
 
         var midnight = new DateTimeOffset(2026, 10, 24, 0, 0, 0, TimeSpan.Zero); // a Saturday
-        Assert.Equal("next 02:00", Status(EventIds.Rift, midnight));
+        Assert.Equal("next 2:00am", Status(EventIds.Rift, midnight));
         Assert.Equal("portal open now", Status(EventIds.Rift, midnight.AddHours(2).AddMinutes(5)));
         Assert.Equal("entry open now", Status(EventIds.Shugo, midnight.AddHours(1).AddMinutes(1)));
         Assert.Equal("running, entry closed", Status(EventIds.Shugo, midnight.AddHours(1).AddMinutes(5)));
-        Assert.Equal("next Sun 12:00", Status(EventIds.Nahma, midnight)); // server Sun 21:00
+        Assert.Equal("next Sun 12:00pm", Status(EventIds.Nahma, midnight)); // server Sun 21:00
 
         var boss = EventSchedule.Occurrence(rules[EventIds.Nahma], midnight, offset) with { Phase = EventPhase.ScheduledActive };
-        Assert.Equal("started 12:00", EventText.Status(boss, midnight, utc));
+        Assert.Equal("started 12:00pm", EventText.Status(boss, midnight, utc));
 
         var auckland = TimeZoneInfo.CreateCustomTimeZone("UTC+13", TimeSpan.FromHours(13), "UTC+13", "UTC+13");
-        Assert.Equal("next 15:00", EventText.Status(EventSchedule.Occurrence(rules[EventIds.Rift], midnight, offset), midnight, auckland));
+        Assert.Equal("next 3:00pm", EventText.Status(EventSchedule.Occurrence(rules[EventIds.Rift], midnight, offset), midnight, auckland));
 
         // Fri 23:30 UTC is Sat 12:30 at UTC+13 and the 02:00 UTC rift is Sat 15:00 there: the same local day,
         // though not the same UTC day, so no weekday.
         var lateFriday = new DateTimeOffset(2026, 10, 23, 23, 30, 0, TimeSpan.Zero);
-        Assert.Equal("next 15:00", EventText.Status(EventSchedule.Occurrence(rules[EventIds.Rift], lateFriday, offset), lateFriday, auckland));
-        Assert.Equal("next Sat 02:00", Status(EventIds.Rift, lateFriday));
+        Assert.Equal("next 3:00pm", EventText.Status(EventSchedule.Occurrence(rules[EventIds.Rift], lateFriday, offset), lateFriday, auckland));
+        Assert.Equal("next Sat 2:00am", Status(EventIds.Rift, lateFriday));
     }
 
     [Fact]

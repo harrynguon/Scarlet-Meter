@@ -566,6 +566,22 @@ tr.child td {
     white-space: normal;
 }
 
+/* The state counts down ("Respawns in 14:43") in figures of one width, so the words do not shift each second. Where the
+   timers came from gives way first in a narrow window: it wraps, so the clock time beside the state stays on one line. */
+.fb-table td.fb-state {
+    font-variant-numeric: tabular-nums;
+}
+
+.fb-table td.fb-from {
+    white-space: normal;
+}
+
+/* The belled bosses come first (FieldBossListing); a line under the last of them, in the lit bell's gold, sets them apart
+   from the rest (the theme's --line was too faint beside the rows' own lines in a headless render). */
+.fb-table tr.fb-chosen-end td {
+    border-bottom-color: rgba(220, 198, 140, 0.3);
+}
+
 .fb-table tr.up .fb-state { color: var(--good); }
 .fb-table tr.soon .fb-state,
 .fb-table tr.soon .num { color: var(--soon); }
