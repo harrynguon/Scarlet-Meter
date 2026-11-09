@@ -12,11 +12,21 @@ public static class DetailFormat
     /// <summary>A whole number with thousands separators ("1,234,567").</summary>
     public static string Full(long value) => value.ToString("N0", CultureInfo.InvariantCulture);
 
-    /// <summary>A combat-log timestamp with milliseconds.</summary>
-    public static string LogTime(DateTime time) => time.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture);
+    /// <summary>A combat-log timestamp with milliseconds ("9:05:33.120pm").</summary>
+    public static string LogTime(DateTime time) => ClockText.Precise(time);
 
-    /// <summary>A fight's date for lists ("Fri 24 Oct 21:05").</summary>
-    public static string When(DateTime time) => time.ToString("ddd d MMM HH:mm", CultureInfo.InvariantCulture);
+    /// <summary>A fight's date for lists ("Fri 24 Oct 9:05pm").</summary>
+    public static string When(DateTime time) => time.ToString("ddd d MMM ", CultureInfo.InvariantCulture) + ClockText.Time(time);
+
+    /// <summary>
+    /// What is wrong with the History window's dates, in its own words and dates ("The From date (9 Nov) is after the To date
+    /// (8 Nov)."), or null when they make a range. Checked before the query, so the engine's own message, written for
+    /// developers with 24-hour times (HistoryQuery.Validate), does not reach the player.
+    /// </summary>
+    public static string? RangeProblem(DateTime? from, DateTime? to) =>
+        from is { } start && to is { } end && start.Date > end.Date
+            ? string.Create(CultureInfo.InvariantCulture, $"The From date ({start:d MMM}) is after the To date ({end:d MMM}).")
+            : null;
 
     /// <summary>The flags of a hit as short tags, in RATmeter's order.</summary>
     public static IEnumerable<string> Tags(HitFlags flags)

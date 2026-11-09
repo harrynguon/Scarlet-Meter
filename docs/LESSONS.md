@@ -311,6 +311,16 @@ Mistakes found in this repository's work, why they got through, and what now cat
 
 ## In the process
 
+**The player's last-played time went into the public docs again** (the audit on #79, fixed before merge).
+- What: Harry's request quoted the Characters window's Last played cell, a date and time from his screen. The WORKLOG's "Why" quoted it verbatim, and CHANGELOG and ARCHITECTURE used that same date and time as their example of the new format. A test case also used that clock time. The commit is on the PR's branch, which GitHub keeps; the merge carries only the fixed text.
+- Why: the rule from #66 (below) was known, but it was applied when reading quotations for counts and names. A date and time quoted as an example of a format did not read as the player's own, because the request was about how times look, not about when he played.
+- Guard: the scarlet-ship skill's "Document" step now has a command that lists every added Markdown line with a clock time or a date, to read before the first commit, and says to use made-up values ("Thu 30 Oct" over "7:00pm") and to leave the value out of a quotation. A value from the player's own screen is theirs whatever it is being used to show.
+
+**The clock guard was narrower than its description** (the audit on #79, fixed before merge).
+- What: ARCHITECTURE said `NoTwentyFourHourClockIsLeftInTheApp` failed on "any" 24-hour format. Its pattern missed "H:mm", "HHmm", `{at:t}`, "g" formats, `{h}:{m:00}` and the scripts. The History window's dates-out-of-order message, built by the engine with "HH:mm:ss", was outside the folders it scanned. Two lines kept 24-hour times on purpose without being named: the log's gap summary (the whole file was left out) and a kept-aside file's UTC stamp, which passed only because "HHmmss" has no word boundary.
+- Why: the pattern was written from the formats the app had, then described as covering all of them; nothing tested what it could see. This is "Guards were weaker than the words describing them" (#23) again.
+- Guard: the pattern now covers each of these, and two theories pin it: `TheGuardSeesEachWayOfWritingATwentyFourHourTime` lists the ways to write a 24-hour time, and `TheGuardLetsDatesCountdownsAndNumbersBe` lists dates, countdowns, durations and numbers. The kept lines are named by their own text and must still match. The History window says the dates' problem itself (`DetailFormat.RangeProblem`). ARCHITECTURE says what the guard cannot see (a `DateTime` written with no format). When a guard is described, list what it catches and what it cannot, and test the pattern itself on samples of both.
+
 **Codex reviewed each PR before its changelog line was in** (Codex P1 on #76 and on #77, both fixed before merge).
 - What: the changelog line needs its PR's link, so it was added in the commit after the PR was opened; Codex reviews a PR as it is opened and reviewed the first commit, so both times its P1 was the missing (or unedited) line, already on its way.
 - Why: the ship skill's order (open, then add the line) met Codex's trigger (a review when a PR is opened for review) and nobody put the two side by side; the second time, the line was also left unedited on purpose until the number came.

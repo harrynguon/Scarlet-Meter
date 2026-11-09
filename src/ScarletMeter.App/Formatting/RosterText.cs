@@ -41,7 +41,7 @@ public static class RosterText
         return days > 0 ? $"{days}d {hours}h" : hours > 0 ? $"{hours}h {rest}m" : $"{rest}m";
     }
 
-    /// <summary>An instant in the PC's local time, with the day when it is not today ("01:42", "Thu 30 Oct 07:00").</summary>
+    /// <summary>An instant in the PC's local time, with the day when it is not today ("1:42am", "Thu 30 Oct 7:00pm").</summary>
     public static string At(DateTimeOffset instant, DateTimeOffset now) =>
         Day(instant, now) is { Length: > 0 } day ? day + " " + Time(instant) : Time(instant);
 
@@ -55,8 +55,8 @@ public static class RosterText
         return local.Date == now.ToLocalTime().Date ? string.Empty : local.ToString("ddd d MMM", CultureInfo.InvariantCulture);
     }
 
-    /// <summary>The time of an instant in the PC's local time ("07:00").</summary>
-    public static string Time(DateTimeOffset instant) => instant.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture);
+    /// <summary>The time of an instant in the PC's local time ("7:00pm").</summary>
+    public static string Time(DateTimeOffset instant) => ClockText.Time(instant.ToLocalTime().DateTime);
 
     /// <summary>The line under a character's name: server, class and level ("SIE · Sorcerer · Lv 45"), whichever are known.</summary>
     public static string ServerClassAndLevel(RosterCharacter character) =>

@@ -5,9 +5,11 @@
 @implements IDisposable
 @*
     The field-boss timers (Windows/MeterWindows.FieldBosses, the hourglass in the overlay's header): a tab per map the game
-    lists field bosses for, and a row per boss with what the meter knows of it on the timers' server: up (since when), the
-    respawn time and the time to it, or no timer yet, and where that came from (the player's own map, or NotMeter's shared
-    timers) and how long ago. The bell on a row gives that boss a notice in the overlay's event row. The timers come from
+    lists field bosses for, and a row per boss with what the meter knows of it on the timers' server: its state with the time
+    left to a respawn ("Respawns in 2h 59m"), the clock time beside it (the respawn, or since when it is up), or no timer
+    yet, and where that came from (the player's own map, or NotMeter's shared timers) and how long ago. The bell on a row
+    gives that boss a notice in the overlay's event row; the belled bosses are listed first (FieldBossListing), a line under
+    the last of them. The timers come from
     FieldBosses/FieldBossService; while this window is open it keeps the shared timers current (Watch), and the countdowns
     tick once a second. The server is the one the game last named a character on, or one chosen here.
 *@
@@ -17,6 +19,7 @@
     var options = Settings.Current.FieldBosses;
     var map = ShownMap(view);
     var chosen = options.Bosses.ToHashSet();
+    var rows = FieldBossListing.Ordered(FieldBossCatalog.OnMap(map), chosen);
 }
 <div class="tool fieldbosses" data-window="fieldbosses">
     <nav class="tabs" role="tablist" aria-label="Maps">
@@ -61,16 +64,17 @@
                     <th class="fb-bell-col"><span class="sr-only">Notice</span></th>
                     <th>Boss</th>
                     <th>State</th>
-                    <th class="num">In</th>
+                    <th class="num">Time</th>
                     <th>From</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var boss in FieldBossCatalog.OnMap(map))
+                @for (var i = 0; i < rows.Count; i++)
                 {
+                    var boss = rows[i];
                     var timer = view.Board.GetValueOrDefault(boss.Id);
                     var on = chosen.Contains(boss.Id);
-                    <tr class="@RowClass(timer, now)" @key="boss.Id">
+                    <tr class="@RowClass(timer, now) @(FieldBossListing.EndsChosen(rows, i, chosen) ? "fb-chosen-end" : "")" @key="boss.Id">
                         <td class="fb-bell-col">
                             <button type="button" class="fb-bell @(on ? "on" : "")" aria-pressed="@(on ? "true" : "false")"
                                     title="@(on ? "Notice in the overlay: on" : "Notice in the overlay: off")" aria-label="@($"Notice for {boss.Name}")"
@@ -80,8 +84,8 @@
                         </td>
                         <td class="fb-name">@boss.Name</td>
                         <td class="fb-state">@FieldBossText.State(timer, now)</td>
-                        <td class="num">@FieldBossText.Countdown(timer, now)</td>
-                        <td class="muted">@(timer is null ? string.Empty : FieldBossText.Source(timer, now))</td>
+                        <td class="num fb-time">@FieldBossText.Time(timer, now)</td>
+                        <td class="muted fb-from">@(timer is null ? string.Empty : FieldBossText.Source(timer, now))</td>
                     </tr>
                 }
             </tbody>

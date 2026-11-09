@@ -236,9 +236,9 @@ public sealed class RosterTests : IDisposable
         // An instant on another day: its day apart from its time, for Last played's two lines; today's has no day.
         var now = new DateTimeOffset(new DateTime(2026, 10, 28, 12, 0, 0, DateTimeKind.Local));
         var yesterday = new DateTimeOffset(new DateTime(2026, 10, 27, 21, 32, 0, DateTimeKind.Local));
-        Assert.Equal(("Tue 27 Oct", "21:32", "Tue 27 Oct 21:32"), (RosterText.Day(yesterday, now), RosterText.Time(yesterday), RosterText.At(yesterday, now)));
+        Assert.Equal(("Tue 27 Oct", "9:32pm", "Tue 27 Oct 9:32pm"), (RosterText.Day(yesterday, now), RosterText.Time(yesterday), RosterText.At(yesterday, now)));
         var earlierToday = now.AddMinutes(-175);
-        Assert.Equal((string.Empty, "09:05", "09:05"), (RosterText.Day(earlierToday, now), RosterText.Time(earlierToday), RosterText.At(earlierToday, now)));
+        Assert.Equal((string.Empty, "9:05am", "9:05am"), (RosterText.Day(earlierToday, now), RosterText.Time(earlierToday), RosterText.At(earlierToday, now)));
         Assert.Equal("SIE · Gladiator", RosterText.ServerClassAndLevel(new RosterCharacter { Name = "A", Server = "SIE", ClassName = "Gladiator" }));
         Assert.Equal("Gladiator", RosterText.ServerClassAndLevel(new RosterCharacter { Name = "A", ClassName = "Gladiator" }));
         Assert.Equal("SIE · Sorcerer · Lv 45", RosterText.ServerClassAndLevel(new RosterCharacter { Name = "A", Server = "SIE", ClassName = "Sorcerer", Level = 45 }));

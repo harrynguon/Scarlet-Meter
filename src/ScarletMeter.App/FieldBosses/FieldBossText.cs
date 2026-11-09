@@ -20,8 +20,10 @@ public static class FieldBossText
     }
 
     /// <summary>
-    /// A boss's state for the window, at <paramref name="now"/> in the PC's local time: "Up since 21:05", "Up (seen 21:05)"
-    /// when the source did not say since when, "Respawns 21:05", "Killed, no time given", or "No timer yet".
+    /// A boss's state for the window at <paramref name="now"/>, with the time left to a respawn as the overlay's notice
+    /// counts it: "Respawns in 2h 59m", "Respawns in 14:43", "Up", "Killed, no time given", or "No timer yet". The clock
+    /// time is <see cref="Time(FieldBossTimer?, DateTimeOffset)"/>'s, in the column beside it (Harry, 2026-11-09: "say
+    /// 'Respawns in ...' and then the timer/countdown, followed by the exact time on the other column").
     /// </summary>
     public static string State(FieldBossTimer? timer, DateTimeOffset now)
     {
@@ -29,16 +31,31 @@ public static class FieldBossText
         var state = timer.StateAt(now);
         return state.Status switch
         {
-            FieldBossStatus.Up when state.At is { } since => $"Up since {EventText.LocalTime(since)}",
-            FieldBossStatus.Up => $"Up (seen {EventText.LocalTime(timer.ObservedAt)})",
-            FieldBossStatus.Respawning when state.At is { } back => $"Respawns {EventText.LocalTime(back)}",
+            FieldBossStatus.Up => "Up",
+            FieldBossStatus.Respawning when state.At is { } back => $"Respawns in {EventText.IconTime(back - now)}",
             _ => "Killed, no time given",
         };
     }
 
-    /// <summary>The time left to a respawn for the window's countdown ("4:59", "2h 05m"), or null when the boss is not respawning.</summary>
-    public static string? Countdown(FieldBossTimer? timer, DateTimeOffset now) =>
-        timer?.StateAt(now) is { Status: FieldBossStatus.Respawning, At: { } back } ? EventText.IconTime(back - now) : null;
+    /// <summary>
+    /// The clock time beside a boss's state, in the PC's local time: the respawn ("6:01pm"), since when it is up ("since
+    /// 2:58pm"), or when it was seen up when the source did not say since when ("seen 2:58pm"); empty with no time.
+    /// </summary>
+    public static string Time(FieldBossTimer? timer, DateTimeOffset now) => Time(timer, now, TimeZoneInfo.Local);
+
+    /// <summary>The clock time beside a boss's state, as <see cref="Time(FieldBossTimer?, DateTimeOffset)"/>, in <paramref name="zone"/>.</summary>
+    public static string Time(FieldBossTimer? timer, DateTimeOffset now, TimeZoneInfo zone)
+    {
+        if (timer is null) return string.Empty;
+        var state = timer.StateAt(now);
+        return state.Status switch
+        {
+            FieldBossStatus.Up when state.At is { } since => "since " + EventText.LocalTime(since, zone),
+            FieldBossStatus.Up => "seen " + EventText.LocalTime(timer.ObservedAt, zone),
+            FieldBossStatus.Respawning when state.At is { } back => EventText.LocalTime(back, zone),
+            _ => string.Empty,
+        };
+    }
 
     /// <summary>Where a timer came from and how long ago: "Your map · 3 min ago", "NotMeter · just now".</summary>
     public static string Source(FieldBossTimer timer, DateTimeOffset now)
@@ -79,7 +96,7 @@ public static class FieldBossText
         _ => serverId.ToString(System.Globalization.CultureInfo.InvariantCulture),
     };
 
-    /// <summary>What a field-boss notice says for screen readers and its tip: "Eternal Gartua respawns at 21:05", "Eternal Gartua is up".</summary>
+    /// <summary>What a field-boss notice says for screen readers and its tip: "Eternal Gartua respawns at 9:05pm", "Eternal Gartua is up".</summary>
     public static string Notice(FieldBossAlert alert) => alert.Kind == FieldBossAlertKind.Soon
         ? $"{alert.Boss.Name} respawns at {EventText.LocalTime(alert.At)}"
         : $"{alert.Boss.Name} is up";
