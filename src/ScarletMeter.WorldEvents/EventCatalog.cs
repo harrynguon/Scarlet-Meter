@@ -5,10 +5,11 @@ namespace ScarletMeter.WorldEvents;
 /// <summary>
 /// The built-in schedule: nine entries, in display order, as two presets. <see cref="Global"/> is Scarlet's
 /// default. Neither is verified against Global Asia / Nezekan; see docs/ARCHITECTURE.md ("World events") for the
-/// sources and the evidence so far, and docs/SECURITY.md ("Provenance"). Two things differ from the fork, both the
+/// sources and the evidence so far, and docs/SECURITY.md ("Provenance"). Three things differ from the fork. Two are the
 /// player's choice for the overlay's event row (Harry, 2026-10-26): the order (the festivals and rift first, then the
 /// siege, the bosses and the resets; the fork starts with Kaira) and the siege's name, Abyss Siege (the fork's
-/// Artifact Siege).
+/// Artifact Siege). The third is the game's: the siege and the Executors on Thursdays and Saturdays since its update
+/// of 2026-11-09 (<see cref="Global"/>).
 /// </summary>
 public static class EventCatalog
 {
@@ -45,7 +46,8 @@ public static class EventCatalog
     /// taengu/A2Tools-Plugins' event-timers data. Resets at 07:00 UTC; Kaira and rifts on the server clock; rifts
     /// every three hours from 02:00 server with a ten-minute portal and no longer activity; Shugo and Invasion with
     /// a three-minute entry in a seven- and thirteen-minute window; boss and siege end times unknown (duration 0),
-    /// so they are never shown as active.
+    /// so they are never shown as active. One change of Scarlet's own since the game's update of 2026-11-09 (its patch
+    /// notes): the siege and the Executors on Thursdays and Saturdays only, at the same times (they were Mondays too).
     /// </summary>
     public static IReadOnlyList<EventRule> Global { get; } = [.. Legacy.Select(ToGlobal)];
 
@@ -112,12 +114,14 @@ public static class EventCatalog
         return false;
     }
 
-    // presets.mjs applied to one legacy rule; the A2Tools parameters at the pinned commit.
+    // presets.mjs applied to one legacy rule; the A2Tools parameters at the pinned commit. The siege and the Executors
+    // then keep only Thursday and Saturday (the game's update of 2026-11-09; 0 = Sunday).
     private static EventRule ToGlobal(EventRule rule) => rule.Id switch
     {
         EventIds.Daily or EventIds.Weekly => rule with { Basis = ScheduleBasis.Utc, Hours = [7] },
         EventIds.Kaira => rule with { Basis = ScheduleBasis.Server, DurationMinutes = 0 },
-        EventIds.Nahma or EventIds.Executors or EventIds.Siege => rule with { DurationMinutes = 0 },
+        EventIds.Executors or EventIds.Siege => rule with { Days = [4, 6], DurationMinutes = 0 },
+        EventIds.Nahma => rule with { DurationMinutes = 0 },
         EventIds.Rift => rule with
         {
             Basis = ScheduleBasis.Server,

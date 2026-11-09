@@ -2,6 +2,48 @@
 
 Newest first. Each entry: what changed, why, actual checks, unresolved issues, next action.
 
+## 2026-11-09 — The Abyss Siege and the Executors on Thursdays and Saturdays (#80)
+
+**What:**
+- The Global preset's Abyss Siege (21:00 server) and Executors (21:30) are on Thursdays and Saturdays only (`EventCatalog.ToGlobal`). The Legacy preset, the fork's for comparison, keeps Mondays.
+- The overlay's notices, the Alerts settings and the Characters window's "Corridors reset" follow, since `RechargeCalendar` reads the siege from this schedule. The corridors' count now runs from Saturday's siege to Thursday's.
+- Field bosses need no change: the meter holds no respawn interval or schedule for them, and every time comes from the map or the shared timers. `FieldBossCatalog`'s comment, which called Argo, the Spirit King the one Abyss boss without a fixed schedule, says so now, and ARCHITECTURE notes the update's 11-hour Gartua and Lagta and Argo's 10:30 and 22:30.
+
+**Why:** Harry, 2026-11-09, with the game's patch notes for that day's update: "please update timers as needed. for abyss siege, the next one is in …" (the countdown he read is left out: with the siege's time it says when he played). The notes:
+- The Artifact Siege goes from three times a week to Thursdays and Saturdays, at 21:00 as before. The three Artifact Bosses (Executors Kaira, Argo and Tamasa) follow it, at 21:30.
+- Gartua and Lagta (both sides) respawn in 11 hours instead of 12.
+- Argo, the Spirit King spawns at 10:30 and 22:30 (presumably server time, as the notes' siege time is).
+- The game's countdown, set against the time it was read, ends at Thursday's 21:00 server time at the preset's UTC+9, within the minute. On the old schedule the next siege would have been sooner.
+
+**Checks (Windows PowerShell 5.1, SDK 10.0.402, at idle priority with no shared compiler server or reused build nodes; nothing launched, no window opened):**
+- Fail first, on main's schedule with the tests changed first. Four failed, each showing the Monday siege:
+  - `EventCatalogTests.TheSiegeAndTheExecutorsAreOnThursdaysAndSaturdays` (new);
+  - `GlobalPresetMatchesTheFork`, which now applies Scarlet's two changed days to the fork's values;
+  - `RosterTests.SiegesAreTheWorldEventSchedules`: the next siege from a Monday is Thursday's, with none that Monday evening;
+  - `RosterTests.CorridorRunsCountFromTheLastSiege`: runs since Saturday still count on Tuesday, and none after Thursday's siege.
+- With the change, two more tests that compared the presets needed new expectations:
+  - `EventScheduleTests.GlobalAndLegacyAgree…`: the siege and the Executors now differ between Global and Legacy.
+  - `AlertPlannerTests.ActiveEventsWithoutAnEntryWindowGetNoAlert`: Thursday's siege now, and no notice on a Monday.
+- The whole suite: 1,143 tests, all passing. Release build: 0 errors, upstream's five usual warnings.
+
+**Review:**
+- CI passed on d87652a. Codex reviewed it: completed, no findings.
+- The standard audit: ready with nits. It confirmed every consumer of the schedule follows the catalog (the alert planner, the settings list, `RechargeCalendar` and the corridor rules), saved settings hold no schedule, and no field-boss interval or schedule exists. Its findings, all fixed in the follow-up commit:
+  1. ARCHITECTURE's corridors bullet still gave Mondays: now Thursdays and Saturdays.
+  2. HANDOFF's corridors check still said "Mon, Thu or Sat": now "Thu or Sat".
+  3. `RosterRules` comments still said "three a week": now twice a week, five days at most between sieges. The values (eight days back, seven for a holding) still cover that.
+  4. `EventCatalog`'s summary listed two differences from the fork: now three.
+  5. A test's comment had lost a line to a script that replaced it in parts. Two more comments were cut the same way while fixing the nits, and were seen by `git diff --check` before the commit. All three are repaired. `SourceTextTests.NoLineEndsInWhitespace` now fails on any line of Scarlet's C# or Razor ending in whitespace: it failed with a comment cut that way. LESSONS has an entry.
+  6. `EventScheduleTests.GlobalAndLegacyAgree…`'s name said the bosses agree: renamed `…AgreeOnKairaAndNahmaAndDisagreeOnTheRestAtUtcPlusNine`.
+  7. For Harry: the Executors' name lists two of the patch notes' three bosses (Kaira, Argo, Tamasa). It is the fork's label and is left as it is.
+  8. For Harry: Argo, the Spirit King's fixed times could make it a world event. Not done. The comment and ARCHITECTURE now say the 10:30 and 22:30 are presumably server time.
+  - Also: this entry no longer says the countdown was read on the update's Monday.
+- After the fixes: the whole suite, 1,144 tests, all passing; `git diff --check` clean.
+
+**Not checked:** in the game. The siege's and the Executors' notices on Thursday and Saturday, none on Monday, and "Corridors reset" naming Thursday.
+
+**Next:** Codex's review of the follow-up commit; merge with Harry's go-ahead, then rebuild both portable copies. The fork's World Companion (`AionDpsMeter.Companion`, presets.mjs) still has the three days, and needs the same change in its own repository.
+
 ## 2026-11-09 — The 12-hour clock everywhere; the Field bosses window's belled bosses first and "Respawns in" (#79)
 
 **What:**

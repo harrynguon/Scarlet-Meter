@@ -63,17 +63,19 @@ public sealed class RosterTests : IDisposable
         Assert.Equal(1, Calendar.WeeklyResetsBetween(Monday, Monday.AddDays(2.2), 5));
     }
 
-    // The Abyss Siege on the world-event schedule: Mondays, Thursdays and Saturdays at 21:00 server time, 12:00 UTC at the
-    // default UTC+9; a siege at an instant is the last one then.
+    // The Abyss Siege on the world-event schedule: Thursdays and Saturdays at 21:00 server time, 12:00 UTC at the default
+    // UTC+9 (Mondays too until the game's update of 2026-11-09; EventCatalogTests); a siege at an instant is the last one
+    // then. So the corridors' count runs from Saturday's siege to Thursday's, through Monday.
     [Fact]
     public void SiegesAreTheWorldEventSchedules()
     {
         var saturday = new DateTimeOffset(2026, 10, 24, 12, 0, 0, TimeSpan.Zero);
-        var monday = new DateTimeOffset(2026, 10, 26, 12, 0, 0, TimeSpan.Zero);
+        var thursday = new DateTimeOffset(2026, 10, 29, 12, 0, 0, TimeSpan.Zero);
         Assert.Equal(saturday, Calendar.LastSiege(Monday));
-        Assert.Equal(monday, Calendar.NextSiege(Monday));
-        Assert.Equal(monday, Calendar.LastSiege(monday));
-        Assert.Equal(new DateTimeOffset(2026, 10, 29, 12, 0, 0, TimeSpan.Zero), Calendar.NextSiege(monday));
+        Assert.Equal(thursday, Calendar.NextSiege(Monday));
+        Assert.Equal(saturday, Calendar.LastSiege(Monday.AddHours(10))); // Monday 12:30 UTC: no siege that evening
+        Assert.Equal(thursday, Calendar.LastSiege(thursday));
+        Assert.Equal(new DateTimeOffset(2026, 10, 31, 12, 0, 0, TimeSpan.Zero), Calendar.NextSiege(thursday));
         Assert.Equal(saturday.AddHours(-1), RechargeCalendar.Default(TimeSpan.FromHours(10)).LastSiege(Monday)); // the server's clock moves it
     }
 
@@ -82,9 +84,11 @@ public sealed class RosterTests : IDisposable
     public void CorridorRunsCountFromTheLastSiege()
     {
         var saturday = new DateTimeOffset(2026, 10, 24, 12, 0, 0, TimeSpan.Zero);
+        var thursday = new DateTimeOffset(2026, 10, 29, 12, 0, 0, TimeSpan.Zero);
         DateTimeOffset[] runs = [saturday.AddHours(-1), saturday, saturday.AddHours(1), Monday.AddHours(-1)];
         Assert.Equal(2, RosterRules.CorridorRunsSinceSiege(runs, Monday, Calendar));
-        Assert.Equal(0, RosterRules.CorridorRunsSinceSiege(runs, Monday.AddDays(1), Calendar)); // Monday's siege since
+        Assert.Equal(2, RosterRules.CorridorRunsSinceSiege(runs, Monday.AddDays(1), Calendar)); // no siege on Monday
+        Assert.Equal(0, RosterRules.CorridorRunsSinceSiege(runs, thursday.AddHours(1), Calendar)); // Thursday's siege since
         Assert.Equal(0, RosterRules.CorridorRunsSinceSiege([], Monday, Calendar));
     }
 

@@ -64,6 +64,10 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions below
 
 ### Changed
 
+- The Abyss Siege and the Executors are on Thursdays and Saturdays only, as the game's update of 9 November made them
+  (at 9:00pm and 9:30pm server time, as before). Their notices, the Alerts settings and the Characters window's
+  "Corridors reset" follow, so the corridors you run count from Saturday's siege to Thursday's.
+  ([#80](https://github.com/harrynguon/Scarlet-Meter/pull/80))
 - Every time the meter shows is on the 12-hour clock: "9:34pm", "9:34am". This covers the event notices and their tips,
   the Alerts settings' schedules ("Every 3 h from 2:00am server time"), the Characters window's times and Last played
   ("Thu 30 Oct" over "7:00pm"), the corridors' and Odyle's next times, the fight history and combat log, the Pet souls

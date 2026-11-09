@@ -73,7 +73,7 @@ public sealed class RechargeCalendar
 
     /// <summary>
     /// The last Abyss Siege at or before <paramref name="instant"/>: found by walking forward from eight days before,
-    /// which holds one for any schedule with a siege at least weekly (the catalog's are three a week).
+    /// which holds one for any schedule with a siege at least weekly (the catalog's are twice a week, Thursday and Saturday).
     /// </summary>
     public DateTimeOffset LastSiege(DateTimeOffset instant)
     {
@@ -176,8 +176,9 @@ public static class RosterRules
     public const int CorridorsPerSiege = AbyssArtifacts.Corridors;
 
     /// <summary>
-    /// The longest a holding the game reports is taken to last, from when it was read to its reset: sieges come three
-    /// times a week, so a reset further off is not one the meter can use, and the schedule stands in.
+    /// The longest a holding the game reports is taken to last, from when it was read to its reset: sieges come twice a
+    /// week (five days from Saturday's to Thursday's at most), so a reset further off is not one the meter can use, and
+    /// the schedule stands in.
     /// </summary>
     public static readonly TimeSpan LongestHolding = TimeSpan.FromDays(7);
 

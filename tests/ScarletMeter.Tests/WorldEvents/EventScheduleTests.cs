@@ -165,9 +165,11 @@ public sealed class EventScheduleTests
     }
 
     [Fact]
-    public void GlobalAndLegacyAgreeOnBossesAndDisagreeOnResetsAndRiftsAtUtcPlusNine()
+    public void GlobalAndLegacyAgreeOnKairaAndNahmaAndDisagreeOnTheRestAtUtcPlusNine()
     {
-        // TIMER-COMPARISON.md: Kaira and Nahma agree at UTC+9 (nine is divisible by three); resets and rifts do not.
+        // TIMER-COMPARISON.md: Kaira and Nahma agree at UTC+9 (nine is divisible by three); resets and rifts do not. The
+        // siege and the Executors differ too since the game's update of 2026-11-09, which left them off Mondays in the Global
+        // preset only (EventCatalogTests).
         var disagreements = new HashSet<string>(StringComparer.Ordinal);
         var kairaDiffersAtUtcPlusEight = false;
         for (var now = At("2026-10-21T00:00:00Z"); now < At("2026-10-29T00:00:00Z"); now = now.AddMinutes(30))
@@ -181,7 +183,7 @@ public sealed class EventScheduleTests
                 != EventSchedule.Occurrence(Global(EventIds.Kaira), now, Offset(8)).Next;
         }
 
-        Assert.Equal(new HashSet<string> { EventIds.Daily, EventIds.Weekly, EventIds.Rift }, disagreements);
+        Assert.Equal(new HashSet<string> { EventIds.Daily, EventIds.Weekly, EventIds.Rift, EventIds.Siege, EventIds.Executors }, disagreements);
         Assert.True(kairaDiffersAtUtcPlusEight);
     }
 
